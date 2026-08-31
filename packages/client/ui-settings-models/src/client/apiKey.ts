@@ -4,12 +4,12 @@
  */
 
 /**
- * Twin of `normalizeApiKey` in `@deepseek-ai/dsh-llm`: printable ASCII, space
- * excluded. Client packages reference only client packages, so the charset
+ * Twin of `normalizeApiKey` in `@deepseek-ai/dsh-llm`: printable ASCII plus
+ * space. Client packages reference only client packages, so the charset
  * rule is mirrored here rather than imported; keep the two in step, as
  * `validateDeepSeekModels` is kept in step with the host's `catalogModel`.
  */
-const LEGAL_API_KEY = /^[\x21-\x7E]+$/
+const LEGAL_API_KEY = /^[\x20-\x7E]+$/
 
 /**
  * A pasted `NAME=value` environment line. Two narrowings keep real keys clear

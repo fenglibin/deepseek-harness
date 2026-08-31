@@ -6,13 +6,13 @@
 
 /**
  * Characters an HTTP header value carries verbatim and every known provider
- * key uses: printable ASCII, space excluded. A key outside this set cannot
+ * key uses: printable ASCII plus space. A key outside this set cannot
  * reach any provider — `fetch` refuses to build the header — so this is a
  * transport invariant rather than one provider's policy. Latin-1 is excluded
  * deliberately: a header could carry it, but no provider issues it, and
  * admitting it trades a local explained refusal for an opaque 401.
  */
-const LEGAL_API_KEY = /^[\x21-\x7E]+$/
+const LEGAL_API_KEY = /^[\x20-\x7E]+$/
 
 /** Why a supplied API key cannot be used. */
 export type ApiKeyRejection = 'empty' | 'illegalCharacters'
