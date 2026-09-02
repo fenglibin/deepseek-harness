@@ -17,7 +17,7 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { LlmDiscoveredModel } from '@deepseek-ai/dsh-api-remotes/client'
-import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconSearchOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { formatCapacity, parseCapacity } from './DeepSeekModelsEditor.tsx'
 import type { ModelsOperations } from './operations.ts'
 import type { DeepSeekModelDraft } from './DeepSeekModelsEditor.tsx'
@@ -141,6 +141,20 @@ function capacitySpelling(value: number | undefined): string {
   return value === undefined ? '' : formatCapacity(value)
 }
 
+/**
+ * Whether a discovered model matches the picker's filter text. A provider
+ * listing carries an id always and a display name sometimes, so both are
+ * searched; matching is substring, case-folded, because these ids are typed
+ * by hand from the same list the user is looking at.
+ * @param candidate - one discovered model.
+ * @param normalizedQuery - the filter text, trimmed and lower-cased.
+ * @returns whether the candidate stays visible.
+ */
+function matchesQuery(candidate: LlmDiscoveredModel, normalizedQuery: string): boolean {
+  return candidate.id.toLocaleLowerCase().includes(normalizedQuery)
+    || (candidate.name?.toLocaleLowerCase().includes(normalizedQuery) ?? false)
+}
+
 /** Adopt a candidate, keeping whatever capacities the provider disclosed. */
 function adopt(candidate: LlmDiscoveredModel): ModelDraft {
   return {
@@ -162,6 +176,9 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
   const [failure, setFailure] = useState<string | undefined>(undefined)
   const [candidates, setCandidates] = useState<readonly LlmDiscoveredModel[] | undefined>(undefined)
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set())
+  // Filter text for the candidate picker only: it is a reading aid for one
+  // listing, so it dies with the dialog rather than becoming provider state.
+  const [query, setQuery] = useState('')
   // Rows carry an id and a name; capacities are the exception, so they stay
   // folded until asked for rather than crowding every row with four inputs.
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(new Set())
@@ -249,6 +266,9 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
       const known = new Set(models.map(model => textOf(model, 'id')))
       setCandidates(found)
       setPicked(new Set(found.filter(model => !known.has(model.id)).map(model => model.id)))
+      // A filter left over from the previous interrogation would hide most of
+      // the new list behind text the user cannot see is still applied.
+      setQuery('')
     } finally {
       setBusy(false)
     }
@@ -257,6 +277,7 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
   const closePicker = (): void => {
     setCandidates(undefined)
     setPicked(new Set())
+    setQuery('')
   }
 
   const adoptPicked = (): void => {
@@ -284,14 +305,26 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
   }
 
   const activeCandidates = candidates ?? []
-  const allCandidatesPicked = activeCandidates.length > 0
-    && activeCandidates.every(candidate => picked.has(candidate.id))
+  // The filter narrows the list, not the selection: a picked candidate stays
+  // picked while hidden, so selecting under two filters accumulates instead of
+  // replacing. Every bulk action below therefore speaks about the visible
+  // rows — "select all" with a filter on means "select all matches".
+  const normalizedQuery = query.trim().toLocaleLowerCase()
+  const visibleCandidates = normalizedQuery.length === 0
+    ? activeCandidates
+    : activeCandidates.filter(candidate => matchesQuery(candidate, normalizedQuery))
+  const allVisiblePicked = visibleCandidates.length > 0
+    && visibleCandidates.every(candidate => picked.has(candidate.id))
 
   const toggleAllCandidates = (): void => {
     setPicked((current) => {
-      return activeCandidates.every(candidate => current.has(candidate.id))
-        ? new Set()
-        : new Set(activeCandidates.map(candidate => candidate.id))
+      const visible = new Set(visibleCandidates.map(candidate => candidate.id))
+      if (visibleCandidates.every(candidate => current.has(candidate.id))) {
+        const next = new Set(current)
+        for (const id of visible) next.delete(id)
+        return next
+      }
+      return new Set([...current, ...visible])
     })
   }
 
@@ -451,12 +484,25 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
         )}
       >
         <div className={styles['candidateActions']}>
+          <label className={styles['fetchFilter']}>
+            <IconSearchOutline16 aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              placeholder={t('fetchFilter')}
+              aria-label={t('fetchFilter')}
+              onChange={(event) => { setQuery(event.currentTarget.value) }}
+            />
+          </label>
           <Button variant="ghost" size="sm" onClick={toggleAllCandidates}>
-            {t(allCandidatesPicked ? 'fetchDeselectAll' : 'fetchSelectAll')}
+            {t(allVisiblePicked ? 'fetchDeselectAll' : 'fetchSelectAll')}
           </Button>
         </div>
+        {visibleCandidates.length === 0
+          ? <p className={styles['fetchNoMatch']}>{t('fetchNoMatch')}</p>
+          : null}
         <ul className={styles['candidateList']}>
-          {(candidates ?? []).map(candidate => (
+          {visibleCandidates.map(candidate => (
             <li key={candidate.id} className={styles['candidate']}>
               <label className={styles['candidateLabel']}>
                 <input

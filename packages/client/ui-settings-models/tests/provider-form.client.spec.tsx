@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /** Model-list editing, endpoint interrogation, and hand-declared provider creation. */
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Schema from '@deepseek-ai/schemastery'
 import { bindSnapshotSelector, RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
@@ -680,6 +680,97 @@ describe('endpoint interrogation', () => {
     fireEvent.click(within_(dialog, en.fetchSelectAll))
     expect(boxes.map(box => box.checked)).toEqual([true, true, true])
     expect(within_(dialog, en.fetchDeselectAll)).toBeTruthy()
+  })
+})
+
+describe('candidate filtering', () => {
+  /** The ids the picker lists, in order: one checkbox per candidate row. */
+  function listedCandidates(dialog: HTMLElement): string[] {
+    return within(dialog).queryAllByRole('checkbox')
+      .map(box => box.closest('label')?.textContent ?? '')
+  }
+
+  /** Open the picker of one provider over a scripted discovery answer. */
+  async function openPicker(models: Parameters<typeof ok>[0]): Promise<HTMLElement> {
+    const discover = vi.fn(() => Promise.resolve(ok(models)))
+    await mountSection({ discover })
+    openEditor('openai')
+    fireEvent.click(screen.getByText(en.fetchModels))
+    return await screen.findByRole('dialog')
+  }
+
+  /** Type `text` into the picker's filter field. */
+  function filter(dialog: HTMLElement, text: string): void {
+    fireEvent.change(within(dialog).getByRole('searchbox', { name: en.fetchFilter }), {
+      target: { value: text },
+    })
+  }
+
+  it('narrows the list by id and by the name a provider disclosed', async () => {
+    const dialog = await openPicker([
+      { id: 'acme-mini', name: 'Acme Mini' },
+      { id: 'acme-large' },
+      { id: 'other-nano', name: 'mini turbo' },
+    ])
+    expect(listedCandidates(dialog)).toEqual(['acme-mini', 'acme-large', 'other-nano'])
+
+    // Case-insensitive, and a hit on the disclosed name counts as a hit.
+    filter(dialog, 'MINI')
+    expect(listedCandidates(dialog)).toEqual(['acme-mini', 'other-nano'])
+
+    filter(dialog, 'acme-')
+    expect(listedCandidates(dialog)).toEqual(['acme-mini', 'acme-large'])
+
+    filter(dialog, '  ')
+    expect(listedCandidates(dialog)).toEqual(['acme-mini', 'acme-large', 'other-nano'])
+
+    filter(dialog, 'nothing-matches')
+    expect(listedCandidates(dialog)).toEqual([])
+    expect(within(dialog).getByText(en.fetchNoMatch)).toBeTruthy()
+  })
+
+  it('adopts a selection gathered under two filters, so filtering never drops a pick', async () => {
+    const discover = vi.fn(() => Promise.resolve(ok([
+      { id: 'acme-mini' }, { id: 'acme-large' }, { id: 'other-nano' },
+    ])))
+    const { mutate } = await mountSection({ discover })
+    openEditor('openai')
+    fireEvent.click(screen.getByText(en.fetchModels))
+    const dialog = await screen.findByRole('dialog')
+
+    // Every discovered candidate starts picked, so clearing the whole list
+    // takes one unfiltered action; from there each filter selects its own rows.
+    fireEvent.click(within(dialog).getByText(en.fetchDeselectAll))
+    filter(dialog, 'acme-')
+    expect(listedCandidates(dialog).length).toBe(2)
+
+    // Select-all reaches only the visible rows, and a pick made under one
+    // filter survives the next: filtering is a reading aid, never a way to
+    // narrow the selection.
+    filter(dialog, 'mini')
+    fireEvent.click(within(dialog).getByText(en.fetchSelectAll))
+    filter(dialog, 'large')
+    fireEvent.click(within(dialog).getByText(en.fetchSelectAll))
+    fireEvent.click(within(dialog).getByText(en.fetchAdopt))
+    fireEvent.click(screen.getByText(en.apply))
+
+    await waitFor(() => { expect(mutate).toHaveBeenCalled() })
+    expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'acme-mini' }, { id: 'acme-large' }])
+  })
+
+  it('leaves the filter empty when the picker opens again', async () => {
+    const dialog = await openPicker([{ id: 'acme-mini' }, { id: 'other-nano' }])
+    filter(dialog, 'acme')
+    expect(listedCandidates(dialog)).toEqual(['acme-mini'])
+
+    fireEvent.click(within(dialog).getByText(en.cancel))
+    await waitFor(() => { expect(screen.queryByText(en.fetchTitle)).toBeNull() })
+
+    fireEvent.click(screen.getByText(en.fetchModels))
+    const reopened = await screen.findByRole('dialog')
+    const field = within(reopened).getByRole('searchbox', { name: en.fetchFilter })
+    expect((field as HTMLInputElement).value).toBe('')
+    expect(listedCandidates(reopened)).toEqual(['acme-mini', 'other-nano'])
   })
 })
 

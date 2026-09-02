@@ -642,8 +642,54 @@ select.input {
 
 .candidateActions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 6px;
+}
+
+/* Filter field for the candidate picker: the settings catalog's search control
+   (icon inset left, full-width input), sharing the row with the bulk action
+   instead of owning it. */
+.fetchFilter {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.fetchFilter > svg {
+  position: absolute;
+  left: 10px;
+  pointer-events: none;
+}
+
+.fetchFilter input {
+  width: 100%;
+  height: 32px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  padding: 0 12px 0 32px;
+  outline: none;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.fetchFilter input::placeholder {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.fetchFilter input:focus-visible {
+  border-color: var(--dsw-alias-state-business-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent);
+}
+
+.fetchNoMatch {
+  margin: 0 0 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
 }
 
 .candidateList {
