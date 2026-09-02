@@ -66,6 +66,27 @@ function fireResize(el: Element): void {
   }
 }
 
+/** Emulates the pointer capture the drag handles gate on, which jsdom does not
+ * implement.
+ * @returns the call that restores the original descriptors, so a case's
+ * finally block keeps the stubs from leaking into later tests.
+ */
+function stubPointerCapture(): () => void {
+  const names = ['setPointerCapture', 'releasePointerCapture', 'hasPointerCapture'] as const
+  const originals = names.map(name =>
+    [name, Object.getOwnPropertyDescriptor(Element.prototype, name)] as const)
+  const captured = new Set<Element>()
+  Element.prototype.setPointerCapture = function () { captured.add(this) }
+  Element.prototype.releasePointerCapture = function () { captured.delete(this) }
+  Element.prototype.hasPointerCapture = function () { return captured.has(this) }
+  return () => {
+    for (const [name, descriptor] of originals) {
+      if (descriptor === undefined) Reflect.deleteProperty(Element.prototype, name)
+      else Object.defineProperty(Element.prototype, name, descriptor)
+    }
+  }
+}
+
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
@@ -603,16 +624,7 @@ describe('ConversationRoot resident composer', () => {
     act(() => { fireResize(root) })
     const handle = b.view.container.querySelector('[data-width-handle="right"]') as HTMLElement
     expect(handle).not.toBeNull()
-    // jsdom lacks pointer capture: emulate per-element so hasPointerCapture
-    // gates pass; the finally block restores the original descriptors so the
-    // stubs cannot leak into later tests.
-    const names = ['setPointerCapture', 'releasePointerCapture', 'hasPointerCapture'] as const
-    const originals = names.map(name =>
-      [name, Object.getOwnPropertyDescriptor(Element.prototype, name)] as const)
-    const captured = new Set<Element>()
-    Element.prototype.setPointerCapture = function () { captured.add(this) }
-    Element.prototype.releasePointerCapture = function () { captured.delete(this) }
-    Element.prototype.hasPointerCapture = function () { return captured.has(this) }
+    const restore = stubPointerCapture()
     try {
       // Base resolves from the adaptive clamp: min(1600*0.64, 920) = 920.
       // Dragging the right handle outward by 25px widens by 2×25 = 50 → 970,
@@ -638,15 +650,82 @@ describe('ConversationRoot resident composer', () => {
       fireEvent.doubleClick(handle)
       expect(localStorage.getItem('dsh.conversation.contentWidth')).toBe('970')
     } finally {
-      for (const [name, descriptor] of originals) {
-        if (descriptor === undefined) Reflect.deleteProperty(Element.prototype, name)
-        else Object.defineProperty(Element.prototype, name, descriptor)
-      }
+      restore()
     }
   })
 
   it('hero phase renders no width handles (no transcript to size)', () => {
     const b = mount(sessionSnapshotOf({ blank: true }))
     expect(b.view.container.querySelector('[data-width-handle]')).toBeNull()
+  })
+
+  it('drag → persist → window clamp round-trip on the height handle', () => {
+    const b = mount(sessionSnapshotOf())
+    const root = b.view.container.querySelector('[data-phase]') as HTMLElement
+    Object.defineProperty(root, 'clientHeight', { value: 900, configurable: true })
+    act(() => { fireResize(root) })
+    const handle = b.view.container.querySelector('[data-height-handle]') as HTMLElement
+    expect(handle).not.toBeNull()
+    // A pointer move is rAF-throttled; run the frame synchronously so the
+    // published height is the one this gesture asked for.
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1 })
+    const restore = stubPointerCapture()
+    try {
+      // The handle reads the column's height: max = 900 − 240 = 660. With no
+      // preference the base is the stylesheet's cap, 336.
+      fireEvent.pointerDown(handle, { pointerId: 1, clientY: 300 })
+      fireEvent.pointerMove(handle, { pointerId: 1, clientY: 260 })
+      expect(root.style.getPropertyValue('--dsh-composer-user-height')).toBe('376px')
+      // Nothing is durable until the gesture ends with travel.
+      expect(localStorage.getItem('dsh.conversation.composerHeight')).toBeNull()
+      fireEvent.pointerUp(handle, { pointerId: 1, clientY: 240 })
+      expect(localStorage.getItem('dsh.conversation.composerHeight')).toBe('396')
+
+      // Window shrinks: the published height re-clamps (500 − 240 = 260) while
+      // the preference keeps what the user dragged.
+      Object.defineProperty(root, 'clientHeight', { value: 500, configurable: true })
+      act(() => { fireResize(root) })
+      expect(root.style.getPropertyValue('--dsh-composer-user-height')).toBe('260px')
+      expect(localStorage.getItem('dsh.conversation.composerHeight')).toBe('396')
+      // A press without travel must not overwrite the stored preference with
+      // the clamped display value.
+      fireEvent.pointerDown(handle, { pointerId: 1, clientY: 300 })
+      fireEvent.pointerUp(handle, { pointerId: 1, clientY: 300 })
+      expect(localStorage.getItem('dsh.conversation.composerHeight')).toBe('396')
+      // A secondary button starts no gesture at all.
+      fireEvent.pointerDown(handle, { pointerId: 1, button: 2, clientY: 300 })
+      fireEvent.pointerUp(handle, { pointerId: 1, clientY: 200 })
+      expect(localStorage.getItem('dsh.conversation.composerHeight')).toBe('396')
+    } finally {
+      restore()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('resizes the composer from the keyboard and restores the default on double-click', () => {
+    const b = mount(sessionSnapshotOf())
+    const root = b.view.container.querySelector('[data-phase]') as HTMLElement
+    Object.defineProperty(root, 'clientHeight', { value: 900, configurable: true })
+    localStorage.setItem('dsh.conversation.composerHeight', '400')
+    act(() => { fireResize(root) })
+    const handle = b.view.container.querySelector('[data-height-handle]') as HTMLElement
+    expect(root.style.getPropertyValue('--dsh-composer-user-height')).toBe('400px')
+
+    // One line per step, and the separator takes the arrows rather than the page.
+    fireEvent.keyDown(handle, { key: 'ArrowUp' })
+    expect(localStorage.getItem('dsh.conversation.composerHeight')).toBe('424')
+    fireEvent.keyDown(handle, { key: 'ArrowDown' })
+    expect(localStorage.getItem('dsh.conversation.composerHeight')).toBe('400')
+    fireEvent.keyDown(handle, { key: 'Enter' })
+    expect(localStorage.getItem('dsh.conversation.composerHeight')).toBe('400')
+
+    fireEvent.doubleClick(handle)
+    expect(localStorage.getItem('dsh.conversation.composerHeight')).toBeNull()
+    expect(root.style.getPropertyValue('--dsh-composer-user-height')).toBe('')
+  })
+
+  it('hero phase renders no height handle (the centered composer sizes itself)', () => {
+    const b = mount(sessionSnapshotOf({ blank: true }))
+    expect(b.view.container.querySelector('[data-height-handle]')).toBeNull()
   })
 })

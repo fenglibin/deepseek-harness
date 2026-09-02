@@ -272,8 +272,58 @@
 
 /* Views that elect a composer overlay (trajectory etc.) own their full-bleed
    scrollers; the strips would sit over their content and steal clicks. */
-.root:has([data-conversation-composer-overlay]) .widthHandle {
+.root:has([data-conversation-composer-overlay]) .widthHandle,
+.root:has([data-conversation-composer-overlay]) .heightHandle {
   display: none;
+}
+
+/* The input card's positioning context: the height handle is absolute so it
+   adds no layout height of its own. */
+.composerResizeSeat {
+  position: relative;
+}
+
+/* Composer height handle: a row-resize strip straddling the input card's top
+   edge, inset past the card's corner arc so it never sits over the rounded
+   corner, and shallow enough that the draft's first line stays clickable
+   below it. */
+.heightHandle {
+  position: absolute;
+  top: -4px;
+  right: 22px;
+  left: 22px;
+  z-index: 9;
+  height: 9px;
+  border-radius: 4px;
+  cursor: row-resize;
+  touch-action: none;
+}
+
+/* The grip: one short bar that appears on hover, on focus, and while
+   dragging, so the strip stays invisible until it is wanted. */
+.heightHandle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--dsw-alias-scrollbar-hover-l1);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.heightHandle:hover::after,
+.heightHandle:focus-visible::after,
+.heightHandle[data-dragging]::after {
+  opacity: 1;
+}
+
+.heightHandle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent);
 }
 
 /* Composer context stack (Figma 9:937): standalone dock cards share one

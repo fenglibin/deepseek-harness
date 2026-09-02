@@ -15,6 +15,8 @@ export type ConversationRootProps = ConversationSlotProps
 
 /** localStorage key for the dragged transcript width preference (px). */
 const WIDTH_PREF_KEY = 'dsh.conversation.contentWidth'
+/** localStorage key for the dragged composer height preference (px). */
+const HEIGHT_PREF_KEY = 'dsh.conversation.composerHeight'
 /** Floor for a dragged content width; matches the layout center-column minimum. */
 const CONTENT_MIN = 640
 /** Column budget the content must leave free: 88px per side keeps the width
@@ -22,15 +24,33 @@ const CONTENT_MIN = 640
  * larger dragged width would push its own handles off the column and leave no
  * way to drag back. */
 const CONTENT_EDGE_BUDGET = 176
+/** Floor for a dragged composer height: the toolbar row plus two draft lines. */
+const COMPOSER_MIN = 96
+/** Column budget the composer must leave free: the session header and a few
+ * transcript lines stay visible, and the handle stays reachable above a
+ * composer that has swallowed the column. */
+const COMPOSER_EDGE_BUDGET = 240
+/** The height a composer starts from with no preference; mirrors
+ * `--dsh-composer-text-max-height` in this file's stylesheet (14 lines). */
+const COMPOSER_DEFAULT = 336
+/** One keyboard step, the 24px line rhythm that cap counts in. */
+const COMPOSER_STEP = 24
 
-/** Reads the persisted width preference; durable-storage boundary, so a
- * missing or corrupt value resolves to "no preference".
- * @returns the stored width in px, or null when unset or invalid. */
-function readWidthPreference(): number | null {
-  const raw = localStorage.getItem(WIDTH_PREF_KEY)
+/** Reads one persisted px preference; durable-storage boundary, so a missing
+ * or corrupt value resolves to "no preference".
+ * @param key - localStorage key holding the preference.
+ * @returns the stored px value, or null when unset or invalid. */
+function readPxPreference(key: string): number | null {
+  const raw = localStorage.getItem(key)
   if (raw === null) return null
   const value = Number(raw)
   return Number.isFinite(value) && value > 0 ? value : null
+}
+
+/** Reads the persisted width preference.
+ * @returns the stored width in px, or null when unset or invalid. */
+function readWidthPreference(): number | null {
+  return readPxPreference(WIDTH_PREF_KEY)
 }
 
 /** Resolves the content width the CSS axis would show for a column width.
@@ -41,6 +61,17 @@ function resolveContentWidth(columnWidth: number, preference: number | null): nu
   const max = Math.max(CONTENT_MIN, columnWidth - CONTENT_EDGE_BUDGET)
   if (preference !== null) return Math.min(Math.max(preference, CONTENT_MIN), max)
   return Math.max(680, Math.min(columnWidth * 0.64, 920))
+}
+
+/** Clamps a dragged composer height against the column that must also hold the
+ * transcript. A shrunken window clamps the display without rewriting the stored
+ * preference, so growing the window restores it (the sidebar-drag rule).
+ * @param columnHeight - the conversation column's rendered height in px.
+ * @param height - the requested height in px.
+ * @returns the height the composer may actually take in px. */
+function resolveComposerHeight(columnHeight: number, height: number): number {
+  const max = Math.max(COMPOSER_MIN, columnHeight - COMPOSER_EDGE_BUDGET)
+  return Math.min(Math.max(height, COMPOSER_MIN), max)
 }
 
 /** One transcript width handle: pointer capture + rAF-throttled symmetric
@@ -128,6 +159,93 @@ function WidthHandle(props: {
   )
 }
 
+/** One composer-height handle: the width handles' pointer-capture and rAF
+ * model, with the keyboard and reset gestures a draggable separator owes —
+ * dragging up grows the composer, so the pointer's travel is inverted. */
+function HeightHandle(props: {
+  label: string
+  title: string
+  onStart: () => number
+  onDrag: (height: number) => void
+  onCommit: (height: number) => void
+  onEnd: () => void
+  onNudge: (delta: number) => void
+  onReset: () => void
+}) {
+  const [dragging, setDragging] = useState(false)
+  const base = useRef(0)
+  const origin = useRef(0)
+  const latest = useRef(0)
+  const frame = useRef<number | null>(null)
+  const callbacks = useRef(props)
+  callbacks.current = props
+
+  const draggedHeight = () => base.current + (origin.current - latest.current)
+  const cancelFrame = () => {
+    if (frame.current !== null) { cancelAnimationFrame(frame.current); frame.current = null }
+  }
+  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    origin.current = e.clientY
+    latest.current = e.clientY
+    base.current = callbacks.current.onStart()
+    setDragging(true)
+  }, [])
+  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    latest.current = e.clientY
+    frame.current ??= requestAnimationFrame(() => {
+      frame.current = null
+      callbacks.current.onDrag(draggedHeight())
+    })
+  }, [])
+  const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    cancelFrame()
+    latest.current = e.clientY
+    // Only a gesture with actual travel commits: a press-and-release on a
+    // window-clamped height must not overwrite the taller stored preference
+    // with the clamped display value.
+    if (latest.current !== origin.current) callbacks.current.onCommit(draggedHeight())
+    setDragging(false)
+    callbacks.current.onEnd()
+  }, [])
+  const onPointerCancel = useCallback(() => {
+    cancelFrame()
+    setDragging(false)
+    callbacks.current.onEnd()
+  }, [])
+  const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    const delta = e.key === 'ArrowUp' ? COMPOSER_STEP : e.key === 'ArrowDown' ? -COMPOSER_STEP : 0
+    if (delta === 0) return
+    e.preventDefault()
+    callbacks.current.onNudge(delta)
+  }, [])
+
+  return (
+    <div
+      className={css.heightHandle}
+      data-height-handle=""
+      data-dragging={dragging || undefined}
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label={props.label}
+      title={props.title}
+      tabIndex={0}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      onLostPointerCapture={onPointerCancel}
+      onKeyDown={onKeyDown}
+      onDoubleClick={() => { callbacks.current.onReset() }}
+    />
+  )
+}
+
 export function ConversationRoot({
   sessionId, useSession, useSessions, useSessionPendingInteraction,
   useWorkspaces, useConversation, useInput, useComposerBlock,
@@ -178,20 +296,27 @@ export function ConversationRoot({
   }, [])
 
   // Publishes the column's live width as --dsh-conversation-column-width so
-  // the shared width axis can adapt (see the .root CSS), and re-clamps a
-  // dragged preference against the shrunken column WITHOUT rewriting the
+  // the shared width axis can adapt (see the .root CSS), and re-clamps both
+  // dragged preferences against the shrunken column WITHOUT rewriting the
   // stored preference — widening the window restores it (the AppFrame
   // sidebar-drag rule). Same callback-ref pattern as the seat observer.
   const rootEl = useRef<HTMLDivElement | null>(null)
   const rootObserver = useRef<ResizeObserver | null>(null)
-  const publishWidths = useCallback((root: HTMLDivElement): void => {
+  const publishSizes = useCallback((root: HTMLDivElement): void => {
     const column = root.offsetWidth
     root.style.setProperty('--dsh-conversation-column-width', `${column}px`)
-    const preference = readWidthPreference()
-    if (preference === null) {
+    const width = readWidthPreference()
+    if (width === null) {
       root.style.removeProperty('--dsh-chat-user-width')
     } else {
-      root.style.setProperty('--dsh-chat-user-width', `${resolveContentWidth(column, preference)}px`)
+      root.style.setProperty('--dsh-chat-user-width', `${resolveContentWidth(column, width)}px`)
+    }
+    const height = readPxPreference(HEIGHT_PREF_KEY)
+    if (height === null) {
+      root.style.removeProperty('--dsh-composer-user-height')
+    } else {
+      const clamped = resolveComposerHeight(root.clientHeight, height)
+      root.style.setProperty('--dsh-composer-user-height', `${clamped}px`)
     }
   }, [])
   const rootResizeRef = useCallback((root: HTMLDivElement | null): void => {
@@ -199,10 +324,10 @@ export function ConversationRoot({
     rootObserver.current = null
     rootEl.current = root
     if (root === null) return
-    rootObserver.current = new ResizeObserver(() => { publishWidths(root) })
+    rootObserver.current = new ResizeObserver(() => { publishSizes(root) })
     rootObserver.current.observe(root)
-    publishWidths(root)
-  }, [publishWidths])
+    publishSizes(root)
+  }, [publishSizes])
 
   // Drag plumbing for the two width handles: onStart snapshots the resolved
   // width (grabbing a clamped column must not jump back to the raw stored
@@ -231,8 +356,44 @@ export function ConversationRoot({
   }, [])
   const onHandleEnd = useCallback((): void => {
     const root = rootEl.current
-    if (root !== null) publishWidths(root)
-  }, [publishWidths])
+    if (root !== null) publishSizes(root)
+  }, [publishSizes])
+
+  // The height handle reads and writes the same two places the width handles
+  // do — a clamped live variable and one localStorage scalar — so a drag, a
+  // keyboard nudge, and a reset all leave one published value behind.
+  const currentHeight = (root: HTMLDivElement): number =>
+    resolveComposerHeight(root.clientHeight, readPxPreference(HEIGHT_PREF_KEY) ?? COMPOSER_DEFAULT)
+  const onHeightStart = useCallback((): number => {
+    const root = rootEl.current
+    /* v8 ignore next -- the handle renders inside the root, so the ref is attached. */
+    if (root === null) return COMPOSER_DEFAULT
+    return currentHeight(root)
+  }, [])
+  const onHeightDrag = useCallback((height: number): void => {
+    const root = rootEl.current
+    /* v8 ignore next -- the handle renders inside the root, so the ref is attached. */
+    if (root === null) return
+    root.style.setProperty('--dsh-composer-user-height', `${resolveComposerHeight(root.clientHeight, height)}px`)
+  }, [])
+  const onHeightCommit = useCallback((height: number): void => {
+    const root = rootEl.current
+    /* v8 ignore next -- the handle renders inside the root, so the ref is attached. */
+    if (root === null) return
+    localStorage.setItem(HEIGHT_PREF_KEY, `${resolveComposerHeight(root.clientHeight, height)}`)
+  }, [])
+  const onHeightNudge = useCallback((delta: number): void => {
+    const root = rootEl.current
+    if (root === null) return
+    localStorage.setItem(HEIGHT_PREF_KEY, `${currentHeight(root) + delta}`)
+    publishSizes(root)
+  }, [publishSizes])
+  const onHeightReset = useCallback((): void => {
+    const root = rootEl.current
+    if (root === null) return
+    localStorage.removeItem(HEIGHT_PREF_KEY)
+    publishSizes(root)
+  }, [publishSizes])
 
   const sessionWorkspace = sessionId === undefined
     ? undefined
@@ -348,16 +509,32 @@ export function ConversationRoot({
     footer: !hero && zone !== undefined ? renderSlot('conversation.composer.dock', zone) : null,
   })
 
+  const phase = settling ? 'settling' : hero ? 'hero' : 'active'
   const composerBar = (
     <div className={clsx(css.composerStack, hero && css.composerHero)}>
       {hero && <HeroShell t={t} renderSlot={renderSlot} />}
       {hero && heroWorkspaceRow}
       {zone !== undefined && renderSlot('conversation.input.dock', zone)}
-      {inputBar}
+      {/* The handle rides the input card's top edge, so the seat it is
+          positioned against is the card's own, never the dock above it. */}
+      <div className={css.composerResizeSeat}>
+        {phase === 'active' && (
+          <HeightHandle
+            label={t('input.resize')}
+            title={t('input.resizeTitle')}
+            onStart={onHeightStart}
+            onDrag={onHeightDrag}
+            onCommit={onHeightCommit}
+            onEnd={onHandleEnd}
+            onNudge={onHeightNudge}
+            onReset={onHeightReset}
+          />
+        )}
+        {inputBar}
+      </div>
     </div>
   )
 
-  const phase = settling ? 'settling' : hero ? 'hero' : 'active'
   const composer = renderSlotChain(
     'conversation.composer',
     { sessionId, session, pendingInteraction },

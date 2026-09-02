@@ -113,13 +113,27 @@
 
 /* The draft's scrollport, and the ONLY scrolling box in the composer. The
    contenteditable grows with its content inside; the 14-line cap lives here
-   because this is the box the cap describes. */
+   because this is the box the cap describes.
+
+   With a dragged height, that height is the scrollport's own: the box holds it
+   instead of collapsing back to its content (a draft of one line keeps the
+   size the user dragged), and the same value caps growth from below, so a
+   longer draft scrolls at exactly the dragged height instead of the 14-line
+   default. Without a preference the surface auto-grows and the cap is the only
+   constraint. */
 .scroll {
-  max-height: var(--dsh-composer-text-max-height);
+  height: var(--dsh-composer-user-height, auto);
+  max-height: var(--dsh-composer-user-height, var(--dsh-composer-text-max-height));
   overflow-y: auto;
   /* Keeps the bar off the card's right border; .input's right pad gives the
      4px back so the text column is unchanged. */
   margin-right: 4px;
+}
+
+/* The centered hero composer sizes itself from its content: a height dragged
+   on the docked bar belongs to the docked bar. */
+.hero .scroll {
+  height: auto;
 }
 
 /* The card's 22px corner arc still overlaps the scrollport's top (10px top
