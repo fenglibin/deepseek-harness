@@ -190,7 +190,7 @@ export class TestSessions implements ISessions {
   /** Calls observed on the service-level face, newest last. */
   readonly calls: {
     method: 'create' | 'open' | 'openSubagent' | 'setSubagentCatalogOpen' | 'refreshSubagents'
-      | 'clear' | 'refresh' | 'search' | 'fork'
+      | 'clear' | 'refresh' | 'search' | 'fork' | 'delete'
     args: unknown[]
   }[] = []
 
@@ -507,6 +507,17 @@ export class TestSessions implements ISessions {
   fork(opts: { sessionId: SessionId; atSeq?: number; increaseTitle?: boolean }): Promise<SessionId> {
     this.calls.push({ method: 'fork', args: [opts] })
     return Promise.resolve(opts.sessionId)
+  }
+
+  /**
+   * Recorded delete: the row, its scope fiber, and its stores die together
+   * ({@link TestSessions.remove}), which is the same observable effect the
+   * production service reaches through `api-session/removed`.
+   * @param id - session to delete.
+   */
+  async delete(id: SessionId): Promise<void> {
+    this.calls.push({ method: 'delete', args: [id] })
+    await this.remove(id)
   }
 
   /**

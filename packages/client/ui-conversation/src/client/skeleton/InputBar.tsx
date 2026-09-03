@@ -61,10 +61,13 @@ export function InputBar({
   // Absent (undefined: no frame yet) and cleared (null) both mean no goal.
   const hasGoal = useProjection('goal', goal => goal != null)
   // Session-maybe: the machine faces are absent together while no session is
-  // current; the bar renders the same DOM inert instead of a parallel tree.
-  const live = input !== undefined && keyboard !== undefined && inputActions !== undefined
+  // current; the bar renders the same DOM inert instead of a parallel tree. A
+  // disposed shell (its Session scope tore down) counts as absent too: it owns
+  // no bindable editor and accepts no input.
+  const shell = keyboard?.live === true ? keyboard : undefined
+  const live = input !== undefined && shell !== undefined && inputActions !== undefined
   const draft = input?.draft ?? ''
-  const editor = keyboard?.editor ?? null
+  const editor = shell?.editor ?? null
   const attachments = useMemo(
     () => input === undefined || draftImages === undefined ? [] : draftImages(input.imageIds),
     [draftImages, input?.imageIds],
@@ -254,14 +257,14 @@ export function InputBar({
   gate.current = { locked, machineBusy, canSteerQueue, running, subagent, resolveSubmitMode, intakeImages }
 
   useEffect(() => {
-    if (editor === null || keyboard === undefined) return
+    if (editor === null || shell === undefined) return
     return registerComposerKeymap(editor, {
-      arbitrate: (key, composing) => keyboard.arbitrate(key, composing),
+      arbitrate: (key, composing) => shell.arbitrate(key, composing),
       space: () => {
         if (gate.current.machineBusy || gate.current.locked) return false
-        return keyboard.space()
+        return shell.space()
       },
-      dismissPopup: () => { keyboard.dismissPopup() },
+      dismissPopup: () => { shell.dismissPopup() },
       canSubmit: () => !gate.current.locked && !gate.current.machineBusy,
       submit: (accelerated) => {
         const g = gate.current
@@ -269,10 +272,10 @@ export function InputBar({
         // (empty) draft: the machine rejects empty drafts, so the gesture
         // steers every still-pending queued message into the running turn.
         if (accelerated && g.canSteerQueue) {
-          keyboard.steerQueue()
+          shell.steerQueue()
           return
         }
-        keyboard.submit(g.resolveSubmitMode(
+        shell.submit(g.resolveSubmitMode(
           g.running,
           accelerated ? 'accelerated' : 'enter',
           g.subagent === null,
@@ -281,10 +284,10 @@ export function InputBar({
       intakeFiles: (files) => { gate.current.intakeImages(files) },
       pasteText: (text) => {
         if (gate.current.machineBusy || gate.current.locked) return
-        keyboard.paste(text)
+        shell.paste(text)
       },
     })
-  }, [editor, keyboard])
+  }, [editor, shell])
 
   // Button presses steal focus from the editor; suppress at mousedown so
   // typing continues seamlessly. Lexical's focus() carries preventScroll and
@@ -296,7 +299,7 @@ export function InputBar({
   }
 
   const onToggleCommandMenu = (): void => {
-    if (keyboard !== undefined) toggleCommandMenu?.(keyboard.caretSpan())
+    if (shell !== undefined) toggleCommandMenu?.(shell.caretSpan())
   }
 
   // The no-session Workspace trigger: the resident editable div acts as the

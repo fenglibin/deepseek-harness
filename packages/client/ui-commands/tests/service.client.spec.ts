@@ -209,6 +209,15 @@ describe('candidates', () => {
     expect(list).toEqual([{ name: 'goal', description: 'leadingInput kind', hint: 'goal text' }])
   })
 
+  it('maps a command title onto the candidate for localized display', async () => {
+    const titled: CommandDescriptor[] = [
+      { name: 'code-review', title: '代码审查', description: 'review the diff' },
+    ]
+    const { source } = await bench({ commands: () => Promise.resolve({ commands: titled }) })
+    const list = await source.candidates(proj('s1'), req(''))
+    expect(list).toEqual([{ name: 'code-review', title: '代码审查', description: 'review the diff' }])
+  })
+
   it('matches case-insensitive subsequences and ranks prefixes, boundaries, adjacency, gaps, then source order', async () => {
     const commands: CommandDescriptor[] = [
       { name: 'q-xylophone', description: '' },

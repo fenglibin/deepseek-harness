@@ -29,6 +29,16 @@ describe('chat flow font-size axis', () => {
     }
   })
 
+  it('the reasoning body caps at ten lines and scrolls past them', () => {
+    // jsdom has no layout, so this reads the declaration: a streaming thought
+    // stays ten lines tall and scrolls inside itself instead of pushing the
+    // reply off the viewport. The 8px is the block's own vertical padding.
+    expect(declarationsFrom(read('ReasoningRow.module.css'), '.thinkBody')).toEqual(expect.arrayContaining([
+      'max-height: calc((20px + var(--dsh-content-font-delta-secondary, 0px)) * 10 + 8px)',
+      'overflow-y: auto',
+    ]))
+  })
+
   it('command and context summaries read the secondary tier on the shared row line', () => {
     expect(declarationsFrom(read('GenericCommandCard.module.css'), '.summary')).toEqual(expect.arrayContaining([
       'font-size: var(--dsh-content-font-size-secondary, 13px)',

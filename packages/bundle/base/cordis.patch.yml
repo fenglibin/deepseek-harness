@@ -295,6 +295,11 @@
     - id: command-feedback
       name: '@deepseek-ai/dsh-command-feedback'
 
+    - id: command-prompt-config
+      name: '@deepseek-ai/dsh-command-prompt-config'
+      config:
+        commands: []
+
     - id: goal
       name: '@deepseek-ai/dsh-goal'
 
@@ -430,11 +435,13 @@
       config:
         maxOutputChars: 16000
 
-    # Consecutive-repeat reminders on the tool chain.
+    # Consecutive-repeat reminders on the tool chain. The first threshold fires
+    # at the second repeat: a model stuck in a loop costs a full round trip per
+    # attempt, and the reminder is advice the model may ignore on the first call.
     - id: repeat-tool-reminder
       name: '@deepseek-ai/dsh-repeat-tool-reminder'
       config:
-        thresholds: [3, 5, 8]
+        thresholds: [2, 4, 6]
         argumentsPreviewChars: 500
 
     # Every mode enables the stable model-facing web_search tool. The Web app's
@@ -480,6 +487,14 @@
       name: '@deepseek-ai/dsh-system-prompt'
       config:
         persona: ''
+
+    # Which language the model writes user-visible prose in. `auto` follows the
+    # Web GUI's stored language choice, then the host process's own locale, and
+    # stays silent about language when neither names a language this row directs.
+    - id: response-language
+      name: '@deepseek-ai/dsh-response-language'
+      config:
+        language: auto
 
     # Agents created at startup. The base stays empty; raw overlays may create
     # agents, while Web creates sessions on client request.

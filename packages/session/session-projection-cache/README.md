@@ -58,7 +58,7 @@ Three mandatory points always write: session creation persists the seed-derived 
 
 ### Reading cached values
 
-`cachedSnapshot(meta)` synchronously serves client values from the storage domain's in-memory tables with zero I/O. It accepts only an identity-matching record and version- and schema-matching keys, then returns a `{ asOfSeq, values }` cut at the lowest served-row watermark. It returns `undefined` for an unknown id, unrelated lifecycle, absent or foreign record document, or no usable rows. `coldSnapshot(meta, events)` accepts a complete ordered log, skips the checkpointed prefix while folding, and refreshes the record without reading the persistence layer itself.
+`cachedSnapshot(meta)` synchronously serves client values from the storage domain's in-memory tables with zero I/O. It accepts only an identity-matching record and version- and schema-matching keys, then returns a `{ asOfSeq, values }` cut at the lowest served-row watermark. It returns `undefined` for an unknown id, unrelated lifecycle, absent or foreign record document, or no usable rows. `coldSnapshot(meta, events)` accepts a complete ordered log, skips the checkpointed prefix while folding, and refreshes the record without reading the persistence layer itself. `remove(id)` discards one session's cached rows and reports whether a row existed: the rows are derived from a log this package never reads on its own, so deleting that log must delete them, since no later read can tell a recreated id from one that inherited the rows.
 
 ### What the cache guarantees
 

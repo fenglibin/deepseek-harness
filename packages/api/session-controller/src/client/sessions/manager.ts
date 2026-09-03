@@ -611,6 +611,22 @@ export class SessionManager {
   }
 
   /**
+   * Contract session.deleteSession. The Host discards the durable log and
+   * broadcasts `api-session/removed`, which drops the row through the same
+   * sink a live disposal uses; the explicit removal here keeps the row gone
+   * for this client whether or not that broadcast is still in flight.
+   * @param opts - Session identity.
+   * @returns the delete result.
+   */
+  async delete(
+    opts: { sessionId: SessionId },
+  ): Promise<RemoteResult<{ sessionId: SessionId; deleted: true }>> {
+    const result = await this.remote.session.deleteSession({ sessionId: opts.sessionId })
+    if (result.ok) this.recordMutation({ kind: 'remove', sessionId: opts.sessionId })
+    return result
+  }
+
+  /**
    * Insert-or-enrich a locally synthesized summary: a new id prepends; an
    * existing entry only gains fields it lacks (the session-added frame and the
    * create() echo race — whichever lands second must fill the placeholder's

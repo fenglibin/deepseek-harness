@@ -14,7 +14,7 @@ import type { PromptContextOrderName, PromptSectionOrderName } from '@deepseek-a
 const BUILT_IN = ['harness:identity', 'deployment:persona']
 const IDENTITY = 'You are an AI agent powered by DeepSeek Harness.'
 const SECTION_ORDER_NAMES = [
-  'HARNESS_IDENTITY', 'HARNESS_SOURCE', 'WEB_SURFACE', 'DEPLOYMENT_PERSONA',
+  'HARNESS_IDENTITY', 'RESPONSE_LANGUAGE', 'HARNESS_SOURCE', 'WEB_SURFACE', 'DEPLOYMENT_PERSONA',
   'PLAN_POLICY', 'TEAM_POLICY', 'PTC_ONLY', 'FILE_REFERENCE', 'TOOL_BASH',
   'TOOL_PWSH', 'TOOL_READ', 'TOOL_WRITE', 'TOOL_EDIT', 'TOOL_GLOB',
   'TOOL_GREP', 'TOOL_JOBS', 'TOOL_PTY', 'TOOL_WEB_SEARCH', 'TOOL_WEB_FETCH',

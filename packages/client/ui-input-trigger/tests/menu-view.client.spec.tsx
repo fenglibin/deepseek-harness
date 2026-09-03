@@ -114,6 +114,21 @@ describe('MenuView', () => {
     expect(status.children).toHaveLength(2)
   })
 
+  it('renders a candidate title in place of the name, falling back to the name', () => {
+    mount(openState({
+      groups: [{
+        source: 'command',
+        status: 'ready',
+        items: [
+          { name: 'code-review', title: '代码审查', description: 'review the diff' },
+          { name: 'plan', description: 'plan it' },
+        ],
+      }],
+    }))
+    const options = screen.getAllByRole('option')
+    expect(options.map(o => o.textContent)).toEqual(['代码审查review the diff', 'planplan it'])
+  })
+
   it('keeps an opted-out source title hidden while its candidates are pending', () => {
     mount(openState({
       groups: [{ source: 'reference', showGroupTitle: false, status: 'pending', items: [] }],

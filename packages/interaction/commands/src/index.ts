@@ -8,6 +8,7 @@ import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import { AttachmentError, admitEncodedImages } from '@deepseek-ai/dsh-attachment'
 import type { EncodedImageAttachment } from '@deepseek-ai/dsh-attachment/types'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ImageBlock } from '@deepseek-ai/dsh-llm'
 import { NamedEntries, ScopedLayers } from '@deepseek-ai/dsh-scope'
 import type { ScopeKey, ScopeLayer } from '@deepseek-ai/dsh-scope'
@@ -51,10 +52,15 @@ export interface CommandInvocation {
   readonly signal: AbortSignal
 }
 
+/** A command handler executes directly against the receiving agent, without sending the command to the model. */
+export type CommandHandler = (invocation: CommandInvocation) => CommandResult | Promise<CommandResult>
+
 /** Plugin-owned command registration. */
 export interface CommandDefinition {
   /** Lowercase command name without the leading slash. */
   readonly name: string
+  /** Localized display title (e.g. a Chinese name); discovery UI falls back to `name` when absent. */
+  readonly title?: string
   /** Human-readable summary used in discovery UI. */
   readonly description: string
   /** Optional free-form input hint advertised to capable clients. */
@@ -65,8 +71,16 @@ export interface CommandDefinition {
    * that payload in the session log.
    */
   readonly recordInput?: boolean
-  /** Execute against the receiving agent without sending the command to the model. */
-  readonly handler: (invocation: CommandInvocation) => CommandResult | Promise<CommandResult>
+  /**
+   * Execution kind. `code` (the default) runs `handler` directly against the
+   * receiving agent without producing a model message; `prompt` submits
+   * `prompt` to the model as a user message — a lightweight prompt shortcut.
+   */
+  readonly kind?: 'code' | 'prompt'
+  /** Required for `kind: 'prompt'`: the prompt text submitted to the model. */
+  readonly prompt?: string
+  /** Required for `kind: 'code'` (the default): the direct-execution handler. */
+  readonly handler?: CommandHandler
 }
 
 /** Syntactically valid slash command before registry resolution. */
@@ -77,8 +91,33 @@ export interface ParsedCommand {
   readonly rawInput: string
 }
 
+/** A normalized `code`-kind definition: `handler` is guaranteed present. */
+interface CodeDefinition {
+  readonly kind: 'code'
+  readonly name: string
+  readonly description: string
+  readonly title?: string
+  readonly input?: CommandInputDescriptor
+  readonly recordInput?: boolean
+  readonly handler: CommandHandler
+}
+
+/** A normalized `prompt`-kind definition: `prompt` is guaranteed present. */
+interface PromptDefinition {
+  readonly kind: 'prompt'
+  readonly name: string
+  readonly description: string
+  readonly title?: string
+  readonly input?: CommandInputDescriptor
+  readonly recordInput?: boolean
+  readonly prompt: string
+}
+
+/** The registry's validated, kind-discriminated definition union. */
+type NormalizedDefinition = CodeDefinition | PromptDefinition
+
 interface RegisteredCommand {
-  readonly definition: CommandDefinition
+  readonly definition: NormalizedDefinition
   readonly descriptor: CommandDescriptor
 }
 
@@ -143,6 +182,12 @@ function renderThrown(value: unknown): string {
   }
 }
 
+/** Combine a prompt-kind command's configured prompt with any extra argument text the user typed. */
+function renderPromptSubmission(prompt: string, rawInput: string): string {
+  const extra = rawInput.trim()
+  return extra === '' ? prompt : `${prompt}\n\n${extra}`
+}
+
 /** Stop awaiting an uncooperative handler once its owning UI request aborts. */
 function withAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   if (signal.aborted) return Promise.reject(abortError(signal))
@@ -178,9 +223,7 @@ function normalizeDefinition(definition: CommandDefinition): RegisteredCommand {
   if (definition.description.trim().length === 0) {
     throw new TypeError(`command "${definition.name}" description must not be empty`)
   }
-  if (typeof definition.handler !== 'function') {
-    throw new TypeError(`command "${definition.name}" handler must be a function`)
-  }
+  const title = normalizeTitle(definition)
   const rawInput: unknown = definition.input
   let input: CommandInputDescriptor | undefined
   if (rawInput !== undefined) {
@@ -199,19 +242,49 @@ function normalizeDefinition(definition: CommandDefinition): RegisteredCommand {
       ...('images' in rawInput && rawInput.images === true) ? { images: true } : {},
     })
   }
-  const normalized = Object.freeze({
+  const base = Object.freeze({
     name: definition.name,
     description: definition.description,
+    ...title === undefined ? {} : { title },
     ...input === undefined ? {} : { input },
     ...definition.recordInput === undefined ? {} : { recordInput: definition.recordInput },
-    handler: definition.handler,
   })
+  const kind = definition.kind ?? 'code'
+  let normalized: NormalizedDefinition
+  if (kind === 'code') {
+    if (typeof definition.handler !== 'function') {
+      throw new TypeError(`command "${definition.name}" handler must be a function`)
+    }
+    if (definition.prompt !== undefined) {
+      throw new TypeError(`command "${definition.name}" prompt is only valid for kind "prompt"`)
+    }
+    normalized = Object.freeze({ ...base, kind: 'code' as const, handler: definition.handler })
+  } else {
+    if (typeof definition.prompt !== 'string' || definition.prompt.trim().length === 0) {
+      throw new TypeError(`command "${definition.name}" prompt must be a non-empty string`)
+    }
+    if (definition.handler !== undefined) {
+      throw new TypeError(`command "${definition.name}" handler is only valid for kind "code"`)
+    }
+    normalized = Object.freeze({ ...base, kind: 'prompt' as const, prompt: definition.prompt })
+  }
   const descriptor = Object.freeze({
     name: normalized.name,
+    ...normalized.title === undefined ? {} : { title: normalized.title },
     description: normalized.description,
     ...normalized.input === undefined ? {} : { input: normalized.input },
   })
   return { definition: normalized, descriptor }
+}
+
+/** Validate and return the optional localized display title. */
+function normalizeTitle(definition: CommandDefinition): string | undefined {
+  const title = definition.title
+  if (title === undefined) return undefined
+  if (typeof title !== 'string' || title.trim().length === 0) {
+    throw new TypeError(`command "${definition.name}" title must be a non-empty string`)
+  }
+  return title
 }
 
 /** Validate and detach an untrusted handler result at the registry boundary. */
@@ -387,13 +460,32 @@ export class CommandRuntime extends TypertRemoteService {
     const invocation = Object.freeze({ commandId, agent, rawInput: parsed.rawInput, attachments, signal })
     let result: CommandResult
     try {
-      const output = command.definition.handler(invocation)
-      result = normalizeResult(parsed.name, await withAbort(Promise.resolve(output), signal))
+      result = command.definition.kind === 'prompt'
+        ? this.executePrompt(invocation, command.definition.prompt, parsed.name)
+        : normalizeResult(parsed.name, await withAbort(Promise.resolve(command.definition.handler(invocation)), signal))
     } catch (error: unknown) {
       this.settleThrown(agent.session, parsed.name, commandId, error)
       throw error
     }
     return settle(result)
+  }
+
+  /**
+   * Submit a prompt-kind command's configured prompt to the model as one user
+   * message. Admitted composer images (if any) ride the same message after
+   * the prompt text, and any extra argument text the user typed after the
+   * command name is appended as a follow-up line. Returns a plain success so
+   * the composer renders nothing extra — the model's reply flows through the
+   * ordinary turn path, and the prompt body is durable in the resulting
+   * user/message event (its source names the command).
+   */
+  private executePrompt(invocation: CommandInvocation, prompt: string, name: string): CommandResult {
+    const text = renderPromptSubmission(prompt, invocation.rawInput)
+    invocation.agent.followup(createUserMessage({
+      content: [{ type: 'text', text }, ...invocation.attachments],
+      source: { kind: 'command-invocation', name },
+    }))
+    return { kind: 'success' }
   }
 
   /** Contained `command/done` error append for a thrown handler or admission failure. */

@@ -57,6 +57,14 @@ Slot 声明固定两个相互独立的维度。
 
 对于 `single`、`list` 和 `keyed` cell，`priority` 是遮蔽优先级；对于 `chain`，它是选举顺序。数值越小越先运行或渲染。普通增量贡献应选用新的 list `id` 或 keyed `key`；复用已有 cell 表示有意替换其展示。
 
+## 失败处理
+
+每个 entry 都渲染在各自的 error boundary 内。单个 entry 内部的崩溃（组件渲染或 inject 工厂）被就地隔离：boundary 打印 `slot entry crashed in '<key>'`，通过注册表的监管通道上报崩溃，并渲染崩溃占位。装配错误（接错线的 shell、在 provider 之外渲染的 scope）则继续向外抛——接错的组合必须响亮地失败。
+
+对可覆盖的 cardinality，上报还会让崩溃的 entry 从它所在的 cell 退休，改由该 cell 的下一个存活者渲染；一个 cell 的所有注册都退休后保留崩溃占位。退休是按 scope 生效的：它只作用于崩溃发生时正在渲染的那个 Session，因此一个 Session 级注册在某个 Session 下崩溃后，切换到下一个 Session 仍会重新渲染。root 级注册没有更窄的 scope 可用于重试，会一直保持退休直到其注册被销毁。`chain` entry 永不退休——候选项在 select 时决出——因此一个已当选 entry 崩溃后保留静态崩溃占位。
+
+崩溃占位在 official 构建中是纯粹的 `[data-slot-error="<key>"]` 标记元素；本地构建会把它渲染成带 slot key 的可见占位，让开发期能直接看到树上的空洞。
+
 ## 组件输入
 
 注册组件会在 binding 位置收到组装后的输入。组件应从这些类型推导 props，不要重新抄写成员。

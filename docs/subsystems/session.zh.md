@@ -694,6 +694,13 @@ inspect( sessionId: SessionId, signal?: AbortSignal, ): Promise<{ meta: SessionH
 @Remote('fork') fork(request: SessionForkRequest): Promise<SessionForkValue>
 
 /**
+ * Delete one Session and every reference the Host holds to it.
+ * @param request - Session identity.
+ * @returns the deleted identity.
+ */
+@Remote('deleteSession') deleteSession(request: SessionDeleteRequest): Promise<SessionDeleteValue>
+
+/**
  * Admit one prompt after explicitly resuming its Session.
  * @param request - Session identity, prompt content, source metadata, and delivery mode.
  * @param signal - caller cancellation before prompt admission begins.

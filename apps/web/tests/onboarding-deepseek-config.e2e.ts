@@ -203,7 +203,9 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     await deepSeek.locator('xpath=ancestor::li').getByRole('button', { name: '编辑' }).click()
     await settings.getByText('自定义设置').click()
     await settings.getByRole('button', { name: /删除模型/ }).first().click()
-    await settings.getByRole('button', { name: '添加模型' }).click()
+    // The model catalog's own row button: adding a row by hand, beside the
+    // button that fetches them from the endpoint.
+    await settings.getByRole('button', { name: '手动添加' }).click()
     const customModelId = settings.getByLabel('模型 ID 3')
     await customModelId.fill('private-preview')
     await settings.getByLabel('显示名称 3').fill('Private Preview')

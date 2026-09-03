@@ -250,6 +250,13 @@ export interface InputNotice {
 export interface ComposerKeyboard {
   /** Live machine state for event-handler reads (render reads go through useInput). */
   readonly snapshot: InputState
+  /**
+   * Whether this shell still owns an editor the composer may bind: false once
+   * the Session scope tore the shell down. The composer degrades to its inert
+   * DOM instead of binding a root element to a shell that can no longer carry
+   * one.
+   */
+  readonly live: boolean
   /** The shell-owned Lexical editor the composer binds its contenteditable to. */
   readonly editor: LexicalEditor
   /** Submit with an explicit delivery mode resolved by the keyboard policy. */

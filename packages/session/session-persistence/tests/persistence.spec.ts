@@ -127,6 +127,10 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
 
+  remove(id: SessionId, signal?: AbortSignal): Promise<boolean> {
+    return this.coordinator.remove(id, signal)
+  }
+
   // --- PersistenceBackend hooks (the Map storage primitives) ---
 
   // A Map-backed store has no torn tails, so `tornMarker` is never set.
@@ -178,6 +182,10 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
   async list(signal?: AbortSignal): Promise<SessionHeader[]> {
     signal?.throwIfAborted()
     return [...this.store.values()].map(e => structuredClone(e.meta))
+  }
+
+  async deleteStored(id: SessionId): Promise<boolean> {
+    return this.store.delete(id)
   }
 
   async listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> {
@@ -646,6 +654,65 @@ describe('PersistenceCoordinator session preparations', () => {
 
     try {
       await expect(coordinator.prepare(id)).rejects.toThrow(/live persistence owner/)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('rejects a delete while durable state still has a live owner', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    const backend = new ControlledBackend()
+    const id = SessionId('delete-live-owner')
+    backend.store.set(id, { meta: meta(id), events: oneTurnLog() })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+    const owner = Session.create(id, oneTurnLog(), meta(id))
+    const states = (coordinator as unknown as {
+      states: Map<SessionId, {
+        meta: SessionHeader
+        cursor: number
+        materialized: boolean
+        owner?: Session
+      }>
+    }).states
+    states.set(id, {
+      meta: owner.header,
+      cursor: oneTurnLog().length,
+      materialized: true,
+      owner,
+    })
+
+    try {
+      await expect(coordinator.remove(id)).rejects.toThrow(/live persistence owner/)
+      // Refused means intact: the owner still has a log to append to.
+      expect(backend.store.has(id)).toBe(true)
+    } finally {
+      await fiber.dispose()
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('rejects a delete the backend cannot perform instead of pretending it succeeded', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    // ControlledBackend predates deletion and implements no `deleteStored`,
+    // which is why that hook is optional: a backend without it must say so.
+    const backend = new ControlledBackend()
+    const id = SessionId('delete-unsupported')
+    backend.store.set(id, { meta: meta(id), events: oneTurnLog() })
+    let coordinator!: PersistenceCoordinator<never>
+    const fiber = await ctx.plugin(Object.assign((inner: Context) => {
+      coordinator = new PersistenceCoordinator(inner, backend)
+    }, { inject: ['sessions'] }))
+
+    try {
+      await expect(coordinator.remove(id))
+        .rejects.toThrow('session persistence backend cannot delete a session')
+      expect(backend.store.has(id)).toBe(true)
     } finally {
       await fiber.dispose()
       await ctx.fiber.dispose()

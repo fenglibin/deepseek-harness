@@ -211,6 +211,17 @@ export interface PersistenceBackend<TornMarker = unknown> {
   locate?(meta: SessionHeader): SessionLocation | undefined
 
   /**
+   * Remove one stored session's complete durable record — header and events
+   * both. Resolves `false` when nothing is stored under `id`; an unknown id is
+   * not a failure. The coordinator has already dropped its in-memory state for
+   * `id` when this resolves `true`, and it refuses to call this hook while a
+   * live Session owns the id.
+   * @param id - the session whose durable record is discarded.
+   * @param signal - optional cancellation for backend removal work.
+   */
+  deleteStored?(id: SessionId, signal?: AbortSignal): Promise<boolean>
+
+  /**
    * Optional lifecycle teardown (e.g. close a database handle). Awaited by the
    * coordinator's dispose effect AFTER the quiescence drain. A stateless file
    * backend omits it.
@@ -949,6 +960,40 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     const whole = await this.readStoredPrefix(id, signal)
     // Sequential fallback: contiguous seqs from 0 make the suffix an index slice.
     return { meta: whole.meta, events: whole.events.slice(fromSeq) }
+  }
+
+  /**
+   * Discard one session's durable record and the coordinator's in-memory
+   * bookkeeping for it. Retirement is awaited outside the id's serialization
+   * chain: retirement itself serializes, so waiting inside would deadlock.
+   * @param id - the persisted session to remove.
+   * @param signal - optional cancellation for queued and backend work.
+   * @returns whether a durable record existed and was removed.
+   */
+  async remove(id: SessionId, signal?: AbortSignal): Promise<boolean> {
+    await this.waitForRetirement(id, signal)
+    return this.serialize(id, () => this.removeCore(id, signal), signal)
+  }
+
+  private async removeCore(id: SessionId, signal?: AbortSignal): Promise<boolean> {
+    signal?.throwIfAborted()
+    // A live Session would keep appending onto a log that no longer exists.
+    if (this.ctx.sessions.get(id) !== undefined) {
+      throw new Error(`cannot delete session "${id}" while it is live`)
+    }
+    if (this.states.get(id)?.owner !== undefined) {
+      throw new Error(`session "${id}" already has a live persistence owner`)
+    }
+    if (this.backend.deleteStored === undefined) {
+      throw new Error('session persistence backend cannot delete a session')
+    }
+    this.preparations.assertWritable(id)
+    const removed = await this.backend.deleteStored(id, signal)
+    // Drop the in-memory state either way: after a durable delete, a stale
+    // cursor would let the next append recreate the log under the same id.
+    this.states.delete(id)
+    this.preparations.invalidate(id)
+    return removed
   }
 
   /** Read one detached physical prefix without logical recovery or caching. */

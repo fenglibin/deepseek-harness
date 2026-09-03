@@ -170,6 +170,10 @@ class TestPersistence extends SessionPersistence {
     }))
   }
 
+  remove(id: SessionId): Promise<boolean> {
+    return Promise.resolve(this.durable.delete(id))
+  }
+
   persist(session: Session): void {
     this.durable.set(session.id, { meta: session.header, events: session.events })
   }

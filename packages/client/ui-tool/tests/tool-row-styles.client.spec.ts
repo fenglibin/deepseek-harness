@@ -21,6 +21,73 @@ function declarations(selector: string): string[] {
   return (rule[1] ?? '').split(';').map(part => part.trim()).filter(Boolean)
 }
 
+/**
+ * The bash row's output-height stages, as CSS text. jsdom has no layout, so
+ * the rendering spec can pin which stage the row is in but not how many lines
+ * that stage shows.
+ */
+const bashCss = readFileSync(fileURLToPath(new URL('../src/client/tool/toolviews/bash-sample.module.css', import.meta.url)), 'utf8')
+const bashDeclarationText = bashCss.replace(/\/\*[\s\S]*?\*\//g, ' ')
+
+function bashDeclarations(selector: string): string[] {
+  const rule = new RegExp(`(?:^|\\})\\s*\\${selector}\\s*\\{([^{}]*)\\}`).exec(bashDeclarationText)
+  if (rule === null) throw new Error(`bash-sample.module.css has no \`${selector}\` rule`)
+  return (rule[1] ?? '').split(';').map(part => part.trim()).filter(Boolean)
+}
+
+/** One output stage; the selector's brackets are escaped, not a character class. */
+function stageDeclarations(stage: string): string[] {
+  const rule = new RegExp(
+    `\\.terminalWrap\\[data-stage='${stage}'\\] \\.terminal\\s*\\{([^{}]*)\\}`,
+  ).exec(bashDeclarationText)
+  if (rule === null) throw new Error(`bash-sample.module.css has no '${stage}' stage rule`)
+  return (rule[1] ?? '').split(';').map(part => part.trim()).filter(Boolean)
+}
+
+describe('bash row output-height stages', () => {
+  it('caps the closed row at two lines and the open row at ten', () => {
+    expect(stageDeclarations('peek')).toEqual([
+      '--dsl-terminal-output-max-height: calc(var(--dsl-terminal-line-height) * 2)',
+    ])
+    expect(stageDeclarations('full')).toEqual([
+      '--dsl-terminal-output-max-height: calc(var(--dsl-terminal-line-height) * 10)',
+    ])
+  })
+
+  it('derives both caps from the line height the row binds, never a copied px value', () => {
+    // A cap written in px would drift from the terminal's own line height the
+    // moment that binding changed, leaving the row showing half a line.
+    expect(bashDeclarations('.terminal')).toEqual(expect.arrayContaining([
+      '--dsl-terminal-line-height: 18px',
+    ]))
+    for (const stage of ['peek', 'full']) {
+      expect(stageDeclarations(stage).join(';')).toContain('var(--dsl-terminal-line-height)')
+    }
+  })
+
+  it('hides the closed preview\'s scrollbars and keeps them on the open stages', () => {
+    // A two-line thumb is too small to drag and crowds the lines it sits
+    // beside; the open stages are where scrolling is meant to happen.
+    expect(bashDeclarationText).toContain(
+      ".terminalWrap[data-stage='peek'] .terminal ::-webkit-scrollbar",
+    )
+    const peek = /\.terminalWrap\[data-stage='peek'\] \.terminal \*\s*\{([^{}]*)\}/.exec(bashDeclarationText)
+    expect((peek?.[1] ?? '').split(';').map(part => part.trim()).filter(Boolean)).toEqual([
+      'scrollbar-width: none',
+    ])
+  })
+
+  it('leaves the unbounded stage without a cap', () => {
+    // The primitive reads `none` by default, so the overflow never engages.
+    for (const stage of ['peek', 'full']) {
+      expect(bashDeclarations('.terminal')).not.toEqual(expect.arrayContaining([
+        '--dsl-terminal-output-max-height: none',
+      ]))
+      expect(stageDeclarations(stage).join(';')).not.toContain('none')
+    }
+  })
+})
+
 describe('ToolRow.module.css summary line', () => {
   it('keeps the summary suffix on one line and unshrunk', () => {
     // `flex: none` stops the box shrinking, not the text wrapping: without

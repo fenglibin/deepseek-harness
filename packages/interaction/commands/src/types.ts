@@ -50,6 +50,8 @@ export interface CommandExecution {
 export interface CommandDescriptor {
   /** Lowercase command name without the leading slash. */
   readonly name: string
+  /** Localized display title (e.g. a Chinese name); clients fall back to `name` when absent. */
+  readonly title?: string
   /** Human-readable summary used in discovery UI. */
   readonly description: string
   /** Optional free-form input hint advertised to capable clients. */
@@ -68,6 +70,26 @@ export interface CommandSourceMap {
 
 /** The union over {@link CommandSourceMap} — who issued a command line. */
 export type CommandSource = CommandSourceMap[keyof CommandSourceMap]
+
+/**
+ * Durable source for the user message a `prompt`-kind command injects: the
+ * invoked command name rides the message source so transcript consumers
+ * present the submission from metadata instead of re-parsing model-facing
+ * text. The prompt body itself is the message content and rides the ordinary
+ * user/message event, so the whole model-visible text stays reconstructable.
+ */
+export interface CommandInvocationSource {
+  readonly kind: 'command-invocation'
+  /** Invoked command name without the leading slash. */
+  readonly name: string
+}
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    /** A prompt-kind command submitted its configured prompt as a user message. */
+    'command-invocation': CommandInvocationSource
+  }
+}
 
 declare module '@deepseek-ai/cordis' {
   interface Events {

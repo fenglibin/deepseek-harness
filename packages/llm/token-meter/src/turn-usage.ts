@@ -84,6 +84,11 @@ function normalizeUsage(usage: TokenUsage, route?: TurnTokenUsageRoute): Normali
     return undefined
   }
 
+  // Absent cache buckets contribute zero: the harness `TokenUsage` convention
+  // keeps `inputTokens` uncached and reports cache traffic in separate
+  // optional buckets (the cumulative tokenUsage projection defaults them the
+  // same way). A provider without a cache-write bucket (DeepSeek) therefore
+  // still yields the exact prompt total as input + cacheRead + cacheWrite.
   const knownPrompt = safeSum([
     inputTokens,
     ...cacheReadTokens === undefined ? [] : [cacheReadTokens],
@@ -101,7 +106,6 @@ function normalizeUsage(usage: TokenUsage, route?: TurnTokenUsageRoute): Normali
     }
     exactTotal = totalTokens
   } else {
-    if (cacheReadTokens === undefined || cacheWriteTokens === undefined) return undefined
     const derivedTotal = safeSum([knownPrompt, outputTokens])
     if (derivedTotal === undefined) return undefined
     exactTotal = derivedTotal
@@ -164,9 +168,12 @@ function sameAttempt(
 /**
  * Fold one complete Turn's durable attempt lifecycle into exact token accounting.
  *
- * No attempt is inferred from a usage sample. Any missing lifecycle boundary,
- * incomplete attempt usage, unsafe count, or contradictory exact total makes
- * the whole disclosure unavailable.
+ * No attempt is inferred from a usage sample. An attempt that reported a usage
+ * sample must close with safe counts and an exact total; an attempt interrupted
+ * before reporting any usage (aborted or failed stream) is skipped, so a turn's
+ * remaining billed attempts still disclose. Missing lifecycle boundaries,
+ * unsafe counts, and contradictory exact totals still make the whole disclosure
+ * unavailable.
  * @param events - Turn-local durable events from `turn/start` through `turn/end`.
  * @returns exact aggregate usage, or undefined when it cannot be proven.
  */
@@ -229,8 +236,10 @@ export function deriveTurnTokenUsage(events: readonly SessionEvent[]): TurnToken
         state = { ...state, sample: event.data.chunk.usage }
       } else if (event.data.chunk.type === 'finish'
         && (event.data.chunk.reason.kind === 'error' || event.data.chunk.reason.kind === 'aborted')) {
-        if (!closeOpen()) invalid = true
-        else state = { kind: 'finishClosed', turn, step: event.data.step }
+        // An error/aborted finish without a usage sample is an interrupted
+        // attempt: skip it rather than discarding the turn's other attempts.
+        if (state.sample !== undefined && !closeOpen()) invalid = true
+        if (!invalid) state = { kind: 'finishClosed', turn, step: event.data.step }
       }
       continue
     }
@@ -252,7 +261,8 @@ export function deriveTurnTokenUsage(events: readonly SessionEvent[]): TurnToken
         invalid = true
         continue
       }
-      if (state.kind === 'settled' || (state.kind === 'open' && !closeOpen())) invalid = true
+      if (state.kind === 'settled'
+        || (state.kind === 'open' && state.sample !== undefined && !closeOpen())) invalid = true
       if (!invalid) state = { kind: 'settled', turn, step: event.data.step, by: 'retry' }
       continue
     }
@@ -262,7 +272,9 @@ export function deriveTurnTokenUsage(events: readonly SessionEvent[]): TurnToken
         invalid = true
         continue
       }
-      if (state.kind === 'open' && !closeOpen()) invalid = true
+      // A sampled open attempt closes with its usage; an unsampled attempt was
+      // interrupted before reporting usage and is skipped, not a disclosure failure.
+      if (state.kind === 'open' && state.sample !== undefined && !closeOpen()) invalid = true
       if (!invalid) state = { kind: 'idle' }
     }
   }

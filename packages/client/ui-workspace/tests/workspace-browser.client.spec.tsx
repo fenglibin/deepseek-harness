@@ -9,7 +9,7 @@ import type {
 import type { SessionPendingInteractionSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
-import type { WorkspaceBrowserProps } from '../src/client/contract/slots.ts'
+import type { SessionDeleteOutcome, WorkspaceBrowserProps } from '../src/client/contract/slots.ts'
 import { createWorkspaceViewStore, FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
 import { UNGROUPED_KEY } from '../src/client/tree.ts'
 import { WorkspaceBrowser } from '../src/client/rows/WorkspaceBrowser.tsx'
@@ -45,6 +45,10 @@ const workspaceState = (
   archivedSessionIds: readonly SessionId[] = [],
 ): WorkspaceSnapshot => ({ items, archivedSessionIds, state: 'idle', phase: 'ready', error: null })
 const noPendingInteraction: SessionPendingInteractionSnapshot = new Map()
+/** A delete the Host accepted; a refusal names why nothing was removed. */
+const DELETED: SessionDeleteOutcome = { ok: true }
+const refused = (message: string, refusal: 'live' | 'failed' = 'failed'): SessionDeleteOutcome =>
+  ({ ok: false, refusal, message })
 function hook<T>(snapshot: T) {
   return function select<S>(selector: (state: T) => S): S { return selector(snapshot) }
 }
@@ -80,6 +84,8 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     renameWorkspace: vi.fn(async () => {}),
     deleteWorkspace: vi.fn(async () => {}),
     archiveSession: vi.fn(async () => {}),
+    unarchiveSession: vi.fn(async () => {}),
+    deleteSession: vi.fn(async () => DELETED),
     insertWorkspaceBefore: vi.fn(async () => {}),
     insertSessionBefore: vi.fn(async () => {}),
     createWorkspace: vi.fn(async () => workspace('created', [])),
@@ -451,6 +457,147 @@ describe('WorkspaceBrowser', () => {
     } finally {
       warn.mockRestore()
     }
+  })
+
+  it('shows archived sessions in their own collapsed section and restores one from its row menu', async () => {
+    const unarchiveSession = vi.fn(async () => {})
+    const b = mount({
+      useSessions: hook(sessionState([summary('kept-s', 2), summary('gone-s', 1)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['kept-s', 'gone-s'])], [sid('gone-s')])),
+      unarchiveSession,
+    })
+    fireEvent.click(screen.getByText('alpha'))
+    // The only surface that still shows the archived session: a labelled
+    // section carrying its count, collapsed by default.
+    const section = screen.getByRole('button', { name: /已归档/ })
+    expect(section.getAttribute('aria-expanded')).toBe('false')
+    expect(section.textContent).toContain('1')
+    expect(screen.queryByText('gone-s')).toBeNull()
+
+    fireEvent.click(section)
+    expect(screen.getByRole('button', { name: /已归档/ }).getAttribute('aria-expanded')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: '会话“gone-s”的操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '恢复会话' }))
+    expect(unarchiveSession).toHaveBeenCalledWith(sid('gone-s'))
+    // The listed rows keep their own verbs; the archive never offers fork.
+    expect(screen.queryByRole('menuitem', { name: '分叉会话' })).toBeNull()
+
+    // The open state is store-owned, so it survives the surface remount.
+    b.view.unmount()
+    mount({
+      useSessions: hook(sessionState([summary('kept-s', 2), summary('gone-s', 1)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['kept-s', 'gone-s'])], [sid('gone-s')])),
+    })
+    expect(screen.getByRole('button', { name: /已归档/ }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('gone-s')).toBeTruthy()
+  })
+
+  it('logs and keeps the row when the restore call rejects', async () => {
+    const rejection = new Error('restore exploded')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      mount({
+        useSessions: hook(sessionState([summary('gone-s', 1)])),
+        useWorkspaces: hook(workspaceState([], [sid('gone-s')])),
+        unarchiveSession: vi.fn(async () => { throw rejection }),
+      })
+      fireEvent.click(screen.getByRole('button', { name: /已归档/ }))
+      fireEvent.click(screen.getByRole('button', { name: '会话“gone-s”的操作' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: '恢复会话' }))
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(warn).toHaveBeenCalledWith('session restore rejected:', rejection)
+      expect(screen.getByText('gone-s')).toBeTruthy()
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('confirms session deletion from the archive and keeps the dialog open on failure', async () => {
+    let resolveDelete!: (outcome: SessionDeleteOutcome) => void
+    const deleteSession = vi.fn(() => new Promise<SessionDeleteOutcome>((resolve) => {
+      resolveDelete = resolve
+    }))
+    const b = mount({
+      useSessions: hook(sessionState([summary('gone-s', 1)])),
+      useWorkspaces: hook(workspaceState([], [sid('gone-s')])),
+      deleteSession,
+    })
+    fireEvent.click(screen.getByRole('button', { name: /已归档/ }))
+    fireEvent.click(screen.getByRole('button', { name: '会话“gone-s”的操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '删除会话' }))
+    const dialog = screen.getByRole('dialog', { name: '删除会话' })
+    expect(dialog.textContent).toContain('将永久删除“gone-s”及其会话记录')
+    const confirm = screen.getByRole<HTMLButtonElement>('button', { name: '删除会话' })
+    fireEvent.click(confirm)
+    fireEvent.click(confirm)
+    expect(deleteSession).toHaveBeenCalledOnce()
+    expect(deleteSession).toHaveBeenCalledWith(sid('gone-s'))
+    expect(confirm.disabled).toBe(true)
+    expect(screen.getByRole('status').textContent).toBe('正在删除会话…')
+    await act(async () => { resolveDelete(DELETED) })
+    // The row leaves with the session list echo, not with the RPC resolution.
+    expect(screen.queryByRole('dialog', { name: '删除会话' })).toBeNull()
+    expect(screen.getByText('gone-s')).toBeTruthy()
+    rerender(b, { useSessions: hook(sessionState([])), useWorkspaces: hook(workspaceState([])) })
+    expect(screen.queryByText('gone-s')).toBeNull()
+    expect(screen.queryByRole('button', { name: /已归档/ })).toBeNull()
+  })
+
+  it('keeps the session delete dialog open on failure and allows cancellation', async () => {
+    const deleteSession = vi.fn(async () => refused('log is locked'))
+    mount({
+      useSessions: hook(sessionState([summary('gone-s', 1)])),
+      useWorkspaces: hook(workspaceState([], [sid('gone-s')])),
+      deleteSession,
+    })
+    fireEvent.click(screen.getByRole('button', { name: /已归档/ }))
+    fireEvent.click(screen.getByRole('button', { name: '会话“gone-s”的操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '删除会话' }))
+    fireEvent.click(screen.getByRole<HTMLButtonElement>('button', { name: '删除会话' }))
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toBe('log is locked')
+    })
+    fireEvent.click(screen.getByRole<HTMLButtonElement>('button', { name: '取消' }))
+    expect(screen.queryByRole('dialog', { name: '删除会话' })).toBeNull()
+    expect(screen.getByText('gone-s')).toBeTruthy()
+  })
+
+  it('confirms session deletion from a listed row, which archives nothing first', async () => {
+    const deleteSession = vi.fn(async () => DELETED)
+    mount({
+      useSessions: hook(sessionState([summary('live-s', 1)])),
+      useWorkspaces: hook(workspaceState([workspace('alpha', ['live-s'])])),
+      deleteSession,
+    })
+    // A row on the grouping surface reaches the same confirmation the archive
+    // offers, with no archive step in between.
+    fireEvent.click(screen.getByText('alpha'))
+    fireEvent.click(screen.getByRole('button', { name: '会话“live-s”的操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '删除会话' }))
+    expect(screen.getByRole('dialog', { name: '删除会话' }).textContent).toContain('将永久删除“live-s”')
+    fireEvent.click(screen.getByRole<HTMLButtonElement>('button', { name: '删除会话' }))
+    await waitFor(() => { expect(screen.queryByRole('dialog', { name: '删除会话' })).toBeNull() })
+    expect(deleteSession).toHaveBeenCalledWith(sid('live-s'))
+  })
+
+  it('says a live session is still running instead of quoting the wire refusal', async () => {
+    const deleteSession = vi.fn(async () => refused(
+      'session delete failed: session/live: session "live-s" is live', 'live',
+    ))
+    mount({
+      useSessions: hook(sessionState([summary('live-s', 1)])),
+      useWorkspaces: hook(workspaceState([], [sid('live-s')])),
+      deleteSession,
+    })
+    fireEvent.click(screen.getByRole('button', { name: /已归档/ }))
+    fireEvent.click(screen.getByRole('button', { name: '会话“live-s”的操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '删除会话' }))
+    fireEvent.click(screen.getByRole<HTMLButtonElement>('button', { name: '删除会话' }))
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toBe(zh['delete.session.live'])
+    })
+    expect(screen.getByRole('dialog', { name: '删除会话' })).toBeTruthy()
   })
 
   it('renders a fork child as a top-level row without a session twist', () => {

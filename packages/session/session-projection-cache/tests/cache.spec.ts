@@ -192,6 +192,22 @@ describe('SessionProjectionCache write policy', () => {
     expect((await storedRows(root, session.id))?.['cache-test/marks']?.val).toEqual({ marks: ['live'] })
   })
 
+  it('discards a session\'s cached rows on remove, and resolves false when there is none', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-projcache-'))
+    roots.push(root)
+    // Seeded before the domain opens: the table's in-memory view is loaded
+    // from the medium once, so a delete only sees records it loaded.
+    await seedRecord(root, 'doomed', { 'cache-test/marks': { ver: 1, seq: 4, val: { marks: ['gone'] } } })
+    const { cache } = await harness({ root })
+    const id = SessionId('doomed')
+    // The seeded row is durable and identity-bound; remove drops the whole
+    // record, so a later cold read of a recreated id starts from the log.
+    await expect(cache.remove(id)).resolves.toBe(true)
+    expect(await storedRecord(root, id)).toBeUndefined()
+    expect(cache.cachedSnapshot(headerOf(id))).toBeUndefined()
+    await expect(cache.remove(id)).resolves.toBe(false)
+  })
+
   it('flushes when the in-turn event count reaches the configured threshold', async () => {
     const { ctx, root } = await harness({ config: { writeEveryEvents: 3, writeIntervalMs: 60_000 } })
     const session = ctx.sessions.create(SessionId('count'))

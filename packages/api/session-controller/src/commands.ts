@@ -11,6 +11,7 @@ import {
 } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent, SessionHeader, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
+import { SessionPersistenceNotFoundError } from '@deepseek-ai/dsh-session-persistence'
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { SessionTitleInvalidError } from '@deepseek-ai/dsh-session-title'
 import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time'
@@ -33,6 +34,8 @@ import type {
   SessionCancelValue,
   SessionCreateRequest,
   SessionCreateValue,
+  SessionDeleteRequest,
+  SessionDeleteValue,
   SessionForkRequest,
   SessionForkValue,
   SessionPromptRequest,
@@ -273,6 +276,94 @@ export class SessionCommandController {
       }
     }
     return { sessionId: childId }
+  }
+
+  /**
+   * Delete one Session: retire any attached Agent, discard its durable log,
+   * then drop every Host reference the Workspace registry holds. A Session
+   * whose Agent is mid-turn is refused — its write-behind drain would
+   * recreate the log under the same id.
+   * @param request - Session identity.
+   * @returns the deleted identity.
+   */
+  async deleteSession(request: SessionDeleteRequest): Promise<SessionDeleteValue> {
+    const sessionId = request.sessionId
+    // Attaching a Session is what opening it does, so attachment alone says
+    // nothing about work in flight: only a running turn blocks the delete.
+    if (this.ctx.agents.get(sessionId)?.status === 'running') {
+      throw new RemoteError(
+        'session/live',
+        `session "${sessionId}" is still running a turn; cancel it before deleting it`,
+        { sessionId },
+      )
+    }
+    // An idle attachment still owns a write-behind drain, and persistence
+    // refuses to discard a log it could rewrite, so retire the Agent first.
+    // An Agent this controller did not activate cannot be retired here.
+    if (this.ctx.sessions.get(sessionId) !== undefined) {
+      const retired = await this.retire(sessionId)
+      if (!retired) {
+        throw new RemoteError(
+          'session/live',
+          `session "${sessionId}" is live and cannot be retired here; archive it instead of deleting it`,
+          { sessionId },
+        )
+      }
+    }
+    // `sessionPersistence` is a sibling row of this one in every shipped
+    // composition (base's `session-persistence-*` against web-app's
+    // `session-controller`), and the context proxy's service walk is
+    // ancestor-only, so a direct `ctx.sessionPersistence` read throws
+    // "without inject" here. `ctx.get` reaches the same service through the
+    // global store; see docs/postmortem/0001-acp-default-export-drops-inject.md.
+    const persistence = this.ctx.get('sessionPersistence')
+    if (persistence === undefined) {
+      throw new RemoteError(
+        'gateway/internal',
+        'deleting is unavailable: this deployment mounts no session-persistence service',
+        {},
+      )
+    }
+    try {
+      await persistence.remove(sessionId)
+    } catch (error) {
+      if (error instanceof SessionPersistenceNotFoundError) {
+        throw new RemoteError('session/not-found', `session "${sessionId}" not found`, {
+          sessionId,
+        })
+      }
+      throw new RemoteError(
+        'gateway/internal',
+        `failed to delete session "${sessionId}": ${String(error)}`,
+        {},
+      )
+    }
+    // The projection cache's rows are derived from the log that is now gone;
+    // it is an optional service, so a deployment without it simply has no row.
+    await this.ctx.get('sessionProjectionCache')?.remove(sessionId)
+    await this.ctx.workspaceRegistry.removeSession(sessionId)
+    // Publish the removal at its commit point: every connected Client drops the
+    // row from this broadcast, so the caller's own projectList() is an echo of
+    // the same fact rather than its source.
+    this.ctx.emit('api-session/removed', sessionId)
+    return { sessionId, deleted: true }
+  }
+
+  /**
+   * Release one attached Session's Agent ahead of a delete.
+   * @param sessionId - Session identity to retire.
+   * @returns whether the Host released the Session.
+   */
+  private async retire(sessionId: SessionId): Promise<boolean> {
+    try {
+      return await this.agents.release(sessionId)
+    } catch (error) {
+      throw new RemoteError(
+        'gateway/internal',
+        `failed to retire session "${sessionId}" before deleting it: ${String(error)}`,
+        {},
+      )
+    }
   }
 
   /**

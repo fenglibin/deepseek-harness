@@ -308,7 +308,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/api/session-controller/src/index.ts:67`](../packages/api/session-controller/src/index.ts)
+Source: [`packages/api/session-controller/src/index.ts:69`](../packages/api/session-controller/src/index.ts)
 
 <a id="deepseek-aidsh-api-settings-controller"></a>
 
@@ -1711,6 +1711,30 @@ export interface Config {
 
 Source: [`packages/guard/repeat-tool-reminder/src/index.ts:28`](../packages/guard/repeat-tool-reminder/src/index.ts)
 
+<a id="deepseek-aidsh-response-language"></a>
+
+## `@deepseek-ai/dsh-response-language`
+
+Requires: `systemPrompt`
+
+```ts config-catalog
+/** Plugin config: which language the model writes user-visible prose in. */
+export interface Config {
+  /**
+   * `auto` follows the Web GUI's stored language choice and then the host
+   * process's own locale. `zh` pins Chinese, `en` pins English, and `off`
+   * registers no section at all. English pins emit no directive because it is
+   * the language the model reaches unaided.
+   */
+  language: ResponseLanguageSetting
+}
+
+/** How the row chooses the language the model writes in. */
+export type ResponseLanguageSetting = 'auto' | 'zh' | 'en' | 'off'
+```
+
+Source: [`packages/context/response-language/src/index.ts:69`](../packages/context/response-language/src/index.ts)
+
 <a id="deepseek-aidsh-sandbox-local"></a>
 
 ## `@deepseek-ai/dsh-sandbox-local`
@@ -2568,7 +2592,7 @@ export interface Config {
 }
 ```
 
-Source: [`packages/core/system-prompt/src/index.ts:237`](../packages/core/system-prompt/src/index.ts)
+Source: [`packages/core/system-prompt/src/index.ts:238`](../packages/core/system-prompt/src/index.ts)
 
 <a id="deepseek-aidsh-terminal-bash"></a>
 

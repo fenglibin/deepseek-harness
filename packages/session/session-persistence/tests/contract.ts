@@ -428,5 +428,44 @@ export function runPersistenceContract(name: string, make: () => Promise<Contrac
         await dispose()
       }
     })
+
+    it('remove discards the durable record: list drops the id and load rejects as not found', async () => {
+      const { persistence, dispose } = await make()
+      try {
+        const kept = meta('remove-kept', '/work')
+        const doomed = meta('remove-doomed', '/work')
+        await persistence.create(kept)
+        await persistence.append(kept.id, oneTurnLog())
+        await persistence.create(doomed)
+        await persistence.append(doomed.id, oneTurnLog())
+
+        await expect(persistence.remove(doomed.id)).resolves.toBe(true)
+        expect((await persistence.list()).map(entry => entry.id)).toEqual([kept.id])
+        await expect(persistence.load(doomed.id)).rejects.toThrow(/not found/)
+        // The survivor is untouched by its neighbour's removal.
+        expect((await persistence.load(kept.id)).events).toEqual(oneTurnLog())
+      } finally {
+        await dispose()
+      }
+    })
+
+    it('remove resolves false for an id with no durable record and is idempotent', async () => {
+      const { persistence, dispose } = await make()
+      try {
+        // Created but never appended: lazy materialization left nothing to remove.
+        const registered = meta('remove-registered')
+        await persistence.create(registered)
+        await expect(persistence.remove(registered.id)).resolves.toBe(false)
+        await expect(persistence.remove(SessionId('remove-never-seen'))).resolves.toBe(false)
+
+        const m = meta('remove-twice')
+        await persistence.create(m)
+        await persistence.append(m.id, oneTurnLog())
+        await expect(persistence.remove(m.id)).resolves.toBe(true)
+        await expect(persistence.remove(m.id)).resolves.toBe(false)
+      } finally {
+        await dispose()
+      }
+    })
   })
 }

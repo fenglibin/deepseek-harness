@@ -65,8 +65,19 @@ export interface CustomProviderCardProps {
   t: (key: keyof typeof en) => string
   /** Disable writes (read-only settings provider). */
   readOnly: boolean
+  /**
+   * Endpoint the card opens with — the URL the user named on the add dialog
+   * before reaching this card. It is a seed, not a lock: the field stays
+   * editable, because the page cannot tell a gateway's real endpoint from the
+   * one its documentation prints.
+   */
+  initialBaseURL?: string
   /** Close the card; `changed` reports whether a provider was created. */
-  onClose: (changed: boolean) => void
+  /**
+   * Leave the card: `changed` reports a committed profile, and `added` names
+   * the route that profile landed under, so the page can say what was saved.
+   */
+  onClose: (changed: boolean, added?: string) => void
 }
 
 /**
@@ -80,7 +91,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
   const [openedAt] = useState(() => props.revision)
   const [route, setRoute] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [baseURL, setBaseURL] = useState('')
+  const [baseURL, setBaseURL] = useState(props.initialBaseURL ?? '')
   const [protocol, setProtocol] = useState(protocols[0] ?? '')
   const [keyDraft, setKeyDraft] = useState('')
   const [models, setModels] = useState<readonly ModelDraft[]>([])
@@ -179,7 +190,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
         setFailure(outcome)
         return
       }
-      props.onClose(true)
+      props.onClose(true, route)
     } finally {
       setBusy(false)
     }
@@ -286,7 +297,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
         submitDisabled={disabled || !ready}
         submitLabelKey="create"
         submitBusyLabelKey="creating"
-        onCancel={() => { props.onClose(committed) }}
+        onCancel={() => { props.onClose(committed, committed ? route : undefined) }}
         onSubmit={() => { void create() }}
       />
     </div>

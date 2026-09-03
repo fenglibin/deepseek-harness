@@ -42,7 +42,7 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
     await scaffold?.close()
   })
 
-  it('closes the setup card without discarding the add card beside it', async () => {
+  it('keeps the add dialog draft and the setup card state apart', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-onboarding-setup-card-cancel'))
     const credentialStep = page.getByRole('dialog', { name: CREDENTIAL_STEP })
     await credentialStep.waitFor({ timeout: 15_000 })
@@ -58,25 +58,30 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
     const setupKey = settings.getByRole('textbox', { name: 'API 密钥', exact: true })
     await setupKey.waitFor({ timeout: 10_000 })
 
-    const add = settings.getByRole('button', { name: '添加提供方' })
+    const add = settings.getByRole('button', { name: '添加模型' })
     await expect.poll(async () => add.isEnabled(), { timeout: 10_000 }).toBe(true)
     await add.click()
-    const pick = settings.getByLabel('提供方')
+    // One dialog carries the draft now, over the section rather than beside it.
+    const addDialog = page.getByRole('dialog', { name: '添加模型' })
+    await addDialog.waitFor({ timeout: 10_000 })
+    const pick = addDialog.getByLabel('提供方')
     await pick.waitFor({ timeout: 10_000 })
     await pick.selectOption('minimax-cn')
     await expect.poll(
-      async () => settings.getByRole('textbox', { name: 'API 密钥', exact: true }).count(),
+      async () => page.getByRole('textbox', { name: 'API 密钥', exact: true }).count(),
       { timeout: 10_000 },
     ).toBe(2)
 
-    // Cancelling the setup card must not close the independent add-provider
-    // draft beside it.
-    await settings.getByRole('button', { name: '取消', exact: true }).first().click()
-    expect(await settings.getByLabel('提供方').count()).toBe(1)
+    // Leaving the draft uncommitted: closing the dialog discards it and
+    // leaves the setup card's own state alone — the two close independently
+    // because the dialog owns its draft and the section owns the card.
+    await addDialog.getByRole('button', { name: '关闭' }).click()
+    await expect.poll(async () => addDialog.count(), { timeout: 10_000 }).toBe(0)
     await expect.poll(
-      async () => settings.getByRole('textbox', { name: 'API 密钥', exact: true }).count(),
+      async () => page.getByRole('textbox', { name: 'API 密钥', exact: true }).count(),
       { timeout: 10_000 },
     ).toBe(1)
+    await settings.getByRole('button', { name: '取消', exact: true }).first().click()
     await settings.getByRole('button', { name: '编辑 DeepSeek (deepseek-official)' }).waitFor({ timeout: 10_000 })
     const dismissed = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DISMISSED_EXPECTED, dismissed, MODE)
@@ -88,8 +93,13 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
   it('stops prompting for DeepSeek once the other provider can serve requests', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-onboarding-other-provider'))
     const settings = page.getByRole('dialog', { name: '设置' })
-    await settings.getByRole('textbox', { name: 'API 密钥', exact: true }).fill('sk-e2e-minimax')
-    await settings.getByRole('button', { name: '保存', exact: true }).click()
+    await settings.getByRole('button', { name: '添加模型' }).click()
+    const addDialog = page.getByRole('dialog', { name: '添加模型' })
+    await addDialog.waitFor({ timeout: 10_000 })
+    await addDialog.getByLabel('提供方').selectOption('minimax-cn')
+    await addDialog.getByRole('textbox', { name: 'API 密钥', exact: true }).fill('sk-e2e-minimax')
+    await addDialog.getByRole('button', { name: '保存', exact: true }).click()
+    await expect.poll(async () => addDialog.count(), { timeout: 10_000 }).toBe(0)
     await settings.getByText('已保存 minimax-cn。', { exact: true }).waitFor({ timeout: 15_000 })
 
     // Only minimax-cn is reachable; DeepSeek still holds no credential.

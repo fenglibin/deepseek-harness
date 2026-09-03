@@ -146,6 +146,11 @@ describe('WorkspaceController commands', () => {
     vi.spyOn(ctx.workspaceRegistry, 'archiveSession').mockRejectedValueOnce(archiveFailure)
     await expect(controller.archiveSession({ sessionId: SessionId('session') }))
       .rejects.toBe(archiveFailure)
+
+    const unarchiveFailure = new Error('restore storage failed')
+    vi.spyOn(ctx.workspaceRegistry, 'unarchiveSession').mockRejectedValueOnce(unarchiveFailure)
+    await expect(controller.unarchiveSession({ sessionId: SessionId('session') }))
+      .rejects.toBe(unarchiveFailure)
   })
 
   it('resolves queued Workspace identities when their operation starts', async () => {
@@ -216,6 +221,27 @@ describe('WorkspaceController commands', () => {
       .resolves.toEqual({ archivedSessionIds: [session.id] })
     await expect(controller.archiveSession({ sessionId: SessionId('unknown') }))
       .rejects.toMatchObject({ code: 'session/not-found' })
+  })
+
+  it('unarchives a Session and returns the complete remaining archive set', async () => {
+    const { controller, ctx, root } = await harness()
+    const created = await controller.create({ path: stageDir(root, 'restore') })
+    const restored = ctx.sessions.create(SessionId('restored'), {
+      meta: { cwd: created.workspace.path },
+    })
+    const retained = ctx.sessions.create(SessionId('retained'), {
+      meta: { cwd: created.workspace.path },
+    })
+    await controller.archiveSession({ sessionId: restored.id })
+    await expect(controller.archiveSession({ sessionId: retained.id }))
+      .resolves.toEqual({ archivedSessionIds: [restored.id, retained.id] })
+
+    await expect(controller.unarchiveSession({ sessionId: restored.id }))
+      .resolves.toEqual({ archivedSessionIds: [retained.id] })
+    // Restoring requires no Session identity: an id outside the archive set
+    // resolves with the unchanged set instead of the archive path's failure.
+    await expect(controller.unarchiveSession({ sessionId: SessionId('unknown') }))
+      .resolves.toEqual({ archivedSessionIds: [retained.id] })
   })
 })
 

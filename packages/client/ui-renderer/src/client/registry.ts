@@ -474,7 +474,7 @@ export class SlotRegistry extends Service {
       subscribe: (key, fn) => this._core.subscribe(key, fn),
       getVersion: key => this._core.getVersion(key),
       entriesOf: key => this._core.entries(key),
-      entriesOfSlot: key => this._core.entriesOfSlot(key),
+      entriesOfSlot: (key, scope) => this._core.entriesOfSlot(key, scope),
       reportEntryError: (key, entry, error, info) => { this._core.reportEntryError(key, entry, error, info) },
       specOf: key => this._core.specDynamic(key),
       isLive: entry => this._core.isLive(entry),

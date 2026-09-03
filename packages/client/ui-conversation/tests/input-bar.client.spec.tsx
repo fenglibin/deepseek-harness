@@ -1485,4 +1485,14 @@ describe('command launcher chrome and control seats', () => {
     const live = bench({ running: true, permissions })
     expect((live.view.getByLabelText(/^访问模式/) as HTMLButtonElement).disabled).toBe(false)
   })
+  it('renders the composer inert once its Session shell is disposed', () => {
+    const b = bench({ draft: 'typed' })
+    expect(b.view.container.querySelector('[data-composer-input]')?.getAttribute('contenteditable')).toBe('true')
+    // Disposal publishes (the machine releases), so the bar re-renders: a
+    // disposed shell owns no bindable editor, and the bar degrades to the same
+    // inert surface as no-Session instead of keeping a dead contenteditable.
+    act(() => { b.shell.dispose() })
+    expect(b.shell.live).toBe(false)
+    expect(b.view.container.querySelector('[data-composer-input]')?.getAttribute('contenteditable')).toBe('false')
+  })
 })

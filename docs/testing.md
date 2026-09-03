@@ -15,6 +15,10 @@ How this repo tests, tier by tier, and the rules that keep a green suite meaning
 
 Session fixtures keep headers and payloads but omit body sequence/time envelopes. Replay synthesizes them. Fixtures use canonical packed rows; [the migrator](../scripts/migrate-packed-session-fixtures.ts) rewrites old layouts.
 
+## Local verification scope
+
+Run only the affected packages plus their direct dependents locally; the full suite and `test:coverage` belong to CI. The affected-package computation and copyable command templates live in [agent-task-latency.md](design/agent-task-latency.md).
+
 ## How specs execute
 
 Forked workers run several spec files at once, the coverage gate splits into concurrent partitions beside the other gates in its job, and the self-hosted runners share one host and one volume. Only the process is isolated: ports, predictable paths, external namespaces, and inherited children are not. Own each acquired resource through its teardown, and read a spec that passes only when it runs alone as a defect in the spec rather than an unstable runner. [dsh-ci-test-reliability](../.agents/skills/dsh-ci-test-reliability/SKILL.md) owns the allocation, restoration, synchronization, timeout-budget, platform, and teardown rules; its [flake diagnosis workflow](../.agents/skills/dsh-ci-test-reliability/references/ci-flake-diagnosis.md) classifies an existing probabilistic failure.

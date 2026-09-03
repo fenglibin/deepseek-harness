@@ -3,7 +3,7 @@
 // turn wall time click-opens the Turn-time dialog. Both sit right of the
 // branch action in the tail's IconActions row, ahead of the plain clock text.
 
-import { useEffect, useRef, useState, type CSSProperties, type MutableRefObject } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type MutableRefObject } from 'react'
 import { createPortal } from 'react-dom'
 import {
   IconClockOutline16, IconDatabaseOutline16, useAnchoredPosition, useDismissOnOutsidePointer,
@@ -45,6 +45,9 @@ const PANEL_MARGIN = 12
 /** Distance between the trigger's top edge and the panel's bottom. */
 const PANEL_GAP = 8
 
+/** Grace before a hover-dismissed dialog closes, covering the trigger→panel gap. */
+const POINTER_GRACE_MS = 200
+
 /**
  * Unplaced portal panel: hidden but laid out so the clamp measures real
  * dimensions (the `useAnchoredPosition` measure pass).
@@ -53,17 +56,26 @@ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
 
 interface StatDialogSeat {
   open: boolean
+  /** Open immediately (hover-in), cancelling any pending grace close. */
+  openNow: () => void
+  /** Schedule a close after the pointer grace (hover-out). */
+  armClose: () => void
   setOpen: (open: boolean) => void
   rootRef: MutableRefObject<HTMLSpanElement | null>
   panelRef: MutableRefObject<HTMLDivElement | null>
   pos: CSSProperties | null
 }
 
-/** One trigger-anchored dialog seat: open state, viewport-clamped placement, outside-close. */
+/**
+ * One trigger-anchored dialog seat: open state, viewport-clamped placement,
+ * outside-close, and a pointer-grace close so the pointer can cross the
+ * trigger→panel gap while a hover-driven dialog stays open.
+ */
 function useStatDialog(): StatDialogSeat {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLSpanElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Portal placement: the dialog is fixed above the trigger and clamped inside
   // the viewport, so a trigger near the window edge cannot push it off-screen.
@@ -75,6 +87,29 @@ function useStatDialog(): StatDialogSeat {
     gap: PANEL_GAP,
     margin: PANEL_MARGIN,
   })
+
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current !== null) {
+      clearTimeout(closeTimer.current)
+      closeTimer.current = null
+    }
+  }, [])
+
+  const armClose = useCallback(() => {
+    cancelClose()
+    closeTimer.current = setTimeout(() => {
+      closeTimer.current = null
+      setOpen(false)
+    }, POINTER_GRACE_MS)
+  }, [cancelClose])
+
+  const openNow = useCallback(() => {
+    cancelClose()
+    setOpen(true)
+  }, [cancelClose])
+
+  // A pending grace close dies with the component.
+  useEffect(() => cancelClose, [cancelClose])
 
   // Outside pointerdown closes through the shared primitive; the portaled
   // panel counts as inside. Escape close stays local, one listener while open.
@@ -88,7 +123,7 @@ function useStatDialog(): StatDialogSeat {
     return () => { document.removeEventListener('keydown', onKeyDown) }
   }, [open])
 
-  return { open, setOpen, rootRef, panelRef, pos }
+  return { open, openNow, armClose, setOpen, rootRef, panelRef, pos }
 }
 
 /**
@@ -97,16 +132,25 @@ function useStatDialog(): StatDialogSeat {
  * @returns The trigger and, while open, its portaled dialog anchored above the trigger.
  */
 export function TurnUsagePanel({ usage, t }: TurnUsagePanelProps) {
-  const { open, setOpen, rootRef, panelRef, pos } = useStatDialog()
+  const { open, setOpen, openNow, armClose, rootRef, panelRef, pos } = useStatDialog()
 
-  const cacheHit = usage.cacheReadTokens === undefined
-    ? null
-    : formatCacheHitPercent(usage.cacheReadTokens, usage.totalTokens - usage.outputTokens, 1)
+  // Cache-hit share always shows (zero when no bucket reported), matching the
+  // session StatsLine's whole-log reading; absent cache traffic reads 0%.
+  const cacheHit = formatCacheHitPercent(
+    usage.cacheReadTokens ?? 0,
+    usage.totalTokens - usage.outputTokens,
+    1,
+  )
   const total = formatCompactCount(usage.totalTokens, t)
   const routes = usage.routes?.map(route => `${route.provider}/${route.model}`).join(', ') ?? ''
 
   return (
-    <span ref={rootRef} className={css.root}>
+    <span
+      ref={rootRef}
+      className={css.root}
+      onMouseEnter={openNow}
+      onMouseLeave={() => { if (open) armClose() }}
+    >
       <button
         type="button"
         className={css.trigger}
@@ -183,9 +227,14 @@ export function TurnUsagePanel({ usage, t }: TurnUsagePanelProps) {
  * @returns The clock-and-duration trigger and, while open, its portaled dialog anchored above the trigger.
  */
 export function TurnTimePanel({ runMs, tokensPerSecond, ttftMs, t }: TurnTimePanelProps) {
-  const { open, setOpen, rootRef, panelRef, pos } = useStatDialog()
+  const { open, setOpen, openNow, armClose, rootRef, panelRef, pos } = useStatDialog()
   return (
-    <span ref={rootRef} className={css.root}>
+    <span
+      ref={rootRef}
+      className={css.root}
+      onMouseEnter={openNow}
+      onMouseLeave={() => { if (open) armClose() }}
+    >
       <button
         type="button"
         className={css.trigger}

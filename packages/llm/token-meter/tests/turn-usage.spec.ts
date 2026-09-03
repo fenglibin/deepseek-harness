@@ -66,7 +66,7 @@ describe('deriveTurnTokenUsage', () => {
     })
   })
 
-  it('derives an exact total only when both cache buckets are present', () => {
+  it('derives an exact total from the prompt and output buckets', () => {
     expect(deriveTurnTokenUsage(completeAttempt(message(3, usage({
       totalTokens: undefined,
       inputTokens: 10,
@@ -75,10 +75,18 @@ describe('deriveTurnTokenUsage', () => {
       cacheWriteTokens: 1,
     }))))?.totalTokens).toBe(17)
 
+    // A missing cache-write bucket defaults to zero (a provider without a
+    // cache-write concept still bills input + cacheRead + output exactly).
     expect(deriveTurnTokenUsage(completeAttempt(message(3, usage({
       totalTokens: undefined,
       cacheWriteTokens: undefined,
-    }))))).toBeUndefined()
+    }))))).toEqual({
+      uncachedInputTokens: 100,
+      outputTokens: 20,
+      totalTokens: 170,
+      cacheReadTokens: 50,
+      routes: [{ provider: 'deepseek', model: 'deepseek-chat' }],
+    })
   })
 
   it('lets final message usage replace the latest streaming sample', () => {
@@ -277,6 +285,36 @@ describe('deriveTurnTokenUsage', () => {
         chunk: { type: 'finish', reason: { kind: 'aborted' } },
       }),
     ))).toMatchObject({ totalTokens: 170 })
+  })
+
+  it('keeps billed attempts when a later step is interrupted without usage', () => {
+    const events = [
+      event(1, 'turn/start', { turn: 1 }),
+      event(2, 'step/start', { turn: 1, step: 1 }),
+      message(3, usage()),
+      event(4, 'step/end', { turn: 1, step: 1 }),
+      event(5, 'step/start', { turn: 1, step: 2 }),
+      // Interrupted before reporting any usage: the second step bills nothing.
+      event(6, 'step/end', { turn: 1, step: 2 }),
+      event(7, 'turn/end', { turn: 1, reason: { kind: 'aborted' } }),
+    ]
+    expect(deriveTurnTokenUsage(events)).toEqual({
+      uncachedInputTokens: 100,
+      outputTokens: 20,
+      totalTokens: 170,
+      cacheReadTokens: 50,
+      routes: [{ provider: 'deepseek', model: 'deepseek-chat' }],
+    })
+  })
+
+  it('discloses nothing for a turn interrupted before any billed usage', () => {
+    const events = [
+      event(1, 'turn/start', { turn: 1 }),
+      event(2, 'step/start', { turn: 1, step: 1 }),
+      event(3, 'step/end', { turn: 1, step: 1 }),
+      event(4, 'turn/end', { turn: 1, reason: { kind: 'aborted' } }),
+    ]
+    expect(deriveTurnTokenUsage(events)).toBeUndefined()
   })
 
   it.each([

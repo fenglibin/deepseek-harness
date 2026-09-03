@@ -4,7 +4,8 @@
  */
 import { Component, useMemo, useState, useSyncExternalStore, type FC, type ReactNode } from 'react'
 import {
-  SlotOwnershipError, StaleAuthorizationError, standardHookPropName,
+  ABDICATION_SCOPE_ROOT, SlotOwnershipError, StaleAuthorizationError, abdicationScopeOf,
+  standardHookPropName,
   type ChainRenderOpts, type HostObservable, type LocaleFace, type RenderOpts,
   type ScopedStandardSourceBinding, type SessionAreaProps, type SessionProviderComponent, type SlotRenderer,
   type SlotRendererHost, type SlotScope, type SlotScopeAdapter, type StandardSourceBinding,
@@ -307,6 +308,37 @@ function entryKeyOf(entry: StoredEntry): number {
 }
 
 /**
+ * Style of the local-build crash plate. Module-level constant — a stable
+ * reference so the plate never diffs its style prop. `currentColor` keeps the
+ * plate theme-neutral with no color token of its own.
+ */
+const CRASH_FACE_STYLE = {
+  display: 'flex',
+  alignItems: 'center',
+  minHeight: '1.5rem',
+  padding: '0 0.5rem',
+  border: '1px dashed currentColor',
+  fontFamily: 'monospace',
+  fontSize: '0.75rem',
+} as const
+
+/**
+ * Crash face shared by entry boundaries and dry-cell projections: the
+ * placeholder a retired entry leaves behind. Official builds keep the bare
+ * marker element — a production user sees no framework chrome — while local
+ * builds render a visible plate naming the retired slot, so a hole in the
+ * tree is diagnosable on sight instead of silently missing. The plate carries
+ * no product copy: the slot key is a code token, the same value as the
+ * marker's attribute.
+ * @param slotKey - retired slot key.
+ * @returns the crash face element.
+ */
+function SlotCrashFace({ slotKey }: { slotKey: string }): ReactNode {
+  if (process.env.DSH_CLIENT_BUILD_PROFILE === 'official') return <div data-slot-error={slotKey} />
+  return <div data-slot-error={slotKey} style={CRASH_FACE_STYLE}>{slotKey}</div>
+}
+
+/**
  * Per-entry isolation: one registrant crashing (component render or inject
  * factory) must not take down siblings. Assembly errors (missing providers)
  * rethrow — a miswired shell must fail loud, not degrade into fallbacks.
@@ -329,7 +361,7 @@ class SlotErrorBoundary extends Component<
     this.props.onEntryError(error)
   }
   override render(): ReactNode {
-    if (this.state.failed) return <div data-slot-error={this.props.slotKey} />
+    if (this.state.failed) return <SlotCrashFace slotKey={this.props.slotKey} />
     return this.props.children
   }
 }
@@ -732,6 +764,11 @@ function renderOutletContent(
   if (spec.scope === 'session' && scopeBinding.key === undefined) {
     throw new SlotAssemblyError(`strict session slot '${slotKey}' rendered without a scope binding`)
   }
+  // Abdication scope of this render: a crash retires the entry from the
+  // cell only while this scope renders, so a Session-scoped registration
+  // that crashed under one Session renders again for the next instead of
+  // staying retired for the rest of its registration's life.
+  const abdicationScope = spec.scope === 'root' ? ABDICATION_SCOPE_ROOT : abdicationScopeOf(scopeBinding.key)
   const entries = host.entriesOf(slotKey)
   const slotInjected = cachedSlotInject(spec.inject)
 
@@ -746,7 +783,7 @@ function renderOutletContent(
     // resolve at select time, and retiring a crashed elected entry would
     // change the static crash face.
     const onEntryError = (error: unknown) => {
-      host.reportEntryError(slotKey, entry, error, { abdicate: spec.kind !== 'chain' })
+      host.reportEntryError(slotKey, entry, error, { abdicate: spec.kind !== 'chain', scope: abdicationScope })
     }
     return spec.scope === 'session'
       ? (
@@ -790,15 +827,15 @@ function renderOutletContent(
   // A cell whose every registration abdicated keeps the crash face: the
   // shadowing collapse ran out of survivors, which is a failure state, not
   // the owner's natural-empty fallback.
-  const deadCell = () => <div data-slot-error={slotKey} />
+  const deadCell = () => <SlotCrashFace slotKey={slotKey} />
 
   if (spec.kind === 'single') {
-    const entry = host.entriesOfSlot(slotKey)[0]
+    const entry = host.entriesOfSlot(slotKey, abdicationScope)[0]
     if (!entry) return entries.length > 0 ? deadCell() : <>{opts?.fallback ?? null}</>
     return guarded(entry, entryKeyOf(entry))
   }
   if (spec.kind === 'keyed') {
-    const entry = host.entriesOfSlot(slotKey).find(e => e.options.key === opts?.entryKey)
+    const entry = host.entriesOfSlot(slotKey, abdicationScope).find(e => e.options.key === opts?.entryKey)
     if (!entry) {
       const occupied = entries.some(e => e.options.key === opts?.entryKey)
       return occupied ? deadCell() : <>{opts?.fallback ?? null}</>
@@ -839,7 +876,7 @@ function renderOutletContent(
   // face once every entry of the cell abdicated (a dry cell must not
   // silently drop its row). Row sequence: registration order refined by
   // explicit order, optional id filter, as before shadowing existed.
-  const winners = host.entriesOfSlot(slotKey)
+  const winners = host.entriesOfSlot(slotKey, abdicationScope)
   const rows: { entry: StoredEntry | undefined; id: string | undefined; order: number }[] = winners.map(entry => ({
     entry,
     id: entry.options.id,
@@ -861,7 +898,7 @@ function renderOutletContent(
     <>
       {list.map((item, i) => item.entry !== undefined
         ? guarded(item.entry, `e${entryKeyOf(item.entry)}`)
-        : <div data-slot-error={slotKey} key={`x${item.id ?? i}`} />)}
+        : <SlotCrashFace slotKey={slotKey} key={`x${item.id ?? i}`} />)}
     </>
   )
 }
@@ -899,7 +936,7 @@ function RootOutlet({ ownerProps }: { ownerProps: object }) {
     // Registrations exist but every one abdicated: the shadowing collapse ran
     // dry, so the crash face replaces the tree (registered-but-broken is a
     // crash, not the boot-order assembly failure below).
-    if (host.entriesOf('root').length > 0) return <div data-slot-error="root" />
+    if (host.entriesOf('root').length > 0) return <SlotCrashFace slotKey="root" />
     throw new SlotAssemblyError("renderSlot('root') before any 'root' registration (boot order)")
   }
   // Same anchor contract as SlotOutlet: 'root' is a slot like any other, and

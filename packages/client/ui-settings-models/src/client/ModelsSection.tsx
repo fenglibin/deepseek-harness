@@ -18,8 +18,8 @@ import { Button, IconPlusOutline16, Modal } from '@deepseek-ai/dsh-client-ui-pri
 import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls this package's SlotMap merge (the two Models child slots).
 import type {} from './slot-contract.ts'
-import { CustomProviderCard } from './CustomProviderCard.tsx'
-import { deriveKeyRef, protocolChoices, providerUsable } from './store.ts'
+import { AddModelDialog } from './AddModelDialog.tsx'
+import { deriveKeyRef, keyConfiguredOf, protocolChoices, providerUsable } from './store.ts'
 import type { ModelsSettingsStore, ProviderRow } from './store.ts'
 import type { ModelsOperations } from './operations.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
@@ -144,19 +144,6 @@ export function needsSetup(row: ProviderRow, anyUsable: boolean): boolean {
   return row.credential?.configured !== true
 }
 
-/**
- * The provider-card seat's credential fact: the reference this page would use
- * for the row — the profile's `apiKeyEnv`, or the page's derived
- * `<ROUTE>_API_KEY` while the profile names none — confirmed configured. The
- * derived half is what keeps the seat consistent with the editor on the
- * add-provider draft, whose dormant row names no reference yet.
- */
-function keyConfiguredOf(row: ProviderRow): boolean {
-  return row.apiKeyEnv !== undefined
-    ? row.credential?.configured === true
-    : row.derivedCredential?.configured === true
-}
-
 function targetOf(row: ProviderRow): EditorTarget {
   const managedRef = deriveKeyRef(row.entry.provider)
   const credentialRef = row.apiKeyEnv === managedRef
@@ -210,7 +197,6 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
   const [deleting, setDeleting] = useState(false)
   const [deleteFailure, setDeleteFailure] = useState<string | undefined>(undefined)
   const [savedTarget, setSavedTarget] = useState<ProviderIdentity | undefined>(undefined)
-  const [declaring, setDeclaring] = useState(false)
   const [dismissedSetup, setDismissedSetup] = useState<ReadonlySet<string>>(() => new Set())
 
   const announceSaved = (target: ProviderIdentity): void => {
@@ -223,7 +209,6 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
   const closeEditor = (changed: boolean, target: ProviderIdentity): void => {
     setEditing(undefined)
     setAdding(false)
-    setDeclaring(false)
     if (changed) announceSaved(target)
   }
 
@@ -291,14 +276,6 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
   const anyUsable = state.rows.some(providerUsable)
   const configured = state.rows.filter(row => row.configured)
   const addable = state.rows.filter(row => !row.configured && row.entry.settingsNs !== '')
-  const addTarget = adding ? editing : undefined
-  const addNamespace = addTarget === undefined ? undefined : state.namespaces.get(addTarget.settingsNs)
-  // The draft's directory row, for the card extension seat. A refresh can drop
-  // the row mid-draft (the route was adopted or withdrawn elsewhere); the
-  // draft card stays while the seat simply has no row to dispatch.
-  const addRow = addTarget === undefined
-    ? undefined
-    : state.rows.find(row => row.entry.provider === addTarget.provider)
   // Hand-declared routes live in the pi-ai namespace, which is also the only
   // one whose schema names the protocols one may speak; without it mounted
   // there is nothing to declare and the entry point stays disabled.
@@ -387,10 +364,9 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                     aria-label={providerCopy(t('editProvider'), target)}
                     onClick={() => {
                       setSavedTarget(undefined)
-                      // One card at a time: leaving `declaring` set would show
-                      // the create card beside this editor, and closing either
-                      // one discards the other's draft.
-                      setDeclaring(false)
+                      // One card at a time: an add dialog left open beside
+                      // this editor would be dismissed by closing either one,
+                      // discarding the other's draft.
                       setAdding(false)
                       setEditing(open ? undefined : target)
                     }}
@@ -437,106 +413,46 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
         })}
       </ul>
       <div className={styles['addBlock']}>
-        {addTarget !== undefined && addNamespace !== undefined
+        {/* One entry point for the two ways to gain a provider — adopt one the
+            adapter already knows, or declare one by its endpoint — because
+            both start from the same question and the dialog asks it once. */}
+        <button
+          type="button"
+          className={styles['addButton']}
+          disabled={!state.writable || (addable.length === 0 && protocols.length === 0)}
+          onClick={() => {
+            setSavedTarget(undefined)
+            setEditing(undefined)
+            setAdding(true)
+          }}
+        >
+          <IconPlusOutline16 size={14} />
+          {t('add')}
+        </button>
+        {adding
           ? (
-            <div className={styles['addCard']}>
-              <div className={styles['field']}>
-                <span className={styles['fieldLabel']}>{t('provider')}</span>
-                <select
-                  className={`${styles['input']} ${styles['selectInput']}`}
-                  value={addTarget.provider}
-                  aria-label={t('provider')}
-                  onChange={(event) => {
-                    const row = addable.find(candidate => candidate.entry.provider === event.target.value)
-                    /* v8 ignore next -- the select only lists addable rows */
-                    if (row === undefined) return
-                    setEditing(targetOf(row))
-                  }}
-                >
-                  {addable.map(row => (
-                    <option key={row.entry.provider} value={row.entry.provider}>{row.entry.displayName}</option>
-                  ))}
-                </select>
-              </div>
-              <ProviderEditor
-                key={addTarget.provider}
-                provider={addTarget.provider}
-                displayName={addTarget.displayName}
-                hideTitle
-                namespace={addNamespace}
-                schema={schema}
-                settingsPath={addTarget.settingsPath}
-                operations={operations}
-                t={t}
-                readOnly={!state.writable}
-                onClose={(changed) => { closeEditor(changed, addTarget) }}
-              />
-              {addRow === undefined
-                ? null
-                : renderSlot(
-                  'settings.models.provider-card',
-                  { provider: addRow.entry, configured: addRow.configured, keyConfigured: keyConfiguredOf(addRow) },
-                  { entryKey: addRow.entry.settingsNs },
-                )}
-            </div>
+            <AddModelDialog
+              rows={state.rows}
+              addable={addable}
+              namespaces={state.namespaces}
+              protocols={protocols}
+              /* v8 ignore next -- the create is only reachable with this namespace mounted */
+              revision={state.namespaces.get('llm-pi-ai')?.revision ?? 0}
+              schema={schema}
+              operations={operations}
+              t={t}
+              readOnly={!state.writable}
+              renderSlot={renderSlot}
+              onClose={(added) => {
+                setAdding(false)
+                // A committed route is announced like any saved row: the
+                // dialog is gone by then, and the notice is what says the
+                // write landed rather than merely closed.
+                if (added !== undefined) announceSaved({ provider: added, displayName: added })
+              }}
+            />
           )
-          : declaring
-            ? (
-              <div className={styles['addCard']}>
-                <CustomProviderCard
-                  taken={state.rows.map(row => row.entry.provider)}
-                  protocols={protocols}
-                  /* v8 ignore next -- the card only opens from a button disabled without this namespace */
-                  revision={state.namespaces.get('llm-pi-ai')?.revision ?? 0}
-                  operations={operations}
-                  t={t}
-                  readOnly={!state.writable}
-                  onClose={(changed) => {
-                    setDeclaring(false)
-                    if (changed) void controller.load()
-                  }}
-                />
-              </div>
-            )
-            : (
-              // One row for the two ways to gain a provider: adopt one the
-              // adapter already knows, or declare one it does not. Side by side
-              // and equal-width so they read as siblings and line up with the
-              // rows above, rather than two pills of different lengths.
-              <div className={styles['addActions']}>
-                <button
-                  type="button"
-                  className={styles['addButton']}
-                  disabled={addable.length === 0 || !state.writable}
-                  onClick={() => {
-                    const first = addable[0]
-                    /* v8 ignore next -- the button is disabled while nothing is addable */
-                    if (first === undefined) return
-                    setSavedTarget(undefined)
-                    setDeclaring(false)
-                    setAdding(true)
-                    setEditing(targetOf(first))
-                  }}
-                >
-                  <IconPlusOutline16 size={14} />
-                  {t('add')}
-                </button>
-                <button
-                  type="button"
-                  className={styles['addButton']}
-                  disabled={protocols.length === 0 || !state.writable}
-                  onClick={() => {
-                    setSavedTarget(undefined)
-                    setAdding(false)
-                    setEditing(undefined)
-                    setDeclaring(true)
-                  }}
-                >
-                  <IconPlusOutline16 size={14} />
-                  {t('customAdd')}
-                </button>
-              </div>
-            )}
+          : null}
       </div>
       {renderSlot('settings.models.footer', {})}
       <Modal

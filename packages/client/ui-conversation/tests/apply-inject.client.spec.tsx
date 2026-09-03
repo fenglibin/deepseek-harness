@@ -136,13 +136,22 @@ describe('Conversation inject API', () => {
     await b.runtime.dispose()
   })
 
-  it('fails loud for an unknown binding or an unloaded scoped service', async () => {
+  it('degrades an unknown binding to the absent face and fails loud on an unloaded scoped service', async () => {
     const b = await bench()
     const entry = b.entryOf('conversation.composer.bar')
     const injectBar = entry.inject as unknown as (
       sessionId: SessionId | undefined,
     ) => ComposerBarInjected
-    expect(() => { injectBar('ghost' as SessionId).stop!() }).toThrow(/resolved no binding/)
+    // A Session whose binding is unresolvable (its scope is mid-build or
+    // mid-teardown) degrades to the same inert face as no-Session: the
+    // composer-bar entry keeps its slot instead of crashing out of it for
+    // every Session until the page reloads, and the rebuilt scope re-runs the
+    // inject on its new binding.
+    const ghost = injectBar('ghost' as SessionId)
+    expect(ghost.keyboard).toBeUndefined()
+    expect(ghost.draftImages).toBeUndefined()
+    expect(ghost.stop).toBeUndefined()
+    expect(ghost.hooks.notices.getSnapshot()).toBeNull()
 
     const absent = injectBar(undefined)
     expect(absent.keyboard).toBeUndefined()

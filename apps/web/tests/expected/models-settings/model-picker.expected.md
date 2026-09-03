@@ -3,6 +3,8 @@
   - button "关闭":
     - img
   - paragraph: 以下是模型提供方的可用模型，勾选要添加的模型。
+  - img
+  - searchbox "筛选模型"
   - button "全选"
   - list:
     - listitem:

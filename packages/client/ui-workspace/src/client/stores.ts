@@ -21,6 +21,8 @@ type WorkspaceViewState = {
   orderBy: SessionOrderBy
   /** Explicit zero-or-five-session state keyed by Workspace group identity. */
   groupExpansion: Record<string, boolean>
+  /** Whether the archive section shows its rows. */
+  archivedExpanded: boolean
   /** Shared editable order per Workspace group plus the browser-local flat-list account. */
   sessionOrderByAccount: Record<string, string[]>
   /** Last observed update timestamps per order account for one-time promotion events. */
@@ -35,6 +37,7 @@ type WorkspaceViewActions = {
   setGroupBy: (draft: WorkspaceViewState, mode: SessionGroupBy) => void
   setOrderBy: (draft: WorkspaceViewState, mode: SessionOrderBy) => void
   setGroupExpanded: (draft: WorkspaceViewState, key: string, expanded: boolean) => void
+  setArchivedExpanded: (draft: WorkspaceViewState, expanded: boolean) => void
   retainAccountKeys: (draft: WorkspaceViewState, workspaceKeys: readonly string[]) => void
   syncSessionOrderAccount: (
     draft: WorkspaceViewState,
@@ -55,14 +58,16 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
       groupBy: 'workspace',
       orderBy: 'updated',
       groupExpansion: {},
+      archivedExpanded: false,
       sessionOrderByAccount: {},
       sessionUpdatedAtByAccount: {},
     }),
-    persist: 'dsh.workspace.view.v5',
+    persist: 'dsh.workspace.view.v6',
     actions: {
       setGroupBy: (d, mode: SessionGroupBy) => { d.groupBy = mode },
       setOrderBy: (d, mode: SessionOrderBy) => { d.orderBy = mode },
       setGroupExpanded: (d, key: string, expanded: boolean) => { d.groupExpansion[key] = expanded },
+      setArchivedExpanded: (d, expanded: boolean) => { d.archivedExpanded = expanded },
       retainAccountKeys: (d, workspaceKeys: readonly string[]) => {
         const retained = new Set(workspaceKeys)
         d.groupExpansion = Object.fromEntries(

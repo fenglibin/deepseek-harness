@@ -51,7 +51,7 @@ register 调用可以用 `store: defineStore(...)` 声明 store 席位：`init` 
 
 ### 注册与路由
 
-`SlotCore` 在构造时预置 `'root'` slot，并强制执行加载时验证。`ChainSelect` selector 按升序 `priority` 运行（相同值按注册顺序）；第一个非 null 返回值选中其条目，并成为组件的 `matched` prop；全部返回 null 时使用 owner 的 `renderSlotChain` fallback（`ChainRenderOpts`）。每个 key 都携带一个 declaration epoch，它只在声明与移除时递增；`ui-renderer` 将其用于 `ctx.slots.inject`，且与普通条目版本相互独立。
+`SlotCore` 在构造时预置 `'root'` slot，并强制执行加载时验证。经 `reportEntryError` 上报的条目崩溃会让该条目从可覆盖 cardinality 的 cell 退休，改由该 cell 的下一个存活条目渲染；退休按崩溃发生时正在渲染的 Session 生效，因此 Session 级注册在下一个 Session 会重新渲染，而 root 级注册在注册销毁前保持退休。`ChainSelect` selector 按升序 `priority` 运行（相同值按注册顺序）；第一个非 null 返回值选中其条目，并成为组件的 `matched` prop；全部返回 null 时使用 owner 的 `renderSlotChain` fallback（`ChainRenderOpts`）。每个 key 都携带一个 declaration epoch，它只在声明与移除时递增；`ui-renderer` 将其用于 `ctx.slots.inject`，且与普通条目版本相互独立。
 
 ### 渲染器约定
 

@@ -50,6 +50,9 @@ describe('ReasoningRow', () => {
       />,
     )
     expect(view.getByText('运行中')).toBeTruthy()
+    // A streaming block now opens on the reasoning itself; fold it to read the
+    // one-line summary that follows the tail.
+    fireEvent.click(view.getByText('思考'))
     const summary = view.getByText('Newest reasoning tokens')
     Object.defineProperties(summary, {
       scrollWidth: { configurable: true, value: 300 },
@@ -84,6 +87,101 @@ describe('ReasoningRow', () => {
     expect(view.queryByText('运行中')).toBeNull()
     expect(summary.scrollLeft).toBe(0)
     expect(summary.hasAttribute('data-follow-end')).toBe(false)
+  })
+
+  it('opens on the reasoning while streaming and folds away once it settles', () => {
+    const blocks = [{ kind: 'reasoning' as const, text: 'First thought\nSecond thought' }]
+    const view = render(
+      <AssistantMarkdown t={t} blocks={blocks} streaming renderMessageImages={renderMessageImages} />,
+    )
+    const row = view.getByRole('button')
+    // Streaming shows the process rather than only its tail line.
+    expect(row.getAttribute('aria-expanded')).toBe('true')
+    expect(view.container.querySelector('[class*="thinkBody"]')).not.toBeNull()
+
+    view.rerender(
+      <AssistantMarkdown t={t} blocks={blocks} streaming={false} renderMessageImages={renderMessageImages} />,
+    )
+    // Settling folds it away with no click.
+    expect(row.getAttribute('aria-expanded')).toBe('false')
+    expect(view.container.querySelector('[class*="thinkBody"]')).toBeNull()
+  })
+
+  it('opens only the streaming block when one turn carries several', () => {
+    const blocks = [
+      { kind: 'reasoning' as const, text: 'first thought' },
+      { kind: 'reasoning' as const, text: 'second thought still arriving' },
+    ]
+    const view = render(
+      <AssistantMarkdown t={t} blocks={blocks} streaming renderMessageImages={renderMessageImages} />,
+    )
+    // Only the last block is the streaming tail, so an earlier thought in the
+    // same turn must not pop open behind it.
+    const rows = view.container.querySelectorAll('[data-disclosure-row]')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]?.getAttribute('aria-expanded')).toBe('false')
+    expect(rows[1]?.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('stops following the tail once the reader scrolls up', () => {
+    const blocks = (text: string) => [{ kind: 'reasoning' as const, text }]
+    const view = render(
+      <AssistantMarkdown t={t} blocks={blocks('first\nsecond')} streaming renderMessageImages={renderMessageImages} />,
+    )
+    const body = view.container.querySelector<HTMLElement>('[class*="thinkBody"]')!
+    Object.defineProperties(body, {
+      scrollHeight: { configurable: true, value: 400 },
+      clientHeight: { configurable: true, value: 100 },
+      scrollTop: { configurable: true, writable: true, value: 300 },
+    })
+    // Scrolling up to re-read releases the tail...
+    body.scrollTop = 0
+    fireEvent.scroll(body)
+    // ...so a later chunk leaves the reader where they are instead of yanking
+    // them back down mid-sentence. (Reopening re-takes the follow, but that
+    // needs a laid-out element — jsdom gives new nodes no scroll geometry.)
+    view.rerender(
+      <AssistantMarkdown t={t} blocks={blocks('first\nsecond\nthird')} streaming renderMessageImages={renderMessageImages} />,
+    )
+    expect(body.scrollTop).toBe(0)
+  })
+
+  it('follows the tail to the newest line while streaming', () => {
+    const blocks = (text: string) => [{ kind: 'reasoning' as const, text }]
+    const view = render(
+      <AssistantMarkdown t={t} blocks={blocks('first\nsecond')} streaming renderMessageImages={renderMessageImages} />,
+    )
+    const body = view.container.querySelector<HTMLElement>('[class*="thinkBody"]')!
+    Object.defineProperties(body, {
+      scrollHeight: { configurable: true, value: 400 },
+      clientHeight: { configurable: true, value: 100 },
+      scrollTop: { configurable: true, writable: true, value: 0 },
+    })
+    view.rerender(
+      <AssistantMarkdown t={t} blocks={blocks('first\nsecond\nthird')} streaming renderMessageImages={renderMessageImages} />,
+    )
+    // The open block keeps its newest line in view as chunks arrive.
+    expect(body.scrollTop).toBe(400)
+  })
+
+  it('keeps a settled block collapsed and leaves a reopened one open', () => {
+    const blocks = [{ kind: 'reasoning' as const, text: 'First thought\nSecond thought' }]
+    const view = render(
+      <AssistantMarkdown t={t} blocks={blocks} streaming={false} renderMessageImages={renderMessageImages} />,
+    )
+    const row = view.getByRole('button')
+    // A block that mounts settled — every replayed history message — never
+    // flashes open.
+    expect(row.getAttribute('aria-expanded')).toBe('false')
+
+    fireEvent.click(view.getByText('思考'))
+    expect(row.getAttribute('aria-expanded')).toBe('true')
+    // The auto-fold fires on the streaming -> settled transition only, so a
+    // finished thought the reader reopened stays open across re-renders.
+    view.rerender(
+      <AssistantMarkdown t={t} blocks={blocks} streaming={false} renderMessageImages={renderMessageImages} />,
+    )
+    expect(row.getAttribute('aria-expanded')).toBe('true')
   })
 
   it('expands from either Think or the reasoning summary', () => {

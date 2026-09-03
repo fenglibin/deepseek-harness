@@ -51,7 +51,7 @@ The design is one table: declaration = render authorization = runtime spec. `Slo
 
 ### Registration and routing
 
-`SlotCore` seeds the a-priori `'root'` slot at construction and enforces load-time validation. `ChainSelect` selectors run in ascending `priority` order (ties in registration order); the first non-null return elects its entry and becomes the component's `matched` prop, and all-null falls to the owner's `renderSlotChain` fallback (`ChainRenderOpts`). Each key carries a declaration epoch that advances only on declaration and collapse; `ui-renderer` uses it for `ctx.slots.inject`, independently from ordinary entry versions.
+`SlotCore` seeds the a-priori `'root'` slot at construction and enforces load-time validation. An entry crash reported through `reportEntryError` retires the entry from its cell for the shadowing cardinalities, and the cell's next survivor renders instead; retirement is scoped to the Session whose render crashed, so a Session-scoped registration renders again for the next Session, while a root-scoped registration stays retired until its registration is disposed. `ChainSelect` selectors run in ascending `priority` order (ties in registration order); the first non-null return elects its entry and becomes the component's `matched` prop, and all-null falls to the owner's `renderSlotChain` fallback (`ChainRenderOpts`). Each key carries a declaration epoch that advances only on declaration and collapse; `ui-renderer` uses it for `ctx.slots.inject`, independently from ordinary entry versions.
 
 ### The renderer contract
 

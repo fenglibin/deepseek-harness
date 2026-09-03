@@ -266,6 +266,21 @@ export function providerUsable(row: ProviderRow): boolean {
   return row.credential?.configured === true
 }
 
+/**
+ * The provider-card seat's credential fact: the reference this page would use
+ * for the row — the profile's `apiKeyEnv`, or the page's derived
+ * `<ROUTE>_API_KEY` while the profile names none — confirmed configured. The
+ * derived half is what keeps the seat consistent with the editor card the add
+ * dialog opens on a dormant row, which names no reference yet.
+ * @param row - one joined provider row.
+ * @returns whether the row's key is confirmed stored.
+ */
+export function keyConfiguredOf(row: ProviderRow): boolean {
+  return row.apiKeyEnv !== undefined
+    ? row.credential?.configured === true
+    : row.derivedCredential?.configured === true
+}
+
 /** First-run onboarding readiness derived only from the shared Models join. */
 export type OnboardingReadiness =
   | { kind: 'loading' }

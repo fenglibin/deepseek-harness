@@ -424,6 +424,22 @@ describe('SessionPersistenceSqlite physical packing', () => {
     await store.close()
   })
 
+  it('rolls back a session delete that fails the mutation-time schema check', async () => {
+    const path = await freshDbPath('dsh-sqlite-delete-rollback-')
+    const store = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })
+    const header = meta(SessionId('delete-rollback'))
+    await store.appendBatch(header, [chunk(0)], false)
+
+    const db = new DatabaseSync(path)
+    db.exec(testSql('set-user-version-16'))
+    db.close()
+    // The failed transaction leaves the log alone: a half-deleted session
+    // would strand its events under a row the header no longer owns.
+    await expect(store.deleteStored(header.id)).rejects.toThrow(/schema changed before mutation/)
+    expect((await store.loadStored(header.id))?.events).toEqual([chunk(0)])
+    await store.close()
+  })
+
   it('rejects a stale repair without deleting a newer winning tail', async () => {
     const path = await freshDbPath('dsh-sqlite-stale-repair-')
     const stale = new SqliteStore({ path, journalMode: 'wal', busyTimeoutMs: DEFAULT_BUSY_TIMEOUT_MS })

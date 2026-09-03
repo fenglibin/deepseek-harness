@@ -68,6 +68,10 @@
   text-overflow: clip;
 }
 
+/* The reasoning body: ten lines of the secondary tier, then it scrolls. A chat
+   flow reads many blocks at once, so an unbounded thought would push the
+   reply — and every row under it — off the viewport while it streams. The cap
+   rides the font-size axis, and the 8px is the block's own vertical padding. */
 .thinkBody {
   /* Indent under the title, which starts at leading (16 + delta) + gap 6. */
   padding: 4px 0 4px calc(22px + var(--dsh-content-font-delta, 0px));
@@ -76,6 +80,21 @@
   line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
   white-space: pre-wrap;
   word-break: break-word;
+  max-height: calc((20px + var(--dsh-content-font-delta-secondary, 0px)) * 10 + 8px);
+  overflow-y: auto;
+}
+
+/* In-block scrollbar, matching the Tool row's IN/OUT card scroller: a 2px
+   transparent border clips the thumb inward, and the track margins keep its
+   travel out of the body's top and bottom edges. */
+.thinkBody::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 6px;
+}
+
+.thinkBody::-webkit-scrollbar-track {
+  margin: 6px 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

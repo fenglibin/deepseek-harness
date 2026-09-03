@@ -10,7 +10,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
-import { ClientSessions, SessionCreateError } from '../src/client/sessions/service.ts'
+import { ClientSessions, SessionCreateError, SessionDeleteError } from '../src/client/sessions/service.ts'
 import { scopeOf } from '../src/client/scope.ts'
 import type { SessionFollowFrame } from '../src/types.ts'
 import {
@@ -720,6 +720,41 @@ describe('fork', () => {
     await expect(b.svc.fork({ sessionId: sid('source'), increaseTitle: true }))
       .rejects.toThrow('fork child rename failed: session/title-invalid: rejected')
     expect(b.svc.binding(sid('child'))).toBeDefined()
+  })
+})
+
+describe('delete', () => {
+  it('calls session.deleteSession with the id and drops the row synchronously', async () => {
+    const b = bench()
+    await feedList(b, [{ id: 's1' }, { id: 's2' }])
+    b.svc.open(sid('s1'))
+    expect(b.svc.list.getSnapshot().current).toBe(sid('s1'))
+    b.api.onDeleteSession = () => Promise.resolve(ok({ sessionId: sid('s1'), deleted: true as const }))
+
+    await expect(b.svc.delete(sid('s1'))).resolves.toBeUndefined()
+
+    expect(b.api.callsOf('session.deleteSession')).toEqual([{ sessionId: 's1' }])
+    // No flush wait: the delete echo is the row leaving the client's view, so
+    // a deleted current selection reads as the no-session state immediately.
+    expect(b.svc.list.getSnapshot().ids).toEqual(['s2'])
+    expect(b.svc.list.getSnapshot().byId[sid('s1')]).toBeUndefined()
+    expect(b.svc.list.getSnapshot().current).toBeUndefined()
+  })
+
+  it('throws SessionDeleteError with the rpc error and id, leaving the row in place', async () => {
+    const b = bench()
+    await feedList(b, [{ id: 's1' }, { id: 's2' }])
+    b.api.onDeleteSession = () => Promise.resolve(err(
+      new RemoteError('session/live', 'archive it instead', { sessionId: sid('s1') }),
+    ))
+
+    const failure = await b.svc.delete(sid('s1')).catch((error: unknown) => error)
+    expect(failure).toBeInstanceOf(SessionDeleteError)
+    expect(failure).toMatchObject({
+      sessionId: 's1',
+      rpcError: { code: 'session/live', message: 'archive it instead' },
+    })
+    expect(b.svc.list.getSnapshot().ids).toEqual(['s1', 's2'])
   })
 })
 

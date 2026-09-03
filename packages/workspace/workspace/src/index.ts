@@ -39,7 +39,7 @@ export function WorkspaceId(id: string): WorkspaceId {
 }
 
 /**
- * An archiveSession request named a session neither live nor in session
+ * A session-scoped request named a session neither live nor in session
  * persistence — a definite miss only; storage faults propagate as themselves.
  */
 export class WorkspaceUnknownSessionError extends Error {
@@ -47,7 +47,7 @@ export class WorkspaceUnknownSessionError extends Error {
    * @param sessionId - The unknown session id.
    */
   constructor(readonly sessionId: SessionId) {
-    super(`cannot archive session '${sessionId}': live sessions and session persistence hold no such session`)
+    super(`unknown session '${sessionId}': live sessions and session persistence hold no such session`)
     this.name = 'WorkspaceUnknownSessionError'
   }
 }
@@ -251,6 +251,56 @@ export class WorkspaceRegistry extends Service {
       }
       const state = this.requireState()
       await this.setState({ ...state, archivedSessionIds: [...state.archivedSessionIds, sessionId] })
+    })
+  }
+
+  /**
+   * Return one archived session to every grouping surface, in the position its
+   * workspace accounting kept for it. An id outside the archive set resolves
+   * without writing, so a session restored twice — or one that was never
+   * archived — is not an error.
+   * @param sessionId - The session to unarchive.
+   * @returns resolution after durability.
+   */
+  unarchiveSession(sessionId: SessionId): Promise<void> {
+    return this.enqueueOperation(async () => {
+      const state = this.requireState()
+      if (!state.archivedSessionIds.includes(sessionId)) return
+      await this.setState({
+        ...state,
+        archivedSessionIds: state.archivedSessionIds.filter(id => id !== sessionId),
+      })
+    })
+  }
+
+  /**
+   * Drop every reference the registry holds to one session whose durable log
+   * has already been deleted: its workspace accounting slots, its archive-set
+   * entry, and the in-memory header and path caches. Idempotent — a session
+   * with no reference left resolves without writing.
+   *
+   * This is the registry half of a session delete. It does not delete the log
+   * (persistence owns that), and it deliberately does not require the session
+   * to be known: after the log is gone, `sessionPersistence.list()` no longer
+   * reports the id, so a knowledge check would refuse the cleanup it exists to
+   * perform.
+   * @param sessionId - The session whose registry references are dropped.
+   * @returns resolution after durability.
+   */
+  removeSession(sessionId: SessionId): Promise<void> {
+    return this.enqueueOperation(async () => {
+      const state = this.requireState()
+      for (const workspaceId of state.workspaceIds) {
+        await this.entities.get(workspaceId)?.detachSession(sessionId)
+      }
+      this.headers.delete(sessionId)
+      this.sessionPaths.delete(sessionId)
+      this.invalidSessionPaths.delete(sessionId)
+      if (!state.archivedSessionIds.includes(sessionId)) return
+      await this.setState({
+        ...this.requireState(),
+        archivedSessionIds: this.requireState().archivedSessionIds.filter(id => id !== sessionId),
+      })
     })
   }
 

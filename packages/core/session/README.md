@@ -100,6 +100,8 @@ Every append uses the shared iterative `snapshotJsonValue()` pass, which reads, 
 
 The loop logs a full canonical `request/header` snapshot (call config, adapter defaults, rendered system prompt, assembled tool schemas) at each loop-instance boundary and on change; `foldRequestHeader(events)` reconstructs it by selecting the latest snapshot, making every conversation request a pure function of the log. Route metadata (`request/context`) is separate logged state appended only when the provider, model, or capacity differs.
 
+A committed rewrite also decides cache economics. A replacement swaps the old event out of the ordered surface, so `deriveMessages()` emits the rewritten message in place of the original and the next request diverges from its predecessor's prompt prefix at that point — the provider's prefix cache then misses everything after it, not only the rewritten span. `surface.replaceGeneration` increments on every replacement so the loop can record the boundary, but the cache loss follows from the content change, not from the counter. Since cached input costs less than uncached input, a rewrite can cost more than the tokens it frees.
+
 </details>
 
 -----

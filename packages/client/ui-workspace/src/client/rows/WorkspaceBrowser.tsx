@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
   Button, IconCloseFill14, IconPersonalizationOutline16,
-  IconProjectAddOutline16, IconSearchOutline16, Menu, Modal, Tooltip,
+  IconProjectAddOutline16, IconSearchOutline16, IconTriangleRightFill14, Menu, Modal, Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   SessionListState, SessionSearchResultItem,
@@ -22,7 +22,7 @@ import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
 import type { SessionNode, SessionOrderBy } from '../tree.ts'
-import { deriveFlat, deriveGroups, deriveSearchResults, UNGROUPED_KEY } from '../tree.ts'
+import { deriveArchived, deriveFlat, deriveGroups, deriveSearchResults, UNGROUPED_KEY } from '../tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
 import { FLAT_SESSION_ORDER_KEY } from '../stores.ts'
 import { WorkspacePickFlow } from '../WorkspacePicker.tsx'
@@ -252,6 +252,14 @@ type SessionTreeProps = Pick<
   setSessionOrder: (accountKey: string, order: string[]) => void
   /** Registry-global archive set (hidden rows). */
   archivedSessionIds: readonly SessionNode['id'][]
+  /** Whether the archive section is open. */
+  archivedExpanded: boolean
+  /** Persist the archive section's open state. */
+  setArchivedExpanded: (expanded: boolean) => void
+  /** Return an archived session to the grouping surfaces. */
+  onSessionRestore: (sessionId: SessionNode['id']) => void
+  /** Open the browser-owned session delete confirmation (id + current title). */
+  onSessionDelete: (sessionId: SessionNode['id'], currentTitle: string) => void
   /** Open the browser-owned rename dialog for a real Workspace group. */
   onRenameRequest: (workspaceId: WorkspaceId, currentTitle: string) => void
   /** Open the browser-owned delete-confirmation dialog for a real Workspace group. */
@@ -267,6 +275,7 @@ type SessionTreeProps = Pick<
 /** The scrolling session tree; unmounting drops the sessions subscription and expand-all state. */
 function SessionTree({
   useSessions, useSessionPendingInteraction, startSession, open, forkSession, workspaces, archivedSessionIds,
+  archivedExpanded, setArchivedExpanded, onSessionRestore, onSessionDelete,
   onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive,
   insertWorkspaceBefore, insertSessionBefore, orderBy,
   groupExpansion, setGroupExpanded,
@@ -561,9 +570,13 @@ function SessionTree({
                     currentId={current}
                     now={now}
                     onOpen={open}
-                    onRename={onSessionRename}
-                    onFork={forkSession}
-                    onArchive={onSessionArchive}
+                    menu={{
+                      kind: 'listed',
+                      onRename: () => { onSessionRename(node.id, node.title) },
+                      onFork: () => { forkSession(node.id) },
+                      onArchive: () => { onSessionArchive(node.id) },
+                      onDelete: () => { onSessionDelete(node.id, node.title) },
+                    }}
                     drag={dragProps}
                     t={t}
                   />
@@ -585,6 +598,17 @@ function SessionTree({
           )
         })}
       </div>
+      <ArchivedSection
+        useSessions={useSessions}
+        useSessionPendingInteraction={useSessionPendingInteraction}
+        open={open}
+        archivedSessionIds={archivedSessionIds}
+        expanded={archivedExpanded}
+        onToggle={() => { setArchivedExpanded(!archivedExpanded) }}
+        onSessionRestore={onSessionRestore}
+        onSessionDelete={onSessionDelete}
+        t={t}
+      />
       <span className={css.fade} />
     </div>
   )
@@ -593,7 +617,7 @@ function SessionTree({
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
   useSessions, useSessionPendingInteraction, open, forkSession, onSessionRename, onSessionArchive,
-  archivedSessionIds,
+  archivedSessionIds, archivedExpanded, setArchivedExpanded, onSessionRestore, onSessionDelete,
   orderBy, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, t,
 }: Pick<
   SessionTreeProps,
@@ -604,6 +628,10 @@ function FlatList({
   | 'onSessionRename'
   | 'onSessionArchive'
   | 'archivedSessionIds'
+  | 'archivedExpanded'
+  | 'setArchivedExpanded'
+  | 'onSessionRestore'
+  | 'onSessionDelete'
   | 'orderBy'
   | 'sessionOrderByAccount'
   | 'sessionUpdatedAtByAccount'
@@ -680,9 +708,13 @@ function FlatList({
               currentId={list.current}
               now={now}
               onOpen={open}
-              onRename={onSessionRename}
-              onFork={forkSession}
-              onArchive={onSessionArchive}
+              menu={{
+                kind: 'listed',
+                onRename: () => { onSessionRename(node.id, node.title) },
+                onFork: () => { forkSession(node.id) },
+                onArchive: () => { onSessionArchive(node.id) },
+                onDelete: () => { onSessionDelete(node.id, node.title) },
+              }}
               flat
               drag={{
                 start: () => {
@@ -708,7 +740,85 @@ function FlatList({
           )
         })}
       </div>
+      <ArchivedSection
+        useSessions={useSessions}
+        useSessionPendingInteraction={useSessionPendingInteraction}
+        open={open}
+        archivedSessionIds={archivedSessionIds}
+        expanded={archivedExpanded}
+        onToggle={() => { setArchivedExpanded(!archivedExpanded) }}
+        onSessionRestore={onSessionRestore}
+        onSessionDelete={onSessionDelete}
+        t={t}
+      />
       <span className={css.fade} />
+    </div>
+  )
+}
+
+/**
+ * The archive: the one surface that shows the Sessions the registry hides from
+ * every grouping surface, so archiving stays reversible and an archived
+ * Session is not simply gone. Its rows take the archive's own verbs — restore
+ * and delete — and the section collapses to a single labelled row.
+ */
+function ArchivedSection({
+  useSessions, useSessionPendingInteraction, open, archivedSessionIds,
+  expanded, onToggle, onSessionRestore, onSessionDelete, t,
+}: Pick<
+  SessionTreeProps,
+  'useSessions' | 'useSessionPendingInteraction' | 'open' | 'archivedSessionIds' | 't'
+> & {
+  /** Whether the section shows its rows. */
+  expanded: boolean
+  /** Flip the section's open state. */
+  onToggle: () => void
+  /** Return one archived Session to the grouping surfaces. */
+  onSessionRestore: (sessionId: SessionNode['id']) => void
+  /** Open the browser-owned delete confirmation for one Session. */
+  onSessionDelete: (sessionId: SessionNode['id'], currentTitle: string) => void
+}) {
+  const list = useSessions(s => s)
+  const pendingInteractions = useSessionPendingInteraction(s => s)
+  const rows = useMemo(
+    () => deriveArchived(list, archivedSessionIds, pendingInteractions),
+    [list, archivedSessionIds, pendingInteractions],
+  )
+  const now = Date.now()
+  // An archive nobody has filled yet has nothing to be a destination for.
+  if (rows.length === 0) return null
+  return (
+    <div className={css.archivedSection}>
+      <button
+        type="button"
+        className={css.archivedHeader}
+        aria-expanded={expanded}
+        onClick={onToggle}
+      >
+        <IconTriangleRightFill14 className={clsx(css.archivedArrow, expanded && css.archivedArrowOpen)} />
+        <span className={css.archivedLabel}>{t('section.archived')}</span>
+        <span className={css.archivedCount}>{rows.length}</span>
+      </button>
+      {expanded && (
+        <div className={css.list} role="tree" aria-label={t('section.archived')}>
+          {rows.map(node => (
+            <SessionNodeItem
+              key={node.id}
+              node={node}
+              currentId={list.current}
+              now={now}
+              onOpen={open}
+              flat
+              menu={{
+                kind: 'archived',
+                onRestore: () => { onSessionRestore(node.id) },
+                onDelete: () => { onSessionDelete(node.id, node.title) },
+              }}
+              t={t}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -815,6 +925,8 @@ export function WorkspaceBrowser({
   deleteWorkspace,
   insertWorkspaceBefore,
   archiveSession,
+  unarchiveSession,
+  deleteSession,
   insertSessionBefore,
   createWorkspace,
   searchSessions,
@@ -834,6 +946,7 @@ export function WorkspaceBrowser({
   const groupBy = useStore(s => s.groupBy)
   const orderBy = useStore(s => s.orderBy)
   const groupExpansion = useStore(s => s.groupExpansion)
+  const archivedExpanded = useStore(s => s.archivedExpanded)
   const sessionOrderByAccount = useStore(s => s.sessionOrderByAccount)
   const sessionUpdatedAtByAccount = useStore(s => s.sessionUpdatedAtByAccount)
   const currentBlankSessionId = useSessions((state) => {
@@ -1022,14 +1135,52 @@ export function WorkspaceBrowser({
     setSessionRenameError(null)
   }
 
-  // Archive is dialog-free: not destructive (the log and the accounting slot
-  // remain), so the menu action commits directly; the row disappears when the
-  // archive-set echo lands. Failures are non-fatal console diagnostics, the
-  // same posture as reorder rejections.
+  // Session delete dialog: a successful delete removes the row that opened it,
+  // so the dialog is browser-owned like the workspace one and stays pending
+  // until the row is gone. A refusal keeps it open: the one the operator can
+  // act on (`live`) names what to do instead of quoting the wire.
+  const [sessionDeleteTarget, setSessionDeleteTarget] = useState<{ sessionId: SessionNode['id']; title: string } | null>(null)
+  const [sessionDeleting, setSessionDeleting] = useState(false)
+  const [sessionDeleteError, setSessionDeleteError] = useState<string | null>(null)
+  const closeSessionDelete = () => {
+    if (sessionDeleting) return
+    setSessionDeleteTarget(null)
+    setSessionDeleteError(null)
+  }
+  const confirmSessionDelete = () => {
+    /* v8 ignore next -- the Modal is absent without a target and its button is disabled while deleting. */
+    if (sessionDeleting || sessionDeleteTarget === null) return
+    setSessionDeleting(true)
+    setSessionDeleteError(null)
+    void deleteSession(sessionDeleteTarget.sessionId).then((outcome) => {
+      setSessionDeleting(false)
+      if (outcome.ok) {
+        setSessionDeleteTarget(null)
+        return
+      }
+      setSessionDeleteError(outcome.refusal === 'live' ? t('delete.session.live') : outcome.message)
+    })
+  }
+
+  // Archive and restore are dialog-free: neither touches the session log, so
+  // the menu action commits directly and the row moves between surfaces when
+  // the archive-set echo lands. Failures are non-fatal console diagnostics,
+  // the same posture as reorder rejections.
   const onSessionArchive = (sessionId: SessionNode['id']) => {
     archiveSession(sessionId).catch((reason: unknown) => {
       console.warn('session archive rejected:', reason)
     })
+  }
+  const onSessionRestore = (sessionId: SessionNode['id']) => {
+    unarchiveSession(sessionId).catch((reason: unknown) => {
+      console.warn('session restore rejected:', reason)
+    })
+  }
+  // Delete is destructive, so the menu action opens the browser-owned dialog
+  // above and the dialog commits.
+  const onSessionDelete = (sessionId: SessionNode['id'], currentTitle: string) => {
+    setSessionDeleteTarget({ sessionId, title: currentTitle })
+    setSessionDeleteError(null)
   }
 
   // Delete dialog is separate from the row so a successful removal can
@@ -1222,6 +1373,10 @@ export function WorkspaceBrowser({
                 open={open} forkSession={forkSession}
                 onSessionRename={onSessionRename} onSessionArchive={onSessionArchive}
                 archivedSessionIds={archivedSessionIds}
+                archivedExpanded={archivedExpanded}
+                setArchivedExpanded={actions.setArchivedExpanded}
+                onSessionRestore={onSessionRestore}
+                onSessionDelete={onSessionDelete}
                 orderBy={orderBy}
                 sessionOrderByAccount={sessionOrderByAccount}
                 sessionUpdatedAtByAccount={sessionUpdatedAtByAccount}
@@ -1245,6 +1400,10 @@ export function WorkspaceBrowser({
                 syncSessionOrderAccount={actions.syncSessionOrderAccount}
                 setSessionOrder={actions.setSessionOrder}
                 archivedSessionIds={archivedSessionIds}
+                archivedExpanded={archivedExpanded}
+                setArchivedExpanded={actions.setArchivedExpanded}
+                onSessionRestore={onSessionRestore}
+                onSessionDelete={onSessionDelete}
                 startSession={startSession}
                 open={open}
                 insertWorkspaceBefore={insertWorkspaceBefore}
@@ -1355,6 +1514,31 @@ export function WorkspaceBrowser({
       >
         {deleting && <div className={css.deleteStatus} role="status">{t('delete.pending')}</div>}
         {deleteError !== null && <div className={css.renameError} role="alert">{deleteError}</div>}
+      </Modal>
+      <Modal
+        open={sessionDeleteTarget !== null}
+        onClose={closeSessionDelete}
+        closeLabel={t('close')}
+        title={t('delete.session')}
+        {...sessionDeleteTarget === null
+          ? {}
+          : { description: t('delete.session.desc', { name: sessionDeleteTarget.title }) }}
+        footer={(
+          <>
+            <Button variant="outline" disabled={sessionDeleting} onClick={closeSessionDelete}>{t('cancel')}</Button>
+            <Button
+              variant="outline"
+              className={css.deleteAction}
+              disabled={sessionDeleting}
+              onClick={confirmSessionDelete}
+            >
+              {t('delete.session')}
+            </Button>
+          </>
+        )}
+      >
+        {sessionDeleting && <div className={css.deleteStatus} role="status">{t('delete.session.pending')}</div>}
+        {sessionDeleteError !== null && <div className={css.renameError} role="alert">{sessionDeleteError}</div>}
       </Modal>
     </div>
   )

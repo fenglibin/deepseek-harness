@@ -4,8 +4,10 @@ import {
   CodeBlock, DiffBlock, DisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, WebBlock,
   diffTotals,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
-import { CHAT_DIFF_MAX_LINES, type DiffCardModel } from '../models/diff-card-model.ts'
+import type { LocaleKeysOf, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import {
+  CHAT_DIFF_MAX_LINES, type DiffCardModel, type FileOperation,
+} from '../models/diff-card-model.ts'
 import { CHAT_READ_MAX_LINES, type ReadCardModel } from '../models/read-card-model.ts'
 import { CHAT_SEARCH_MAX_LINES, type SearchCardModel } from '../models/search-card-model.ts'
 import {
@@ -64,6 +66,13 @@ export interface ToolRowProps {
    */
   inspect?: (() => void) | undefined
 }
+
+/** Locale key per file-operation kind, so the row's label stays locale-owned. */
+const OPERATION_KEYS = {
+  added: 'row.op.added',
+  modified: 'row.op.modified',
+  deleted: 'row.op.deleted',
+} as const satisfies Record<FileOperation, LocaleKeysOf<'conversation'>>
 
 function leadingFor(state: ToolRowState, icon: ReactNode): ReactNode {
   switch (state) {
@@ -140,6 +149,9 @@ export function ToolRow({
   }, [diffBody])
   const suffix = failureLine === null ? summarySuffix ?? diffStat : null
   const fileLink = filePath !== undefined && onOpenFile !== undefined && failureLine === null
+  // Only a file-mutation row names what it did to the path; every other row
+  // has no file change to describe, so it keeps its plain suffix.
+  const operation = diffBody?.operation ?? null
   const toggleExpand = () => {
     setExpanded(v => !v)
   }
@@ -147,11 +159,17 @@ export function ToolRow({
     event.stopPropagation()
     if (filePath !== undefined) onOpenFile?.(filePath)
   }
-  // Keep Enter/Space on the focused path link from bubbling to the row's
-  // keydown handler, which would preventDefault() the key and toggle expand
-  // instead of activating the link — the keyboard analogue of openFile's
-  // stopPropagation. The native button still fires its own onClick from the key.
-  const fileLinkKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+  // The change toggle lives inside a row that expands on its own click; without
+  // stopping the event the two handlers would cancel each other out.
+  const toggleChange = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    if (expandable) setExpanded(v => !v)
+  }
+  // Keep Enter/Space on a row-nested button from bubbling to the row's keydown
+  // handler, which would preventDefault() the key and toggle expand instead of
+  // activating the button — the keyboard analogue of stopPropagation on click.
+  // The native button still fires its own onClick from the key.
+  const stopRowToggleKeys = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
   }
   // The code variant's program renders through CodeBlock (shiki), so only its
@@ -182,7 +200,7 @@ export function ToolRow({
                 type="button"
                 className={css.fileLink}
                 onClick={openFile}
-                onKeyDown={fileLinkKeyDown}
+                onKeyDown={stopRowToggleKeys}
               >
                 {summaryText}
               </button>
@@ -193,8 +211,22 @@ export function ToolRow({
                 {summaryText}
               </span>
             )}
+            {operation !== null && (
+              <span className={css.operation}>{t(OPERATION_KEYS[operation])}</span>
+            )}
             {suffix !== null && (
               <span className={clsx(css.summarySuffix, suffix === diffStat && css.diffStat)}>{suffix}</span>
+            )}
+            {operation !== null && (
+              <button
+                type="button"
+                className={css.changeToggle}
+                data-change-toggle
+                onClick={toggleChange}
+                onKeyDown={stopRowToggleKeys}
+              >
+                {t(open ? 'row.hideChange' : 'row.viewChange')}
+              </button>
             )}
           </>
         )}

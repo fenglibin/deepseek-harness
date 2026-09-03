@@ -59,6 +59,8 @@ Character counts are Unicode code points, so slicing never splits an emoji pair,
 
 Trimming only runs when a compaction trigger qualifies: `dsh-compaction-basic` invokes it after pressure or overflow is confirmed, before it selects what to condense. Below pressure nothing is trimmed, and trimming itself makes no model call.
 
+Each trimmed result is one committed replacement, which rewrites a message in the ordered surface; the next request then diverges from its predecessor at that message and the provider's prefix cache misses everything after it. `surface.replaceGeneration` records the boundary, but the cache loss follows from the rewritten content. Lowering `thresholdChars` to trim more often therefore trades a smaller context for a full cache miss on the next request. The [latency profile](../../../docs/design/agent-task-latency.md) records a measurement of that trade; keep the default unless your own measurement says otherwise.
+
 -----
 
 <a id="understand-the-implementation"></a>

@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useState, type KeyboardEvent, type MouseEvent } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import clsx from 'clsx'
 import {
@@ -18,6 +18,23 @@ import { CONVERSATION_NS as NS } from '../../locale.ts'
 import css from './bash-sample.module.css'
 
 type BashRowProps = ToolCallViewProps & PropsLocale<'conversation'>
+
+/**
+ * Output-height stages: two lines while the row is closed, ten once it is open,
+ * and unbounded after the reader asks for the rest. The row's own `data-stage`
+ * carries the stage to CSS, which derives each cap from the terminal's line
+ * height so the two can never disagree.
+ */
+type OutputStage = 'peek' | 'full' | 'all'
+
+/** Output rows the ten-line cap shows before the reader asks for the rest. */
+const FULL_OUTPUT_LINES = 10
+
+/** Count the rows a command's output occupies, trailing newline excluded. */
+function outputLineCount(output: string | undefined): number {
+  if (output === undefined || output === '') return 0
+  return output.replace(/\n$/u, '').split('\n').length
+}
 
 function leadingFor(state: ToolRowState) {
   switch (state) {
@@ -53,6 +70,8 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
     : model.state
   const status = stateStatus(state, t)
   const [expanded, setExpanded] = useState(false)
+  // Whether the open row has dropped its height cap for the rest of the output.
+  const [unbounded, setUnbounded] = useState(false)
   // Execution failures and persistent-shell results have no terminal card.
   // Keep their recorded args and complete output reachable through the generic
   // body; background acknowledgements and malformed calls remain collapsed.
@@ -62,8 +81,29 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
   const expandable = terminal !== null || genericBody
   const open = expanded && expandable
   const failureLine = model.state === 'error' ? model.errorSummary : null
+  const stage: OutputStage = !open ? 'peek' : unbounded ? 'all' : 'full'
+  // Only an output taller than the open cap has a stage past it to reach.
+  const outputLines = outputLineCount(terminal?.card.output)
+  const showToggle = terminal !== null && outputLines > FULL_OUTPUT_LINES
   const toggleExpand = () => {
     setExpanded(v => !v)
+  }
+  const toggleUnbounded = (event: MouseEvent<HTMLButtonElement>) => {
+    // The button sits inside the row that expands on its own click; without
+    // stopping the event the two handlers would cancel each other out.
+    event.stopPropagation()
+    // Asking for the rest opens the row first: from the closed peek the next
+    // stage is the ten-line cap, and only from there is it unbounded.
+    if (!expanded) {
+      setExpanded(true)
+      return
+    }
+    setUnbounded(v => !v)
+  }
+  // Keep Enter/Space on the toggle from bubbling to the row's keydown handler,
+  // which would preventDefault() the key and expand instead of activating it.
+  const stopRowToggle = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') event.stopPropagation()
   }
   const toggleFromKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!expandable || (event.key !== 'Enter' && event.key !== ' ')) return
@@ -101,19 +141,42 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
         <span className={clsx(css.summary, failureLine !== null && css.errorSummary)}>
           {failureLine ?? terminal?.description ?? model.summary}
         </span>
+        {showToggle && (
+          <button
+            type="button"
+            className={css.outputToggle}
+            data-output-toggle
+            onClick={toggleUnbounded}
+            onKeyDown={stopRowToggle}
+          >
+            {t(unbounded ? 'bash.collapseAll' : 'bash.showAll')}
+          </button>
+        )}
       </div>
-      {open && (
-        <div className={css.bodyWrap}>
-          {terminal !== null
-            ? (
+      {terminal !== null
+        ? (
+          <>
+            {/* The closed row still shows what the command printed: two lines
+                under the banner, growing to ten once the row opens. */}
+            <div className={css.terminalWrap} data-stage={stage}>
               <TerminalBlock
                 {...terminal.card}
                 maxLines={Infinity}
                 labels={terminalBlockLabels(t)}
                 className={css.terminal}
               />
-            )
-            : (
+            </div>
+            {inspect !== undefined && (
+              <button type="button" className={css.inspectButton} onClick={inspect}>
+                <IconInspectOutline12 />
+                {t('row.inspect')}
+              </button>
+            )}
+          </>
+        )
+        : open
+          ? (
+            <div className={css.bodyWrap}>
               <div className={css.ioCard}>
                 {model.body !== null && (
                   <div className={css.ioSection}>
@@ -133,15 +196,15 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
                   </div>
                 )}
               </div>
-            )}
-          {inspect !== undefined && (
-            <button type="button" className={css.inspectButton} onClick={inspect}>
-              <IconInspectOutline12 />
-              {t('row.inspect')}
-            </button>
-          )}
-        </div>
-      )}
+              {inspect !== undefined && (
+                <button type="button" className={css.inspectButton} onClick={inspect}>
+                  <IconInspectOutline12 />
+                  {t('row.inspect')}
+                </button>
+              )}
+            </div>
+          )
+          : null}
     </div>
   )
 }

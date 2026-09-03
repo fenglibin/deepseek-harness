@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The context group provides plugins that add model-visible context to each request without defining any tool: workspace instruction files become guidance, `@file` mentions offer path completion, other sessions can be referenced as bounded snapshots, and the model can see the current time and the agent's tmux location. All of them are opt-in except `agent-instructions`, which ships enabled in the default `dsh-agent-spine-demo` bundle and can be disabled through bundle config. Context is durable: injected instructions and references enter session history as user-role messages, so they persist, replay, and compact like other conversation content. This page maps the group; each package README owns the per-package contract.
+The context group provides plugins that add model-visible content to each request without defining any tool: workspace instruction files become guidance, `@file` mentions offer path completion, other sessions can be referenced as bounded snapshots, the model can see the current time and the agent's tmux location, and one row names the language the model writes for a person. All of them are opt-in except `agent-instructions`, which ships enabled in the default `dsh-agent-spine-demo` bundle and can be disabled through bundle config, and `response-language`, which ships enabled in `dsh-base` and is pinned or turned off through an overlay. Context is durable: injected instructions and references enter session history as user-role messages, so they persist, replay, and compact like other conversation content. The response-language row is not — it contributes a system-prompt section rebuilt at each assembly, which never enters history. This page maps the group; each package README owns the per-package contract.
 
 ## Table of Contents
 
@@ -30,6 +30,7 @@ The context group provides plugins that add model-visible context to each reques
 | [`file-reference-local/`](file-reference-local/README.md) | Local-workspace completion provider for `@file` mentions | — |
 | [`time-context/`](time-context/README.md) | Current time, browser zone, and elapsed time per step | — |
 | [`tmux-context/`](tmux-context/README.md) | The agent's tmux session, window, and pane location | — |
+| [`response-language/`](response-language/README.md) | Demands one language for everything the model writes for a person; `auto` follows the GUI language, then the host locale | — |
 
 -----
 

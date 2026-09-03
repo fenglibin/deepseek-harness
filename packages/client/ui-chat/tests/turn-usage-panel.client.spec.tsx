@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 import { TurnTimePanel, TurnUsagePanel } from '../src/client/chat/TurnUsagePanel.tsx'
@@ -50,7 +50,7 @@ describe('TurnUsagePanel', () => {
     expect(details.textContent).not.toContain('Total')
   })
 
-  it('omits unavailable optional facts instead of inventing values', () => {
+  it('omits unavailable optional facts but always shows the cache-hit share', () => {
     const usage: TurnTokenUsage = {
       uncachedInputTokens: 120,
       outputTokens: 30,
@@ -62,10 +62,41 @@ describe('TurnUsagePanel', () => {
     expect(trigger.textContent).toBe('Usage 150 tok')
     fireEvent.click(trigger)
     expect(view.queryByText('Provider / model')).toBeNull()
-    expect(view.queryByText('Cache hit')).toBeNull()
     expect(view.queryByText('Cached input')).toBeNull()
     expect(view.queryByText('Cache write')).toBeNull()
     expect(view.queryByText(/reasoning/)).toBeNull()
+    // No reported cache traffic still renders a 0% cache-hit share, matching
+    // the session StatsLine's whole-log reading.
+    expect(view.getByText('Cache hit')).toBeTruthy()
+    expect(view.getByText('0%')).toBeTruthy()
+  })
+
+  it('opens on mouse hover and closes after the pointer grace elapses', () => {
+    vi.useFakeTimers()
+    try {
+      const usage: TurnTokenUsage = {
+        uncachedInputTokens: 120,
+        outputTokens: 30,
+        totalTokens: 150,
+      }
+      const view = render(<TurnUsagePanel usage={usage} t={t} />)
+      const trigger = view.getByRole('button')
+      expect(view.queryByRole('dialog')).toBeNull()
+
+      fireEvent.mouseEnter(trigger)
+      expect(trigger.getAttribute('aria-expanded')).toBe('true')
+      expect(view.getByRole('dialog')).toBeTruthy()
+
+      fireEvent.mouseLeave(trigger)
+      // Still open inside the grace window; closed once it elapses.
+      act(() => { vi.advanceTimersByTime(199) })
+      expect(view.getByRole('dialog')).toBeTruthy()
+      act(() => { vi.advanceTimersByTime(1) })
+      expect(view.queryByRole('dialog')).toBeNull()
+      expect(trigger.getAttribute('aria-expanded')).toBe('false')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps a partial cache hit below 100 in the dialog and closes on Escape or outside pointerdown', () => {

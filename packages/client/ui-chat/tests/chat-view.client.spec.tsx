@@ -1876,6 +1876,20 @@ describe('ChatView', () => {
     expect(status.textContent).toMatch(/^深度求索中\.\.\.2分0\d秒$/)
   })
 
+  it('omits the running clock when the turn start is outside the loaded window', () => {
+    // A running turn whose turn/start boundary is not in the window has no
+    // stable anchor; the label renders without a clock instead of restarting
+    // from mount time on every re-entry.
+    const h = makeHarness(
+      { runningCalls: [runningCall('r1')] },
+      { running: true },
+    )
+    const view = render(<h.ChatView {...h.props} />)
+    const status = view.getByRole('status')
+    expect(status.textContent).toBe('深度求索中...')
+    expect(status.querySelector('[aria-hidden="true"]')).toBeNull()
+  })
+
   it('hands each ordered root call to the keyed business-node slot', () => {
     const block = toolResult(3, 'a')
     const h = makeHarness({ nodes: [block] })

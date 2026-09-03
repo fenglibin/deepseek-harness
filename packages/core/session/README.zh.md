@@ -100,6 +100,8 @@ session.deriveMessages()         // the derived model history
 
 循环在每个循环实例边界及变更时记录完整规范 `request/header` 快照（调用配置、适配器默认值、渲染后的系统提示词、组装后的工具 schema）；`foldRequestHeader(events)` 通过选择最新快照来重建它，使每个对话请求都成为日志的纯函数。路由元数据（`request/context`）是独立的已记录状态，仅在提供方、模型或容量变化时追加。
 
+一次已提交的改写同时决定了缓存的经济性。替换会把旧事件移出有序 surface，因此 `deriveMessages()` 会输出改写后的消息以取代原消息，下一次请求会在该点与上一次请求的提示词前缀分叉——提供方的 prefix cache 会未命中其后的所有内容，而不只是被改写的那一段。`surface.replaceGeneration` 每次替换递增一，使循环能够记录这一边界，但缓存损失来自内容变化，而非该计数器。由于缓存输入比未缓存输入便宜，一次改写可能比它释放的 token 更贵。
+
 </details>
 
 -----

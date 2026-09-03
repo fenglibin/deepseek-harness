@@ -243,6 +243,124 @@ describe('ApiSession Agent lookup and recovery', () => {
   })
 })
 
+describe('ApiSession Agent retirement', () => {
+  it('disposes an activated Agent once and reports ids it never activated', async () => {
+    const { ctx, agents } = await harness()
+    const meta = header('retired-agent')
+    const live = agent(ctx, meta)
+    const dispose = vi.fn(() => Promise.resolve())
+    vi.spyOn(ctx.agents, 'resume').mockImplementation(async () => {
+      ctx.agents.register(live)
+      return { agent: live, dispose }
+    })
+    providePersistence(ctx, {
+      list: () => Promise.resolve([meta]),
+      inspect: () => Promise.resolve({ meta, events: [] }),
+    })
+
+    await expect(agents.resolveAgent(meta.id)).resolves.toEqual({ agent: live })
+    await expect(agents.release(meta.id)).resolves.toBe(true)
+    expect(dispose).toHaveBeenCalledOnce()
+
+    // The capability is spent: a second release owns nothing to tear down.
+    await expect(agents.release(meta.id)).resolves.toBe(false)
+    expect(dispose).toHaveBeenCalledOnce()
+
+    const foreign = header('never-activated')
+    ctx.sessions.create(foreign.id, { meta: foreign })
+    await expect(agents.release(foreign.id)).resolves.toBe(false)
+  })
+
+  it('retires an Agent only once its in-flight activation settles', async () => {
+    const { ctx, agents } = await harness()
+    const meta = header('retire-during-resume')
+    const live = agent(ctx, meta)
+    const dispose = vi.fn(() => Promise.resolve())
+    let openGate!: () => void
+    const gate = new Promise<void>((resolve) => { openGate = resolve })
+    vi.spyOn(ctx.agents, 'resume').mockImplementation(async () => {
+      await gate
+      ctx.agents.register(live)
+      return { agent: live, dispose }
+    })
+    providePersistence(ctx, {
+      list: () => Promise.resolve([meta]),
+      inspect: () => Promise.resolve({ meta, events: [] }),
+    })
+
+    const resolving = agents.resolveAgent(meta.id)
+    const retiring = agents.release(meta.id)
+    // The activation has not published, so there is nothing to dispose yet.
+    await Promise.resolve()
+    expect(dispose).not.toHaveBeenCalled()
+    openGate()
+
+    await expect(resolving).resolves.toEqual({ agent: live })
+    await expect(retiring).resolves.toBe(true)
+    expect(dispose).toHaveBeenCalledOnce()
+  })
+
+  it('retires a created Agent only once its in-flight creation settles', async () => {
+    const { ctx, agents } = await harness()
+    const cwd = mkdtempSync(join(tmpdir(), 'dsh-session-controller-retire-'))
+    const meta = header('retire-created', cwd)
+    const created = unpublishedAgent(ctx, meta)
+    const dispose = vi.fn(() => Promise.resolve())
+    let openGate!: () => void
+    const gate = new Promise<void>((resolve) => { openGate = resolve })
+    vi.spyOn(ctx.agents, 'create').mockImplementation(async () => {
+      await gate
+      ctx.agents.register(created)
+      return { agent: created, dispose }
+    })
+    providePersistence(ctx, { list: () => Promise.resolve([]), inspect: vi.fn() })
+
+    const creating = agents.ensureSession(meta.id, cwd, false)
+    const retiring = agents.release(meta.id)
+    await Promise.resolve()
+    expect(dispose).not.toHaveBeenCalled()
+    openGate()
+
+    await expect(creating).resolves.toBe(created)
+    await expect(retiring).resolves.toBe(true)
+    expect(dispose).toHaveBeenCalledOnce()
+  })
+
+  it('leaves a failed activation and a later lifecycle alone', async () => {
+    const failed = await harness()
+    const failedMeta = header('retire-failed')
+    providePersistence(failed.ctx, {
+      list: () => Promise.resolve([failedMeta]),
+      inspect: () => Promise.resolve({ meta: failedMeta, events: [] }),
+    })
+    vi.spyOn(failed.ctx.agents, 'resume').mockRejectedValue(new Error('factory unavailable'))
+    const rejected = failed.agents.resolveAgent(failedMeta.id)
+    await expect(failed.agents.release(failedMeta.id)).resolves.toBe(false)
+    await expect(rejected).resolves.toMatchObject({ error: { code: 'gateway/internal' } })
+
+    const later = await harness()
+    const laterMeta = header('retire-later')
+    const first = agent(later.ctx, laterMeta)
+    const firstDispose = vi.fn(() => Promise.resolve())
+    let detachFirst!: () => void
+    vi.spyOn(later.ctx.agents, 'resume').mockImplementation(async () => {
+      detachFirst = later.ctx.agents.register(first)
+      return { agent: first, dispose: firstDispose }
+    })
+    providePersistence(later.ctx, {
+      list: () => Promise.resolve([laterMeta]),
+      inspect: () => Promise.resolve({ meta: laterMeta, events: [] }),
+    })
+    await expect(later.agents.resolveAgent(laterMeta.id)).resolves.toEqual({ agent: first })
+
+    // A second lifecycle under the same id outlives the retired capability.
+    detachFirst()
+    later.ctx.agents.register({ ...first })
+    await expect(later.agents.release(laterMeta.id)).resolves.toBe(false)
+    expect(firstDispose).not.toHaveBeenCalled()
+  })
+})
+
 describe('ApiSession model selection', () => {
   it('requires the model-selection projection', async () => {
     const { ctx, agents } = await harness()

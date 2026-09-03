@@ -131,17 +131,35 @@ export class InputHub implements SessionInputResolver {
   }
 
   /**
+   * Resident shell by session id, or undefined while that Session's binding
+   * cannot be resolved — the window in which a Session scope is being built
+   * or torn down (a created Session activates asynchronously, and a switching
+   * Session rebuilds its scope). Composer chrome reads through this accessor:
+   * it degrades to the absent-input face instead of throwing, so the
+   * composer-bar entry survives the window instead of crashing out of its
+   * slot for every Session.
+   * @param id - session id.
+   * @returns the shell, or undefined while the binding is unavailable.
+   */
+  tryShell(id: SessionId): SessionInputShell | undefined {
+    const existing = this.shells.get(id)
+    if (existing !== undefined) return existing
+    const binding = this.sessions().binding(id)
+    return binding === undefined ? undefined : this.shellFor(binding)
+  }
+
+  /**
    * Resident shell by session id (service-face path; the provide channel has
    * normally created it already — this covers direct id-addressed access).
+   * Programmatic callers own an addressable Session, so an unresolvable
+   * binding is a contract breach and throws.
    * @param id - session id.
    * @returns the shell.
    */
   shell(id: SessionId): SessionInputShell {
-    const existing = this.shells.get(id)
-    if (existing !== undefined) return existing
-    const binding = this.sessions().binding(id)
-    if (binding === undefined) throw new Error(`conversation.input: session "${id}" resolved no binding`)
-    return this.shellFor(binding)
+    const shell = this.tryShell(id)
+    if (shell === undefined) throw new Error(`conversation.input: session "${id}" resolved no binding`)
+    return shell
   }
 
   /**

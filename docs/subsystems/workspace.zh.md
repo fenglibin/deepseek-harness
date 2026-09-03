@@ -233,6 +233,13 @@ Host service backing the generated `ctx.remote.workspace` namespace.
 @Remote('archiveSession') archiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue>
 
 /**
+ * Return one Session to the Workspace grouping surfaces.
+ * @param request - Session identity to unarchive.
+ * @returns the complete resulting archive set.
+ */
+@Remote('unarchiveSession') unarchiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue>
+
+/**
  * Stream a complete Workspace baseline followed by ordered increments.
  * @param signal - generation cancellation.
  * @returns baseline followed by ordered Workspace increments.
@@ -304,6 +311,32 @@ insertBefore(id: WorkspaceId, beforeId?: WorkspaceId): Promise<readonly Workspac
  * @returns resolution after durability.
  */
 archiveSession(sessionId: SessionId): Promise<void>
+
+/**
+ * Return one archived session to every grouping surface, in the position its
+ * workspace accounting kept for it. An id outside the archive set resolves
+ * without writing, so a session restored twice — or one that was never
+ * archived — is not an error.
+ * @param sessionId - The session to unarchive.
+ * @returns resolution after durability.
+ */
+unarchiveSession(sessionId: SessionId): Promise<void>
+
+/**
+ * Drop every reference the registry holds to one session whose durable log
+ * has already been deleted: its workspace accounting slots, its archive-set
+ * entry, and the in-memory header and path caches. Idempotent — a session
+ * with no reference left resolves without writing.
+ *
+ * This is the registry half of a session delete. It does not delete the log
+ * (persistence owns that), and it deliberately does not require the session
+ * to be known: after the log is gone, `sessionPersistence.list()` no longer
+ * reports the id, so a knowledge check would refuse the cleanup it exists to
+ * perform.
+ * @param sessionId - The session whose registry references are dropped.
+ * @returns resolution after durability.
+ */
+removeSession(sessionId: SessionId): Promise<void>
 
 /**
  * Resolve by canonical directory path without creating or mutating a

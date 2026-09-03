@@ -43,7 +43,7 @@ const { meta, events } = await ctx.sessionPersistence.load(id)   // reload on re
 const headers = await ctx.sessionPersistence.list()        // every stored session
 ```
 
-`append` resolves only after the batch is durable, so a resolved write survives an OS crash or power loss. Ordinary `create` remains lazy; a lifecycle frontend calls `ensureMaterialized` only when an empty session must itself appear in durable listing without inventing an event. `load` returns an immutable balanced log and commits any needed crash recovery; `inspect` reads the same view without committing recovery. Consumers that resume from a watermark can read only the events at or past a sequence number, and a session's artifact location (`locate`) resolves without filesystem I/O.
+`append` resolves only after the batch is durable, so a resolved write survives an OS crash or power loss. Ordinary `create` remains lazy; a lifecycle frontend calls `ensureMaterialized` only when an empty session must itself appear in durable listing without inventing an event. `load` returns an immutable balanced log and commits any needed crash recovery; `inspect` reads the same view without committing recovery. Consumers that resume from a watermark can read only the events at or past a sequence number, and a session's artifact location (`locate`) resolves without filesystem I/O. `remove` discards a whole session log in one step — it is a discard, not an append, and leaves no tombstone — resolving `true` when it deleted something and `false` when the id had no durable record; the id must be free of live owners, so a caller removes a session's durable past only after its lifecycle ends.
 
 ### Resuming and crash recovery
 
@@ -133,7 +133,7 @@ Persistence does not mutate live request prefixes. A resumed loop can reuse prov
 
 These limits define where the seam's guarantees stop. They are current package constraints, not a task backlog.
 
-- **No deletion or retention API** — pruning stored sessions is out-of-band backend maintenance.
+- **No retention policy** — `remove` deletes one log on request; pruning on age, size, or count is out-of-band backend maintenance.
 - **`list()` is unpaginated and unfiltered** — it returns every stored session's header; fine for local stores, unindexed at scale.
 - **Synthetic closers are the only crash story** — a backend must synthesize `tool/result`/`step/end`/`turn/end` closers on load; there is no partial-turn resume that continues an interrupted turn instead of closing it.
 

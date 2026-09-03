@@ -51,7 +51,7 @@ The plugin activates after `slots`, `sessions`, and `layout`; it installs `creat
 
 ### Slot bindings
 
-`createSlotRenderer` connects the slot registry to React: entry lists become reactive sources, and each outlet renders through the installed renderer. Business plugins pass bare observable sources through typed slot `hooks`; the renderer binds them at the outlet via the uSES adapter.
+`createSlotRenderer` connects the slot registry to React: entry lists become reactive sources, and each outlet renders through the installed renderer. Each entry renders inside its own error boundary, so one crash is contained: the boundary logs the slot key, reports through the registry, and the outlet re-projects onto the cell's next survivor — retired only for the Session whose render crashed. The crash face is a bare `[data-slot-error]` marker in official builds and plates the slot key in local builds, so a hole in the tree is visible during development. Business plugins pass bare observable sources through typed slot `hooks`; the renderer binds them at the outlet via the uSES adapter.
 
 ### Identity
 

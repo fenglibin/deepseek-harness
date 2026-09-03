@@ -12,6 +12,11 @@
  * A provider that cannot be interrogated (an unreachable endpoint, a protocol
  * with no readable listing) is not a dead end: the failure is shown next to the
  * rows the user can still fill in by hand.
+ *
+ * The picker opens with the models this provider already carries checked, so an
+ * edit reads as a view of the current list rather than as a second, competing
+ * selection; a provider with no rows yet starts with every discovered model
+ * checked, which keeps adding one a single action.
  */
 
 import { useState } from 'react'
@@ -261,11 +266,18 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
         setFailure(t('fetchEmpty'))
         return
       }
-      // Everything already configured starts unchecked, so adopting a
-      // selection never silently rewrites a capacity the user corrected.
+      // An editor opens with its own rows checked: the picker is a second view
+      // of the same list, and a model the provider already carries is not a
+      // candidate to add. A provider with no rows yet is the create case,
+      // where every discovered model is worth adding, so those start checked.
+      // Checking a configured row changes nothing either way — adopting keeps
+      // the row the user tuned rather than the capacities the endpoint
+      // reported, so a pre-checked row never rewrites a corrected capacity.
       const known = new Set(models.map(model => textOf(model, 'id')))
       setCandidates(found)
-      setPicked(new Set(found.filter(model => !known.has(model.id)).map(model => model.id)))
+      setPicked(new Set(known.size === 0
+        ? found.map(model => model.id)
+        : found.filter(model => known.has(model.id)).map(model => model.id)))
       // A filter left over from the previous interrogation would hide most of
       // the new list behind text the user cannot see is still applied.
       setQuery('')

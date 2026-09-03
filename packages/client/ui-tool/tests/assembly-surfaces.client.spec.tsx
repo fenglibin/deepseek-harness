@@ -144,13 +144,16 @@ describe('terminal card assembly', () => {
     ])
     const view = runtime.renderRoot()
 
-    // Keyed BashRow: collapsed by default, the whole summary row is the toggle.
+    // Keyed BashRow: the terminal sits on the row from the start (capped to two
+    // lines), and the whole summary row is what grows it.
     const keyedRow = view.container.querySelector('[data-sample="bash"]')
     const keyed = keyedRow?.parentElement
-    expect(keyed?.querySelector('[data-terminal]')).toBeNull()
+    const keyedStage = () => keyed?.querySelector('[data-stage]')?.getAttribute('data-stage')
+    expect(keyed!.querySelector('[data-terminal]')).not.toBeNull()
+    expect(keyedStage()).toBe('peek')
     fireEvent.click(keyedRow!)
     await waitFor(() => {
-      expect(keyed!.querySelector('[data-terminal]')).not.toBeNull()
+      expect(keyedStage()).toBe('full')
     })
 
     // Fallback row: same unified expand interaction.

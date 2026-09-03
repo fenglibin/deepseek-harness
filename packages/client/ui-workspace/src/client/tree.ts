@@ -337,6 +337,32 @@ export function deriveFlat(
 }
 
 /**
+ * Derive the archived rows: exactly the Sessions the registry-global archive
+ * set hides from every grouping surface, newest first. A listed id whose
+ * summary has not landed yet has no row to show, so it is skipped rather than
+ * waited for — the row appears when the summary arrives.
+ * @param list - sessions list snapshot.
+ * @param archivedSessionIds - registry-global archive set.
+ * @param pendingInteractions - pending UI interactions by Session.
+ * @returns archived rows in render order.
+ */
+export function deriveArchived(
+  list: SessionListState,
+  archivedSessionIds: readonly SessionId[],
+  pendingInteractions: SessionPendingInteractions,
+): SessionNode[] {
+  const descendants = indexSubagentDescendants(list.byId)
+  const rows: SessionSummary[] = []
+  for (const id of archivedSessionIds) {
+    const summary = list.byId[id]
+    if (summary === undefined) continue
+    rows.push(summary)
+  }
+  rows.sort(byRecency)
+  return rows.map(session => sessionNode(session, descendants, pendingInteractions))
+}
+
+/**
  * Merge immediate title/Workspace substring matches with ranked Host content
  * matches. Local rows lead newest-first, content-only rows retain backend
  * order, and duplicate sessions receive the backend snippet in place.

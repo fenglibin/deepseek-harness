@@ -1,0 +1,232 @@
+/* Zero-height sticky slot, like the back-to-bottom control and the
+   TurnNavigator rail: the floating trigger and panel live above the
+   transcript scrollport without extending scrollHeight. */
+.slot {
+  position: sticky;
+  top: 0;
+  z-index: 7;
+  /* The slot sits inside the transcript's side padding (ConversationRoot /
+     ChatView.scroll), so the toggle gives that inset back and keeps 12px of
+     its own — flush with the right gutter like the existing rail. */
+  right: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+::global([data-conversation-scroll]) .slot {
+  /* When the conversation scrollport owns its own scrollbar, the slot is
+     bound to that scrollport instead of the viewport. The same vertical
+     clamp therefore reads --turn-rail-band (which ConversationRoot publishes
+     off the scrollport). */
+  --turn-rail-band: calc(
+    var(--dsh-conversation-viewport-height, 100dvh) - var(--dsh-composer-height, 152px)
+  );
+}
+
+/* The toggle is a circular pill pinned to the right gutter centre, the same
+   band the TurnNavigator rail sits on. Solid brand fill on the resting state
+   matches the deepseek-blue badge in the design reference; hovering lifts
+   the box-shadow one tier to advertise pressability. */
+.toggle {
+  position: absolute;
+  top: calc(var(--turn-rail-band, 100dvh) / 2);
+  right: 12px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: var(--dsw-alias-button-floating-fill);
+  color: var(--dsw-alias-label-primary);
+  box-shadow: var(--dsw-shadow-lv2);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.toggle:hover {
+  background: var(--dsw-alias-button-floating-hover);
+  box-shadow: var(--dsw-shadow-lv3);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.toggle:active {
+  transform: translateY(-50%) scale(0.97);
+}
+
+.toggleBadge {
+  font: var(--dsw-font-s-strong-14);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-state-business-primary);
+}
+
+/* Open state: the panel floats off the same anchor the toggle uses, so
+   opening feels like the badge expanding rather than a separate dialog
+   popping up. Width is bounded by the conversation column gutter so the
+   panel never sits past 88% of the visible scrollport. */
+.panel {
+  position: absolute;
+  top: calc(var(--turn-rail-band, 100dvh) / 2);
+  right: 12px;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  width: min(360px, calc(100% - 48px));
+  max-height: min(
+    var(--turn-rail-band, 100dvh),
+    560px
+  );
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-shadow-lv3);
+  overflow: hidden;
+  pointer-events: auto;
+  animation: dsh-user-turn-panel-enter 160ms ease-out;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+}
+
+.title {
+  font: var(--dsw-font-s-strong-14);
+  color: var(--dsw-alias-label-primary);
+}
+
+.count {
+  font: var(--dsw-font-xs-12);
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+
+.list {
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  overflow-y: auto;
+  /* Reserves room for the focus ring on the last item so keyboard
+     navigation doesn't crop. */
+  scroll-padding-block: 8px;
+}
+
+.list > li {
+  padding: 0;
+  margin: 0;
+}
+
+.list > li + li {
+  border-top: 1px solid var(--dsw-alias-border-l1);
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 16px;
+  border: 0;
+  margin: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.item:hover {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: -2px;
+}
+
+/* The active item is kept in lockstep with TurnNavigator's `activeTurn`,
+   so reading the rail mark and the highlighted row stay aligned as the
+   user scrolls. */
+.itemActive {
+  background: var(--dsw-alias-interactive-bg-selected-solid);
+}
+
+.itemActive .tag {
+  border-color: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.tag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 999px;
+  font: var(--dsw-font-xs-12);
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-layer-2);
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font: var(--dsw-font-s-14);
+  font-size: var(--dsh-content-font-size, 14px);
+  line-height: calc(20px + var(--dsh-content-font-delta, 0px));
+  color: var(--dsw-alias-label-secondary);
+  word-break: break-word;
+}
+
+.itemActive .preview {
+  color: var(--dsw-alias-label-primary);
+}
+
+@keyframes dsh-user-turn-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-50%) translateX(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggle,
+  .panel,
+  .item,
+  .tag {
+    transition: none;
+    animation: none;
+  }
+}
+
+@container (max-width: 900px) {
+  .slot {
+    display: none;
+  }
+}

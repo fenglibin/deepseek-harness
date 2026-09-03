@@ -96,6 +96,12 @@ export interface ISessions {
    */
   fork(opts: { sessionId: SessionId; atSeq?: number; increaseTitle?: boolean }): Promise<SessionId>
   /**
+   * Delete a session and every Host reference to it; irreversible.
+   * @param id - session id to delete.
+   * @throws {SessionDeleteError} with the session id.
+   */
+  delete(id: SessionId): Promise<void>
+  /**
    * Resolve an Agent-scoped context view (use-and-discard).
    * @param id - session id.
    * @returns scoped ctx, or undefined for a session neither listed nor already scoped.

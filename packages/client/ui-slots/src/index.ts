@@ -93,6 +93,24 @@ export type SlotKind = 'single' | 'list' | 'keyed' | 'chain'
 export type SlotScope = 'root' | 'session-maybe' | 'session'
 
 /**
+ * Abdication scope of a render that has no narrower scope to retire under:
+ * root-scope slots and Session slots rendered while no Session is selected.
+ * An entry that abdicates in this scope stays retired until its registration
+ * is disposed — there is no scope change left to retry it on.
+ */
+export const ABDICATION_SCOPE_ROOT = ''
+
+/**
+ * Abdication scope of one Session-scoped render.
+ * @param sessionId - the rendered Session, or undefined for the no-Session
+ * state (which shares {@link ABDICATION_SCOPE_ROOT}).
+ * @returns the scope key an abdicating crash retires the entry under.
+ */
+export function abdicationScopeOf(sessionId: string | undefined): string {
+  return sessionId ?? ABDICATION_SCOPE_ROOT
+}
+
+/**
  * One SlotMap entry: kind/scope axes plus the optional owner-supplied props
  * share (`owner` is what the parent passes at its renderSlot call site; the
  * framework standard kit and the registrant's injected share never enter this
@@ -684,12 +702,16 @@ export class SlotCore {
   private flushScheduled = false
   /**
    * Entries retired by an abdicating crash report
-   * ({@link SlotCore.reportEntryError}): excluded from
-   * {@link SlotCore.entriesOfSlot} projections for the rest of their
-   * registration's life, while the registration itself stays on the ledger
-   * (disposal authority remains with the registrant).
+   * ({@link SlotCore.reportEntryError}), keyed by the scope whose render
+   * crashed: excluded from {@link SlotCore.entriesOfSlot} projections while
+   * that same scope renders, restored to their cell once a different scope
+   * renders. The registration stays on the ledger either way (disposal
+   * authority remains with the registrant), and only the latest abdication
+   * scope is retained — a Session-scoped registration earns one fresh attempt
+   * per Session instead of staying retired for the rest of its life after a
+   * single crash.
    */
-  private abdicated = new WeakSet<StoredEntry>()
+  private abdicated = new WeakMap<StoredEntry, string>()
   private entryErrorListeners
     = new Set<(key: string, entry: StoredEntry, error: unknown, info: { abdicated: boolean }) => void>()
 
@@ -928,10 +950,17 @@ export class SlotCore {
    * entry, shadowing does not apply. The raw {@link SlotCore.entries} view
    * stays the inspection surface. Builds a fresh array per call — a render
    * body read, not a uSES getSnapshot source.
+   *
+   * Live means "not retired in the scope being rendered": an entry is skipped
+   * only while {@link SlotCore.reportEntryError} retired it under this exact
+   * scope, so a Session-scoped entry that crashed under one Session renders
+   * again for the next one.
    * @param key - slot key (dynamic: the render machinery holds keys as strings).
+   * @param scope - abdication scope of the caller's render (see
+   * {@link abdicationScopeOf}); defaults to {@link ABDICATION_SCOPE_ROOT}.
    * @returns the winning entry per occupied cell (empty while undeclared).
    */
-  entriesOfSlot(key: string): readonly StoredEntry[] {
+  entriesOfSlot(key: string, scope: string = ABDICATION_SCOPE_ROOT): readonly StoredEntry[] {
     const rec = this.records.get(key)
     if (!rec?.spec) return NO_ENTRIES
     const kind = rec.spec.kind
@@ -939,7 +968,7 @@ export class SlotCore {
     const heads: StoredEntry[] = []
     const seenCells = new Set<string | undefined>()
     for (const entry of rec.entries) {
-      if (this.abdicated.has(entry)) continue
+      if (this.abdicated.get(entry) === scope) continue
       // Single-kind entries all share the one undefined cell.
       const cell = kind === 'keyed' ? entry.options.key : kind === 'list' ? entry.options.id : undefined
       if (seenCells.has(cell)) continue
@@ -971,6 +1000,9 @@ export class SlotCore {
 
   /**
    * Export the current declaration topology without components or executable hooks.
+   * `active` marks the occupant that wins per cell in the root abdication
+   * scope: an entry retired only while rendering one Session counts as active
+   * here, since the tree has no Session to project against.
    * @param root - exact Slot key to select; omitted returns every live root.
    * @returns selected live Slot trees, or an empty array when `root` is unavailable.
    */
@@ -1081,22 +1113,35 @@ export class SlotCore {
    * Renderer crash report from an entry boundary. Always notifies
    * {@link SlotCore.onEntryError} listeners; with `info.abdicate` set (the
    * shadowing kinds — single/keyed/list) it first retires the entry from its
-   * cell, one-shot: the record's version bumps through the ordinary mutation
-   * channel so outlets re-project onto the cell's next survivor, and a
-   * repeat abdicating report no-ops entirely. Chain crashes report with
-   * `abdicate: false` — election alternatives resolve at select time, so the
-   * entry keeps its cell and only the notification fires. The registration
-   * itself stays on the ledger either way — raw {@link SlotCore.entries}
-   * still lists the entry and its disposer keeps working.
+   * cell for the reported scope: the record's version bumps through the
+   * ordinary mutation channel so outlets re-project onto the cell's next
+   * survivor, and a repeat abdicating report in the same scope no-ops
+   * entirely. Retirement is scoped, so the entry re-enters its cell as soon
+   * as a different scope renders — a Session-scoped entry that crashed while
+   * rendering one Session renders again for the next, instead of staying
+   * retired for the rest of its registration's life. Chain crashes report
+   * with `abdicate: false` — election alternatives resolve at select time, so
+   * the entry keeps its cell and only the notification fires. The
+   * registration itself stays on the ledger either way — raw
+   * {@link SlotCore.entries} still lists the entry and its disposer keeps
+   * working.
    * @param key - slot key the entry rendered under.
    * @param entry - the crashed entry.
    * @param error - the crash cause, forwarded to listeners verbatim.
-   * @param info - `abdicate`: whether the crash retires the entry from its cell.
+   * @param info - `abdicate`: whether the crash retires the entry from its
+   * cell; `scope`: the scope the retire applies to (see
+   * {@link abdicationScopeOf}), defaulting to {@link ABDICATION_SCOPE_ROOT}.
    */
-  reportEntryError(key: string, entry: StoredEntry, error: unknown, info: { abdicate: boolean }): void {
+  reportEntryError(
+    key: string,
+    entry: StoredEntry,
+    error: unknown,
+    info: { abdicate: boolean; scope?: string },
+  ): void {
     if (info.abdicate) {
-      if (this.abdicated.has(entry)) return
-      this.abdicated.add(entry)
+      const scope = info.scope ?? ABDICATION_SCOPE_ROOT
+      if (this.abdicated.get(entry) === scope) return
+      this.abdicated.set(entry, scope)
       const rec = this.records.get(key)
       if (rec !== undefined) this.markDirty(key, rec)
     }

@@ -150,6 +150,58 @@
   text-decoration-color: currentColor;
 }
 
+/* File-operation kind beside the path (`(修改)`): the summary already names the
+   file, so this reads as a qualifier in the same tertiary tone. Outside the
+   summary's ellipsis and non-shrinking, so a narrow row clips the path first.
+   The parentheses are decoration — a screen reader reads "path 修改" either
+   way — so they live here rather than in each dictionary, where a locale that
+   omits them could not drop them. */
+.operation {
+  flex: none;
+  margin-left: 6px;
+  white-space: nowrap;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.operation::before {
+  content: '(';
+}
+
+.operation::after {
+  content: ')';
+}
+
+/* Expand/collapse control on a diff row: the chevron alone reads as a generic
+   disclosure, so the row names the action it reveals. It sits in real flow
+   after the +/- totals and never shrinks, keeping it reachable at any width. */
+.changeToggle {
+  flex: none;
+  margin-left: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.changeToggle:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Underline on keyboard focus: a borderless button shows no native ring here,
+   and the underline keeps the same "clickable" cue .fileLink already uses. */
+.changeToggle:focus-visible {
+  color: var(--dsw-alias-label-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* Error row's collapsed summary: the failure's first line in the error color. */
 .errorSummary {
   color: var(--dsw-alias-state-error-primary);

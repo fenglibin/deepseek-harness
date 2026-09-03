@@ -10,8 +10,8 @@ import clsx from 'clsx'
 import {
   HoverCard, IconAlarmClockOutline16, IconArchiveOutline20, IconBranchOutline16,
   IconEditOutline16, IconEllipsisOutline16, IconFolderClose16, IconFolderOpen16,
-  IconPlusOutline16, IconTrashOutline16, IconTriangleRightFill14, Menu, relativeTime,
-  StateDot,
+  IconPlusOutline16, IconTrashOutline16, IconTriangleRightFill14, IconUndoOutline16, Menu,
+  relativeTime, StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
 import { abbreviateHomePath } from '@deepseek-ai/dsh-util-workspace-path'
@@ -361,31 +361,51 @@ export function SearchResultItem({ result, currentId, onOpen, t }: {
 }
 
 /**
+ * One session row's menu actions. A row on the grouping surfaces renames,
+ * forks, archives, and deletes; a row in the archive restores and deletes.
+ * Delete is the one verb both sets carry — a listed row reaches the same
+ * browser-owned confirmation an archived one does.
+ */
+export type SessionRowMenu =
+  | {
+    readonly kind: 'listed'
+    /** Open the browser-owned session rename dialog. */
+    readonly onRename: () => void
+    /** Fork the session at its last completed turn. */
+    readonly onFork: () => void
+    /** Archive the session; commits without a dialog. */
+    readonly onArchive: () => void
+    /** Open the browser-owned delete confirmation; destructive. */
+    readonly onDelete: () => void
+  }
+  | {
+    readonly kind: 'archived'
+    /** Return the session to the grouping surfaces. */
+    readonly onRestore: () => void
+    /** Open the browser-owned delete confirmation; destructive. */
+    readonly onDelete: () => void
+  }
+
+/**
  * One top-level 34px session row: status dot (pending user interaction outranks
  * own or descendant activity), title, relative time, and the row actions menu.
  * @param props.node - derived session node.
  * @param props.currentId - selected session id (row highlight).
  * @param props.now - epoch ms for relative-time formatting.
  * @param props.onOpen - open a session by id.
- * @param props.onRename - open the session rename dialog (id + current title).
- * @param props.onFork - fork a session at its last completed turn.
- * @param props.onArchive - archive a session by id.
+ * @param props.menu - the row's menu, listed verbs or archived ones.
  * @param props.drag - optional draggable-row wiring.
  * @param props.flat - omit the empty status slot in the hierarchy-free flat list.
  * @param props.t - the browser root's locale seat.
  * @returns the session row.
  */
-export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork, onArchive, drag, flat = false, t }: {
+export function SessionNodeItem({ node, currentId, now, onOpen, menu, drag, flat = false, t }: {
   node: SessionNode
   currentId: string | undefined
   now: number
   onOpen: (id: SessionNode['id']) => void
-  /** Open the browser-owned session rename dialog (row menu action). */
-  onRename: (id: SessionNode['id'], currentTitle: string) => void
-  /** Fork a session at its last completed turn (row menu action). */
-  onFork: (id: SessionNode['id']) => void
-  /** Archive this session (row menu action; commits without a dialog). */
-  onArchive: (id: SessionNode['id']) => void
+  /** Row menu actions; the row renders the one set it was given. */
+  menu: SessionRowMenu
   /** Present only on draggable rows (workspace-group sessions outside search). */
   drag?: RowDragProps | undefined
   /** The row is rendered without a parent Workspace header. */
@@ -401,13 +421,20 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
   const [menuOpen, setMenuOpen] = useState(false)
   // Archive hides the row through the registry-global archive set and never
   // touches the session log, so it is not styled as destructive and needs no
-  // confirmation dialog.
-  const sessionMenuItems = [
-    { id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> },
-    { id: 'fork', label: t('menu.fork'), icon: <IconBranchOutline16 /> },
-    // 20-native glyph in the menu's 16px icon slot (Menu.module.css .itemIcon).
-    { id: 'archive', label: t('menu.archiveSession'), icon: <IconArchiveOutline20 size={16} /> },
-  ]
+  // confirmation dialog; a delete does touch the log, which is why it hands
+  // off to a dialog the browser owns instead of committing from the menu.
+  const sessionMenuItems = menu.kind === 'listed'
+    ? [
+      { id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> },
+      { id: 'fork', label: t('menu.fork'), icon: <IconBranchOutline16 /> },
+      // 20-native glyph in the menu's 16px icon slot (Menu.module.css .itemIcon).
+      { id: 'archive', label: t('menu.archiveSession'), icon: <IconArchiveOutline20 size={16} /> },
+      { id: 'delete', label: t('menu.deleteSession'), icon: <IconTrashOutline16 />, danger: true },
+    ]
+    : [
+      { id: 'restore', label: t('menu.restoreSession'), icon: <IconUndoOutline16 /> },
+      { id: 'delete', label: t('menu.deleteSession'), icon: <IconTrashOutline16 />, danger: true },
+    ]
   // Figma session cell: pad 8, status slot 16, then a 4px title gap.
   const ownRow = (
     <div
@@ -467,9 +494,15 @@ export function SessionNodeItem({ node, currentId, now, onOpen, onRename, onFork
             items={sessionMenuItems}
             onSelect={(id) => {
               setMenuOpen(false)
-              if (id === 'rename') onRename(node.id, row.title)
-              if (id === 'fork') onFork(node.id)
-              if (id === 'archive') onArchive(node.id)
+              if (menu.kind === 'listed') {
+                if (id === 'rename') menu.onRename()
+                if (id === 'fork') menu.onFork()
+                if (id === 'archive') menu.onArchive()
+                if (id === 'delete') menu.onDelete()
+                return
+              }
+              if (id === 'restore') menu.onRestore()
+              if (id === 'delete') menu.onDelete()
             }}
             portal
             closeOnPointerLeave

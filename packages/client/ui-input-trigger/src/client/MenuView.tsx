@@ -153,7 +153,7 @@ export function MenuView({ menu, headers, onPick, onCrumb, onHover, onDismiss, t
                             <ReferenceIcon kind={item.icon} size={16} />
                           </span>
                         )}
-                        <span className={css.itemName}>{item.name}</span>
+                        <span className={css.itemName}>{item.title ?? item.name}</span>
                         {item.description !== undefined && <span className={css.itemDescription}>{item.description}</span>}
                         {item.drill === true && (
                           <span className={css.trailing}>

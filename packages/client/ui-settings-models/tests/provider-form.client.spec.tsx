@@ -244,6 +244,21 @@ function within_(scope: HTMLElement, label: string): HTMLElement {
   return found
 }
 
+/** Open the add dialog and reach the hand-declared card by naming an endpoint. */
+async function openManualCard(url = 'https://acme.test/v1'): Promise<HTMLElement> {
+  fireEvent.click(screen.getByRole('button', { name: en.add }))
+  const dialog = await screen.findByRole('dialog')
+  fireEvent.change(within(dialog).getByLabelText(en.addManualUrl), { target: { value: url } })
+  fireEvent.click(within_(dialog, en.addManualContinue))
+  return dialog
+}
+
+/** The add dialog's resting state: a provider to pick and a URL to type. */
+async function openAddDialog(): Promise<HTMLElement> {
+  fireEvent.click(screen.getByRole('button', { name: en.add }))
+  return await screen.findByRole('dialog')
+}
+
 describe('protocolChoices', () => {
   it('reads the protocols out of the namespace schema and nothing else', async () => {
     const { namespace } = scriptedFace()
@@ -527,7 +542,7 @@ describe('endpoint interrogation', () => {
     })
   })
 
-  it('adopts only the picked candidates, keeping a row the user already tuned', async () => {
+  it('opens the picker on the configured rows and keeps the one the user tuned', async () => {
     const discover = vi.fn(() => Promise.resolve(ok([
       { id: 'kept', contextWindow: 999 }, { id: 'fresh', contextWindow: 4096, name: 'Fresh' },
     ])))
@@ -539,9 +554,11 @@ describe('endpoint interrogation', () => {
 
     fireEvent.click(screen.getByText(en.fetchModels))
     await screen.findByText(en.fetchTitle)
-    // The already-configured row starts unchecked; the new one starts checked.
+    // An edit opens on the list as it stands: the configured model is checked,
+    // the one this provider does not carry yet is not.
     const boxes = [...document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
-    expect(boxes.map(box => box.checked)).toEqual([false, true])
+    expect(boxes.map(box => box.checked)).toEqual([true, false])
+    fireEvent.click(boxes[1] as HTMLInputElement)
     fireEvent.click(screen.getByText(en.fetchAdopt))
 
     fireEvent.click(screen.getByText(en.apply))
@@ -550,6 +567,17 @@ describe('endpoint interrogation', () => {
       { id: 'kept', contextWindow: 111 },
       { id: 'fresh', contextWindow: 4096, name: 'Fresh' },
     ])
+  })
+
+  it('starts a provider with no rows on every discovered model, so adding one is a single action', async () => {
+    const discover = vi.fn(() => Promise.resolve(ok([{ id: 'a' }, { id: 'b' }])))
+    await mountSection({ discover })
+    openEditor('openai')
+
+    fireEvent.click(screen.getByText(en.fetchModels))
+    await screen.findByText(en.fetchTitle)
+    const boxes = [...document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+    expect(boxes.map(box => box.checked)).toEqual([true, true])
   })
 
   it('keeps the rows editable when the provider cannot be interrogated', async () => {
@@ -856,7 +884,7 @@ describe('hand-declared providers', () => {
     fireEvent.change(screen.getByLabelText(`${en.modelContextWindow} 1`), { target: { value: '65536' } })
     fireEvent.click(screen.getByText(en.create))
 
-    await waitFor(() => { expect(onClose).toHaveBeenCalledWith(true) })
+    await waitFor(() => { expect(onClose).toHaveBeenCalledWith(true, 'acme-gateway') })
     expect(firstMutate(mutate)).toEqual({
       ns: 'llm-pi-ai',
       ops: [{
@@ -1064,7 +1092,7 @@ describe('hand-declared providers', () => {
 
     fireEvent.change(screen.getByLabelText(en.keyInput), { target: { value: 'gw-key-2' } })
     fireEvent.click(screen.getByText(en.create))
-    await waitFor(() => { expect(onClose).toHaveBeenCalledWith(true) })
+    await waitFor(() => { expect(onClose).toHaveBeenCalledWith(true, 'acme') })
     // Re-running the profile write would carry the revision this card's own
     // first write superseded, so the Host would answer settings-conflict and
     // the key could never be stored from here at all.
@@ -1087,7 +1115,7 @@ describe('hand-declared providers', () => {
     // Walking away leaves a real provider behind; reporting no change would
     // leave the page without the row it now has.
     fireEvent.click(screen.getByText(en.cancel))
-    expect(onClose).toHaveBeenCalledWith(true)
+    expect(onClose).toHaveBeenCalledWith(true, 'acme')
   })
 
   it('never contradicts a filled-in field with the next gate\u2019s copy', () => {
@@ -1232,7 +1260,7 @@ describe('hand-declared providers', () => {
     expect(buttonNamed(en.create).disabled).toBe(false)
     fireEvent.click(screen.getByText(en.create))
 
-    await waitFor(() => { expect(onClose).toHaveBeenCalledWith(true) })
+    await waitFor(() => { expect(onClose).toHaveBeenCalledWith(true, 'acme') })
     expect(firstMutate(mutate).ops[0]?.value).toMatchObject({ models: [{ id: 'bare' }] })
   })
 
@@ -1311,7 +1339,7 @@ describe('hand-declared providers', () => {
     fireEvent.change(screen.getByLabelText(`${en.modelId} 1`), { target: { value: 'm' } })
     fireEvent.click(screen.getByText(en.create))
 
-    await waitFor(() => { expect(onClose).toHaveBeenCalledWith(true) })
+    await waitFor(() => { expect(onClose).toHaveBeenCalledWith(true, 'acme') })
     // No display name configured means none stored; the route id is the name.
     // No key typed means no reference either, matching the editor: the route
     // keeps its provider-native auth path instead of resolving a reference
@@ -1331,7 +1359,7 @@ describe('hand-declared providers', () => {
   it('closes without writing on cancel, and honors a read-only deployment', () => {
     const { onClose, mutate } = mountCard()
     fireEvent.click(screen.getByText(en.cancel))
-    expect(onClose).toHaveBeenCalledWith(false)
+    expect(onClose).toHaveBeenCalledWith(false, undefined)
     expect(mutate).not.toHaveBeenCalled()
     cleanup()
 
@@ -1340,10 +1368,19 @@ describe('hand-declared providers', () => {
     expect(buttonNamed(en.create).disabled).toBe(true)
   })
 
-  it('closes the create card when an existing row is opened for editing', async () => {
+  it('seeds the hand-declared card with the endpoint the dialog was given', async () => {
+    await mountSection()
+
+    await openManualCard('https://acme.test/v1')
+    // The URL the user named is the endpoint, not a separate question: the
+    // card opens on it and leaves it editable.
+    expect(screen.getByLabelText<HTMLInputElement>(en.baseUrl).value).toBe('https://acme.test/v1')
+  })
+
+  it('closes the add dialog when an existing row is opened for editing', async () => {
     await mountSection({ providers: { openai: { baseURL: 'https://proxy.example/v1' } } })
 
-    fireEvent.click(screen.getByRole('button', { name: en.customAdd }))
+    await openManualCard()
     expect(screen.getByText(en.customTitle)).toBeTruthy()
 
     // Two cards at once would each be closable by the other: whichever one is
@@ -1352,15 +1389,21 @@ describe('hand-declared providers', () => {
     expect(screen.queryByText(en.customTitle)).toBeNull()
   })
 
-  it('reaches the card from the section and returns to the button on cancel', async () => {
+  it('returns from the create card to the chooser, and closes from there', async () => {
     await mountSection()
 
-    fireEvent.click(screen.getByRole('button', { name: en.customAdd }))
+    await openManualCard()
     expect(screen.getByText(en.customTitle)).toBeTruthy()
 
+    // The card's own cancel is a step back, not a dismissal: the dialog keeps
+    // the choice it was opened for.
     fireEvent.click(screen.getByText(en.cancel))
     await waitFor(() => { expect(screen.queryByText(en.customTitle)).toBeNull() })
-    expect(screen.getByRole('button', { name: en.customAdd })).toBeTruthy()
+    expect(screen.getByRole('dialog').textContent).toContain(en.addManualUrl)
+
+    fireEvent.click(screen.getByRole('button', { name: en.close }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('button', { name: en.add })).toBeTruthy()
   })
 
   it('refuses an unusable key on the field and blocks creation', () => {
@@ -1423,7 +1466,7 @@ describe('hand-declared providers', () => {
     fireEvent.change(screen.getByLabelText(`${en.modelId} 1`), { target: { value: 'acme-large' } })
     fireEvent.click(screen.getByText(en.create))
 
-    await waitFor(() => { expect(onClose).toHaveBeenCalledWith(true) })
+    await waitFor(() => { expect(onClose).toHaveBeenCalledWith(true, 'ambient-gateway') })
     expect(set).not.toHaveBeenCalled()
   })
 })
@@ -1531,7 +1574,7 @@ describe('API key field', () => {
     const { controller, mutate } = await mountSection()
     const load = vi.spyOn(controller, 'load')
 
-    fireEvent.click(screen.getByRole('button', { name: en.customAdd }))
+    await openManualCard()
     fireEvent.change(screen.getByLabelText(en.customRoute), { target: { value: 'acme' } })
     fireEvent.change(screen.getByLabelText(en.baseUrl), { target: { value: 'https://acme.test/v1' } })
     fireEvent.click(screen.getByRole('button', { name: en.addModel }))
@@ -1541,5 +1584,32 @@ describe('API key field', () => {
     await waitFor(() => { expect(mutate).toHaveBeenCalledOnce() })
     await waitFor(() => { expect(load).toHaveBeenCalledOnce() })
     expect(screen.queryByText(en.customTitle)).toBeNull()
+  })
+})
+
+describe('add model dialog', () => {
+  it('opens on the manual entry alone when the directory has nothing left to add', async () => {
+    await mountSection()
+
+    // Every route this fixture declares is already configured.
+    const dialog = await openAddDialog()
+    expect(within(dialog).getByText(en.addNoneAddable)).toBeTruthy()
+    expect(within(dialog).getByLabelText(en.addManualUrl)).toBeTruthy()
+    expect(within(dialog).queryByLabelText(en.provider)).toBeNull()
+  })
+
+  it('refuses to continue without an endpoint, and pastes the typed one into the card', async () => {
+    await mountSection()
+
+    const dialog = await openAddDialog()
+    expect(buttonNamed(en.addManualContinue).disabled).toBe(true)
+    fireEvent.change(within(dialog).getByLabelText(en.addManualUrl), {
+      target: { value: '  https://acme.test/v1  ' },
+    })
+    expect(buttonNamed(en.addManualContinue).disabled).toBe(false)
+    fireEvent.click(buttonNamed(en.addManualContinue))
+
+    // The typed endpoint is the profile's, so it arrives trimmed.
+    expect(screen.getByLabelText<HTMLInputElement>(en.baseUrl).value).toBe('https://acme.test/v1')
   })
 })

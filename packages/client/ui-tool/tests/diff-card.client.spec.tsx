@@ -13,7 +13,9 @@ import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/c
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
-import { CHAT_DIFF_MAX_LINES, diffCardModel } from '../src/client/tool/models/diff-card-model.ts'
+import {
+  CHAT_DIFF_MAX_LINES, diffCardModel, fileOperation,
+} from '../src/client/tool/models/diff-card-model.ts'
 import { createChatStore } from '@deepseek-ai/dsh-client-ui-chat/src/client/stores.ts'
 import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/toolviews/GenericToolCard.tsx'
 import { DetailsPanel } from '@deepseek-ai/dsh-client-ui-chat/src/client/details/DetailsPanel.tsx'
@@ -52,6 +54,7 @@ describe('diffCardModel', () => {
   it('derives a running card from raw edit arguments', () => {
     expect(diffCardModel(running())).toEqual({
       card: { diffs: [{ path: 'notes/demo.txt', oldText: 'hello', newText: 'hello fixture' }] },
+      operation: 'modified',
     })
   })
 
@@ -60,6 +63,7 @@ describe('diffCardModel', () => {
       argsRaw: '{"file_path":"notes/demo.txt","old_string":"","new_string":"replacement"}',
     }))).toEqual({
       card: { diffs: [{ path: 'notes/demo.txt', oldText: null, newText: 'replacement' }] },
+      operation: 'added',
     })
   })
 
@@ -68,23 +72,26 @@ describe('diffCardModel', () => {
       command: 'create',
       args: { command: 'create', path: 'notes/new.txt', file_text: 'new file\n' },
       diff: { path: 'notes/new.txt', oldText: null, newText: 'new file\n' },
+      operation: 'added',
     },
     {
       command: 'str_replace',
       args: { command: 'str_replace', path: 'notes/demo.txt', old_str: 'old', new_str: 'new' },
       diff: { path: 'notes/demo.txt', oldText: 'old', newText: 'new' },
+      operation: 'modified',
     },
-  ])('preserves the running str_replace_editor $command diff', ({ args, diff }) => {
+  ])('preserves the running str_replace_editor $command diff', ({ args, diff, operation }) => {
     expect(diffCardModel(running({
       name: 'str_replace_editor',
       argsRaw: JSON.stringify(args),
-    }))).toEqual({ card: { diffs: [diff] } })
+    }))).toEqual({ card: { diffs: [diff] }, operation })
   })
 
   it('preserves str_replace_editor defaults and its settled Generic result', () => {
     const argsRaw = JSON.stringify({ command: 'str_replace', path: 'notes/demo.txt' })
     expect(diffCardModel(running({ name: 'str_replace_editor', argsRaw }))).toEqual({
       card: { diffs: [{ path: 'notes/demo.txt', oldText: null, newText: '' }] },
+      operation: 'added',
     })
     expect(diffCardModel(settled({
       call: { name: 'str_replace_editor', argsRaw },
@@ -109,6 +116,7 @@ describe('diffCardModel', () => {
       meta: { diffs: [{ path: 'notes/demo.txt', oldText: 'a', newText: 'b' }] },
     }))).toEqual({
       card: { diffs: [{ path: 'notes/demo.txt', oldText: 'a', newText: 'b' }] },
+      operation: 'modified',
     })
   })
 
@@ -119,6 +127,7 @@ describe('diffCardModel', () => {
       meta: { diffs: [] },
     }))).toEqual({
       card: { diffs: [{ path: 'notes/new.txt', oldText: null, newText: 'hello fixture\n' }] },
+      operation: 'added',
     })
   })
 
@@ -153,7 +162,36 @@ describe('diffCardModel', () => {
       meta,
     }))).toEqual({
       card: { diffs: [{ path: 'notes/new.txt', oldText: null, newText: 'hello fixture\n' }] },
+      operation: 'added',
     })
+  })
+
+  it.each([
+    { label: 'a creation', diffs: [{ path: 'a.txt', oldText: null, newText: 'x' }], operation: 'added' },
+    { label: 'an edit', diffs: [{ path: 'a.txt', oldText: 'x', newText: 'y' }], operation: 'modified' },
+    {
+      label: 'a mixed set',
+      diffs: [{ path: 'a.txt', oldText: null, newText: 'x' }, { path: 'b.txt', oldText: 'y', newText: 'z' }],
+      operation: 'modified',
+    },
+  ])('names $label as $operation', ({ diffs, operation }) => {
+    expect(diffCardModel(settled({ meta: { diffs } }))?.operation).toBe(operation)
+  })
+
+  it('reports no operation without a hunk', () => {
+    expect(fileOperation([])).toBeNull()
+  })
+
+  it('yields no diff card for a delete tool, so its operation stays reserved', () => {
+    // `intendedDiff` accepts only the mutation tools, so `deleted` — carried by
+    // the type, the dictionaries, and OPERATION_KEYS — has no row that can
+    // reach it today. Asserting the model stays null keeps that honest: a
+    // delete tool arriving later is a change here, not a silent label swap.
+    for (const name of ['delete', 'delete_file', 'remove_file']) {
+      expect(diffCardModel(settled({
+        call: { name, argsRaw: '{"path":"notes/demo.txt"}' },
+      }))).toBeNull()
+    }
   })
 
   it('validates mutation escalation fields but accepts unrelated open-root fields', () => {
@@ -244,6 +282,73 @@ describe('FileMutationRow diff card', () => {
     // The row passes the tool's own path; the injected openFile resolves it
     // against the session cwd (apply.ts), so the row must not resolve twice.
     expect(openFile).toHaveBeenCalledWith('notes/demo.txt')
+  })
+
+  it('names the file operation beside the path', () => {
+    const edit = render(<FileMutationRow {...rowProps(settled())} />)
+    // A hunk carrying a previous revision is a modification.
+    expect(edit.getByText('修改')).toBeTruthy()
+    cleanup()
+    // A hunk with no previous revision is a creation.
+    const create = render(<FileMutationRow {...rowProps(settled({
+      call: { name: 'write', argsRaw: '{"file_path":"notes/new.txt","content":"x\\n"}' },
+      meta: { diffs: [] },
+    }), 'write')} />)
+    expect(create.getByText('新增')).toBeTruthy()
+    expect(create.queryByText('修改')).toBeNull()
+  })
+
+  it('lays the collapsed row out in the reader\'s scan order', () => {
+    // Title, path, operation, +/- totals, then the control — the order the eye
+    // takes and the order CodeBuddy prints it. A reordering here is a visual
+    // regression no per-element assertion would catch.
+    const view = render(<FileMutationRow {...rowProps(settled())} />)
+    const row = view.container.querySelector('[data-disclosure-row]')
+    expect(row?.textContent).toBe('编辑notes/demo.txt修改+1 -1查看变更')
+  })
+
+  it('the change toggle expands the diff and renames itself while open', () => {
+    const view = render(<FileMutationRow {...rowProps(settled())} />)
+    const toggle = view.getByText('查看变更')
+    expect(view.container.querySelector('[data-diff]')).toBeNull()
+    fireEvent.click(toggle)
+    expect(view.container.querySelector('[data-diff]')).not.toBeNull()
+    expect(view.getByText('收起变更')).toBeTruthy()
+    // A second click collapses again: the control never becomes a dead end.
+    fireEvent.click(view.getByText('收起变更'))
+    expect(view.container.querySelector('[data-diff]')).toBeNull()
+  })
+
+  it('keeps the change toggle off rows with no file change', () => {
+    // A mutation result with no metadata has no diff card, so there is no
+    // change to name and no toggle to reveal one.
+    const view = render(<FileMutationRow {...rowProps(settled({ meta: undefined }))} />)
+    expect(view.queryByText('查看变更')).toBeNull()
+    expect(view.queryByText('修改')).toBeNull()
+  })
+
+  it('drops the operation on an error row, whose summary is the failure line', () => {
+    const view = render(<FileMutationRow {...rowProps(settled({
+      isError: true,
+      content: [{ type: 'text', text: 'boom' }],
+    }))} />)
+    // The failure replaces, not supplements, the path summary.
+    expect(view.queryByText('查看变更')).toBeNull()
+    expect(view.getByText('boom')).toBeTruthy()
+  })
+
+  it('the change toggle keeps Enter/Space off the row-level key handler', () => {
+    const view = render(<FileMutationRow {...rowProps(settled())} />)
+    const toggle = view.getByText('查看变更')
+    const row = view.container.querySelector('[data-disclosure-row]')!
+    expect(row.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.keyDown(toggle, { key: 'Enter' })
+    // Reaching the row would let its handler preventDefault() the key and
+    // expand here; the browser's own activation of the button would then
+    // collapse it again, so the key must never get there. (The row's state is
+    // the observable: React delegates to the root, so a mid-tree native
+    // listener cannot see the synthetic stop.)
+    expect(row.getAttribute('aria-expanded')).toBe('false')
   })
 
   it('registers under write too, rendering a create as an added-only diff', () => {

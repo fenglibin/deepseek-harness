@@ -1,25 +1,8 @@
-- dialog "设置":
-  - navigation:
-    - text: 设置
-    - button "通用设置":
-      - img
-      - text: 通用设置
-    - button "模型":
-      - img
-      - text: 模型
-    - button "插件":
-      - img
-      - text: 插件
-    - button "Agent 预设":
-      - img
-      - text: Agent 预设
-  - button "打开配置文件"
+- dialog "添加模型":
+  - heading "添加模型" [level=2]
   - button "关闭":
     - img
-    - text: 关闭
-  - heading "模型" [level=2]
-  - paragraph: 填入各提供方的 API 密钥即可使用其模型。
-  - list
+  - paragraph: 选择一个提供方，或手动输入 API 地址来自定义提供方。
   - text: 提供方
   - combobox "提供方":
     - option "amazon-bedrock"
@@ -61,6 +44,7 @@
     - option "xiaomi-token-plan-sgp"
     - option "zai"
     - option "zai-coding-cn"
+  - button "返回"
   - text: API 密钥
   - textbox "API 密钥":
     - /placeholder: 输入 API 密钥，或留空使用环境认证

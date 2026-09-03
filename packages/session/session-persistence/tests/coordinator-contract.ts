@@ -310,6 +310,35 @@ export function runCoordinatorContract(name: string, makeFixture: () => Promise<
       }
     })
 
+    it('refuses to delete a live session and deletes the log once it retires', async () => {
+      const fix = await makeFixture()
+      const { ctx, fiber } = await freshCtx(fix)
+      const id = SessionId('delete-live')
+      let session!: Session
+      const sessionFiber = await ctx.plugin(Object.assign((inner: Context) => {
+        session = inner.sessions.create(id, { meta: { cwd: WORK } })
+      }, { inject: ['sessions'] }))
+      try {
+        send(session, oneTurnLog())
+        await ctx.sessions.flush(session)
+
+        await expect(ctx.sessionPersistence.remove(id))
+          .rejects.toThrow(`cannot delete session "${id}" while it is live`)
+        // The refusal is a refusal only: the log is still there.
+        expect((await ctx.sessionPersistence.load(id)).events).toHaveLength(6)
+
+        // Retirement is asynchronous and serializes on the same per-id chain,
+        // so the delete waits for it instead of deadlocking against it.
+        await sessionFiber.dispose()
+        await expect(ctx.sessionPersistence.remove(id)).resolves.toBe(true)
+        await expect(ctx.sessionPersistence.load(id)).rejects.toThrow(/not found/)
+      } finally {
+        await sessionFiber.dispose()
+        await fiber.dispose()
+        await fix.cleanup()
+      }
+    })
+
     it('does not load an unmaterialized empty live session', async () => {
       const fix = await makeFixture()
       const { ctx, fiber } = await freshCtx(fix)

@@ -83,6 +83,19 @@ export type DirectoryPickingInjected = {
 export type DirectoryPickingHooks = PropsHooks<DirectoryPickingInjected['hooks']>
 
 /**
+ * Why a Session delete removed nothing. `live` is the one refusal the operator
+ * can act on from the row it happened on; `failed` covers every other Host
+ * refusal (an absent log, a transport fault), whose only honest report is the
+ * wire message.
+ */
+export type SessionDeleteRefusal = 'live' | 'failed'
+
+/** Result of one Session delete; a refusal carries the message the Host sent. */
+export type SessionDeleteOutcome =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly refusal: SessionDeleteRefusal; readonly message: string }
+
+/**
  * Browser-private injected share (arrives via the register inject factory).
  * Data reads use the global framework hooks; these are the Host actions the
  * browsing region drives.
@@ -134,6 +147,19 @@ export type WorkspaceBrowserInjected = {
    * session clears the selection into the New Session view state.
    */
   archiveSession: (sessionId: SessionId) => Promise<void>
+  /**
+   * Return an archived Session to the grouping surfaces. The log and the
+   * accounting slot were retained, so the rows reappear where they were
+   * hidden without any navigation.
+   */
+  unarchiveSession: (sessionId: SessionId) => Promise<void>
+  /**
+   * Delete a Session: discard the durable log and every Host reference, then
+   * drop it from the Client's session list. Irreversible, which is why the
+   * browser asks before committing. A refusal resolves instead of throwing, so
+   * the confirmation dialog can name the reason nothing was removed.
+   */
+  deleteSession: (sessionId: SessionId) => Promise<SessionDeleteOutcome>
   /**
    * Reorder a session inside its Workspace account (DOM-insertBefore
    * semantics: omitted anchor appends to the end). The view refreshes from

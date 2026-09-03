@@ -214,6 +214,18 @@ export class SessionProjectionCache extends Service {
     return restored.snapshot
   }
 
+  /**
+   * Discard one session's cached rows. The rows are derived from a log this
+   * service never reads on its own, so deleting that log must delete them:
+   * a surviving row is durable state with no session left to bind it to an
+   * identity, and no later read can tell recreated from inherited.
+   * @param id - the deleted session's id.
+   * @returns whether a row existed.
+   */
+  async remove(id: SessionId): Promise<boolean> {
+    return await this.requireTable().delete(id)
+  }
+
 
   // --- write-behind (throttle + mandatory points) ---
 

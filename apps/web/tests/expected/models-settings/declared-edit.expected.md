@@ -57,12 +57,9 @@
             - /placeholder: 显示名称
           - button "容量 1"
           - button "删除模型 1"
-          - button "添加模型"
+          - button "手动添加"
       - button "取消"
       - button "保存"
-  - button "添加提供方":
+  - button "添加模型":
     - img
-    - text: 添加提供方
-  - button "添加自定义提供方":
-    - img
-    - text: 添加自定义提供方
+    - text: 添加模型

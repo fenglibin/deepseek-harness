@@ -15,6 +15,31 @@ import { parsedToolCall, validEscalationFields } from './raw-tool-call.ts'
 export const CHAT_DIFF_MAX_LINES = 8
 
 /**
+ * File-operation kind a mutation row names beside its title.
+ *
+ * `deleted` is reserved, not reachable: no first-party tool removes a path, and
+ * `intendedDiff` returns null for every wire name that is not a mutation tool,
+ * so `diffCardModel` yields no card — and therefore no operation — for one. The
+ * dictionaries still carry the label so adopting a delete tool is a change to
+ * `intendedDiff` in this module, not a change to the row.
+ */
+export type FileOperation = 'added' | 'modified' | 'deleted'
+
+/**
+ * Classify the file operation from the hunks a mutation row presents.
+ *
+ * The Host presenter reports a creation as a hunk with no previous revision, so
+ * a null `oldText` on every hunk is the create signal; any surviving previous
+ * revision makes the row a modification.
+ * @param diffs - the hunks the row presents.
+ * @returns the operation, or null when the row presents no file change.
+ */
+export function fileOperation(diffs: readonly DiffHunk[]): FileOperation | null {
+  if (diffs.length === 0) return null
+  return diffs.every(hunk => hunk.oldText === null) ? 'added' : 'modified'
+}
+
+/**
  * The {@link DiffBlock} props this derivation owns. Picked off the primitive's
  * props so the two stay in step; `maxLines`/`className` belong to each render
  * site.
@@ -26,6 +51,8 @@ export interface DiffCardModel {
    * neighbouring field into it.
    */
   card: Pick<DiffBlockProps, 'diffs'>
+  /** File-operation kind for the row's title suffix; null when no hunk survives. */
+  operation: FileOperation | null
 }
 
 /**
@@ -109,12 +136,16 @@ export function diffCardModel(block: ToolCallBlock): DiffCardModel | null {
   if (block.parentCallId !== undefined) return null
   const intended = intendedDiff(block)
   if (intended === null) return null
-  if (!('kind' in block)) return { card: { diffs: [intended.diff] } }
+  if (!('kind' in block)) {
+    return { card: { diffs: [intended.diff] }, operation: fileOperation([intended.diff]) }
+  }
   if (intended.tool === 'str_replace_editor') return null
   if (block.isError) return null
   const applied = appliedDiffs(block.meta)
   if (applied === null || applied === 'empty') {
-    return intended.tool === 'write' ? { card: { diffs: [intended.diff] } } : null
+    return intended.tool === 'write'
+      ? { card: { diffs: [intended.diff] }, operation: fileOperation([intended.diff]) }
+      : null
   }
-  return { card: { diffs: applied } }
+  return { card: { diffs: applied }, operation: fileOperation(applied) }
 }

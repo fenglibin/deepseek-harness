@@ -76,6 +76,8 @@ All settings are optional. The defaults start condensing at 80% of the routed mo
 
 Misconfiguration fails fast: an unknown setting, a duplicate per-model override, both retention forms together, or a ratio retention that is not below the threshold all reject the plugin at load. An absolute `retainTokens` budget — top-level or per-model — that is not below its threshold fails when that model is first used, because the comparison needs the model's context size.
 
+Condensing earlier is not a free win. A condensation replaces history, and a replacement rewrites the ordered surface so the next request diverges from its predecessor's prompt prefix at that point, missing the provider's prefix cache for the entire conversation — on top of the summarization request each run costs. In a measured 75-step session, provider-side invalidation happened twice and cost 4–7% of agent time; condensing on a lower `thresholdRatio` would turn that occasional miss into a certain one on every run. Keep the `0.8` default unless a measurement says otherwise.
+
 ### What happens when condensation runs
 
 The oldest balanced span is replaced by one summary message and the recent tail stays verbatim; the conversation continues from the summary. The operation reports how many history items were condensed and the estimated tokens freed. If nothing can be condensed safely — for example the whole conversation is one indivisible unit — nothing changes and nothing is written to the session log. If no model is available to write the summary (no configured target and no routed request yet), condensation fails with a clear error telling you to configure the summarization provider and model or route one request.

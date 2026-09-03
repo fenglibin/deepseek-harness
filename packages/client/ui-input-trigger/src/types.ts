@@ -46,6 +46,8 @@ export type InputTriggerCandidateIcon = 'file' | 'folder' | 'session'
 /** One menu candidate. Pure display data — zero behavior declaration. */
 export interface InputTriggerCandidate {
   readonly name: string
+  /** Localized display title; the menu shows it instead of `name` when present. */
+  readonly title?: string
   readonly description?: string
   readonly icon?: InputTriggerCandidateIcon
   readonly hint?: string

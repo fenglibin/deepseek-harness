@@ -108,6 +108,8 @@ class FakeSessions {
   readonly create: ReturnType<typeof vi.fn<ISessions['create']>>
   readonly open: ReturnType<typeof vi.fn<(id: SessionId) => void>>
   readonly clear: ReturnType<typeof vi.fn<() => void>>
+  readonly deleteCalls: SessionId[] = []
+  onDelete: ISessions['delete'] = async () => {}
 
   constructor(initial: SessionListState) {
     this.list = new MutableSource(initial)
@@ -120,15 +122,27 @@ class FakeSessions {
       this.list.update(state => ({ ...state, current: undefined }))
     })
   }
+
+  delete(sessionId: SessionId): Promise<void> {
+    this.deleteCalls.push(sessionId)
+    return this.onDelete(sessionId)
+  }
 }
 
 class FakeWorkspaces implements IWorkspaces {
   readonly list: MutableSource<WorkspaceSnapshot>
   readonly archiveCalls: SessionId[] = []
+  readonly unarchiveCalls: SessionId[] = []
   onArchive: IWorkspaces['archiveSession'] = async (sessionId) => {
     this.list.update(state => ({
       ...state,
       archivedSessionIds: [...state.archivedSessionIds, sessionId],
+    }))
+  }
+  onUnarchive: IWorkspaces['unarchiveSession'] = async (sessionId) => {
+    this.list.update(state => ({
+      ...state,
+      archivedSessionIds: state.archivedSessionIds.filter(id => id !== sessionId),
     }))
   }
 
@@ -145,6 +159,11 @@ class FakeWorkspaces implements IWorkspaces {
   archiveSession(sessionId: SessionId): Promise<void> {
     this.archiveCalls.push(sessionId)
     return this.onArchive(sessionId)
+  }
+
+  unarchiveSession(sessionId: SessionId): Promise<void> {
+    this.unarchiveCalls.push(sessionId)
+    return this.onUnarchive(sessionId)
   }
 }
 
@@ -420,6 +439,62 @@ describe('UiWorkspaceService', () => {
     b.workspaces.onArchive = () => Promise.reject(new Error('archive rejected'))
     await expect(b.uiWorkspace.archiveSession(idle)).rejects.toThrow('archive rejected')
     expect(b.workspaces.archiveCalls).toEqual([idle, idle])
+  })
+
+  it('forwards restore commands and preserves failures', async () => {
+    const idle = sid('idle')
+    const b = bench()
+
+    await b.uiWorkspace.unarchiveSession(idle)
+    expect(b.workspaces.unarchiveCalls).toEqual([idle])
+
+    b.workspaces.onUnarchive = () => Promise.reject(new Error('restore rejected'))
+    await expect(b.uiWorkspace.unarchiveSession(idle)).rejects.toThrow('restore rejected')
+    expect(b.workspaces.unarchiveCalls).toEqual([idle, idle])
+  })
+
+  it('forwards session deletion to the Sessions face and reports a refusal as an outcome', async () => {
+    const doomed = sid('doomed')
+    const b = bench()
+
+    await expect(b.uiWorkspace.deleteSession(doomed)).resolves.toEqual({ ok: true })
+    expect(b.sessions.deleteCalls).toEqual([doomed])
+
+    b.sessions.onDelete = () => Promise.reject(new Error('log is locked'))
+    await expect(b.uiWorkspace.deleteSession(doomed)).resolves.toEqual({
+      ok: false, refusal: 'failed', message: 'log is locked',
+    })
+    expect(b.sessions.deleteCalls).toEqual([doomed, doomed])
+  })
+
+  it('names a live-session refusal so the row can say what to do instead', async () => {
+    const doomed = sid('doomed')
+    const b = bench()
+    // The structured error the sessions service throws carries the Host's
+    // business code; a Client plugin reads it as wire data, not by type.
+    b.sessions.onDelete = () => Promise.reject(Object.assign(
+      new Error('session delete failed: session/live: session "doomed" is live'),
+      { rpcError: { code: 'session/live', message: 'archive it instead', details: {} } },
+    ))
+    await expect(b.uiWorkspace.deleteSession(doomed)).resolves.toEqual({
+      ok: false,
+      refusal: 'live',
+      message: 'session delete failed: session/live: session "doomed" is live',
+    })
+  })
+
+  it('falls back to a generic refusal for a rejection carrying no wire code', async () => {
+    const doomed = sid('doomed')
+    const b = bench()
+    // A wire rejection carries anything, not only Errors: the outcome has to
+    // survive a bare string the way it survives a RemoteError.
+    b.sessions.onDelete = async () => {
+      const failure: unknown = 'transport down'
+      throw failure
+    }
+    await expect(b.uiWorkspace.deleteSession(doomed)).resolves.toEqual({
+      ok: false, refusal: 'failed', message: 'transport down',
+    })
   })
 
   it('passes directory operations to the Host and preserves structured browse failures', async () => {

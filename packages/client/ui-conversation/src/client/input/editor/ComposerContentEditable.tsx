@@ -2,9 +2,11 @@
  * The composer's contenteditable host: binds one shell-owned Lexical editor
  * to a resident div. Session-maybe by design — a null editor renders the
  * same DOM inert (the no-session Workspace-trigger state), so switching
- * between the two never swaps the element tree. Editability has ONE writer:
- * this component reflects the `editable` prop onto the editor; nothing else
- * calls setEditable.
+ * between the two never swaps the element tree. A null editor also carries the
+ * disposed-shell case: the caller withholds the editor of a shell whose
+ * Session scope tore down, so no layout effect ever binds a root element to
+ * one. Editability has ONE writer: this component reflects the `editable` prop
+ * onto the editor; nothing else calls setEditable.
  */
 import { useLayoutEffect, useRef } from 'react'
 import type { HTMLAttributes, ReactNode } from 'react'
@@ -12,7 +14,10 @@ import type { LexicalEditor } from 'lexical'
 
 /** Host props: the editor binding plus the div passthroughs the bar owns. */
 export interface ComposerContentEditableProps extends HTMLAttributes<HTMLDivElement> {
-  /** The shell-owned editor; null renders the same div unbound and inert. */
+  /**
+   * The shell-owned editor; null renders the same div unbound and inert — the
+   * no-session state and a shell whose Session scope was disposed.
+   */
   readonly editor: LexicalEditor | null
   /** Whether the user may edit (readOnly/disabled states fold in here). */
   readonly editable: boolean

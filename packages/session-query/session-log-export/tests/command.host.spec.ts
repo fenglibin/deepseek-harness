@@ -22,7 +22,7 @@ describe('/export Web download command', () => {
       name: 'export',
       description: 'Download this Session log as a ZIP archive',
     })
-    const invoke = (rawInput: string) => descriptor?.handler({ rawInput } as CommandInvocation)
+    const invoke = (rawInput: string) => descriptor?.handler?.({ rawInput } as CommandInvocation)
     await expect(invoke('')).resolves.toEqual({
       kind: 'success', text: 'Session log download requested.',
     })

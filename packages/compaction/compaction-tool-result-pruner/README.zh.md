@@ -59,6 +59,8 @@ kind: "package-reference"
 
 修剪只在压缩触发条件满足后运行：`dsh-compaction-basic` 在压力或溢出确认后、选择要压缩的内容之前调用它。低于压力时不会修剪任何内容，修剪本身也不发起模型调用。
 
+每个被修剪的结果都是一次已提交的替换，它会改写有序 surface 中的一条消息；下一次请求随后会在该消息处与上一次请求分叉，提供方的 prefix cache 会未命中其后的所有内容。`surface.replaceGeneration` 记录了这一边界，但缓存损失来自改写后的内容。把 `thresholdChars` 调低以更频繁地修剪，等于用「更小的上下文」换「下一次请求的全量缓存未命中」。[耗时剖析](../../../docs/design/agent-task-latency.zh.md)记录了这次权衡的一次实测；除非你自己的测量给出相反结论，否则保持默认值。
+
 -----
 
 <a id="understand-the-implementation"></a>

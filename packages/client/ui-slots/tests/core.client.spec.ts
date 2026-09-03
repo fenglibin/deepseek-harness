@@ -379,3 +379,64 @@ describe('subscription API', () => {
     expect(keys).toHaveLength(1)
   })
 })
+
+describe('abdication scope', () => {
+  it('retires an entry only in the scope that crashed, and restores it for any other scope', () => {
+    const core = new SlotCore()
+    mountFrame(core)
+    const dispose = core.register({ name: 'test.session' }, Comp as never)
+    const [entry] = [...core.entries('test.session')]
+    expect(core.entriesOfSlot('test.session')).toEqual([entry])
+    expect(core.entriesOfSlot('test.session', 's1')).toEqual([entry])
+
+    const errors: unknown[] = []
+    const off = core.onEntryError((_key, _entry, error) => { errors.push(error) })
+    core.reportEntryError('test.session', entry!, new Error('boom'), { abdicate: true, scope: 's1' })
+    // Retired for s1 only: the cell goes dry there, other scopes keep the entry.
+    expect(core.entriesOfSlot('test.session', 's1')).toEqual([])
+    expect(core.entriesOfSlot('test.session', 's2')).toEqual([entry])
+    expect(core.entriesOfSlot('test.session')).toEqual([entry])
+    // The registration itself stays on the ledger — disposal is the registrant's.
+    expect(core.entries('test.session')).toEqual([entry])
+
+    // A repeat report in the same scope no-ops entirely: one retirement, one
+    // version bump, one supervision notification.
+    const version = core.getVersion('test.session')
+    core.reportEntryError('test.session', entry!, new Error('boom'), { abdicate: true, scope: 's1' })
+    expect(core.getVersion('test.session')).toBe(version)
+    expect(errors).toHaveLength(1)
+    // A crash in a different scope retires the entry there too, and reports.
+    core.reportEntryError('test.session', entry!, new Error('boom2'), { abdicate: true, scope: 's2' })
+    expect(core.entriesOfSlot('test.session', 's2')).toEqual([])
+    expect(core.entriesOfSlot('test.session', 's3')).toEqual([entry])
+    expect(errors).toHaveLength(2)
+    off()
+    dispose()
+  })
+
+  it('reports a chain crash without retiring the entry', () => {
+    const core = new SlotCore()
+    mountFrame(core)
+    const dispose = core.register({
+      name: 'test.chain',
+      select: () => null,
+    }, Comp as never)
+    const [entry] = [...core.entries('test.chain')]
+    core.reportEntryError('test.chain', entry!, new Error('boom'), { abdicate: false, scope: 's1' })
+    // Election resolves at select time: the entry keeps its cell in every scope.
+    expect(core.entriesOfSlot('test.chain', 's1')).toEqual([entry])
+    dispose()
+  })
+
+  it('retires under the root scope when no scope is reported', () => {
+    const core = new SlotCore()
+    mountFrame(core)
+    const dispose = core.register({ name: 'test.single' }, Comp as never)
+    const [entry] = [...core.entries('test.single')]
+    core.reportEntryError('test.single', entry!, new Error('boom'), { abdicate: true })
+    // No narrower scope can ever retry a root registration.
+    expect(core.entriesOfSlot('test.single')).toEqual([])
+    expect(core.entriesOfSlot('test.single', 's1')).toEqual([entry])
+    dispose()
+  })
+})

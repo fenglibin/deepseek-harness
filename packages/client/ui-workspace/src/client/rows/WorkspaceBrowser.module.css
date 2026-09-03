@@ -449,6 +449,53 @@
   font-size: 13px;
 }
 
+/* The archive: a section separator above the rows it owns, so the section
+   reads as a different place rather than as more sessions. */
+.archivedSection {
+  margin-top: 8px;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+  padding-top: 6px;
+}
+
+.archivedHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.archivedHeader:hover {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.archivedArrow {
+  flex: none;
+  transition: transform 120ms ease;
+}
+
+.archivedArrowOpen {
+  transform: rotate(90deg);
+}
+
+.archivedLabel {
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.archivedCount {
+  flex: none;
+  color: var(--dsw-alias-label-dimmed);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Rename dialog form (same figma dialog family as the create modals). */
 .renameInput {
   box-sizing: border-box;

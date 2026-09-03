@@ -399,16 +399,68 @@ describe('BashRow terminal card', () => {
     t,
   } as unknown as BashRowProps)
 
-  it('collapses to the summary row; the whole row toggles the command output', () => {
+  it('lays the row out as title, summary, then the height control', () => {
+    const lines = Array.from({ length: 24 }, (_, index) => `line ${index + 1}`).join('\n')
+    const view = render(<BashRow {...rowProps(settled({
+      content: [{ type: 'text', text: `${lines}\n` }],
+    }))} />)
+    const row = view.container.querySelector('[data-sample="bash"]')
+    expect(row?.textContent).toBe('BashList files查看全部')
+  })
+
+  it('keeps the height control off a running command, which has no output yet', () => {
+    const view = render(<BashRow {...rowProps(running())} />)
+    // Nothing is printed while it runs, so there is nothing to show more of.
+    expect(view.queryByText('查看全部')).toBeNull()
+    expect(view.container.querySelector('[data-stage]')?.getAttribute('data-stage')).toBe('peek')
+  })
+
+  it('keeps the height control off an output that already fits the open cap', () => {
+    // Two lines never reach ten, so the row stops at opening and closing.
+    const view = render(<BashRow {...rowProps(settled())} />)
+    expect(view.queryByText('查看全部')).toBeNull()
+    fireEvent.click(view.container.querySelector('[data-expandable]')!)
+    expect(view.container.querySelector('[data-stage]')?.getAttribute('data-stage')).toBe('full')
+    expect(view.queryByText('查看全部')).toBeNull()
+  })
+
+  it('offers a stage past ten lines only when the output overflows it', () => {
+    // Two lines of output already fit the open cap, so there is nothing to reach.
+    const short = render(<BashRow {...rowProps(settled())} />)
+    expect(short.queryByText('查看全部')).toBeNull()
+    cleanup()
+
+    const lines = Array.from({ length: 24 }, (_, index) => `line ${index + 1}`).join('\n')
+    const view = render(<BashRow {...rowProps(settled({
+      content: [{ type: 'text', text: `${lines}\n` }],
+    }))} />)
+    const stage = () => view.container.querySelector('[data-stage]')?.getAttribute('data-stage')
+    // Asking for the rest from the closed row opens it to the ten-line cap
+    // first, so the reader is never dropped straight into an unbounded card.
+    fireEvent.click(view.getByText('查看全部'))
+    expect(stage()).toBe('full')
+    fireEvent.click(view.getByText('查看全部'))
+    expect(stage()).toBe('all')
+    // The control is a two-way door: it puts the cap back rather than leaving
+    // the row stuck open.
+    fireEvent.click(view.getByText('收起'))
+    expect(stage()).toBe('full')
+  })
+
+  it('shows the output on the closed row; the whole row grows it to ten lines', () => {
     const view = render(<BashRow {...rowProps(settled())} />)
     expect(view.getByText('List files')).toBeTruthy()
-    expect(view.queryByText(/a\.ts/)).toBeNull()
-    fireEvent.click(view.container.querySelector('[data-expandable]')!)
+    // The closed row answers "what did it print" without being opened: the
+    // terminal card is present at every stage, only its height changes.
     expect(view.getByText('a.ts  b.ts', RAW)).toBeTruthy()
     expect(view.getByText('复制')).toBeTruthy()
-    // Collapse back in place: the summary row returns, the card unmounts.
+    const stage = () => view.container.querySelector('[data-stage]')?.getAttribute('data-stage')
+    expect(stage()).toBe('peek')
     fireEvent.click(view.container.querySelector('[data-expandable]')!)
-    expect(view.queryByText(/a\.ts/)).toBeNull()
+    expect(stage()).toBe('full')
+    // Collapsing returns to the two-line peek rather than unmounting the card.
+    fireEvent.click(view.container.querySelector('[data-expandable]')!)
+    expect(stage()).toBe('peek')
     expect(view.getByText('List files')).toBeTruthy()
   })
 

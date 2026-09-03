@@ -4,7 +4,8 @@ import { mkdir } from 'node:fs/promises'
 import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type {
-  Agent, AgentOptions, AgentSetup, ModelSelection as AgentModelSelection, ModelSelectionRef,
+  Agent, AgentHandle, AgentOptions, AgentSetup, ModelSelection as AgentModelSelection,
+  ModelSelectionRef,
 } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
 import type {} from '@deepseek-ai/dsh-agent-presets'
@@ -135,6 +136,8 @@ export async function inspectApiSession(
 export class ApiSessionAgentController {
   private readonly resumes = new Map<SessionId, Promise<Agent>>()
   private readonly creations = new Map<SessionId, Promise<Agent>>()
+  /** Teardown capability of every Agent this controller activated, keyed by Session id. */
+  private readonly handles = new Map<SessionId, AgentHandle>()
   private readonly selections = new WeakMap<Agent, InstalledSelection>()
   private readonly imageAdmissionChains = new WeakMap<Agent, Promise<void>>()
 
@@ -173,6 +176,33 @@ export class ApiSessionAgentController {
    */
   async resolveObservedAgent(observation: SessionObservation): Promise<ApiSessionAgentResult> {
     return this.resolve(observation.header.id, observation)
+  }
+
+  /**
+   * Retire one ordinary Agent this controller activated, taking its Session out
+   * of the Host store and draining whatever it still owes durable storage.
+   * Discarding a Session's log needs this first: persistence refuses to delete
+   * a log an attached Session could rewrite under the same id.
+   *
+   * An Agent this controller did not activate keeps its own owner — a
+   * configured, subagent-owned, or externally created one is reported as not
+   * released rather than disposed here.
+   * @param sessionId - Session identity whose Agent is retired.
+   * @returns whether the Host released the Session; false leaves it attached.
+   */
+  async release(sessionId: SessionId): Promise<boolean> {
+    // An activation already in flight would re-enter the store right after the
+    // dispose, so let it settle (or fail) before releasing what it produced.
+    const inflight = this.resumes.get(sessionId) ?? this.creations.get(sessionId)
+    if (inflight !== undefined) await inflight.then(() => undefined, () => undefined)
+    const handle = this.handles.get(sessionId)
+    if (handle === undefined) return false
+    this.handles.delete(sessionId)
+    // A different Agent under the same id belongs to a later lifecycle this
+    // capability cannot tear down.
+    if (this.ctx.agents.get(sessionId) !== handle.agent) return false
+    await handle.dispose()
+    return true
   }
 
   private async resolve(
@@ -420,11 +450,22 @@ export class ApiSessionAgentController {
     if (published !== undefined && hasApiSessionSubagentOwner(this.ctx, published, live)) {
       throw new ApiSessionSubagentOwnership(sessionId)
     }
-    return (await this.ctx.agents.resume({
+    return this.activate(sessionId, await this.ctx.agents.resume({
       resumeSessionId: sessionId,
       agentOptions: this.agentOptions(),
       setup: composition.setup,
-    })).agent
+    }))
+  }
+
+  /**
+   * Record one activated Agent's teardown capability against its Session id.
+   * @param sessionId - Session identity the Agent was activated under.
+   * @param handle - owned Agent plus its disposer.
+   * @returns the activated Agent.
+   */
+  private activate(sessionId: SessionId, handle: AgentHandle): Agent {
+    this.handles.set(sessionId, handle)
+    return handle.agent
   }
 
   private async createOrAdopt(
@@ -452,11 +493,11 @@ export class ApiSessionAgentController {
         const storedPreset = this.presetForObservation(observation)
         this.assertPresetUnchanged(sessionId, presetId, storedPreset)
         const composition = await this.composeAgent(storedPreset)
-        return (await this.ctx.agents.resume({
+        return this.activate(sessionId, await this.ctx.agents.resume({
           resumeSessionId: sessionId,
           agentOptions: this.agentOptions(),
           setup: composition.setup,
-        })).agent
+        }))
       } catch (error: unknown) {
         if (!(error instanceof SessionQueryError)
           || error.code !== 'SESSION_QUERY_SESSION_NOT_FOUND') throw error
@@ -469,7 +510,7 @@ export class ApiSessionAgentController {
       throw new Error(`failed to ensure project directory "${cwd}": ${String(error)}`, { cause: error })
     }
     const composition = await this.composeAgent(presetId)
-    return (await this.ctx.agents.create({
+    return this.activate(sessionId, await this.ctx.agents.create({
       sessionId,
       agentOptions: this.agentOptions(),
       meta: {
@@ -477,7 +518,7 @@ export class ApiSessionAgentController {
         ...(composition.agentPreset === undefined ? {} : { agentPreset: composition.agentPreset }),
       },
       setup: composition.setup,
-    })).agent
+    }))
   }
 
   private agentOptions(): AgentOptions {

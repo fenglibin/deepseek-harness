@@ -99,6 +99,10 @@ class TracePersistence extends SessionPersistence {
   listSnapshots(): Promise<never[]> {
     return Promise.resolve([])
   }
+
+  remove(id: SessionIdType): Promise<boolean> {
+    return Promise.resolve(TracePersistence.entries.delete(id))
+  }
 }
 
 async function queryContext(): Promise<Context> {

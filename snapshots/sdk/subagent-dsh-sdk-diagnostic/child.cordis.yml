@@ -16,3 +16,11 @@
 - insert:
     - id: child-mock-llm
       name: '../../../packages/subagent/subagent-dsh-sdk/tests/fixtures/loader/child-mock-llm.ts'
+
+# `auto` follows the host's own locale, so a replay's prompt would change with
+# the machine that produced it. Pin English — which emits no directive — and
+# every recorded system prompt stays machine-independent.
+- id: response-language
+  name: '@deepseek-ai/dsh-response-language'
+  config:
+    language: en

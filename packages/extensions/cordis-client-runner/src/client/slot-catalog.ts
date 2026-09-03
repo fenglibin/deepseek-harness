@@ -1606,14 +1606,14 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.models.footer\', () => ctx.slots.register(\n      { name: \'settings.models.footer\', id: \'my-entry\', order: 100, label: \'My entry\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-settings-models/src/client/slot-contract.ts:38',
+    source: 'packages/client/ui-settings-models/src/client/slot-contract.ts:42',
   },
   {
     key: 'settings.models.provider-card',
     kind: 'keyed',
     scope: 'root',
-    summary: 'One provider card\'s adapter extension area, dispatched with `entryKey = settingsNs` on every card that renders a directory row: a saved row\'s card (its first-run setup posture included) and the add-provider draft card.',
-    doc: 'One provider card\'s adapter extension area, dispatched with\n`entryKey = settingsNs` on every card that renders a directory row: a\nsaved row\'s card (its first-run setup posture included) and the\nadd-provider draft card. The hand-declared draft card has no directory\nrow yet, so it dispatches nothing until saved. Without a registrant the\narea renders nothing.',
+    summary: 'One provider card\'s adapter extension area, dispatched with `entryKey = settingsNs` on every card that renders a directory row: a saved row\'s card (its first-run setup posture included) and the add dialog\'s card for a picked route.',
+    doc: 'One provider card\'s adapter extension area, dispatched with\n`entryKey = settingsNs` on every card that renders a directory row: a\nsaved row\'s card (its first-run setup posture included) and the add\ndialog\'s card for a picked route. The hand-declared draft card has no\ndirectory row yet, so it dispatches nothing until saved. Without a\nregistrant the area renders nothing.',
     registerOptions: [
       {
         name: 'key',
@@ -1641,7 +1641,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
     occupants: [],
     replaceRisk: 'none',
     example: 'return {\n  inject: [\'slots\'],\n  apply(ctx) {\n    ctx.slots.inject(\'settings.models.provider-card\', () => ctx.slots.register(\n      { name: \'settings.models.provider-card\', key: \'<one key the owner dispatches>\' },\n      () => React.createElement(\'div\', null, \'hello\'),\n    ))\n  },\n}',
-    source: 'packages/client/ui-settings-models/src/client/slot-contract.ts:33',
+    source: 'packages/client/ui-settings-models/src/client/slot-contract.ts:37',
   },
   {
     key: 'settings.onboarding',

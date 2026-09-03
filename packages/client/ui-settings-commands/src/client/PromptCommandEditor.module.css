@@ -1,0 +1,38 @@
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dsw-text-secondary, #666);
+}
+
+.optional {
+  margin-left: 4px;
+  font-weight: 400;
+}
+
+.textarea {
+  min-height: 96px;
+  resize: vertical;
+  padding: 8px;
+  border: 1px solid var(--dsw-border, #e0e0e0);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.invalid {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dsw-danger, #d32f2f);
+}

@@ -1402,6 +1402,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the new Session identity.',
       },
       {
+        signature: '@Remote(\'deleteSession\') deleteSession(request: SessionDeleteRequest): Promise<SessionDeleteValue>',
+        description: 'Delete one Session and every reference the Host holds to it.',
+        parameters: [{ name: 'request', description: 'Session identity.' }],
+        returns: 'the deleted identity.',
+      },
+      {
         signature: '@Remote(\'prompt\') prompt(request: SessionPromptRequest, signal: AbortSignal): Promise<SessionPromptValue>',
         description: 'Admit one prompt after explicitly resuming its Session.',
         parameters: [{ name: 'request', description: 'Session identity, prompt content, source metadata, and delivery mode.' }, { name: 'signal', description: 'caller cancellation before prompt admission begins.' }],
@@ -1533,6 +1539,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'one header per materialized session.',
       },
       {
+        signature: 'abstract remove(id: SessionId, signal?: AbortSignal): Promise<boolean>',
+        description: 'Remove one session\'s complete durable record — header and every stored event — so list and listSnapshots no longer report it and load, inspect, and readFrom reject with `SessionPersistenceNotFoundError`. Removal discards the log; it is not an append and leaves no tombstone. A backend MAY reclaim the id afterwards — create refuses only an id whose record still exists.\n\nA backend with no materialized record for `id` resolves `false`: create may defer the physical write until the first append, so a registered-but-never-appended session has nothing to remove. Backends reject while the id is bound to a live Session, which would otherwise append onto a deleted log.',
+        parameters: [{ name: 'id', description: 'the persisted session whose record is discarded.' }, { name: 'signal', description: 'optional cancellation for queueing and backend work.' }],
+        returns: 'whether a durable record existed and was removed.',
+      },
+      {
         signature: 'abstract listSnapshots(signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]>',
         description: 'List materialized sessions with cheap per-log change tokens.\n\nRepeated observations of an unchanged log return the same revision. A successful mutating load repair changes the next listed revision. Revisions also distinguish independently backed stores so backend-local counters cannot compare equal across different persistence sources.',
         parameters: [{ name: 'signal', description: 'optional cancellation for backend snapshot-listing work.' }],
@@ -1568,6 +1580,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Cold-read one session\'s projections from its complete log. Each unit is seeded from the identity-checked cached rows — the registry skips `apply` for the already-folded prefix (events at or below the row\'s `seq`) — and the refreshed checkpoint is written back (fail-soft, fire-and-forget), so the first cold read creates the cache row and later ones seed from it. The caller supplies the complete log in seq order: this service never consults the persistence layer.',
         parameters: [{ name: 'meta', description: 'the stored session header (identity witness).' }, { name: 'events', description: 'the session\'s complete log, in seq order.' }],
         returns: 'the projection cut at the log end.',
+      },
+      {
+        signature: 'async remove(id: SessionId): Promise<boolean>',
+        description: 'Discard one session\'s cached rows. The rows are derived from a log this service never reads on its own, so deleting that log must delete them: a surviving row is durable state with no session left to bind it to an identity, and no later read can tell recreated from inherited.',
+        parameters: [{ name: 'id', description: 'the deleted session\'s id.' }],
+        returns: 'whether a row existed.',
       },
     ],
   },
@@ -2827,6 +2845,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the complete resulting archive set.',
       },
       {
+        signature: '@Remote(\'unarchiveSession\') unarchiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue>',
+        description: 'Return one Session to the Workspace grouping surfaces.',
+        parameters: [{ name: 'request', description: 'Session identity to unarchive.' }],
+        returns: 'the complete resulting archive set.',
+      },
+      {
         signature: '@Remote({ mode: \'stream\' }) follow(signal: AbortSignal): AsyncIterable<WorkspaceFollowFrame>',
         description: 'Stream a complete Workspace baseline followed by ordered increments.',
         parameters: [{ name: 'signal', description: 'generation cancellation.' }],
@@ -2873,6 +2897,18 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         signature: 'archiveSession(sessionId: SessionId): Promise<void>',
         description: 'Archive one session durably. The session must exist (live or in session persistence); its workspace accounting — or lack of one — is irrelevant. An already archived id resolves without writing.',
         parameters: [{ name: 'sessionId', description: 'The session to archive.' }],
+        returns: 'resolution after durability.',
+      },
+      {
+        signature: 'unarchiveSession(sessionId: SessionId): Promise<void>',
+        description: 'Return one archived session to every grouping surface, in the position its workspace accounting kept for it. An id outside the archive set resolves without writing, so a session restored twice — or one that was never archived — is not an error.',
+        parameters: [{ name: 'sessionId', description: 'The session to unarchive.' }],
+        returns: 'resolution after durability.',
+      },
+      {
+        signature: 'removeSession(sessionId: SessionId): Promise<void>',
+        description: 'Drop every reference the registry holds to one session whose durable log has already been deleted: its workspace accounting slots, its archive-set entry, and the in-memory header and path caches. Idempotent — a session with no reference left resolves without writing.\n\nThis is the registry half of a session delete. It does not delete the log (persistence owns that), and it deliberately does not require the session to be known: after the log is gone, `sessionPersistence.list()` no longer reports the id, so a knowledge check would refuse the cleanup it exists to perform.',
+        parameters: [{ name: 'sessionId', description: 'The session whose registry references are dropped.' }],
         returns: 'resolution after durability.',
       },
       {
@@ -4854,6 +4890,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SessionCreateValue',
     declaration: 'export interface SessionCreateValue {\n    readonly sessionId: SessionId;\n    readonly agentPreset?: string;\n}',
+  },
+  {
+    name: 'SessionDeleteRequest',
+    declaration: 'export interface SessionDeleteRequest {\n    readonly sessionId: SessionId;\n}',
+  },
+  {
+    name: 'SessionDeleteValue',
+    declaration: 'export interface SessionDeleteValue {\n    readonly sessionId: SessionId;\n    readonly deleted: true;\n}',
   },
   {
     name: 'SessionEvent',

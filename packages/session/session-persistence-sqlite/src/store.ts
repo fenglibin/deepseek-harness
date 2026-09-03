@@ -274,6 +274,28 @@ export class SqliteStore implements PersistenceBackend<number> {
     }))
   }
 
+  /**
+   * Delete one session row and every event it owns — the schema cascades
+   * `events` on session delete. No revision increment follows: the row is
+   * gone, so there is nothing left to bump.
+   * @param id - session whose durable record is discarded.
+   * @param signal - optional cancellation before the transaction.
+   * @returns whether a session row existed for `id`.
+   */
+  async deleteStored(id: SessionId, signal?: AbortSignal): Promise<boolean> {
+    await this.open()
+    signal?.throwIfAborted()
+    this.db.exec(sql('begin-immediate'))
+    try {
+      validateSchemaForMutation(this.databaseConstructor, this.db, this.databasePath)
+      const { changes } = this.db.prepare(sql('delete-session')).run(id)
+      this.db.exec(sql('commit'))
+      return Number(changes) > 0
+    } catch (error: unknown) {
+      return this.rollback(error, 'delete')
+    }
+  }
+
   async close(): Promise<void> {
     if (this.ready === undefined) {
       if (this.pathReady !== undefined) await Promise.allSettled([this.pathReady])

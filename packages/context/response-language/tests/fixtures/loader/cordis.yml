@@ -1,0 +1,12 @@
+# Minimal response-language composition: real app boot path, one pinned
+# language, and no other prompt contributor that could shadow the section.
+# Driven by the package's loader.spec.ts.
+- id: system-prompt
+  name: '@deepseek-ai/dsh-system-prompt'
+  config:
+    persona: 'Persona for the response-language smoke.'
+
+- id: response-language
+  name: '@deepseek-ai/dsh-response-language'
+  config:
+    language: zh

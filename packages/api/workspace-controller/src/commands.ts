@@ -160,6 +160,17 @@ export class WorkspaceCommands {
     return { archivedSessionIds: [...this.ctx.workspaceRegistry.archivedSessionIds] }
   }
 
+  /**
+   * Return one Session to the grouping surfaces by removing it from the
+   * registry-global archive set.
+   * @param request - Session identity to unarchive.
+   * @returns the complete resulting archive set.
+   */
+  async unarchiveSession(request: WorkspaceArchiveSessionRequest): Promise<WorkspaceArchiveValue> {
+    await this.ctx.workspaceRegistry.unarchiveSession(request.sessionId)
+    return { archivedSessionIds: [...this.ctx.workspaceRegistry.archivedSessionIds] }
+  }
+
   private requireWorkspace(workspaceId: WorkspaceId): Workspace {
     const workspace = this.ctx.workspaceRegistry.get(WorkspaceId(workspaceId))
     if (workspace === undefined) throw workspaceNotFound(workspaceId)

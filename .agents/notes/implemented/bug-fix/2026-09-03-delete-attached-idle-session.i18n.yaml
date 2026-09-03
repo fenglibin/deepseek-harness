@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-03-delete-attached-idle-session.md
+2026-09-03-delete-attached-idle-session.md: 332e066f0dbd49fe3830ae5306ab3d90ffcdcca1
+2026-09-03-delete-attached-idle-session.zh.md: d27e575099bbc091b16212291e719fe06ccc446b

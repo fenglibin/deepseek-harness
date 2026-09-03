@@ -26,9 +26,6 @@
       - img "API 密钥已配置"
       - button "编辑 minimax-cn": 编辑
       - button "删除 minimax-cn": 删除
-  - button "添加提供方":
+  - button "添加模型":
     - img
-    - text: 添加提供方
-  - button "添加自定义提供方":
-    - img
-    - text: 添加自定义提供方
+    - text: 添加模型

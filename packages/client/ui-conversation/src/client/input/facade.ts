@@ -592,6 +592,17 @@ export class SessionInputShell implements SessionInput {
   }
 
   /**
+   * Whether the composer may still bind this shell's editor: false after
+   * {@link SessionInputShell.dispose}, which unbinds the root element and
+   * refuses further interaction. Composer chrome reads it before binding —
+   * a shell whose Session scope tore down must not receive a contenteditable.
+   * @returns false once the shell is disposed.
+   */
+  get live(): boolean {
+    return !this.disposed
+  }
+
+  /**
    * Bind the draft persistence mirror (Conversation store write). Adopt-on-bind: the
    * store draft may hold a persisted value from a previous mount; the caller
    * seeds it via setDraft BEFORE binding, and afterwards every editor-adopted

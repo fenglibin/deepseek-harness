@@ -11,6 +11,7 @@ import type { ChatSnapshot, TurnNavigationItem } from '../contract/snapshot.ts'
 import { PendingSteeringBubble, PendingSubmissionBubble } from './MessageItem.tsx'
 import { ChatNodeSeat } from './ChatNodeSeat.tsx'
 import { TurnNavigator } from './TurnNavigator.tsx'
+import { UserTurnPanel } from './UserTurnPanel.tsx'
 import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
@@ -163,28 +164,29 @@ function runningTurnStartTime(timeline: ConversationTimelineSnapshot): number | 
 
 /** Turn-level model activity label retained across first-token, tool, and streaming phases. */
 function TurnStatus({ startTime, t }: {
-  /** The running turn's logged `turn/start` time; null falls back to mount
-   *  time when that boundary is outside the window. */
+  /** The running turn's logged `turn/start` time; null when that boundary is outside the window. */
   startTime: number | null
   /** The owning view's locale seat. */
   t: ChatViewSlotProps['t']
 }) {
-  const [mountedAt] = useState(() => Date.now())
-  // Anchored to turn/start so a mid-turn reload keeps the real
-  // elapsed time and the final footer's Ran-for label matches this clock.
-  const anchor = startTime ?? mountedAt
-  const [elapsedMs, setElapsedMs] = useState(() => Math.max(0, Date.now() - anchor))
+  // Anchored to turn/start so a mid-turn reload keeps the real elapsed time and
+  // the final footer's Ran-for label matches this clock. When turn/start is
+  // outside the window there is no stable anchor — a mount-time fallback would
+  // restart the clock on every re-entry — so the clock is omitted instead.
+  const [elapsedMs, setElapsedMs] = useState(() =>
+    startTime === null ? 0 : Math.max(0, Date.now() - startTime))
   useEffect(() => {
+    if (startTime === null) return
     const tick = (): void => {
-      setElapsedMs(Math.max(0, Date.now() - anchor))
+      setElapsedMs(Math.max(0, Date.now() - startTime))
     }
     tick()
     const id = setInterval(tick, 1000)
     return () => { clearInterval(id) }
-  }, [anchor])
+  }, [startTime])
   // Short turns keep the plain label; the clock only appears once the turn
   // has clearly been running for a while.
-  const showClock = elapsedMs >= 15_000
+  const showClock = startTime !== null && elapsedMs >= 15_000
   return (
     <div className={css.turnStatus} role="status" aria-live="polite">
       {t('chat.deepDiving')}
@@ -573,6 +575,16 @@ export function ChatView({
     <div className={css.root}>
       <div ref={listRef} className={css.scroll}>
         <TurnNavigator
+          items={turnNavigationItems}
+          activeTurn={activeTurn}
+          onNavigate={navigateToTurn}
+          t={t}
+        />
+        {/* User-message drawer sits beside the rail on the same right gutter.
+            Both widgets read the same navigation items, so the list grows in
+            lockstep with the rail's marks and the active highlight tracks
+            `activeTurn`. */}
+        <UserTurnPanel
           items={turnNavigationItems}
           activeTurn={activeTurn}
           onNavigate={navigateToTurn}

@@ -17,18 +17,22 @@
  * the declaration. The types therefore live with their declarer.
  */
 
+import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { ProviderDirectoryEntry } from './store.ts'
+
+/** The provider-card seat's dispatch function, bound by the renderer at the render call. */
+export type ProviderCardRenderSlot = PropsRenderSlots<'settings.models.provider-card'>['renderSlot']
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /**
      * One provider card's adapter extension area, dispatched with
      * `entryKey = settingsNs` on every card that renders a directory row: a
-     * saved row's card (its first-run setup posture included) and the
-     * add-provider draft card. The hand-declared draft card has no directory
-     * row yet, so it dispatches nothing until saved. Without a registrant the
-     * area renders nothing.
+     * saved row's card (its first-run setup posture included) and the add
+     * dialog's card for a picked route. The hand-declared draft card has no
+     * directory row yet, so it dispatches nothing until saved. Without a
+     * registrant the area renders nothing.
      */
     'settings.models.provider-card': { kind: 'keyed'; scope: 'root'; owner: ProviderCardExtrasOwnerProps }
     /**

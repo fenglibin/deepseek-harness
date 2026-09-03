@@ -895,6 +895,28 @@ describe('registry-global session archive', () => {
     expect(result.registry.archivedSessionIds).toEqual(['gone', 'kept'])
   })
 
+  it('unarchives durably and treats an id outside the archive set as a no-op', async () => {
+    const dir = await makeDir('unarchive-home')
+    const result = await harness({ sessions: [header('s1', dir, 100), header('s2', dir, 200)] })
+    const workspace = result.registry.list()[0]!
+    await result.registry.archiveSession(SessionId('s1'))
+    await result.registry.archiveSession(SessionId('s2'))
+    expect(result.registry.archivedSessionIds).toEqual(['s1', 's2'])
+    const globals = result.changes.filter(change => change.table === '').length
+
+    await result.registry.unarchiveSession(SessionId('s1'))
+    expect(result.registry.archivedSessionIds).toEqual(['s2'])
+    expect(storedState(result.pool).archivedSessionIds).toEqual(['s2'])
+    // Restoring is a display-set write: the workspace account never moved.
+    expect(workspace.sessionIds).toEqual(['s2', 's1'])
+
+    await result.registry.unarchiveSession(SessionId('s1'))
+    await result.registry.unarchiveSession(SessionId('never-archived'))
+    expect(result.registry.archivedSessionIds).toEqual(['s2'])
+    // Only the one restore wrote; both no-ops skipped the medium entirely.
+    expect(result.changes.filter(change => change.table === '').length).toBe(globals + 1)
+  })
+
   it('accepts unaccounted and live sessions but rejects unknown ids without writing', async () => {
     const dir = await makeDir('archive-strays')
     const live = await makeDir('archive-live')
@@ -907,7 +929,7 @@ describe('registry-global session archive', () => {
     expect(result.registry.archivedSessionIds).toEqual(['stray', 'live-only'])
 
     await expect(result.registry.archiveSession(SessionId('ghost')))
-      .rejects.toThrow(/cannot archive session 'ghost'/)
+      .rejects.toThrow(/unknown session 'ghost'/)
     expect(storedState(result.pool).archivedSessionIds).toEqual(['stray', 'live-only'])
   })
 
@@ -940,5 +962,95 @@ describe('registry-global session archive', () => {
     )
     const upgraded = await harness({ pool: legacy })
     expect(upgraded.registry.archivedSessionIds).toEqual([])
+  })
+})
+
+describe('registry-global session removal', () => {
+  it('drops a removed session from its workspace account and from the archive set', async () => {
+    const dir = await makeDir('remove-accounted')
+    const result = await harness({ sessions: [header('kept', dir, 100), header('gone', dir, 200)] })
+    const workspace = result.registry.list()[0]!
+    await result.registry.archiveSession(SessionId('gone'))
+    expect(workspace.sessionIds).toEqual(['gone', 'kept'])
+    expect(result.registry.archivedSessionIds).toEqual(['gone'])
+    const globals = result.changes.filter(change => change.table === '').length
+
+    await result.registry.removeSession(SessionId('gone'))
+
+    expect(workspace.sessionIds).toEqual(['kept'])
+    expect(storedRecord(result.pool, workspace.id).sessionIds).toEqual(['kept'])
+    expect(result.registry.archivedSessionIds).toEqual([])
+    expect(storedState(result.pool).archivedSessionIds).toEqual([])
+    // The archive entry costs one global write; the account costs a table write.
+    expect(result.changes.filter(change => change.table === '').length).toBe(globals + 1)
+  })
+
+  it('resolves without writing when no workspace accounts for the session', async () => {
+    const owned = await makeDir('remove-unaccounted')
+    const strayHome = await makeDir('remove-unaccounted-stray')
+    const result = await harness({ sessions: [], liveSessions: [header('stray', strayHome, 200)] })
+    const workspace = await result.registry.create(owned)
+    const written = result.changes.length
+    const listed = result.list.mock.calls.length
+
+    // 'stray' is header-indexed but unaccounted and unarchived, so the cleanup
+    // has nothing durable to drop. It also never asks persistence whether the
+    // session is known: the log is already gone when a delete reaches this half.
+    await expect(result.registry.removeSession(SessionId('stray'))).resolves.toBeUndefined()
+    await expect(result.registry.removeSession(SessionId('stray'))).resolves.toBeUndefined()
+    await expect(result.registry.removeSession(SessionId('never-listed'))).resolves.toBeUndefined()
+
+    expect(result.changes).toHaveLength(written)
+    expect(result.list.mock.calls).toHaveLength(listed)
+    expect(storedRecord(result.pool, workspace.id).sessionIds).toEqual([])
+    expect(storedState(result.pool).archivedSessionIds).toEqual([])
+  })
+
+  it('does not resurrect a removed session when a fresh registry reopens the medium', async () => {
+    const dir = await makeDir('remove-reopen')
+    const pool = new MemoryMediaPool()
+    const first = await harness({
+      pool,
+      sessions: [header('kept', dir, 100), header('gone', dir, 200)],
+    })
+    const workspace = first.registry.list()[0]!
+    await first.registry.archiveSession(SessionId('gone'))
+    await first.registry.removeSession(SessionId('gone'))
+    await first.fiber.dispose()
+
+    // A session delete removes the durable log first, so the listing a
+    // reopening registry reads — the harness `sessions:` fixture — no longer
+    // carries the header. The account and archive set stay clean without it.
+    const second = await harness({ pool, sessions: [header('kept', dir, 100)] })
+    const reopened = second.registry.list()[0]!
+    expect(reopened.id).toBe(workspace.id)
+    expect(reopened.sessionIds).toEqual(['kept'])
+    expect(second.registry.archivedSessionIds).toEqual([])
+    // The removal is durable: the reopened projection filters candidates by
+    // header cwd, so only the medium proves the account itself lost the id.
+    expect(storedRecord(pool, workspace.id).sessionIds).toEqual(['kept'])
+    expect(storedState(pool).archivedSessionIds).toEqual([])
+    expect(second.list).toHaveBeenCalledTimes(1)
+  })
+
+  it('drops the in-memory header cache so persistence alone decides what the registry knows', async () => {
+    const dir = await makeDir('remove-caches')
+    const result = await harness({ sessions: [header('kept', dir, 100), header('gone', dir, 200)] })
+    const workspace = result.registry.list()[0]!
+    // The header indexed at startup answers the knowledge check on its own.
+    await expect(result.registry.archiveSession(SessionId('gone'))).resolves.toBeUndefined()
+    await result.registry.unarchiveSession(SessionId('gone'))
+
+    await result.registry.removeSession(SessionId('gone'))
+    result.setSessions([header('kept', dir, 100)])
+
+    // The cached header is gone, so the knowledge check and the attach-time
+    // header read both fall through to the listing, which no longer names it.
+    await expect(result.registry.archiveSession(SessionId('gone')))
+      .rejects.toThrow(/unknown session 'gone'/)
+    await expect(workspace.attachSession(SessionId('gone')))
+      .rejects.toThrow(/no such session/)
+    expect(workspace.sessionIds).toEqual(['kept'])
+    expect(storedRecord(result.pool, workspace.id).sessionIds).toEqual(['kept'])
   })
 })

@@ -396,6 +396,45 @@
   padding-top: 12px;
 }
 
+/* Add-model dialog body: the chooser's two entries, then whichever card the
+   choice opened, stacked with the gap the cards use internally. */
+.addDialogBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.addDialogStep {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Endpoint entry of the add dialog: field, then commit button beside it
+   rather than below, so entering a URL reads as one gesture. */
+.addManualRow {
+  display: flex;
+  gap: 8px;
+}
+
+.addManualRow .input {
+  flex: 1 1 auto;
+}
+
+/* Add-model dialog: roomier than the confirmations, because it carries a whole
+   provider card; the body scrolls instead of the mask. */
+.addDialog {
+  max-width: 560px;
+
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+.addDialogContent {
+  max-height: min(72vh, 640px);
+  overflow-y: auto;
+}
+
 /* Model catalog: a table, not a stack of cards. The column captions are
    written once above the rows, so a row is one line of fields plus its
    delete control; each field still carries the indexed `aria-label` that

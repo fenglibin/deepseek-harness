@@ -196,6 +196,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'session/steer-unavailable': { readonly itemId: MessageId }
     'session/title-invalid': { readonly sessionId: SessionId }
     'session/fork-unavailable': { readonly sessionId: SessionId }
+    'session/live': { readonly sessionId: SessionId }
     'subagent/not-found': {
       readonly parentSessionId: SessionId
       readonly childSessionId: SessionId
@@ -296,6 +297,17 @@ export interface SessionForkRequest {
 /** Identity of a newly forked Session. */
 export interface SessionForkValue {
   readonly sessionId: SessionId
+}
+
+/** Session delete request. */
+export interface SessionDeleteRequest {
+  readonly sessionId: SessionId
+}
+
+/** Receipt after one Session's durable log and every Host reference are gone. */
+export interface SessionDeleteValue {
+  readonly sessionId: SessionId
+  readonly deleted: true
 }
 
 /** Session prompt request. */

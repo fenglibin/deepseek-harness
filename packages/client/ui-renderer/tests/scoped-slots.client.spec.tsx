@@ -92,7 +92,11 @@ function makeHost() {
   const versions = new Map<string, number>()
   const subs = new Map<string, Set<() => void>>()
   const live = new Set<StoredEntry>()
-  const abdicated = new Set<StoredEntry>()
+  const abdicated = new Map<StoredEntry, string>()
+  // Abdication-scope trace: which scope each retirement was reported under,
+  // and which scope each projection was read for.
+  const retirementScopes: (string | undefined)[] = []
+  const projectionScopes: (string | undefined)[] = []
   const storeCache = new Map<StoredEntry, Map<string, StoreInstanceLike>>()
   const list = observable<{ ids: string[] }>({ ids: [] })
   const workspaces = observable<{ ids: string[] }>({ ids: [] })
@@ -135,16 +139,20 @@ function makeHost() {
     },
     getVersion: key => versions.get(key) ?? 0,
     entriesOf: key => entries.get(key) ?? [],
-    entriesOfSlot: (key) => {
+    entriesOfSlot: (key, scope) => {
+      projectionScopes.push(scope)
       const all = entries.get(key) ?? []
       const kind = specs.get(key)?.kind
       if (kind === 'chain') return all
-      // Mirror the ledger projection: first live (non-abdicated) entry per
-      // cell (single — one cell; keyed — per key; list — per id).
+      // Mirror the ledger projection: first live (non-retired) entry per cell
+      // (single — one cell; keyed — per key; list — per id). Live is judged in
+      // the caller's abdication scope, so an entry retired while rendering one
+      // Session still wins for the next.
       const heads: StoredEntry[] = []
       const seen = new Set<string | undefined>()
       for (const entry of all) {
-        if (abdicated.has(entry)) continue
+        // An omitted scope is the root scope: no Session to retry on.
+        if (abdicated.get(entry) === (scope ?? '')) continue
         const cell = kind === 'keyed' ? entry.options.key : kind === 'list' ? entry.options.id : undefined
         if (seen.has(cell)) continue
         seen.add(cell)
@@ -153,8 +161,11 @@ function makeHost() {
       return heads
     },
     reportEntryError: (key, entry, _error, info) => {
-      if (!info.abdicate || abdicated.has(entry)) return
-      abdicated.add(entry)
+      if (!info.abdicate) return
+      retirementScopes.push(info.scope)
+      const scope = info.scope ?? ''
+      if (abdicated.get(entry) === scope) return
+      abdicated.set(entry, scope)
       bump(key)
     },
     specOf: key => specs.get(key),
@@ -185,6 +196,8 @@ function makeHost() {
     host,
     list,
     workspaces,
+    retirementScopes,
+    projectionScopes,
     // Driver surface: set(id) publishes the resolved binding (or the absent
     // projection) through the scope adapter.
     current: {
@@ -261,6 +274,7 @@ function mountRoot(
 
 const SINGLE_ROOT: DeclaredSpec = { kind: 'single', scope: 'root' }
 const SINGLE_SESSION: DeclaredSpec = { kind: 'single', scope: 'session' }
+const SINGLE_SESSION_MAYBE: DeclaredSpec = { kind: 'single', scope: 'session-maybe' }
 const CHAIN_ROOT: DeclaredSpec = { kind: 'chain', scope: 'root' }
 const CHAIN_SESSION: DeclaredSpec = { kind: 'chain', scope: 'session' }
 
@@ -377,8 +391,73 @@ describe('child outlets and the renderSlot binding', () => {
     const { view } = mountRoot(h, { 'k.list': { kind: 'list', scope: 'root' } },
       renderSlot => renderSlot('k.list', {}))
     spy.mockRestore()
-    expect(view.container.textContent).toBe('alive')
-    expect(view.container.querySelector('[data-slot-error]')).not.toBeNull()
+    expect(view.container.textContent).toContain('alive')
+    const face = view.container.querySelector('[data-slot-error]')
+    expect(face).not.toBeNull()
+    // Local builds plate the retired slot key so a hole in the tree is visible.
+    expect(face?.textContent).toBe('k.list')
+  })
+
+  it('retires a crashed session-maybe entry only in the Session that crashed: the next Session renders it again', () => {
+    const h = makeHost()
+    h.declare('k.composer', SINGLE_SESSION_MAYBE)
+    h.addSession('s1')
+    h.addSession('s2')
+    // Stands in for the composer bar: one page-wide registration every
+    // Session renders through, so a single crash must not retire it for all
+    // of them until the page reloads.
+    let fail = false
+    h.add('k.composer', {
+      component: () => {
+        if (fail) throw new Error('composer boom')
+        return <span>composer</span>
+      },
+    })
+    // Session-maybe needs no SessionProvider: it reads the scope binding the
+    // root outlet already provides.
+    const { view } = mountRoot(h, { 'k.composer': SINGLE_SESSION_MAYBE }, renderSlot => renderSlot('k.composer', {}))
+    act(() => { h.current.set('s1') })
+    expect(view.container.textContent).toContain('composer')
+
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    fail = true
+    // Re-declaring bumps the key, re-rendering the outlet under the same
+    // Session; the sole registration crashes.
+    act(() => { h.declare('k.composer', SINGLE_SESSION_MAYBE) })
+    spy.mockRestore()
+    expect(view.container.querySelector('[data-slot-error="k.composer"]')).not.toBeNull()
+    // The crash retired the entry under the rendered Session, not globally.
+    expect(h.retirementScopes).toEqual(['s1'])
+
+    // A different Session is a different abdication scope: the entry renders
+    // again instead of staying retired for the rest of its registration.
+    fail = false
+    act(() => { h.current.set('s2') })
+    expect(view.container.textContent).toContain('composer')
+    // Back to the crashed Session: that retirement stands, so it neither
+    // renders nor crashes again (no repeated crash loop).
+    act(() => { h.current.set('s1') })
+    expect(view.container.querySelector('[data-slot-error="k.composer"]')).not.toBeNull()
+    // Outlets project per rendered Session, which is what scopes the retirement.
+    expect(h.projectionScopes.filter(scope => scope !== undefined)).toContain('s2')
+  })
+
+  it('plates the crash face with the slot key in local builds and leaves a bare marker in official builds', () => {
+    const crashing = (): ReturnType<typeof makeHost> => {
+      const h = makeHost()
+      h.declare('k.single', SINGLE_ROOT)
+      h.add('k.single', { component: () => { throw new Error('boom') } })
+      return h
+    }
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.stubEnv('DSH_CLIENT_BUILD_PROFILE', 'official')
+    const official = mountRoot(crashing(), { 'k.single': SINGLE_ROOT }, renderSlot => renderSlot('k.single', {}))
+    vi.unstubAllEnvs()
+    const local = mountRoot(crashing(), { 'k.single': SINGLE_ROOT }, renderSlot => renderSlot('k.single', {}))
+    spy.mockRestore()
+    // Production users see no framework chrome; local builds make the hole visible.
+    expect(official.view.container.querySelector('[data-slot-error="k.single"]')?.textContent).toBe('')
+    expect(local.view.container.querySelector('[data-slot-error="k.single"]')?.textContent).toBe('k.single')
   })
 })
 
@@ -1004,7 +1083,7 @@ describe('inject: execution point, parameter derivation, cache granularity', () 
     spy.mockRestore()
     // The failing entry blacks out alone; the sibling and the tree above survive.
     expect(view.container.querySelector('main')).not.toBeNull()
-    expect(view.container.textContent).toBe('alive')
+    expect(view.container.textContent).toContain('alive')
     expect(view.container.querySelector('[data-slot-error]')).not.toBeNull()
   })
 

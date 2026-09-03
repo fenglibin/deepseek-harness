@@ -209,6 +209,10 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
 
+  remove(id: SessionId, signal?: AbortSignal): Promise<boolean> {
+    return this.coordinator.remove(id, signal)
+  }
+
   // One method serves both public `list` and the backend hook; delegating it to
   // the coordinator would call this hook recursively.
 
@@ -462,6 +466,23 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
   /** List valid unique stored sessions' metadata (header line only — no full-log parse). */
   async list(signal?: AbortSignal): Promise<SessionHeader[]> {
     return (await this.listArtifacts(signal)).map(artifact => artifact.header)
+  }
+
+  /**
+   * Delete one session's durable record: the whole session directory holding
+   * its log. Removing the directory (not only the log file) leaves no empty
+   * session directory behind for listing or encoding checks to trip on.
+   * @returns whether a log existed for `id`.
+   */
+  async deleteStored(id: SessionId, signal?: AbortSignal): Promise<boolean> {
+    signal?.throwIfAborted()
+    await this.ensureRootEncoding()
+    signal?.throwIfAborted()
+    const path = await this.findLog(id, signal)
+    signal?.throwIfAborted()
+    if (path === undefined) return false
+    await rm(dirname(path), { recursive: true, force: true })
+    return true
   }
 
   /** List metadata plus a stat-derived identity for each append-only log. */

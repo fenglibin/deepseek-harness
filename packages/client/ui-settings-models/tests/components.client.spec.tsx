@@ -282,6 +282,21 @@ async function mountSection(overrides: Parameters<typeof scriptedFace>[0] = {}) 
   return mountFace(scriptedFace(overrides))
 }
 
+/** Open the add dialog on the chooser. */
+async function addDialog(): Promise<HTMLElement> {
+  fireEvent.click(screen.getByRole('button', { name: en.add }))
+  return await screen.findByRole('dialog')
+}
+
+/** Open the add dialog and pick one directory provider inside it. */
+async function addProvider(provider: string): Promise<HTMLElement> {
+  const dialog = await addDialog()
+  fireEvent.change(within(dialog).getByLabelText<HTMLSelectElement>(en.provider), {
+    target: { value: provider },
+  })
+  return dialog
+}
+
 /**
  * Mount for a user who cannot reach any provider yet: no credential is stored
  * anywhere, so the whole-section DeepSeek route owns the first-run setup card.
@@ -329,10 +344,10 @@ describe('ModelsSection', () => {
     expect(cardSeatCalls(renderSlot)).toContainEqual(['deepseek-official', true, false, 'llm-deepseek'])
   })
 
-  it('dispatches the provider-card seat on the add-provider draft with its dormant row', async () => {
+  it('dispatches the provider-card seat on the add dialog\'s dormant row', async () => {
     const { renderSlot } = await mountSection()
     renderSlot.mockClear()
-    fireEvent.click(screen.getByRole('button', { name: en.add }))
+    await addProvider('anthropic')
     expect(cardSeatCalls(renderSlot)).toContainEqual(['anthropic', false, false, 'llm-pi-ai'])
   })
 
@@ -346,7 +361,7 @@ describe('ModelsSection', () => {
     )))
     const { renderSlot } = await mountFace(scripted)
     renderSlot.mockClear()
-    fireEvent.click(screen.getByRole('button', { name: en.add }))
+    await addProvider('anthropic')
     // The dormant row names no reference yet; the seat still reports the
     // derived ANTHROPIC_API_KEY the editor itself displays as configured.
     expect(cardSeatCalls(renderSlot)).toContainEqual(['anthropic', false, true, 'llm-pi-ai'])
@@ -354,7 +369,7 @@ describe('ModelsSection', () => {
 
   it('skips the draft seat when a refresh drops the dormant row', async () => {
     const { renderSlot, face, controller } = await mountSection()
-    fireEvent.click(screen.getByRole('button', { name: en.add }))
+    await addProvider('anthropic')
     const directory = [
       { provider: 'deepseek-official', displayName: 'DeepSeek', settingsNs: 'llm-deepseek', settingsPath: [], active: true },
       { provider: 'openai', displayName: 'openai', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'openai'], active: true },
@@ -362,8 +377,9 @@ describe('ModelsSection', () => {
     face.llm.listConfigurableProviders.mockImplementation(() => Promise.resolve(remoteOk(directory)))
     renderSlot.mockClear()
     await act(async () => { await controller.load() })
-    // The draft card is still open while its row is gone from the directory.
-    expect(screen.getByLabelText(en.keyInput)).toBeTruthy()
+    // The dialog stays open on the row it was opened for; the seat has nothing
+    // to dispatch once that row is gone from the directory.
+    expect(screen.getByRole('dialog')).toBeTruthy()
     expect(cardSeatCalls(renderSlot).some(([provider]) => provider === 'anthropic')).toBe(false)
   })
   it('renders the unkeyed whole-section provider as an open setup card in the first-run posture', async () => {
@@ -1040,12 +1056,63 @@ describe('ModelsSection', () => {
     ])
   })
 
+  it('opens the add dialog on the chooser, with both ways to gain a provider', async () => {
+    await mountSection()
+
+    const dialog = await addDialog()
+    const pick = within(dialog).getByLabelText<HTMLSelectElement>(en.provider)
+    expect(pick.value).toBe('')
+    expect(within(dialog).getByLabelText(en.addManualUrl)).toBeTruthy()
+    // No provider is picked yet, so neither card is open.
+    expect(within(dialog).queryByText(en.customTitle)).toBeNull()
+    expect(within(dialog).queryByLabelText(en.keyInput)).toBeNull()
+
+    // Re-picking the placeholder is not a route named "".
+    fireEvent.change(pick, { target: { value: '' } })
+    expect(within(dialog).queryByLabelText(en.keyInput)).toBeNull()
+  })
+
+  it('opens a declared route\'s card asking for what the adapter cannot default', async () => {
+    const { face, controller } = await mountSection()
+    face.llm.listConfigurableProviders.mockImplementation(() => Promise.resolve(remoteOk([
+      { provider: 'deepseek-official', displayName: 'DeepSeek', settingsNs: 'llm-deepseek', settingsPath: [] },
+      { provider: 'openai', displayName: 'openai', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'openai'] },
+      { provider: 'anthropic', displayName: 'anthropic', settingsNs: 'llm-pi-ai', settingsPath: ['providers', 'anthropic'], declared: true },
+    ])))
+    await act(async () => { await controller.load() })
+
+    await addProvider('anthropic')
+    // The route is in no catalog, so the card reaches for the name and the
+    // protocol the way the create card does rather than sending the user to
+    // settings.yaml for what only this route names.
+    expect(screen.getByLabelText(en.customApi)).toBeTruthy()
+    expect(screen.getByLabelText(en.customDisplayName, { exact: true })).toBeTruthy()
+  })
+
+  it('adopts a picked route through the dialog and leaves the endpoint question behind', async () => {
+    await mountSection()
+
+    await addProvider('anthropic')
+    expect(screen.getByLabelText(en.keyInput)).toBeTruthy()
+    expect(screen.queryByLabelText(en.addManualUrl)).toBeNull()
+    expect(screen.queryByText(en.customTitle)).toBeNull()
+
+    // Returning to the chooser keeps the manual way available.
+    fireEvent.click(screen.getByText(en.addBack))
+    expect(screen.queryByLabelText(en.keyInput)).toBeNull()
+    expect(screen.getByLabelText(en.addManualUrl)).toBeTruthy()
+  })
+
   it('adds a dormant provider with a derived reference and stores its key', async () => {
     const { mutate, set } = await mountSection()
-    fireEvent.click(screen.getByText(en.add))
-    const pick = await screen.findByLabelText<HTMLSelectElement>(en.provider)
+    // The chooser lists the addable routes behind a placeholder; picking one
+    // opens the editor for it, and the placeholder leaves with the choice.
+    const dialog = await addDialog()
+    const pick = within(dialog).getByLabelText<HTMLSelectElement>(en.provider)
+    expect([...pick.options].map(option => option.value)).toEqual(['', 'anthropic', 'broken', 'plain'])
+    expect(pick.value).toBe('')
+    fireEvent.change(pick, { target: { value: 'anthropic' } })
     expect([...pick.options].map(option => option.value)).toEqual(['anthropic', 'broken', 'plain'])
-    expect(pick.value).toBe('anthropic')
     // A dormant profile has no endpoint anywhere: the pi-ai placeholder
     // falls back to the provider-default wording.
     fireEvent.click(screen.getByText(en.customized))
@@ -1065,8 +1132,7 @@ describe('ModelsSection', () => {
 
   it('keeps pi-ai provider-native authentication when no key is entered', async () => {
     const { mutate, set } = await mountSection()
-    fireEvent.click(screen.getByText(en.add))
-    await screen.findByLabelText(en.provider)
+    await addProvider('anthropic')
     fireEvent.click(screen.getByText(en.apply))
     await waitFor(() => { expect(mutate).toHaveBeenCalledOnce() })
     expect(mutate.mock.calls[0]).toEqual([
@@ -1096,8 +1162,7 @@ describe('ModelsSection', () => {
       .mockResolvedValueOnce(remoteFail('credential store unavailable'))
       .mockResolvedValueOnce(remoteOk(undefined))
     const { face, controller, mirror } = await mountSection({ mutate, set })
-    fireEvent.click(screen.getByText(en.add))
-    await screen.findByLabelText(en.provider)
+    await addProvider('anthropic')
     fireEvent.change(screen.getByLabelText<HTMLInputElement>(en.keyInput), { target: { value: 'sk-ant' } })
     fireEvent.click(screen.getByText(en.apply))
     await screen.findByText('credential store unavailable')
@@ -1122,8 +1187,8 @@ describe('ModelsSection', () => {
 
   it('switches the add card target and degrades unknown or broken targets loudly', async () => {
     await mountSection()
-    fireEvent.click(screen.getByText(en.add))
-    const pick = await screen.findByLabelText<HTMLSelectElement>(en.provider)
+    const dialog = await addDialog()
+    const pick = within(dialog).getByLabelText<HTMLSelectElement>(en.provider)
     fireEvent.change(pick, { target: { value: 'broken' } })
     await screen.findByText(/unresolvable settings path/)
     fireEvent.change(pick, { target: { value: 'plain' } })
@@ -1139,8 +1204,7 @@ describe('ModelsSection', () => {
     const { set } = await mountSection({
       mutate: vi.fn(() => Promise.resolve(remoteFail('llm-pi-ai: unknown pi-ai provider "bogus"', 'settings/rejected'))),
     })
-    fireEvent.click(screen.getByText(en.add))
-    await screen.findByLabelText(en.provider)
+    await addProvider('anthropic')
     fireEvent.change(screen.getByLabelText<HTMLInputElement>(en.keyInput), { target: { value: 'sk-x' } })
     fireEvent.click(screen.getByText(en.apply))
     await screen.findByText(/unknown pi-ai provider/)
@@ -1336,13 +1400,15 @@ describe('ModelsSection', () => {
     expect(mutate).not.toHaveBeenCalled()
   })
 
-  it('cancels the add card back to the add button', async () => {
+  it('cancels the add dialog\'s card back to the chooser, not out of the dialog', async () => {
     await mountSection()
-    fireEvent.click(screen.getByText(en.add))
-    await screen.findByLabelText(en.provider)
+    await addProvider('anthropic')
     fireEvent.click(screen.getByText(en.cancel))
-    await screen.findByText(en.add)
-    expect(screen.queryByLabelText(en.provider)).toBeNull()
+    // The card's cancel is a step back: the dialog keeps the choice it was
+    // opened for, so the operator can pick another way in.
+    await waitFor(() => { expect(screen.queryByLabelText(en.keyInput)).toBeNull() })
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByLabelText(en.provider)).toBeTruthy()
   })
 
   it('collapses the setup card on cancel without disturbing another open card', async () => {
@@ -1350,22 +1416,21 @@ describe('ModelsSection', () => {
     // so cancelling it discarded the add card's draft while staying open itself.
     await mountFirstRun()
     expect(screen.getAllByLabelText(en.keyInput)).toHaveLength(1)
-    fireEvent.click(screen.getByText(en.add))
-    await screen.findByLabelText(en.provider)
+    await addProvider('anthropic')
     expect(screen.getAllByLabelText(en.keyInput)).toHaveLength(2)
 
     // The setup card is the first one on the page, above the add block.
     fireEvent.click(screen.getAllByText(en.cancel)[0] as HTMLElement)
-    // The add card kept its draft…
-    expect(screen.getByLabelText(en.provider)).toBeTruthy()
+    // The dialog's card kept its draft…
+    expect(screen.getByLabelText(en.keyInput)).toBeTruthy()
     // …and DeepSeek collapsed to an ordinary row carrying the missing-key dot.
     expect(screen.getAllByLabelText(en.keyInput)).toHaveLength(1)
     expect(screen.getAllByRole('img', { name: en.credentialMissing })
       .some(dot => dot.closest('li')?.textContent?.includes('DeepSeek') === true)).toBe(true)
-    // Its card reopens through Edit, which closes the add card as any row does.
+    // Its card reopens through Edit, which closes the dialog as any row does.
     fireEvent.click(screen.getByRole('button', { name: deepSeekCopy(en.editProvider) }))
     expect(screen.getAllByLabelText(en.keyInput)).toHaveLength(1)
-    expect(screen.queryByLabelText(en.provider)).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('loads on first render of an idle controller', async () => {

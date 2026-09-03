@@ -57,6 +57,14 @@ The slot declaration fixes two independent axes.
 
 `priority` is a shadowing rank for `single`, `list`, and `keyed` cells and an election order for `chain`. Lower values run or render first. Ordinary additive contributions should choose a fresh list `id` or keyed `key`; intentionally reusing a shipped cell replaces its presentation.
 
+## Failure handling
+
+Every entry renders inside its own error boundary. A crash inside one entry — component render or inject factory — is contained: the boundary logs `slot entry crashed in '<key>'`, reports the crash through the registry's supervision seam, and renders the crash face. Assembly errors (a miswired shell, a scope rendered outside its provider) rethrow instead, because a miswired composition must fail loud.
+
+For the shadowing cardinalities the report also retires the crashed entry from its cell, and the cell's next survivor renders; a cell whose every registration retired keeps the crash face. Retirement is scoped: it applies to the Session whose render crashed, so a Session-scoped registration that crashed while rendering one Session renders again for the next. A root-scoped registration has no narrower scope to retry on and stays retired until its registration is disposed. Chain entries never retire — election alternatives resolve at select time — so a crashed elected entry keeps the static crash face.
+
+The crash face is a bare `[data-slot-error="<key>"]` marker element in official builds and plates the slot key in local builds, so a hole in the tree is visible during development.
+
 ## Component inputs
 
 A registered component receives inputs assembled at its binding site. Components derive these types rather than copying their members.

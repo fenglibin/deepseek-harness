@@ -72,14 +72,11 @@
           - textbox "最大输出 token 数 3":
             - /placeholder: 256K
             - text: 64K
-          - button "添加模型":
+          - button "手动添加":
             - img
-            - text: 添加模型
+            - text: 手动添加
       - button "取消"
       - button "保存"
-  - button "添加提供方":
+  - button "添加模型":
     - img
-    - text: 添加提供方
-  - button "添加自定义提供方":
-    - img
-    - text: 添加自定义提供方
+    - text: 添加模型

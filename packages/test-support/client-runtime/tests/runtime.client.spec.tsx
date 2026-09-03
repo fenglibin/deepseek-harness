@@ -292,6 +292,22 @@ describe('stores', () => {
     expect(runtime.sessions.list.getSnapshot().current).toBeUndefined()
     await runtime.dispose()
   })
+
+  it('delete() records the call and prunes the row like a Host removal', async () => {
+    const runtime = await runtimeWithFrame()
+    await runtime.sessions.add({ id: 's1' })
+    await runtime.sessions.add({ id: 's2' }, { current: false })
+    const scope = runtime.sessions.scope('s1')!
+
+    await runtime.sessions.delete('s1' as SessionId)
+
+    expect(runtime.sessions.calls).toEqual([{ method: 'delete', args: ['s1'] }])
+    expect(runtime.sessions.list.getSnapshot().ids).toEqual(['s2'])
+    expect(runtime.sessions.list.getSnapshot().current).toBeUndefined()
+    expect(runtime.sessions.binding('s1')).toBeUndefined()
+    expect(scope.fiber.uid).toBeNull() // the scope dies with the row
+    await runtime.dispose()
+  })
 })
 
 describe('workspaces', () => {
@@ -487,8 +503,13 @@ describe('workspaces action face', () => {
     // state's archive set (features render against the same snapshot).
     await ws.archiveSession('s1' as SessionId)
     expect(ws.list.getSnapshot().archivedSessionIds).toEqual(['s1'])
+    // Restore mirrors the production effect the other way: the id leaves the
+    // archive set, so a restored row rejoins the grouping surfaces.
+    await ws.unarchiveSession('s1' as SessionId)
+    expect(ws.list.getSnapshot().archivedSessionIds).toEqual([])
     expect(ws.calls.map(c => c.method)).toEqual(
-      ['create', 'create', 'rename', 'delete', 'insertBefore', 'insertSessionBefore', 'archiveSession'])
+      ['create', 'create', 'rename', 'delete', 'insertBefore', 'insertSessionBefore',
+        'archiveSession', 'unarchiveSession'])
 
     ws.stub('create', () => Promise.resolve({ workspaceId: 'ws-x', title: 'X', path: '/x', sessionIds: [] } as never))
     ws.stub('rename', () => Promise.resolve({ workspaceId: 'w1', title: 'S', path: '/s', sessionIds: [] } as never))
@@ -497,15 +518,19 @@ describe('workspaces action face', () => {
     ws.stub('insertBefore', insertBefore)
     ws.stub('insertSessionBefore', () => Promise.resolve({ workspaceId: 'w1', title: '', path: '', sessionIds: [] } as never))
     ws.stub('archiveSession', () => Promise.resolve())
+    ws.stub('unarchiveSession', () => Promise.resolve())
     expect((await ws.create({ path: '/y' })).title).toBe('X')
     expect((await ws.rename('w1' as WorkspaceId, 'z')).title).toBe('S')
     await ws.delete('w1' as WorkspaceId)
     await ws.insertBefore('w2' as WorkspaceId)
     expect(insertBefore).toHaveBeenCalledWith('w2', undefined)
     expect((await ws.insertSessionBefore('w1' as WorkspaceId, 's1' as SessionId)).sessionIds).toEqual([])
-    // The stub replaces the default set mutation: the set stays as-is.
-    await ws.archiveSession('s2' as SessionId)
-    expect(ws.list.getSnapshot().archivedSessionIds).toEqual(['s1'])
+    // The stub replaces the default set mutation: the set stays as-is, so
+    // neither verb moves an id in or out of it.
+    await ws.archiveSession('s1' as SessionId)
+    expect(ws.list.getSnapshot().archivedSessionIds).toEqual([])
+    await ws.unarchiveSession('s1' as SessionId)
+    expect(ws.list.getSnapshot().archivedSessionIds).toEqual([])
     await runtime.dispose()
   })
 })

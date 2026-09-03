@@ -5,7 +5,7 @@ import type { SessionPendingInteractionBase } from '@deepseek-ai/dsh-client-ui-s
 import type { ScheduleId, ScheduleRecord } from '@deepseek-ai/dsh-schedule/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import {
-  deriveFlat, deriveGroups, deriveSearchResults, workspaceLabel,
+  deriveArchived, deriveFlat, deriveGroups, deriveSearchResults, workspaceLabel,
   UNGROUPED_KEY,
 } from '../src/client/tree.ts'
 import { createWorkspaceViewStore } from '../src/client/stores.ts'
@@ -329,6 +329,40 @@ describe('deriveFlat', () => {
     const kept = summary('kept', 1)
     const gone = summary('gone', 2)
     expect(deriveFlat(list(kept, gone), archived('gone'), noAttention).map(row => row.id)).toEqual([kept.id])
+  })
+})
+
+describe('deriveArchived', () => {
+  it('derives exactly the archived rows, newest-first', () => {
+    const older = summary('older', 1)
+    const newer = summary('newer', 3)
+    const listed = summary('listed', 2)
+    const rows = deriveArchived(list(older, newer, listed), archived('older', 'newer'), noAttention)
+    expect(rows.map(row => row.id)).toEqual([newer.id, older.id])
+    expect(rows.map(row => row.title)).toEqual(['newer', 'older'])
+  })
+
+  it('skips an archived id whose summary has not landed and an empty archive yields no rows', () => {
+    const present = summary('present', 1)
+    expect(deriveArchived(list(present), archived('ghost', 'present'), noAttention)
+      .map(row => row.id)).toEqual([present.id])
+    expect(deriveArchived(list(present), noArchive, noAttention)).toEqual([])
+  })
+
+  it('keeps the pending-interaction and subagent-activity projection the listed rows use', () => {
+    const archivedRow = { ...summary('archived', 2), running: true }
+    const child = {
+      ...summary('child', 3), parentId: archivedRow.id, origin: 'subagent' as const, running: true,
+    }
+    const attention: ReadonlyMap<SessionId, SessionPendingInteractionBase> = new Map([[
+      archivedRow.id,
+      { key: 'approval:1', kind: 'approval', sessionId: archivedRow.id },
+    ]])
+    const rows = deriveArchived(list(archivedRow, child), archived('archived'), attention)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      pendingInteraction: 'approval', running: true, runningSubagentCount: 1,
+    })
   })
 })
 

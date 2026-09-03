@@ -63,9 +63,11 @@ ctx.workspaceRegistry.list() // shows the project, newest first
 
 A session joins the project of the directory it runs in: create a session in a project's directory and it appears under that project, newest first. A session can only belong to one project. A session whose directory cannot be validated — no recorded directory, or a moved or deleted folder — cannot join and stays ungrouped.
 
-### Hiding sessions and removing projects
+### Hiding sessions, removing projects, and deleting sessions
 
 Hide a session from the grouping when it should stop appearing there: it disappears from the visible list, while its session, history, and place in the project stay intact. Remove a project when it is no longer needed: it leaves the list, and its folder, files, and session histories are never touched — those sessions become ungrouped. Adding the same directory again afterwards starts a fresh project without the old sessions.
+
+Deleting a session is a separate operation whose second half belongs to this package: the session controller discards the durable log, and `removeSession(sessionId)` then drops every reference the registry holds — detaching the id from each Workspace entity, clearing the in-memory header and session-path caches, and removing the id from the archive set — all inside the registry's single-operation queue. It does not delete the log, and it deliberately does not check that the session is known: it runs after the log is gone, so `sessionPersistence.list()` no longer reports the id and a knowledge check would refuse the cleanup it exists to perform. Detaching and cache clearing always run, while the durable write happens only when the id is still in the archive set, so a session that left no reference behind resolves without writing.
 
 -----
 
@@ -157,10 +159,10 @@ Independent of live requests: the package never touches a request prefix, so it 
 
 These limits define when the project list is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
 
-- **Removal never deletes data** — removing a project leaves its folder, files, and session histories in place; those sessions become ungrouped, and session deletion or folder removal are separate, absent capabilities ([decision](../../../.agents/notes/implemented/feature/2026-07-27-workspace-registration-deletion.md)).
+- **Removal never deletes data** — removing a project leaves its folder, files, and session histories in place; those sessions become ungrouped. Deleting a session is a separate operation, and folder removal is a capability this package does not offer ([decision](../../../.agents/notes/implemented/feature/2026-07-27-workspace-registration-deletion.md)).
 - **A session joins only with a recorded directory** — a session belongs to a project only when its record carries a directory that resolves to the project's path; sessions without one stay ungrouped, and a session from another directory cannot be moved in.
 - **External changes are seen late** — if another process deletes or damages a directory, the project reflects it only at the next refresh or restart.
-- **Archiving is one-way** — a hidden session keeps its history and its place, but no unarchive action exists yet; the archive set is a durable display filter.
+- **Archiving is a display filter, not ownership** — a hidden Session keeps its history and its slot in its Workspace rows, and `unarchiveSession` returns it to the grouping surfaces in the position that slot kept.
 - **Re-adding a directory starts fresh** — after removal, adding the same directory again creates a new project with an empty session list; the old sessions do not come back automatically.
 
 <a id="dev-note"></a>

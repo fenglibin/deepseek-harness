@@ -8,16 +8,71 @@
   flex-direction: column;
 }
 
-/* Expanded terminal card, matching ToolRow's terminalBody: 4px indent, l1
-   hairline, and the max-height scroll on the card's own OUTPUT (banner stays
-   pinned; 224px = the 260px card cap minus the ~36px banner); the margin
-   replaces the primitive's standalone vertical margin with the flow's. */
+/* Terminal card, matching ToolRow's terminalBody: 4px indent, l1 hairline, and
+   the max-height scroll on the card's own OUTPUT (the banner stays pinned);
+   the margin replaces the primitive's standalone vertical margin with the
+   flow's. The row shows the card at every stage — closed included — so the
+   output height is the stage's, not the open row's. Each cap derives from the
+   terminal's own line height, so the two can never disagree. */
 .terminal {
   --dsl-terminal-font: var(--dsw-font-markdown-code-block-small);
   --dsl-terminal-line-height: 18px;
-  --dsl-terminal-output-max-height: 224px;
   margin: 4px 0 4px 4px;
   border: 1px solid var(--dsw-alias-border-l1);
+}
+
+/* Closed: two lines of output under the banner, so the row still answers
+   "what did it print" without being opened. */
+.terminalWrap[data-stage='peek'] .terminal {
+  --dsl-terminal-output-max-height: calc(var(--dsl-terminal-line-height) * 2);
+}
+
+/* The closed preview hides its scrollbars. A two-line thumb is too small to
+   drag and would crowd the very lines it sits beside, and the reader who wants
+   to scroll has the whole row to click; the open stages keep theirs, where
+   there is room to use them. */
+.terminalWrap[data-stage='peek'] .terminal ::-webkit-scrollbar {
+  display: none;
+}
+
+.terminalWrap[data-stage='peek'] .terminal * {
+  scrollbar-width: none;
+}
+
+/* Open: ten lines, then the output scrolls inside its own surface. */
+.terminalWrap[data-stage='full'] .terminal {
+  --dsl-terminal-output-max-height: calc(var(--dsl-terminal-line-height) * 10);
+}
+
+/* The unbounded stage sets no cap: the primitive's default (`none`) leaves the
+   overflow from ever engaging. */
+
+/* Height toggle on the summary line: the row's chevron opens and closes the
+   card, while this reaches past the ten-line cap (or puts it back). Never
+   shrinks, so a narrow row clips the summary first. */
+.outputToggle {
+  flex: none;
+  margin-left: 10px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.outputToggle:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Underline on keyboard focus: a borderless button shows no native ring here. */
+.outputToggle:focus-visible {
+  color: var(--dsw-alias-label-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* A bash execution error can settle without terminal-card material (for

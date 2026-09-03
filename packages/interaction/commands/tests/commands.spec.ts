@@ -4,7 +4,7 @@ import { createScope } from '@deepseek-ai/dsh-scope'
 import type { Scope } from '@deepseek-ai/dsh-scope'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
-import CommandRuntime, { parseCommand, type CommandDefinition } from '@deepseek-ai/dsh-commands'
+import CommandRuntime, { parseCommand, type CommandDefinition, type CommandHandler } from '@deepseek-ai/dsh-commands'
 import { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 
 function command(name: string, text = `ran:${name}`): CommandDefinition {
@@ -497,7 +497,7 @@ describe('image attachments', () => {
     return store
   }
 
-  function accepting(handler: CommandDefinition['handler']): CommandDefinition {
+  function accepting(handler: CommandHandler): CommandDefinition {
     return {
       name: 'vision',
       description: 'accepts images',
@@ -623,5 +623,111 @@ describe('image attachments', () => {
       type: 'command/done',
       data: { kind: 'error', text: 'disk gone' },
     })
+  })
+})
+
+describe('prompt commands', () => {
+  /** Mount a scope whose agent records the model submissions made through `followup`. */
+  async function mountPrompt(): Promise<{ ctx: Context; agent: Agent; followup: ReturnType<typeof vi.fn> }> {
+    const ctx = await mount()
+    const { agent } = await mintAgentScope(ctx, 'p')
+    const followup = vi.fn()
+    Object.assign(agent, { followup })
+    return { ctx, agent, followup }
+  }
+
+  it('lists a prompt command with its localized title', async () => {
+    const { ctx, agent } = await mountPrompt()
+    ctx.commands.register({
+      name: 'code-review',
+      title: '代码审查',
+      description: 'review the diff',
+      kind: 'prompt',
+      prompt: 'Please review the diff',
+    })
+    expect(ctx.commands.list(agent)).toEqual([{
+      name: 'code-review',
+      title: '代码审查',
+      description: 'review the diff',
+    }])
+  })
+
+  it('submits the prompt to the model as a command-invocation user message', async () => {
+    const { ctx, agent, followup } = await mountPrompt()
+    ctx.commands.register({
+      name: 'summarize',
+      description: 'summarize the workspace',
+      kind: 'prompt',
+      prompt: 'Summarize this workspace',
+    })
+    const execution = await ctx.commands.execute(agent, '/summarize', [], new AbortController().signal)
+    expect(execution?.result).toEqual({ kind: 'success' })
+    expect(followup).toHaveBeenCalledTimes(1)
+    expect(followup).toHaveBeenCalledWith(expect.objectContaining({
+      content: [{ type: 'text', text: 'Summarize this workspace' }],
+      source: { kind: 'command-invocation', name: 'summarize' },
+    }))
+  })
+
+  it('appends extra argument text as a follow-up line to the prompt', async () => {
+    const { ctx, agent, followup } = await mountPrompt()
+    ctx.commands.register({
+      name: 'summarize',
+      description: 'summarize the workspace',
+      kind: 'prompt',
+      prompt: 'Summarize this workspace',
+    })
+    await ctx.commands.execute(agent, '/summarize  focus on tests', [], new AbortController().signal)
+    expect(followup).toHaveBeenCalledWith(expect.objectContaining({
+      content: [{ type: 'text', text: 'Summarize this workspace\n\nfocus on tests' }],
+    }))
+  })
+
+  it('rejects a prompt command whose prompt is missing or blank', async () => {
+    const ctx = await mount()
+    expect(() => ctx.commands.register({
+      name: 'no-prompt',
+      description: 'missing prompt',
+      kind: 'prompt',
+    } as unknown as CommandDefinition)).toThrow('prompt must be a non-empty string')
+    expect(() => ctx.commands.register({
+      name: 'blank-prompt',
+      description: 'blank prompt',
+      kind: 'prompt',
+      prompt: '   ',
+    } as unknown as CommandDefinition)).toThrow('prompt must be a non-empty string')
+  })
+
+  it('rejects a prompt command that also declares a handler', async () => {
+    const ctx = await mount()
+    expect(() => ctx.commands.register({
+      name: 'both',
+      description: 'both handler and prompt',
+      kind: 'prompt',
+      prompt: 'do it',
+      handler: () => ({ kind: 'success' }),
+    } as unknown as CommandDefinition)).toThrow('handler is only valid for kind "code"')
+  })
+
+  it('rejects a code command that also declares a prompt', async () => {
+    const ctx = await mount()
+    expect(() => ctx.commands.register({
+      name: 'mixed',
+      description: 'both code and prompt',
+      kind: 'code',
+      prompt: 'do it',
+      handler: () => ({ kind: 'success' }),
+    } as unknown as CommandDefinition)).toThrow('prompt is only valid for kind "prompt"')
+  })
+
+  it('rejects a non-string title', async () => {
+    const ctx = await mount()
+    expect(() => ctx.commands.register({
+      name: 'bad-title',
+      description: 'bad title',
+      title: 42,
+      kind: 'prompt',
+      prompt: 'do it',
+    } as unknown as CommandDefinition)).toThrow('title must be a non-empty string')
   })
 })

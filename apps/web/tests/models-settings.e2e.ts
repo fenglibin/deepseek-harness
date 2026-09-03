@@ -56,7 +56,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     await scaffold?.close()
   })
 
-  it('opens the add card over the dormant directory vocabulary', async () => {
+  it('opens the add dialog over the dormant directory vocabulary', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-empty'))
     await page.getByRole('button', { name: '设置', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: '设置' })
@@ -65,26 +65,34 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     await dialog.getByText('填入各提供方的 API 密钥即可使用其模型。').waitFor({ timeout: 10_000 })
     // The dormant pi-ai adapter contributes its whole installed catalog; no
     // provider is configured yet, so the page is one add button.
-    const add = dialog.getByRole('button', { name: '添加提供方' })
+    const add = dialog.getByRole('button', { name: '添加模型' })
     await add.waitFor({ timeout: 10_000 })
     // The button enables once the dormant catalog lands in the join.
     await expect.poll(async () => add.isEnabled(), { timeout: 10_000 }).toBe(true)
     await add.click()
-    const pick = dialog.getByLabel('提供方')
+    // One dialog carries both ways in; picking a route opens its editor card.
+    const addDialog = page.getByRole('dialog', { name: '添加模型' })
+    await addDialog.waitFor({ timeout: 10_000 })
+    const pick = addDialog.getByLabel('提供方')
     await pick.waitFor({ timeout: 10_000 })
     await expect.poll(async () => pick.locator('option').count(), { timeout: 10_000 }).toBeGreaterThan(30)
     const options = await pick.locator('option').allTextContents()
     expect(options).toContain('anthropic')
     expect(options).toContain('minimax-cn')
     await pick.selectOption('minimax-cn')
-    await dialog.getByRole('textbox', { name: 'API 密钥', exact: true }).waitFor({ timeout: 10_000 })
-    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    await addDialog.getByRole('textbox', { name: 'API 密钥', exact: true }).waitFor({ timeout: 10_000 })
+    const snapshot = await captureStableAria(
+      page,
+      '[role="dialog"][aria-label="添加模型"]',
+      scaffold.workspaceCwd,
+    )
     await compareOrRefreshGolden(EMPTY_EXPECTED, snapshot, MODE)
   }, 60_000)
 
   it('refuses a key no HTTP header can carry before anything is written', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-illegal-key'))
-    const dialog = page.getByRole('dialog', { name: '设置' })
+    // Still inside the add dialog's card: the draft has not been saved yet.
+    const dialog = page.getByRole('dialog', { name: '添加模型' })
     const key = dialog.getByLabel('API 密钥')
     const save = dialog.getByRole('button', { name: '保存', exact: true })
 
@@ -104,8 +112,11 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
 
   it('saves a blank key as a reference-free provider-native profile', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-native-auth'))
+    const card = page.getByRole('dialog', { name: '添加模型' })
+    await card.getByRole('button', { name: '保存', exact: true }).click()
+    // Saving closes the add dialog and the route appears as an ordinary row.
+    await expect.poll(async () => card.count(), { timeout: 10_000 }).toBe(0)
     const dialog = page.getByRole('dialog', { name: '设置' })
-    await dialog.getByRole('button', { name: '保存', exact: true }).click()
     const row = dialog.getByText('minimax-cn', { exact: true }).first()
     await row.waitFor({ timeout: 10_000 })
     await dialog.getByText('已保存 minimax-cn。', { exact: true }).waitFor({ timeout: 10_000 })
@@ -218,19 +229,25 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
   it('declares a route the adapter does not ship', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-declare'))
     const dialog = page.getByRole('dialog', { name: '设置' })
-    const declare = dialog.getByRole('button', { name: '添加自定义提供方' })
-    await expect.poll(async () => declare.isEnabled(), { timeout: 10_000 }).toBe(true)
-    await declare.click()
-    await dialog.getByLabel('Provider ID').fill('acme-gateway')
-    await dialog.getByLabel('显示名称').fill('Acme Gateway')
-    await dialog.getByLabel('API 地址').fill('https://gateway.acme.example/v1')
+    const add = dialog.getByRole('button', { name: '添加模型' })
+    await expect.poll(async () => add.isEnabled(), { timeout: 10_000 }).toBe(true)
+    await add.click()
+    // The other way in: an API address opens the hand-declared card seeded
+    // with that address as the endpoint, so it is never asked for twice.
+    const addDialog = page.getByRole('dialog', { name: '添加模型' })
+    await addDialog.waitFor({ timeout: 10_000 })
+    await addDialog.getByLabel('或手动输入 API 地址').fill('https://gateway.acme.example/v1')
+    await addDialog.getByRole('button', { name: '使用此地址' }).click()
+    await addDialog.getByLabel('Provider ID').fill('acme-gateway')
+    await addDialog.getByLabel('显示名称').fill('Acme Gateway')
+    expect(await addDialog.getByLabel('API 地址').inputValue()).toBe('https://gateway.acme.example/v1')
     // No reasoning effort on a provider card at all: effort is a per-model
     // capability, the models under one provider disagree about it, and a
     // switch in the composer already records provider+model+effort together.
-    expect(await dialog.getByLabel('推理强度').count()).toBe(0)
-    await dialog.getByRole('button', { name: '添加模型' }).click()
-    await dialog.getByLabel('模型 ID 1').fill('acme-large')
-    await dialog.getByRole('button', { name: '创建提供方', exact: true }).click()
+    expect(await addDialog.getByLabel('推理强度').count()).toBe(0)
+    await addDialog.getByRole('button', { name: '手动添加' }).click()
+    await addDialog.getByLabel('模型 ID 1').fill('acme-large')
+    await addDialog.getByRole('button', { name: '创建提供方', exact: true }).click()
 
     const row = dialog.getByText('Acme Gateway', { exact: true }).first()
     await row.waitFor({ timeout: 10_000 })

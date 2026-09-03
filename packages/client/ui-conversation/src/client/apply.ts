@@ -239,6 +239,29 @@ export function apply(ctx: Context): void {
     }),
   }, ConversationSessionHeader)
 
+  // The absent-input face: no keyboard, no draft actions — a Workspace picker
+  // trigger and nothing else. It doubles as the degradation of a Session whose
+  // input shell is unreachable: the scope is mid-build or mid-teardown, and a
+  // rebuilt scope re-runs this inject on its new binding, whereas throwing
+  // here would crash the composer bar out of its slot for every Session until
+  // the page reloads.
+  const absentComposerFace = (): ComposerBarInjected => ({
+    keyboard: undefined,
+    addImages: undefined,
+    removeImage: undefined,
+    draftImages: undefined,
+    resolveSubmitMode: (running, gesture, steeringAvailable) =>
+      submissionPolicy.resolve(running, gesture, steeringAvailable),
+    toggleCommandMenu: undefined,
+    stop: undefined,
+    command: undefined,
+    hooks: {
+      notices: ABSENT_NOTICES,
+      lexicon: ABSENT_LEXICON,
+      menuLauncher: ABSENT_MENU_LAUNCHER,
+    },
+  })
+
   const registerComposerBar = () => slots.register({
     name: 'conversation.composer.bar',
     locale: NS,
@@ -248,26 +271,13 @@ export function apply(ctx: Context): void {
       'conversation.input.model': { kind: 'single', scope: 'session' },
     },
     inject: (sessionId: SessionId | undefined): ComposerBarInjected => {
-      if (sessionId === undefined) {
-        return {
-          keyboard: undefined,
-          addImages: undefined,
-          removeImage: undefined,
-          draftImages: undefined,
-          resolveSubmitMode: (running, gesture, steeringAvailable) =>
-            submissionPolicy.resolve(running, gesture, steeringAvailable),
-          toggleCommandMenu: undefined,
-          stop: undefined,
-          command: undefined,
-          hooks: {
-            notices: ABSENT_NOTICES,
-            lexicon: ABSENT_LEXICON,
-            menuLauncher: ABSENT_MENU_LAUNCHER,
-          },
-        }
-      }
+      if (sessionId === undefined) return absentComposerFace()
+      const shell = inputHub.tryShell(sessionId)
+      // The Session's binding is mid-build or mid-teardown: render the same
+      // inert face as no-Session rather than crashing the entry out of the
+      // slot (the rebuilt scope re-runs this inject on its new binding).
+      if (shell === undefined) return absentComposerFace()
       const conversation = concreteConversation(ctx)
-      const shell = inputHub.shell(sessionId)
       const inputTriggers = inputHub.inputTriggers(sessionId)
       return {
         keyboard: shell,

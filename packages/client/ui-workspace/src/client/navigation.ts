@@ -10,6 +10,7 @@ import type {
   IWorkspaces, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { SessionDeleteOutcome } from './contract/slots.ts'
 
 /** Workspace archive and directory operations consumed by Client UI domains. */
 export interface UiWorkspace {
@@ -29,6 +30,22 @@ export interface UiWorkspace {
    * @param sessionId - Session to archive.
    */
   archiveSession(sessionId: SessionId): Promise<void>
+  /**
+   * Return an archived Session to the grouping surfaces. The Session's log and
+   * its position in its Workspace survive, so restoring needs no target: the
+   * rows reappear where they were hidden.
+   * @param sessionId - Session to restore.
+   */
+  unarchiveSession(sessionId: SessionId): Promise<void>
+  /**
+   * Delete a Session: discard its durable log and every reference the Host
+   * holds, then drop it from the Client's session list. Unlike archiving, this
+   * cannot be reversed. A Host refusal resolves as an outcome rather than
+   * rejecting, so the caller can report why nothing was removed.
+   * @param sessionId - Session to delete.
+   * @returns whether the Session is gone, or the refusal the Host reported.
+   */
+  deleteSession(sessionId: SessionId): Promise<SessionDeleteOutcome>
   /**
    * Open the Host-native directory picker.
    * @returns the selected directory, or null when cancelled.
@@ -65,6 +82,22 @@ export class DirectoryBrowseError extends Error {
   constructor(readonly rpcError: RemoteFailure) {
     super(`directory browse failed: ${rpcError.code}: ${rpcError.message}`)
   }
+}
+
+/** The wire code a Host returns when a delete targets a Session it still holds an Agent for. */
+const LIVE_SESSION_REFUSAL_CODE = 'session/live'
+
+/**
+ * The wire code carried by the structured error the sessions service throws on
+ * a refused delete. That error class belongs to the API assembly, whose edge
+ * from a Client plugin is type-only, so its code is read here as wire data at
+ * the boundary instead.
+ * @param reason - the caught rejection.
+ * @returns the Host's business code, or undefined for anything else.
+ */
+function refusalOf(reason: unknown): string | undefined {
+  const code = (reason as { rpcError?: { code?: unknown } }).rpcError?.code
+  return typeof code === 'string' ? code : undefined
 }
 
 /** Implements Workspace archive and directory UI operations. */
@@ -134,6 +167,23 @@ class UiWorkspaceService extends Service implements UiWorkspace {
 
   async archiveSession(sessionId: SessionId): Promise<void> {
     await this.workspaces.archiveSession(sessionId)
+  }
+
+  async unarchiveSession(sessionId: SessionId): Promise<void> {
+    await this.workspaces.unarchiveSession(sessionId)
+  }
+
+  async deleteSession(sessionId: SessionId): Promise<SessionDeleteOutcome> {
+    try {
+      await this.sessions.delete(sessionId)
+      return { ok: true }
+    } catch (reason: unknown) {
+      return {
+        ok: false,
+        refusal: refusalOf(reason) === LIVE_SESSION_REFUSAL_CODE ? 'live' : 'failed',
+        message: reason instanceof Error ? reason.message : String(reason),
+      }
+    }
   }
 
   async pickDirectory(): Promise<string | null> {

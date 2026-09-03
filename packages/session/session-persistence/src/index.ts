@@ -270,6 +270,25 @@ export abstract class SessionPersistence extends Service {
   abstract list(signal?: AbortSignal): Promise<SessionHeader[]>
 
   /**
+   * Remove one session's complete durable record — header and every stored
+   * event — so {@link list} and {@link listSnapshots} no longer report it and
+   * {@link load}, {@link inspect}, and {@link readFrom} reject with
+   * `SessionPersistenceNotFoundError`. Removal discards the log; it is not an
+   * append and leaves no tombstone. A backend MAY reclaim the id afterwards —
+   * {@link create} refuses only an id whose record still exists.
+   *
+   * A backend with no materialized record for `id` resolves `false`: {@link
+   * create} may defer the physical write until the first {@link append}, so a
+   * registered-but-never-appended session has nothing to remove. Backends
+   * reject while the id is bound to a live Session, which would otherwise
+   * append onto a deleted log.
+   * @param id - the persisted session whose record is discarded.
+   * @param signal - optional cancellation for queueing and backend work.
+   * @returns whether a durable record existed and was removed.
+   */
+  abstract remove(id: SessionId, signal?: AbortSignal): Promise<boolean>
+
+  /**
    * List materialized sessions with cheap per-log change tokens.
    *
    * Repeated observations of an unchanged log return the same revision. A

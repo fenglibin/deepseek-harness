@@ -8,25 +8,25 @@ This guide assumes you started the Web UI through the [root README](../../../REA
 
 Open **Settings → Models**. The DeepSeek card exposes one API-key field; enter the key and save it.
 
-![The Models page: the DeepSeek card, with Add provider and Add a custom provider below it](providers-models-page.png)
+![The Models page: the DeepSeek card, with the Add model button below it](providers-models-page.png)
 
 Keys are write-only. The page receives a redacted descriptor after saving, never the literal secret. The key is stored in `$DSH_HOME/.credentials.yaml`, while settings retain only its credential reference.
 
-## Add a catalog provider
+## Add a provider
 
-Choose **Add provider**, select a provider such as Anthropic or OpenAI, enter its API key, and save. The installed catalog supplies the endpoint, protocol, and model list.
+Choose **Add model**. The dialog that opens takes either way: select an installed provider such as Anthropic or OpenAI, or type the API address of one the catalog does not ship. The installed catalog supplies the endpoint, protocol, and model list of a provider you select; only its API key is left to enter.
 
 Providers with native authentication need their native credentials instead. Bedrock, Vertex, Azure, and Codex use AWS credentials and a region, an ADC project, an `api-version`, and OAuth respectively; filling only the API-key field does not configure them.
 
-## Add a custom provider
+### Add a provider by API address
 
-Choose **Add a custom provider** for a company gateway, self-hosted server, or provider absent from the installed catalog. Supply a lowercase Provider ID, base URL, API protocol, credential, and at least one model.
+Type a base URL for a company gateway, self-hosted server, or provider absent from the installed catalog. Supply a lowercase Provider ID, the API protocol, credential, and at least one model; the address you typed is the base URL.
 
 ![The custom provider form: Provider ID, display name, base URL, API protocol, and API key](providers-custom-form.png)
 
 The Provider ID is permanent because requests, saved sessions, model defaults, and credential references use it. To rename a provider, add a new provider and delete the old one. The display name, base URL, protocol, credential, and models remain editable.
 
-Under **Model catalog**, choose **Fetch available models** to query the base URL and credential currently shown in the form. Selecting candidates updates the draft; the provider is not stored until you save. Catalog providers use their installed catalog without a network request.
+Under **Model catalog**, choose **Fetch available models** to query the base URL and credential currently shown in the form. The picker opens with the models this provider already configures selected, so re-selecting keeps what you have and adds what you tick; a provider with no models yet starts with every discovered model selected. Selecting candidates updates the draft; the provider is not stored until you save. Catalog providers use their installed catalog without a network request.
 
 ### Image input
 
