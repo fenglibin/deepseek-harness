@@ -74,3 +74,13 @@ These limits define the current delivery surface. They are current package const
 - **No artifact content preview** — the surface lists paths, not read-only file contents; a content preview needs the host to project `fs` reads into the client.
 - **No config settings card** — the thresholds, switches, and `postHooks` are not yet editable from a settings surface.
 - **Read-only surface** — the task is advanced through the model-facing tools, not this surface; there are no accept/clear/advance verbs here.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

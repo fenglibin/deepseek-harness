@@ -73,6 +73,9 @@
       "path": "../workspace-controller/tsconfig.client.json"
     },
     {
+      "path": "../../mcp/mcp-manager"
+    },
+    {
       "path": "../../typert/protocol"
     }
   ]

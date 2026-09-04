@@ -60,6 +60,7 @@ kind: "package-library"
 | [`src/SearchBlock.tsx`](src/SearchBlock.tsx) / [`src/WebBlock.tsx`](src/WebBlock.tsx) | 搜索与网页检索卡片 |
 | [`src/icons/`](src/icons/) | `ic_ds_*` 字形组件与品牌标记 |
 | [`src/useAnchoredPosition.ts`](src/useAnchoredPosition.ts) / [`src/useAnchoredMaxHeight.ts`](src/useAnchoredMaxHeight.ts) | 浮动面板与浮层几何钩子 |
+| [`src/use-lifecycle-expansion.ts`](src/use-lifecycle-expansion.ts) | 折叠状态钩子：操作运行中展开，结算时折回该行的静止值 |
 
 ### 流式 markdown
 

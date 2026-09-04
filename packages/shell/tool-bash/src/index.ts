@@ -319,11 +319,11 @@ export function apply(ctx: Context, config: Config = {}): void {
           },
         ],
       },
-      render: (_args, value) => [{
+      render: (args, value) => [{
         type: 'text',
         text: value.kind === 'background'
           ? `started background job ${value.jobId}`
-          : renderResult(value as { kind: 'foreground' } & ShellRunResult, escalationModes),
+          : renderResult(value as { kind: 'foreground' } & ShellRunResult, escalationModes, args.command),
       }],
     },
     async execute(args: BashToolArgs, exec) {

@@ -1,0 +1,194 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.intro {
+  margin: 0;
+  color: var(--color-text-secondary, #666);
+}
+
+.notice,
+.savedNotice,
+.error,
+.empty {
+  margin: 0;
+}
+
+.notice {
+  color: var(--color-text-secondary, #666);
+}
+
+.savedNotice {
+  color: var(--color-success, #2e7d32);
+}
+
+.error {
+  color: var(--color-danger, #c62828);
+}
+
+.empty {
+  color: var(--color-text-secondary, #666);
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rowCard {
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.rowHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rowIdentity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.statusDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.statusDotConnected {
+  background: var(--color-success, #2e7d32);
+}
+
+.statusDotReconnecting {
+  background: var(--color-warning, #f57c00);
+}
+
+.statusDotFailed {
+  background: var(--color-danger, #c62828);
+}
+
+.statusDotUnknown {
+  background: var(--color-text-disabled, #bbb);
+}
+
+.statusDotDisabled {
+  background: var(--color-text-disabled, #bbb);
+}
+
+.rowTools {
+  color: var(--color-text-secondary, #666);
+  font-size: 12px;
+}
+
+.rowName {
+  font-weight: 600;
+}
+
+.rowTransport {
+  color: var(--color-text-secondary, #666);
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease;
+}
+
+.toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.toggleOn {
+  background: var(--color-success, #2e7d32);
+}
+
+.toggleOff {
+  background: var(--color-text-disabled, #bbb);
+}
+
+.toggleKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s ease;
+}
+
+.toggleOn .toggleKnob {
+  left: 18px;
+}
+
+.secondaryButton,
+.dangerButton,
+.addButton {
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  background: transparent;
+}
+
+.secondaryButton:disabled,
+.dangerButton:disabled,
+.addButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.dangerButton {
+  color: var(--color-danger, #c62828);
+  border-color: var(--color-danger, #c62828);
+}
+
+.addBlock {
+  display: flex;
+}
+
+.addButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.deleteConfirm {
+  color: var(--color-danger, #c62828);
+}

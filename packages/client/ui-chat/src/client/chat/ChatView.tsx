@@ -6,8 +6,6 @@ import type {
   ConversationTimelineSnapshot, RenderMessageImages,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { Button, IconChevronDownOutline14, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-// Type-only: the `turnOutline` projection key merge (whole-log user-turn list).
-import type {} from '@deepseek-ai/dsh-session-stats/client'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import type { ChatSnapshot, TurnNavigationItem } from '../contract/snapshot.ts'
 import { PendingSteeringBubble, PendingSubmissionBubble } from './MessageItem.tsx'
@@ -22,8 +20,6 @@ const FOLLOW_THRESHOLD = 24
 const TURN_SCROLL_MARGIN = 24
 /** Distance from the list top that arms automatic older-history loading. */
 const OLDER_LOAD_THRESHOLD_PX = 48
-/** Empty whole-log turn outline while the projection has not delivered a value. */
-const EMPTY_TURN_ITEMS: readonly never[] = []
 
 /** Active column host when present; otherwise the view-local scroller. */
 function scrollerOf(from: HTMLElement): HTMLElement {
@@ -213,7 +209,7 @@ function TurnStatus({ startTime, t }: {
  */
 export function ChatView({
   useSession, useChat, useSessions, useStore, actions, renderSlot, sessionId, openFile, loadOlder, loadImage, openView, chatScroll, forkAt,
-  fileMentions, useTranscriptView, useProjection, t,
+  fileMentions, useTranscriptView, t,
 }: ChatViewSlotProps) {
   const order = useChat(s => s.order)
   const nodeStore = useChat(s => s.nodes)
@@ -221,10 +217,6 @@ export function ChatView({
   // both the data and its change signal: the array identity moves only when a
   // Turn enters, leaves, or changes its preview.
   const turnNavigationItems = useChat(s => s.navigation.items())
-  // Whole-log user-turn outline (turn + prompt): the drawer lists every user
-  // message regardless of paging, and navigation pages back on demand.
-  const turnOutline = useProjection('turnOutline')
-  const userTurnItems = turnOutline?.turns ?? EMPTY_TURN_ITEMS
   const timeline = useChat(s => s.timeline)
   const inbox = useSession(s => s.queue)
   // Workspace root off the session list row: path summaries display relative to it.
@@ -619,31 +611,15 @@ export function ChatView({
   const loadOlderAnchoredRef = useRef<() => void>(() => {})
   loadOlderAnchoredRef.current = loadOlderAnchored
 
-  // Latest loaded navigation items, read through a ref so `navigateToTurn`
-  // keeps a stable identity for the memoized rail while still finding a turn
-  // by number (a loaded item is optional — the drawer may target an unloaded
-  // turn and page back to it).
-  const turnNavigationItemsRef = useRef(turnNavigationItems)
-  turnNavigationItemsRef.current = turnNavigationItems
-
   // Identity feeds the memoized rail; a fresh closure per render would defeat it.
-  const navigateToTurn = useCallback((turn: number): void => {
-    const item = turnNavigationItemsRef.current.find(entry => entry.turn === turn)
-    if (item === undefined) {
-      // The turn is not loaded: keep paging until it lands (see the pending effect).
-      if (!hasMore) return
-      pendingTurnRef.current = turn
-      autoPagedSeqRef.current = firstSeq
-      loadOlderAnchoredRef.current()
-      return
-    }
+  const navigateToTurn = useCallback((item: TurnNavigationItem): void => {
     const local = listRef.current
     if (local === null) return
     const row = anchorElement(local, item.anchorKey)
     if (row === null) {
       // The turn is loaded but its row has not rendered: page until it lands.
       if (!hasMore) return
-      pendingTurnRef.current = turn
+      pendingTurnRef.current = item.turn
       autoPagedSeqRef.current = firstSeq
       loadOlderAnchoredRef.current()
       return
@@ -652,8 +628,8 @@ export function ChatView({
     settleAt(local, row, item)
   }, [firstSeq, hasMore, settleAt])
 
-  // The drawer now lists the whole-log outline, so its entries no longer depend
-  // on the loaded window. The rail's hover previews still read the loaded
+  // The drawer lists loaded user turns, so it renders nothing until a loaded
+  // window carries a prompt. The rail's hover previews read the same loaded
   // window, so page until a loaded turn carries a prompt; an empty rail means
   // the first page is still in flight and nothing more can correct it yet.
   const awaitingUserPrompt = turnNavigationItems.length > 0
@@ -697,11 +673,11 @@ export function ChatView({
           t={t}
         />
         {/* User-message drawer sits beside the rail on the same right gutter.
-            It reads the whole-log turn outline (every user message, paged or
-            not), while the rail reads the loaded navigation items; the active
-            highlight tracks `activeTurn` for both. */}
+            Both read the loaded navigation items; the drawer filters to turns
+            with a direct user prompt, and the active highlight tracks
+            `activeTurn` for both. */}
         <UserTurnPanel
-          items={userTurnItems}
+          items={turnNavigationItems}
           activeTurn={activeTurn}
           onNavigate={navigateToTurn}
           t={t}

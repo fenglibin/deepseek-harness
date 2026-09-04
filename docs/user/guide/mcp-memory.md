@@ -32,6 +32,22 @@ Replace the filename with `mcp-reference-memory.cordis.yml` or `engram.cordis.ym
 
 To keep the selection across runs, merge the chosen file's single `insert` patch into a user patch layer — `$DSH_HOME/profiles/<name>/cordis.patch.yml` for one profile, or `$DSH_HOME/cordis.patch.yml` for every profile on the machine. Do not copy over an existing file: it may already contain unrelated user patches.
 
+## Add through Settings → MCP
+
+The [`dsh-mcp-manager`](../../../packages/mcp/mcp-manager/README.md) plugin mounts these same servers through the Settings → MCP page, without hand-editing a Cordis overlay. Add a server with the same fields an overlay carries, then edit, refresh, enable, or remove it at runtime. For example, Memorix:
+
+```yaml
+mcp:
+  servers:
+    - serverName: memorix
+      transport: stdio
+      command: memorix
+      args: [serve]
+      cwd: '/path/to/project'
+```
+
+`env` and `headers` are edited as one `KEY=value` per line in the dialog. The page shows each server's connection status and its `mcp__<serverName>__…` tool count.
+
 ## Provider setup
 
 ### Memorix

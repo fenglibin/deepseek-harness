@@ -2,7 +2,7 @@
 
 import { useId, useState, type ReactNode } from 'react'
 import {
-  CodeBlock, DisclosureRow, IconCodeOutline16, IconInspectOutline12, StateDot,
+  CodeBlock, DisclosureRow, IconCodeOutline16, IconInspectOutline12, StateDot, useLifecycleExpansion,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
@@ -49,7 +49,9 @@ export function CordisDefineRow({
   const card = cordisDefineCard(block)
   const inventory = useInventory(snapshot => snapshot)
   const loaded = useLoaded(snapshot => snapshot)
-  const [expanded, setExpanded] = useState(false)
+  // A running definition opens so the reader watches it settle; settlement folds
+  // the source tabs back behind the package name.
+  const [expanded, toggleExpanded] = useLifecycleExpansion({ running: card.state === 'running' })
   const [selectedSource, setSelectedSource] = useState<SourceTab>(card.clientCode !== null ? 'client' : 'host')
   const sourcePanelId = useId()
 
@@ -94,7 +96,7 @@ export function CordisDefineRow({
         expandable={expandable}
         expandOnRowClick
         keepContentWhenOpen
-        onToggle={() => { setExpanded(value => !value) }}
+        onToggle={toggleExpanded}
         collapsedContent={(
           <>
             <span className={css.separator} aria-hidden />

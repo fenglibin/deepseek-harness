@@ -87,6 +87,21 @@ describe('AskQuestionRow', () => {
     expect(screen.getByRole('button', { expanded: false })).toBeTruthy()
   })
 
+  it('stays open across settlement: the transcript arrives with the answer', () => {
+    // The row mounts running and settles in place, so the answered transcript
+    // has to survive the settlement collapse rather than being folded away.
+    const view = render(<AskQuestionRow {...rowProps(runningCall(READABLE_ARGS))} />)
+    expect(view.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')).toBe('true')
+    view.rerender(<AskQuestionRow {...rowProps(resultNode(READABLE_ARGS, answers([
+      { id: 'scope', selected: ['deepseek-harness'] },
+      { id: 'goal', selected: ['Develop a feature'], custom: 'Keep the API small' },
+      { id: 'notes', selected: [] },
+    ])))} />)
+    expect(view.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByText('What do you want to accomplish?')).toBeTruthy()
+    expect(screen.getByText('Develop a feature')).toBeTruthy()
+  })
+
   it('keeps generic diagnostics when a valid answer result includes a non-text block', () => {
     const resultText = answers([
       { id: 'goal', selected: ['Develop a feature'] },

@@ -93,6 +93,11 @@
   overflow: hidden;
   pointer-events: auto;
   animation: dsh-user-turn-panel-enter 160ms ease-out;
+  /* Floating surface whose turn rows scroll inside it: rebind the scrollbar
+     indirection to the l2 elevation pair here so it inherits down to `.list`
+     (the rebinding contract in ui-theme styles/scrollbar.css). */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
 .header {

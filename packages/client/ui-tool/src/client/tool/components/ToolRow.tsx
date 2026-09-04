@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useMemo, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import {
   CodeBlock, DiffBlock, DisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, WebBlock,
-  diffTotals,
+  diffTotals, useLifecycleExpansion,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { LocaleKeysOf, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import {
@@ -69,12 +69,12 @@ export interface ToolRowProps {
    */
   inspect?: (() => void) | undefined
   /**
-   * Open the row by default. A row that owns the answer (ask-user transcript,
-   * todo checklist) reads naturally in the expanded state; leaving it collapsed
-   * forces the reader to click through a row they just participated in.
-   * User can still collapse; affects only the initial state.
+   * The row's resting state: open when it settles. A row that owns the answer
+   * (ask-user transcript, todo checklist) reads naturally expanded; leaving it
+   * collapsed forces the reader to click through a row they just participated
+   * in. A running row opens regardless, and the reader can still collapse.
    */
-  defaultExpanded?: boolean | undefined
+  restingExpanded?: boolean | undefined
 }
 
 /** Locale key per file-operation kind, so the row's label stays locale-owned. */
@@ -127,30 +127,19 @@ export function ToolRow({
   filePath,
   onOpenFile,
   inspect,
-  defaultExpanded = false,
+  restingExpanded = false,
 }: ToolRowProps) {
   // A running call needs its expanded body in view from the start — the reader
   // wants to watch the streaming result, not have to click through the row to
-  // see what is happening. The expanded body stays under the row's normal height
-  // cap (DiffBlock/ReadBlock/etc. each own theirs), so a long result stays
-  // bounded inside its scroll surface.
-  const initialExpanded = defaultExpanded || state === 'running'
-  const [expanded, setExpanded] = useState(initialExpanded)
-  // A running call auto-collapses the moment it settles: the streaming output
-  // no longer needs the row to be open, and a settled row's collapsed footer
-  // is the canonical shape (so an already-settled transcript reads the same way
-  // it does on first load). The ref tracks the previous render's state so the
-  // effect only fires on the running → settled transition, not on every render.
-  // User-driven toggles (clicking the row / change toggle) keep their target:
-  // the effect runs after the state change commits, and any click on a still-
-  // running row writes through `setExpanded(v => !v)` without us touching it.
-  const prevStateRef = useRef(state)
-  useEffect(() => {
-    if (prevStateRef.current === 'running' && state !== 'running') {
-      setExpanded(false)
-    }
-    prevStateRef.current = state
-  }, [state])
+  // see what is happening. Settlement folds the row back to `restingExpanded`,
+  // the canonical shape an already-settled transcript reads with on first load.
+  // The expanded body stays under the row's normal height cap
+  // (DiffBlock/ReadBlock/etc. each own theirs), so a long result stays bounded
+  // inside its scroll surface.
+  const [expanded, toggleExpanded] = useLifecycleExpansion({
+    running: state === 'running',
+    restingExpanded,
+  })
   const terminalLabels = useMemo(() => terminalBlockLabels(t), [t])
   const diffLabels = useMemo(() => diffBlockLabels(t), [t])
   const readLabels = useMemo(() => readBlockLabels(t), [t])
@@ -210,9 +199,6 @@ export function ToolRow({
   // Only a file-mutation row names what it did to the path; every other row
   // has no file change to describe, so it keeps its plain suffix.
   const operation = diffBody?.operation ?? null
-  const toggleExpand = () => {
-    setExpanded(v => !v)
-  }
   const openFile = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation()
     if (filePath !== undefined) onOpenFile?.(filePath)
@@ -221,7 +207,7 @@ export function ToolRow({
   // stopping the event the two handlers would cancel each other out.
   const toggleChange = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation()
-    if (expandable) setExpanded(v => !v)
+    if (expandable) toggleExpanded()
   }
   // Keep Enter/Space on a row-nested button from bubbling to the row's keydown
   // handler, which would preventDefault() the key and toggle expand instead of
@@ -247,7 +233,7 @@ export function ToolRow({
         expandable={expandable}
         expandOnRowClick
         keepContentWhenOpen
-        onToggle={toggleExpand}
+        onToggle={toggleExpanded}
         collapsedContent={summaryText !== '' && (
           /* An empty summary drops the separator with it (a row that is only
              its title shows no trailing dot). */

@@ -8,7 +8,7 @@ import css from './TurnNavigator.module.css'
 interface TurnNavigatorProps {
   readonly items: readonly TurnNavigationItem[]
   readonly activeTurn: number | null
-  readonly onNavigate: (turn: number) => void
+  readonly onNavigate: (item: TurnNavigationItem) => void
   readonly t: ChatViewSlotProps['t']
 }
 
@@ -65,7 +65,7 @@ function TurnNavigatorRail({ items, activeTurn, onNavigate, t }: TurnNavigatorPr
   }
   const navigateAtPointer = (event: MouseEvent<HTMLElement>): void => {
     const item = itemAtPointer(items, event.currentTarget, event.clientY)
-    if (item !== undefined) onNavigate(item.turn)
+    if (item !== undefined) onNavigate(item)
   }
   return (
     <div className={css.slot}>
@@ -94,7 +94,7 @@ function TurnNavigatorRail({ items, activeTurn, onNavigate, t }: TurnNavigatorPr
                   aria-describedby={showingPreview ? previewId : undefined}
                   onClick={(event) => {
                     event.stopPropagation()
-                    onNavigate(item.turn)
+                    onNavigate(item)
                   }}
                   onFocus={() => { setPreviewTurn(item.turn) }}
                   onBlur={() => { setPreviewTurn(null) }}

@@ -194,8 +194,9 @@ export function AskQuestionRow({ toolName, block, inspect, t }: AskQuestionRowPr
       // The transcript card is the user-participated Q&A: settled answers
       // (answered, cancelled, interrupted) must be visible without a click,
       // because the reader just took part in the exchange. A running question
-      // already opens through ToolRow's own running-state expansion.
-      defaultExpanded={transcript !== null}
+      // also opens, through ToolRow's own running-state expansion, and this
+      // resting value keeps it open across the settlement it was waiting for.
+      restingExpanded={transcript !== null}
     />
   )
 }

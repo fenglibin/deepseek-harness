@@ -1,6 +1,8 @@
 /** Assistant reasoning disclosure, independent of Tool-call presentation. */
-import { useEffect, useRef, useState } from 'react'
-import { DisclosureRow, IconThinkOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useEffect, useRef } from 'react'
+import {
+  DisclosureRow, IconThinkOutline14, useLifecycleExpansion,
+} from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { useThrottledVisualUpdate } from './use-throttled-visual-update.ts'
 import a11yCss from './accessibility.module.css'
@@ -32,10 +34,9 @@ const FOLLOW_THRESHOLD_PX = 8
  * @returns the reasoning disclosure.
  */
 export function ReasoningRow({ text, running, t }: { text: string; running: boolean; t: ChatViewSlotProps['t'] }) {
-  const [expanded, setExpanded] = useState(running)
+  const [expanded, toggleExpanded] = useLifecycleExpansion({ running })
   const summaryRef = useRef<HTMLSpanElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
-  const wasRunning = useRef(running)
   const followTail = useRef(true)
   const summary = running ? latestLine(text) : firstLine(text)
   const scheduleSummaryScroll = useThrottledVisualUpdate(() => {
@@ -46,13 +47,6 @@ export function ReasoningRow({ text, running, t }: { text: string; running: bool
   useEffect(() => {
     scheduleSummaryScroll()
   }, [running, scheduleSummaryScroll, summary])
-  // Settling folds the block away on its own. Only the running -> settled
-  // transition does it, so a reader who reopens a finished thought keeps it
-  // open instead of having it snatched shut by the next render.
-  useEffect(() => {
-    if (wasRunning.current && !running) setExpanded(false)
-    wasRunning.current = running
-  }, [running])
   useEffect(() => {
     const element = bodyRef.current
     if (element === null || !followTail.current) return
@@ -69,9 +63,9 @@ export function ReasoningRow({ text, running, t }: { text: string; running: bool
   // Reopening resumes following: the reader asked to watch the thought again,
   // which for a streaming one means its newest line, not wherever a previous
   // scroll-up had left it.
-  const toggleExpanded = () => {
+  const toggleExpandedWithFollow = () => {
     followTail.current = true
-    setExpanded(value => !value)
+    toggleExpanded()
   }
 
   return (
@@ -87,7 +81,7 @@ export function ReasoningRow({ text, running, t }: { text: string; running: bool
         open={expanded}
         expandable
         expandOnRowClick
-        onToggle={toggleExpanded}
+        onToggle={toggleExpandedWithFollow}
         collapsedContent={(
           <>
             <span className={css.separator} aria-hidden />

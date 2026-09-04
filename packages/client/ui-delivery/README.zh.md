@@ -74,3 +74,13 @@ kind: "package-reference"
 - **无产物内容预览** — 界面列出路径而非只读文件内容；内容预览需要 host 把 `fs` 读取投影到客户端。
 - **无配置设置卡片** — 阈值、开关与 `postHooks` 尚不能从设置界面编辑。
 - **只读界面** — 任务通过模型侧工具推进，而非此界面；这里没有 accept/clear/advance 动词。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文 — 点击展开</summary>
+
+无。
+
+</details>

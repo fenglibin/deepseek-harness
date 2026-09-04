@@ -60,6 +60,7 @@ The package is one separation: presentational React atoms with zero Cordis and z
 | [`src/SearchBlock.tsx`](src/SearchBlock.tsx) / [`src/WebBlock.tsx`](src/WebBlock.tsx) | Search and web-retrieval cards |
 | [`src/icons/`](src/icons/) | `ic_ds_*` glyph components and brand marks |
 | [`src/useAnchoredPosition.ts`](src/useAnchoredPosition.ts) / [`src/useAnchoredMaxHeight.ts`](src/useAnchoredMaxHeight.ts) | Floating-panel and overlay geometry hooks |
+| [`src/use-lifecycle-expansion.ts`](src/use-lifecycle-expansion.ts) | Disclosure state that opens while an operation runs and folds back to the row's resting value on settlement |
 
 ### Streaming markdown
 

@@ -267,8 +267,21 @@ describe('bash tool', () => {
     const ctx = await setup()
     const result = await call(ctx, 'bash', { command: 'sleep 60', description: 'test command', timeoutMs: 100 })
     expect(result.isError).toBe(false)
-    expect(text(result)).toBe('(no output)\n[timed out after 100ms]\n[killed by signal: SIGTERM]')
+    // `sleep 60` also earns the event-driven-wait hint; the kill markers the
+    // exit pill anchors on still come last.
+    expect(text(result)).toContain('job_output with wait: true')
+    expect(text(result)).toMatch(/^\(no output\)\n\[hint: [^\]]*\]\n\[timed out after 100ms\]\n\[killed by signal: SIGTERM\]$/)
   })
+
+  it('appends the search hint to the result of the command that triggered it', async () => {
+    const ctx = await setup()
+    const result = await call(ctx, 'bash', { command: 'grep --version', description: 'test command' })
+    expect(result.isError).toBe(false)
+    expect(text(result)).toContain('[hint: code search through the fs_search tool')
+    expect(text(result)).not.toContain('[exit code:')
+  })
+
+
 
   it('reports a timeout even when the command traps the signal and exits 0', async () => {
     // The signal-independent timeout marker: a trapped SIGTERM that exits 0
@@ -462,6 +475,14 @@ describe('background execution through the job runtime', () => {
     // A later read reports the terminal outcome in the generic status line.
     const final = await callUntilText(ctx, 'job_output', { job_id: 'bash-1' }, '[status: completed, exit code: 0]')
     expect(final.isError).toBe(false)
+  })
+
+  it('a background ack carries no efficiency hint: its command has no result to append one to', async () => {
+    const ctx = await setupWithTasks()
+    const started = await call(ctx, 'bash', { command: 'sleep 60', description: 'test command', run_in_background: true })
+    expect(text(started)).toBe('started background job bash-1')
+    await call(ctx, 'job_kill', { job_id: 'bash-1' })
+    await call(ctx, 'job_output', { job_id: 'bash-1', wait: true }) // await settlement — no orphan
   })
 
   it('a running background job is killable through the REAL job_kill tool', async () => {

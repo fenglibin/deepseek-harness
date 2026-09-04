@@ -1,4 +1,4 @@
-import type { ChatConversationViewNode, ChatNode, ToolChatData } from '../contract/chat-nodes.ts'
+import type { ChatConversationViewNode, ChatNode } from '../contract/chat-nodes.ts'
 import { isSettledTool } from '../contract/chat-nodes.ts'
 
 /**
@@ -65,7 +65,7 @@ interface MutationInfo {
 function mutationInfo(node: ChatConversationViewNode): MutationInfo | null {
   const candidate = node as ChatNode
   if (candidate.kind !== 'tool-call') return null
-  const root = (candidate.data as ToolChatData).root
+  const root = candidate.data.root
   if (!isSettledTool(root)) return null
   const call = root.call
   if (call === null) return null

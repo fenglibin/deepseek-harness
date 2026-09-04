@@ -119,3 +119,13 @@ These limits define when the tools are a poor fit. They are current package cons
 - **Records persist as durable events plus `.dsh/`/`openspec/` files** — each record appends to `.dsh/changes/<task-id>.md`, `.dsh/design/<task-id>.md`, or `openspec/changes/<task-id>/spec.md`; the full openspec change layout (proposal/design/tasks/specs) and `openspec validate` CLI are later batch work.
 - **Gate is per-advance, not continuous** — a task created before the prerequisite policy changed is only re-checked at its next `advance`.
 - **Single-owner scope only** — the task belongs to one agent session; subagent and shared scopes are out of scope.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

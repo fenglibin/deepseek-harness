@@ -12,6 +12,7 @@ import {
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotTestRuntime, TestRemote, usePinnedBrowserLanguages, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as applyConversation, inject as injectConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { SessionLiveEventEntry } from '@deepseek-ai/dsh-api-session-controller/client'
 import { apply as applyTool, inject as injectTool } from '../src/client/apply.ts'
 import { toolSessionEvents } from './tool-details-render.client.tsx'
 
@@ -70,6 +71,42 @@ const LAYOUT_CHILDREN = {
 } as const
 
 async function bench(nodes: ToolResultNode[]) {
+  return benchEvents(toolSessionEvents(nodes))
+}
+
+/**
+ * One `tool/call` with no result yet: the live running row a reader watches.
+ * Both halves come from the shared fixture builder, so the pending prefix and
+ * the result that settles it are exactly what a replayed session emits.
+ * @returns the pending events and the result event that settles them.
+ */
+function pendingBashEvents(): {
+  readonly pending: readonly SessionLiveEventEntry[]
+  readonly result: SessionLiveEventEntry
+} {
+  return pendingCallEvents('c-live', 'bash')
+}
+
+/**
+ * @param callId - the pending call's id.
+ * @param name - wire tool name; one without a keyed row reaches the generic
+ *   `ToolRow` path.
+ * @returns the pending events and the result event that settles them.
+ */
+function pendingCallEvents(callId: string, name: string): {
+  readonly pending: readonly SessionLiveEventEntry[]
+  readonly result: SessionLiveEventEntry
+} {
+  // One node yields turn/start, step/start, tool/call, tool/result, in order.
+  const events = toolSessionEvents([
+    bashResult(4, callId, { call: { name, argsRaw: '{"command":"ls -la","description":"List files"}' } }),
+  ])
+  const result = events[3]
+  if (result === undefined) throw new Error('the fixture builder emitted no result event')
+  return { pending: events.slice(0, 3), result }
+}
+
+async function benchEvents(events: readonly SessionLiveEventEntry[]) {
   const runtime = await SlotTestRuntime.create()
   new TestRemote(runtime.ctx, {
     session: {
@@ -88,7 +125,7 @@ async function bench(nodes: ToolResultNode[]) {
   await runtime.sessions.add({
     id: SID,
     summary: { title: 'S', displayTitle: 'S', cwd: '/proj' },
-    events: toolSessionEvents(nodes),
+    events,
     session: {
       loadOlder: vi.fn<ISession['loadOlder']>(),
       prompt: vi.fn<ISession['prompt']>(async () => ({ ok: true, value: { accepted: true } })),
@@ -145,13 +182,13 @@ describe('terminal card assembly', () => {
     ])
     const view = runtime.renderRoot()
 
-    // Keyed BashRow: the terminal sits on the row from the start (capped to two
-    // lines), and the whole summary row is what grows it.
+    // Keyed BashRow: a settled row shows no terminal at all, and the whole
+    // summary row is what opens it (capped to ten lines).
     const keyedRow = view.container.querySelector('[data-sample="bash"]')
     const keyed = keyedRow?.parentElement
     const keyedStage = () => keyed?.querySelector('[data-stage]')?.getAttribute('data-stage')
-    expect(keyed!.querySelector('[data-terminal]')).not.toBeNull()
-    expect(keyedStage()).toBe('peek')
+    expect(keyed!.querySelector('[data-terminal]')).toBeNull()
+    expect(keyedStage()).toBeUndefined()
     fireEvent.click(keyedRow!)
     await waitFor(() => {
       expect(keyedStage()).toBe('full')
@@ -165,6 +202,56 @@ describe('terminal card assembly', () => {
     await waitFor(() => {
       expect(fallback!.querySelector('[data-terminal]')).not.toBeNull()
     })
+    await runtime.dispose()
+  })
+})
+
+describe('live bash row through the real event stream', () => {
+  it('opens the running command and folds it when the result lands', async () => {
+    const { pending, result } = pendingBashEvents()
+    const runtime = await benchEvents(pending)
+    const view = runtime.renderRoot()
+    const row = () => view.container.querySelector('[data-sample="bash"]')
+    const stage = () => view.container.querySelector('[data-stage]')?.getAttribute('data-stage')
+
+    expect(row()).not.toBeNull()
+    expect(row()!.getAttribute('data-state')).toBe('running')
+    expect(row()!.getAttribute('aria-expanded')).toBe('true')
+    expect(stage()).toBe('full')
+
+    await runtime.sessions.appendEvent(SID, result)
+    await runtime.flush()
+
+    expect(row()!.getAttribute('data-state')).toBe('ok')
+    expect(row()!.getAttribute('aria-expanded')).toBe('false')
+    // Settlement takes the output box away, not just down to two lines: a
+    // settled transcript is a list of one-line summaries.
+    expect(stage()).toBeUndefined()
+    expect(view.container.querySelector('[data-terminal]')).toBeNull()
+    expect(view.container.textContent).not.toContain('total 2')
+    await runtime.dispose()
+  })
+
+  it('folds a generic row shut: its output box leaves the DOM entirely', async () => {
+    // The contrast the bash row's preview exists against. `pwsh` has no keyed
+    // row, so GenericToolCard owns it: its args body makes the row expandable
+    // while running, and a generic row has no collapsed preview — settlement
+    // removes the output box outright instead of shrinking it to two lines.
+    const { pending, result } = pendingCallEvents('c-generic', 'pwsh')
+    const runtime = await benchEvents(pending)
+    const view = runtime.renderRoot()
+    const row = () => view.container.querySelector('[data-tool="pwsh"]')
+    const expanded = () => row()?.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')
+
+    expect(row()!.getAttribute('data-state')).toBe('running')
+    expect(expanded()).toBe('true')
+
+    await runtime.sessions.appendEvent(SID, result)
+    await runtime.flush()
+
+    expect(row()!.getAttribute('data-state')).toBe('ok')
+    expect(expanded()).toBe('false')
+    expect(view.container.textContent).not.toContain('total 2')
     await runtime.dispose()
   })
 })

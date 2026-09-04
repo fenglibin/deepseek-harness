@@ -15,6 +15,87 @@ function streamText(output: CollectedOutput): string {
 }
 
 /**
+ * A `sleep` operand: a bare seconds count, which is the form the pattern this
+ * hint targets actually uses. GNU `sleep` suffixes (`1m`, `2h`) are not parsed,
+ * so a suffixed wait is a missed hint rather than a wrong one.
+ */
+const SLEEP_SECONDS = /\bsleep\s+(\d+(?:\.\d+)?)/g
+
+/** Shortest fixed wait worth replacing with an event-driven wait, in seconds. */
+const SLEEP_HINT_SECONDS = 30
+
+/** A command whose first word is a shell search the `fs_search` tool replaces. */
+const SHELL_SEARCH = /^(?:grep|find)\b/
+
+/** Whole-repository test invocations: `pnpm [run] test…` and `npx vitest run`. */
+const REPO_WIDE_TEST = /\bpnpm\s+(?:run\s+)?test\S*|\bnpx\s+vitest\s+run\b/
+
+/** A token that scopes a run to a path or a file, so the run is no longer repo-wide. */
+const TEST_SCOPE = /\/|\.(?:ts|tsx|js|mjs|cjs|py)$/
+
+const SLEEP_HINT = '[hint: to wait on a background job, call job_output with wait: true and timeout_ms; '
+  + 'it returns the moment the job settles, instead of sleeping a fixed duration]'
+
+const SEARCH_HINT = '[hint: code search through the fs_search tool is structured and avoids shell quoting; '
+  + 'prefer it over grep/find for locating code]'
+
+const REPO_TEST_HINT = '[hint: this runs the whole repository suite (measured ~143 s for 17,429 tests); '
+  + 'scope it to the affected packages — see docs/testing.md]'
+
+/**
+ * Drop one leading `cd <path> &&`, which is how a model wraps most commands
+ * even though every call already starts in the session workspace.
+ * @param command - the exact command the model sent.
+ * @returns the command without that prefix, unchanged when it is absent.
+ */
+function stripLeadingCd(command: string): string {
+  return command.replace(/^\s*cd\s+\S+\s*&&\s*/, '')
+}
+
+/**
+ * Detect a fixed wait long enough to be worth replacing with `job_output`'s
+ * event-driven wait, which settles the moment the job does.
+ * @param command - the command with any `cd` prefix stripped.
+ * @returns whether it sleeps at least {@link SLEEP_HINT_SECONDS} seconds.
+ */
+function waitsBySleep(command: string): boolean {
+  for (const match of command.matchAll(SLEEP_SECONDS)) {
+    if (Number(match[1]) >= SLEEP_HINT_SECONDS) return true
+  }
+  return false
+}
+
+/**
+ * Detect an unscoped verification run, which sweeps the whole repository
+ * instead of the packages the change touched.
+ * @param command - the command with any `cd` prefix stripped.
+ * @returns whether it invokes the suite, or coverage, without a path or file scope.
+ */
+function runsWholeRepoSuite(command: string): boolean {
+  if (command.split(/\s+/).some(token => TEST_SCOPE.test(token))) return false
+  return command.includes('--coverage') || REPO_WIDE_TEST.test(command)
+}
+
+/**
+ * Runtime hints that steer the model toward capabilities the harness already
+ * offers, each fired by the call that exhibits the pattern it names — guidance
+ * stated once in the system prompt does not move behavior at the moment of
+ * action. Triggers are deliberately narrow: roughly a quarter of measured
+ * commands match, and a hint that fires on ordinary commands is noise the
+ * model learns to skip.
+ * @param command - the exact command the model sent.
+ * @returns the hints the command triggers, in trigger order; empty when it triggers none.
+ */
+export function efficiencyHints(command: string): readonly string[] {
+  const stripped = stripLeadingCd(command)
+  const hints: string[] = []
+  if (waitsBySleep(stripped)) hints.push(SLEEP_HINT)
+  if (SHELL_SEARCH.test(stripped)) hints.push(SEARCH_HINT)
+  if (runsWholeRepoSuite(stripped)) hints.push(REPO_TEST_HINT)
+  return hints
+}
+
+/**
  * Shape one finished run into the text the model sees: stdout, then a marked
  * stderr section, then exit-status markers. Non-zero exits are reported, not
  * errored — the model decides how to react; only infrastructure failures
@@ -23,11 +104,14 @@ function streamText(output: CollectedOutput): string {
  * @param escalationModes - the escalation targets this composition advertises;
  *   non-empty adds the same-turn escalation hint after a denial marker
  *   (default `[]`: no hint).
- * @returns the model-facing text: output body (or `(no output)`), then any timeout/signal/exit markers, each on its own line.
+ * @param command - the command that produced this result, which
+ *   {@link efficiencyHints} matches (default `''`: no hints).
+ * @returns the model-facing text: output body (or `(no output)`), then hints, then timeout/signal/exit markers, one per line.
  */
 export function renderResult(
   result: ShellRunResult,
   escalationModes: readonly SandboxMode[] = [],
+  command = '',
 ): string {
   const out = streamText(result.stdout)
   const err = streamText(result.stderr)
@@ -49,6 +133,8 @@ export function renderResult(
       markers.push(escalationHintMarker('command'))
     }
   }
+  // Hints join before the exit block: the exit marker must stay last.
+  markers.push(...efficiencyHints(command))
   // A command may trap SIGTERM and exit 0 after timeout; still report interruption.
   if (result.timedOut) markers.push(`[timed out after ${result.timeoutMs}ms]`)
   if (result.signal !== null) {

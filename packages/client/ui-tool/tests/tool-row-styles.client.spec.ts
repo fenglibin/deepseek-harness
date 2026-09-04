@@ -35,26 +35,35 @@ function bashDeclarations(selector: string): string[] {
   return (rule[1] ?? '').split(';').map(part => part.trim()).filter(Boolean)
 }
 
-/** One output stage; the selector's brackets are escaped, not a character class. */
-function stageDeclarations(stage: string): string[] {
+/**
+ * One output stage; the selector's brackets are escaped, not a character class.
+ * @param stage - stage name the `data-stage` attribute carries.
+ * @param required - false when the assertion is that the stage has NO rule,
+ *   which is how a removed stage stays pinned.
+ * @returns the stage's declarations; empty when it has no rule.
+ */
+function stageDeclarations(stage: string, required = true): string[] {
   const rule = new RegExp(
     `\\.terminalWrap\\[data-stage='${stage}'\\] \\.terminal\\s*\\{([^{}]*)\\}`,
   ).exec(bashDeclarationText)
-  if (rule === null) throw new Error(`bash-sample.module.css has no '${stage}' stage rule`)
+  if (rule === null) {
+    if (required) throw new Error(`bash-sample.module.css has no '${stage}' stage rule`)
+    return []
+  }
   return (rule[1] ?? '').split(';').map(part => part.trim()).filter(Boolean)
 }
 
 describe('bash row output-height stages', () => {
-  it('caps the closed row at two lines and the open row at ten', () => {
-    expect(stageDeclarations('peek')).toEqual([
-      '--dsl-terminal-output-max-height: calc(var(--dsl-terminal-line-height) * 2)',
-    ])
+  it('caps the open row at ten lines and declares no closed stage', () => {
+    // A closed row renders no terminal at all, so `peek` is gone: every
+    // settled row collapses to the one-line summary the other tool rows use.
+    expect(stageDeclarations('peek', false)).toEqual([])
     expect(stageDeclarations('full')).toEqual([
       '--dsl-terminal-output-max-height: calc(var(--dsl-terminal-line-height) * 10)',
     ])
   })
 
-  it('derives both caps from the line height the row reads, never a copied px value', () => {
+  it('derives the cap from the line height the row reads, never a copied px value', () => {
     // A cap written in px would drift from the terminal's own line height the
     // moment that binding changed, leaving the row showing half a line. The row
     // no longer rebinds the measure: the primitive's default rides the content
@@ -63,31 +72,15 @@ describe('bash row output-height stages', () => {
       expect.stringContaining('--dsl-terminal-font'),
       '--dsl-terminal-line-height: 18px',
     ]))
-    for (const stage of ['peek', 'full']) {
-      expect(stageDeclarations(stage).join(';')).toContain('var(--dsl-terminal-line-height)')
-    }
-  })
-
-  it('hides the closed preview\'s scrollbars and keeps them on the open stages', () => {
-    // A two-line thumb is too small to drag and crowds the lines it sits
-    // beside; the open stages are where scrolling is meant to happen.
-    expect(bashDeclarationText).toContain(
-      ".terminalWrap[data-stage='peek'] .terminal ::-webkit-scrollbar",
-    )
-    const peek = /\.terminalWrap\[data-stage='peek'\] \.terminal \*\s*\{([^{}]*)\}/.exec(bashDeclarationText)
-    expect((peek?.[1] ?? '').split(';').map(part => part.trim()).filter(Boolean)).toEqual([
-      'scrollbar-width: none',
-    ])
+    expect(stageDeclarations('full').join(';')).toContain('var(--dsl-terminal-line-height)')
   })
 
   it('leaves the unbounded stage without a cap', () => {
     // The primitive reads `none` by default, so the overflow never engages.
-    for (const stage of ['peek', 'full']) {
-      expect(bashDeclarations('.terminal')).not.toEqual(expect.arrayContaining([
-        '--dsl-terminal-output-max-height: none',
-      ]))
-      expect(stageDeclarations(stage).join(';')).not.toContain('none')
-    }
+    expect(bashDeclarations('.terminal')).not.toEqual(expect.arrayContaining([
+      '--dsl-terminal-output-max-height: none',
+    ]))
+    expect(stageDeclarations('full').join(';')).not.toContain('none')
   })
 })
 

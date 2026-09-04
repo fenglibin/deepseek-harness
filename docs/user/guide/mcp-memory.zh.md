@@ -32,6 +32,22 @@ dsh web --patch "$PWD/apps/cli/config/examples/mcp-memory/memorix.cordis.yml"
 
 如果要跨次运行保留所选配置，请将对应文件中的单个 `insert` patch 合并到用户 patch 层：只对一个 profile 生效则写入 `$DSH_HOME/profiles/<name>/cordis.patch.yml`，对本机所有 profile 生效则写入 `$DSH_HOME/cordis.patch.yml`。不要覆盖已有文件，其中可能已经包含无关的用户 patch。
 
+## 通过「设置 → MCP」添加
+
+[`dsh-mcp-manager`](../../../packages/mcp/mcp-manager/README.zh.md) 插件会在「设置 → MCP」页面挂载同样的服务器，无需手写 Cordis overlay。用 overlay 所携带的相同字段添加服务器，之后即可在运行时编辑、刷新、启用或移除。例如 Memorix：
+
+```yaml
+mcp:
+  servers:
+    - serverName: memorix
+      transport: stdio
+      command: memorix
+      args: [serve]
+      cwd: '/path/to/project'
+```
+
+`env` 和 `headers` 在弹窗中按每行一个 `KEY=value` 编辑。页面会显示每台服务器的连接状态及其 `mcp__<serverName>__…` 工具数。
+
 ## 提供方设置
 
 ### Memorix

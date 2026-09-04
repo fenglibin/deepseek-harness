@@ -410,11 +410,26 @@ describe('BashRow terminal card', () => {
     expect(row?.textContent).toBe('BashList files查看全部')
   })
 
-  it('keeps the height control off a running command, which has no output yet', () => {
+  it('opens a running command and keeps the height control off it, which has no output yet', () => {
     const view = render(<BashRow {...rowProps(running())} />)
     // Nothing is printed while it runs, so there is nothing to show more of.
     expect(view.queryByText('查看全部')).toBeNull()
-    expect(view.container.querySelector('[data-stage]')?.getAttribute('data-stage')).toBe('peek')
+    // The row opens on the running command — the reader watches it rather than
+    // clicking through — so the empty terminal already sits at the open cap.
+    expect(view.container.querySelector('[data-stage]')?.getAttribute('data-stage')).toBe('full')
+    expect(view.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')).toBe('true')
+  })
+
+  it('collapses the moment a running command settles', () => {
+    const view = render(<BashRow {...rowProps(running())} />)
+    const expanded = () => view.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')
+    expect(expanded()).toBe('true')
+    // The same row settles in place: the output no longer needs the row open,
+    // so the terminal card leaves the DOM and the row reads as its summary.
+    view.rerender(<BashRow {...rowProps(settled())} />)
+    expect(expanded()).toBe('false')
+    expect(view.container.querySelector('[data-stage]')).toBeNull()
+    expect(view.container.querySelector('[data-terminal]')).toBeNull()
   })
 
   it('keeps the height control off an output that already fits the open cap', () => {
@@ -449,20 +464,21 @@ describe('BashRow terminal card', () => {
     expect(stage()).toBe('full')
   })
 
-  it('shows the output on the closed row; the whole row grows it to ten lines', () => {
+  it('shows no output on the closed row; the whole row opens it to ten lines', () => {
     const view = render(<BashRow {...rowProps(settled())} />)
     expect(view.getByText('List files')).toBeTruthy()
-    // The closed row answers "what did it print" without being opened: the
-    // terminal card is present at every stage, only its height changes.
+    // A settled row collapses to its one-line summary like every other tool
+    // row: the terminal card mounts on open and unmounts on close.
+    expect(view.queryByText('a.ts  b.ts', RAW)).toBeNull()
+    expect(view.container.querySelector('[data-stage]')).toBeNull()
+    fireEvent.click(view.container.querySelector('[data-expandable]')!)
     expect(view.getByText('a.ts  b.ts', RAW)).toBeTruthy()
     expect(view.getByText('复制')).toBeTruthy()
     const stage = () => view.container.querySelector('[data-stage]')?.getAttribute('data-stage')
-    expect(stage()).toBe('peek')
-    fireEvent.click(view.container.querySelector('[data-expandable]')!)
     expect(stage()).toBe('full')
-    // Collapsing returns to the two-line peek rather than unmounting the card.
+    // Closing takes the card away again rather than shrinking it.
     fireEvent.click(view.container.querySelector('[data-expandable]')!)
-    expect(stage()).toBe('peek')
+    expect(view.container.querySelector('[data-stage]')).toBeNull()
     expect(view.getByText('List files')).toBeTruthy()
   })
 
@@ -472,7 +488,7 @@ describe('BashRow terminal card', () => {
   it('agrees with the summary row about the run state', () => {
     const runningView = render(<BashRow {...rowProps(running())} />)
     expect(runningView.container.querySelector('[data-variant="bash"]')?.getAttribute('data-state')).toBe('running')
-    fireEvent.click(runningView.container.querySelector('[data-expandable]')!)
+    // A running row is already open, so its card reads without a click.
     expect(runStateOf(runningView.container)).toBe('ongoing')
     cleanup()
     const settledView = render(<BashRow {...rowProps(settled())} />)

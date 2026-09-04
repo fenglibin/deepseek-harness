@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 
 /**
- * User-turn drawer behaviour: the collapsed badge carries the whole-log user
- * turn count; the open panel lists every turn with its prompt preview; picking
- * a row hands the turn number back to the parent (which pages/scrolls to it);
- * outside pointerdown and Escape each close the panel. The host projection
- * already omits turns without a direct prompt, so the drawer renders whatever
- * outline it receives without further filtering.
+ * User-turn drawer behaviour: the collapsed badge only appears when at least
+ * one loaded turn carries a user prompt; the open panel lists every such turn
+ * with its prompt preview; picking a row hands the item back to the parent
+ * (which performs the actual scroll); outside pointerdown and Escape each
+ * close the panel; pure-assistant turns are filtered out so the drawer
+ * remains strictly user-facing.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import type { TurnOutlineEntry } from '@deepseek-ai/dsh-session-stats/client'
+import type { TurnNavigationItem } from '../src/client/contract/snapshot.ts'
 import { UserTurnPanel } from '../src/client/chat/UserTurnPanel.tsx'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
@@ -23,15 +23,17 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function makeItems(count: number, promptFactory: (i: number) => string): TurnOutlineEntry[] {
+function makeItems(count: number, promptFactory: (i: number) => string): TurnNavigationItem[] {
   return Array.from({ length: count }, (_, i) => ({
     turn: i + 1,
+    anchorKey: `anchor-${String(i + 1)}`,
     prompt: promptFactory(i),
+    response: `reply ${String(i + 1)}`,
   }))
 }
 
 describe('UserTurnPanel', () => {
-  it('renders the collapsed badge with the user-turn count', () => {
+  it('renders the collapsed badge with the user-turn count when at least one prompt is loaded', () => {
     const items = makeItems(5, i => `prompt ${String(i + 1)}`)
     render(<UserTurnPanel items={items} activeTurn={null} onNavigate={vi.fn()} t={t} />)
     const toggle = screen.getByRole('button', { name: '打开用户消息列表' })
@@ -62,7 +64,24 @@ describe('UserTurnPanel', () => {
     expect(within(listItems[2]!).getByText('#03')).toBeTruthy()
   })
 
-  it('navigates by turn number and closes the panel', () => {
+  it('filters out turns whose prompt is empty so the drawer stays user-facing', () => {
+    const items: TurnNavigationItem[] = [
+      { turn: 1, anchorKey: 'a-1', prompt: 'first user prompt', response: '' },
+      // A loaded window starting mid-turn: the rail still anchors the row
+      // but the drawer must not surface a "Turn 2" the reader never typed.
+      { turn: 2, anchorKey: 'a-2', prompt: '', response: 'reply' },
+      { turn: 3, anchorKey: 'a-3', prompt: 'third user prompt', response: '' },
+    ]
+    render(<UserTurnPanel items={items} activeTurn={null} onNavigate={vi.fn()} t={t} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '打开用户消息列表' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(2)
+    expect(within(dialog).queryByText('#02')).toBeNull()
+    expect(within(dialog).queryByText('共 2 条')).toBeTruthy()
+  })
+
+  it('navigates to the picked turn and closes the panel', () => {
     const items = makeItems(2, i => `turn ${String(i + 1)} prompt`)
     const onNavigate = vi.fn()
     render(<UserTurnPanel items={items} activeTurn={null} onNavigate={onNavigate} t={t} />)
@@ -73,7 +92,7 @@ describe('UserTurnPanel', () => {
     fireEvent.click(within(rows[1]!).getByRole('button'))
 
     expect(onNavigate).toHaveBeenCalledTimes(1)
-    expect(onNavigate).toHaveBeenCalledWith(2)
+    expect(onNavigate).toHaveBeenCalledWith(items[1])
     expect(screen.queryByRole('dialog')).toBeNull()
     // The badge returns so the reader can re-open it.
     expect(screen.getByRole('button', { name: '打开用户消息列表' })).toBeTruthy()
@@ -99,9 +118,10 @@ describe('UserTurnPanel', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('renders nothing when the outline is empty', () => {
+  it('renders nothing when no loaded turn carries a user prompt', () => {
+    const items = makeItems(3, () => '')
     const { container } = render(
-      <UserTurnPanel items={[]} activeTurn={null} onNavigate={vi.fn()} t={t} />,
+      <UserTurnPanel items={items} activeTurn={null} onNavigate={vi.fn()} t={t} />,
     )
     expect(container.firstChild).toBeNull()
   })

@@ -23,7 +23,9 @@ import type { ReconnectConfig } from './connection.ts'
 import type {} from '@deepseek-ai/dsh-tools'
 
 export type { McpResult } from './tools.ts'
-export type { ReconnectConfig, ResolvedReconnectPolicy } from './connection.ts'
+export type {
+  McpConnectionStatus, McpStatusDetail, McpStatusSink, ReconnectConfig, ResolvedReconnectPolicy,
+} from './connection.ts'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'mcp-client'
@@ -170,7 +172,9 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   // The supervisor owns the client/transport generations, the reconnect
   // loop, and the live tool registrations; disposal stops reconnection,
   // quiesces in-flight work, and unregisters the current generation.
-  const connection = startConnection(ctx, config, reconnect)
+  // Status reporting is opt-in: a management surface provides one sink for
+  // every instance it mounts; without one the supervisor is unchanged.
+  const connection = startConnection(ctx, config, reconnect, ctx.get('mcpStatusSink'))
 
   ctx.effect(() => {
     return () => connection.dispose()

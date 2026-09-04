@@ -11,6 +11,12 @@ English | [中文](README.zh.md)
 
 `dsh-client-ui-settings-commands` adds the Prompt Commands settings page. It edits the `prompt-commands` settings namespace — the user-editable list of reusable `/name` prompt shortcuts registered by `@deepseek-ai/dsh-command-prompt-config`. The list supports add and edit through a staged editor and delete through an in-page risk confirmation, so every change is explicit and reversible only by re-adding the command.
 
+## Table of Contents
+
+- [Use this package](#use-this-package)
+- [Source map](#source-map)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+
 ## Use this package
 
 Compose it beside the settings shell and the Host-side `command-prompt-config` plugin. The section renders nothing meaningful when the namespace is not served, but the section is always registered.
@@ -38,3 +44,13 @@ The shipped web app mounts it after the Plugins section. The Host-side namespace
 
 - **No drag reorder** — commands keep configuration order; reordering is a future enhancement.
 - **Whole-list writes** — every confirmed change commits the entire list as one atomic write, which is correct but not minimal.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

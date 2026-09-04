@@ -122,16 +122,24 @@ describe('the response-language row', () => {
 
 describe('the auto signals', () => {
   it('lets the stored GUI language outrank the host environment', async () => {
-    const ctx = new Context()
-    ctx.provide('settings', settingsWith({ locale: { preference: 'en' } }))
-    await ctx.plugin(SystemPrompt, {})
-    await ctx.plugin(ResponseLanguage, { language: 'auto' })
-    const assembly = await ctx.systemPrompt.assemble()
-    // This host reports zh_CN, so an English GUI choice is only observable as
-    // the absence of the Chinese directive the environment alone would produce.
-    expect(ResponseLanguage.hostEnvironmentLocale()).toBe('zh')
-    expect(assembly.sections.find(section => section.name === 'deployment:response-language')?.text).toBe('')
-    await ctx.fiber.dispose()
+    // The scenario needs a Chinese HOST so an English GUI choice is only
+    // observable as the absence of the Chinese directive the environment alone
+    // would produce. CI hosts do not report zh_CN, so pin LC_ALL for the case.
+    const previousLcAll = process.env.LC_ALL
+    process.env.LC_ALL = 'zh_CN.UTF-8'
+    try {
+      const ctx = new Context()
+      ctx.provide('settings', settingsWith({ locale: { preference: 'en' } }))
+      await ctx.plugin(SystemPrompt, {})
+      await ctx.plugin(ResponseLanguage, { language: 'auto' })
+      const assembly = await ctx.systemPrompt.assemble()
+      expect(ResponseLanguage.hostEnvironmentLocale()).toBe('zh')
+      expect(assembly.sections.find(section => section.name === 'deployment:response-language')?.text).toBe('')
+      await ctx.fiber.dispose()
+    } finally {
+      if (previousLcAll === undefined) delete process.env.LC_ALL
+      else process.env.LC_ALL = previousLcAll
+    }
   })
 
   it('directs Chinese when the GUI language is Chinese', async () => {

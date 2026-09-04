@@ -53,6 +53,49 @@ const GENERATION_CLOSE_TIMEOUT_MS = 5_000
 export type ResolvedReconnectPolicy = Readonly<Required<ReconnectConfig>>
 
 /**
+ * Lifecycle state of one server connection, as reported to an optional
+ * {@link McpStatusSink}. The supervisor derives it from the same decisions
+ * that drive its reconnect loop, so a sink observes exactly the transitions
+ * the supervisor already logs.
+ */
+export type McpConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'failed' | 'disposed'
+
+/** Optional detail carried with one {@link McpStatusSink} report. */
+export interface McpStatusDetail {
+  /** Diagnostic text for a failure or a reconnect attempt. */
+  readonly error?: string
+  /** Consecutive failed attempts within the current outage, when reconnecting. */
+  readonly attempt?: number
+  /** Attempt budget for the current outage, when reconnecting. */
+  readonly maxAttempts?: number
+}
+
+/**
+ * Sink for one server's connection status, provided by the embedding plugin
+ * through `ctx.provide('mcpStatusSink', …)` and shared by every mcp-client
+ * instance it mounts. Absent by default, in which case the supervisor's
+ * behavior is unchanged.
+ */
+export interface McpStatusSink {
+  /**
+   * Report one status change. Implementations MUST NOT throw: the supervisor
+   * contains and logs a failure, so a management surface can never break the
+   * reconnect loop it only observes.
+   * @param serverName - the reporting instance's configured `serverName`.
+   * @param status - the new lifecycle state.
+   * @param detail - optional diagnostic and attempt accounting.
+   */
+  report(serverName: string, status: McpConnectionStatus, detail?: McpStatusDetail): void
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Optional connection-status sink shared by every mcp-client instance in scope. */
+    mcpStatusSink?: McpStatusSink
+  }
+}
+
+/**
  * The one explicit resolve step from raw reconnect config to the policy the
  * supervisor runs. Programmatic construction may bypass Schemastery
  * normalization, so every default and bound is re-judged here — misconfiguration
@@ -118,9 +161,15 @@ export interface ConnectionHandle {
  * @param ctx - Cordis context providing the `tools` registry and logger.
  * @param config - Resolved plugin config selecting the transport and server identity.
  * @param policy - Resolved reconnect policy from {@link resolveReconnectPolicy}.
+ * @param sink - Optional status sink; when absent the supervisor reports nothing.
  * @returns Handle with a `ready` promise for startup-await and a `dispose` for teardown.
  */
-export function startConnection(ctx: Context, config: Config, policy: ResolvedReconnectPolicy): ConnectionHandle {
+export function startConnection(
+  ctx: Context,
+  config: Config,
+  policy: ResolvedReconnectPolicy,
+  sink?: McpStatusSink,
+): ConnectionHandle {
   const label = `mcp-client(${config.serverName})`
   const opts: ToolBridgeOptions = {
     registrationFailure: 'contain',
@@ -148,6 +197,21 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
   let connectedAt: number | undefined
   /** The real error from the first connection attempt, for startup-await diagnostics. */
   let firstAttemptError: unknown
+
+  /**
+   * Report one status change to the optional sink. A sink failure is contained
+   * and logged: reporting serves a management surface, never the supervisor.
+   * @param status - the new lifecycle state.
+   * @param detail - optional diagnostic and attempt accounting.
+   */
+  const report = (status: McpConnectionStatus, detail?: McpStatusDetail): void => {
+    if (sink === undefined) return
+    try {
+      sink.report(config.serverName, status, detail)
+    } catch (error) {
+      ctx.logger.warn(`${label}: status sink failed while reporting "${status}": ${String(error)}`)
+    }
+  }
 
   /** A generation may act only while it is the current one on a live plugin. */
   const isCurrent = (generation: Client): boolean => !disposed && client === generation
@@ -196,6 +260,7 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
         ? 'connection lost and reconnect is disabled — registered tools will fail until an HMR reload or Host restart'
         : 'connection failed and reconnect is disabled — no tools were registered; reload the plugin or restart the Host to connect'
       ctx.logger.error(`${label}: ${message}`)
+      report('failed', { error: message })
       return
     }
     // A connection that stayed up past the stability window (= maxDelayMs, the
@@ -210,12 +275,15 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
         for (const dispose of disposers.values()) dispose()
         disposers = new Map()
       })
-      ctx.logger.error(`${label}: giving up after ${policy.maxAttempts} consecutive failed reconnect attempts — tools unregistered; reload the plugin or restart the Host to reconnect`)
+      const message = `giving up after ${policy.maxAttempts} consecutive failed reconnect attempts — tools unregistered; reload the plugin or restart the Host to reconnect`
+      ctx.logger.error(`${label}: ${message}`)
+      report('failed', { error: message, attempt: policy.maxAttempts, maxAttempts: policy.maxAttempts })
       return
     }
     const delayMs = Math.min(policy.maxDelayMs, policy.initialDelayMs * 2 ** (failedAttempts - 1))
     const action = lostEstablishedConnection ? 'connection lost; reconnecting' : 'connection failed; retrying'
     ctx.logger.warn(`${label}: ${action} in ${delayMs}ms (attempt ${failedAttempts}/${policy.maxAttempts})`)
+    report('reconnecting', { attempt: failedAttempts, maxAttempts: policy.maxAttempts })
     reconnectTimer = setTimeout(() => {
       reconnectTimer = undefined
       settling = connectGeneration(false)
@@ -245,6 +313,10 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
     const hasClosed = (): boolean => closeObserved
     client = generation
     clientClosed = closed.promise
+    // A reconnect attempt keeps the 'reconnecting' state its scheduler already
+    // reported with the attempt accounting; only the startup attempt opens the
+    // lifecycle, so one outage never emits the same status twice.
+    if (startup) report('connecting')
     generation.onclose = () => {
       closeObserved = true
       closed.resolve()
@@ -288,7 +360,9 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
       if (!quiesced) {
         client = undefined
         clientClosed = undefined
-        ctx.logger.error(`${label}: failed generation did not close within ${GENERATION_CLOSE_TIMEOUT_MS}ms — reconnect stopped to avoid overlapping server processes; reload the plugin or restart the Host to retry`)
+        const message = `failed generation did not close within ${GENERATION_CLOSE_TIMEOUT_MS}ms — reconnect stopped to avoid overlapping server processes; reload the plugin or restart the Host to retry`
+        ctx.logger.error(`${label}: ${message}`)
+        report('failed', { error: message })
         return
       }
       generationDown(generation)
@@ -301,6 +375,7 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
     }
     if (!isCurrent(generation)) return
     connectedAt = Date.now()
+    report('connected')
     if (failedAttempts > 0) ctx.logger.info(`${label}: reconnected and re-synced tools (attempt ${failedAttempts}/${policy.maxAttempts})`)
   }
 
@@ -346,6 +421,7 @@ export function startConnection(ctx: Context, config: Config, policy: ResolvedRe
       await syncChain
       for (const dispose of disposers.values()) dispose()
       disposers = new Map()
+      report('disposed')
     },
   }
 }

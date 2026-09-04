@@ -119,3 +119,13 @@ kind: "package-reference"
 - **记录以 durable 事件 + `.dsh/`/`openspec/` 文件持久化** — 每条记录追加到 `.dsh/changes/<task-id>.md`、`.dsh/design/<task-id>.md` 或 `openspec/changes/<task-id>/spec.md`；完整的 openspec change 布局（proposal/design/tasks/specs）与 `openspec validate` CLI 是后续批次的工作。
 - **门禁是逐次 advance 而非持续监控** — 在门禁策略变更之前创建的任务，只在其下一次 `advance` 时被重新检查。
 - **仅单一 owner 作用域** — 任务属于一个 agent 会话；子代理与共享作用域不在范围内。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文 — 点击展开</summary>
+
+无。
+
+</details>

@@ -11,31 +11,13 @@
 /* Terminal card, matching ToolRow's terminalBody: 4px indent, l1 hairline, and
    the max-height scroll on the card's own OUTPUT (the banner stays pinned);
    the margin replaces the primitive's standalone vertical margin with the
-   flow's. The row shows the card at every stage — closed included — so the
-   output height is the stage's, not the open row's. Each cap derives from the
-   terminal's own line height, so the two can never disagree; the font measure
-   stays the primitive's default, which reads the Settings size. */
+   flow's. Only an open row renders the card, so the output height is one of
+   the open stages'. Each cap derives from the terminal's own line height, so
+   the two can never disagree; the font measure stays the primitive's default,
+   which reads the Settings size. */
 .terminal {
   margin: 4px 0 4px 4px;
   border: 1px solid var(--dsw-alias-border-l1);
-}
-
-/* Closed: two lines of output under the banner, so the row still answers
-   "what did it print" without being opened. */
-.terminalWrap[data-stage='peek'] .terminal {
-  --dsl-terminal-output-max-height: calc(var(--dsl-terminal-line-height) * 2);
-}
-
-/* The closed preview hides its scrollbars. A two-line thumb is too small to
-   drag and would crowd the very lines it sits beside, and the reader who wants
-   to scroll has the whole row to click; the open stages keep theirs, where
-   there is room to use them. */
-.terminalWrap[data-stage='peek'] .terminal ::-webkit-scrollbar {
-  display: none;
-}
-
-.terminalWrap[data-stage='peek'] .terminal * {
-  scrollbar-width: none;
 }
 
 /* Open: ten lines, then the output scrolls inside its own surface. */

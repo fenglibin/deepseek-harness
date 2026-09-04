@@ -133,3 +133,13 @@ view.specCount                           // number of recorded specs
 - **状态而非策略** — 本包强制阶段顺序，但不决定任务何时推进、不重试失败、也不要求在 `implemented` 之前存在变更记录；这些策略属于 `dsh-tool-delivery`。
 - **无产物持久化** — 变更记录仅以 durable 事件存在；写 `.dsh/changes/` 文件是后续消费者的职责。
 - **受信的进程内生产者** — 拥有 `Session` 直接访问权的插件可以伪造 `delivery/change` 数据。严格回放会检测畸形或不一致的记录，并在该记录处让交付访问失败，直到日志被修复。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文 — 点击展开</summary>
+
+无。
+
+</details>

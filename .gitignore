@@ -59,7 +59,10 @@ vendor/**/src/**/*.d.ts.map
 !packages/**/src/**/turndown-plugin-gfm.d.ts
 !packages/**/src/**/use-sync-external-store.d.ts
 
+# 测试生成的文件
+packages/typert/generator/tests/.generated-*/
+
 # Delivery tools write one artifact per task id into the session cwd.
-.dsh/changes/
-.dsh/design/
-openspec/changes/
+#.dsh/changes/
+#.dsh/design/
+#openspec/changes/

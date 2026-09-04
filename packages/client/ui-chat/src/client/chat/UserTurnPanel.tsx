@@ -12,15 +12,15 @@ import {
   useEffect, useId, useRef, useState, type CSSProperties,
 } from 'react'
 import { useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { TurnOutlineEntry } from '@deepseek-ai/dsh-session-stats/client'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
+import type { TurnNavigationItem } from '../contract/snapshot.ts'
 import css from './UserTurnPanel.module.css'
 
 interface UserTurnPanelProps {
-  /** Whole-log user-turn outline (turn + prompt), independent of paging. */
-  readonly items: readonly TurnOutlineEntry[]
+  /** Loaded Turn navigation items; entries without a direct user prompt are filtered out. */
+  readonly items: readonly TurnNavigationItem[]
   readonly activeTurn: number | null
-  readonly onNavigate: (turn: number) => void
+  readonly onNavigate: (item: TurnNavigationItem) => void
   readonly t: ChatViewSlotProps['t']
 }
 
@@ -60,9 +60,11 @@ export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPane
   const headingId = useId()
   const labelId = useId()
 
-  // `items` is the whole-log outline; the host already omits turns without a
-  // direct user prompt, so every entry is a user message.
-  const count = items.length
+  // The rail carries every loaded Turn, including windows that start mid-Turn
+  // (empty prompt); filtering keeps the drawer strictly user-facing and also
+  // makes the empty state honest.
+  const userTurns = items.filter(item => item.prompt !== '')
+  const count = userTurns.length
 
   useDismissOnOutsidePointer(root, open, setOpen)
 
@@ -79,8 +81,8 @@ export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPane
 
   if (count === 0) return null
 
-  const onPick = (turn: number): void => {
-    onNavigate(turn)
+  const onPick = (item: TurnNavigationItem): void => {
+    onNavigate(item)
     setOpen(false)
   }
 
@@ -102,7 +104,7 @@ export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPane
             </span>
           </header>
           <ol className={css.list} aria-describedby={labelId}>
-            {items.map((item) => {
+            {userTurns.map((item) => {
               const active = item.turn === activeTurn
               return (
                 <li key={item.turn}>
@@ -110,7 +112,7 @@ export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPane
                     type="button"
                     className={active ? `${css.item} ${css.itemActive}` : css.item}
                     aria-current={active ? 'true' : undefined}
-                    onClick={() => { onPick(item.turn) }}
+                    onClick={() => { onPick(item) }}
                   >
                     <span className={css.tag} aria-hidden>#{ZERO_PAD(item.turn)}</span>
                     <span className={css.preview}>{trimPrompt(item.prompt)}</span>

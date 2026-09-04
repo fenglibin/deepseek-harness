@@ -64,8 +64,11 @@ describe('sessionStats projection unit (registry drive)', () => {
   it('counts distinct turns and closed steps and notifies the change feed with the causing seq', async () => {
     const { ctx, session } = await harness(true)
     const changes: { key: string; value: unknown; seq: number }[] = []
+    // SessionStatsPlugin registers both the `sessionStats` and `turnOutline`
+    // units; this suite pins the sessionStats fold, so keep only its feed
+    // entries (turnOutline's own turn-boundary notifications are irrelevant).
     ctx.sessionProjections.onChanged((_session, key, value, seq) => {
-      changes.push({ key, value, seq })
+      if (key === 'sessionStats') changes.push({ key, value, seq })
     })
     session.append('turn/start', { turn: 1 })
     const firstSeq = closeStep(session, 1, 1)

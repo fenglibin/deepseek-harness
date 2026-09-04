@@ -24,6 +24,9 @@ export interface GenericCommandCardProps extends CommandRowOwnerProps {
 }
 
 export function GenericCommandCard({ node, t, runningSummary }: GenericCommandCardProps) {
+  // A running command has no multi-line outcome text yet, so the row is not
+  // expandable until it settles; the reader's own click is the only thing that
+  // opens it.
   const [expanded, setExpanded] = useState(false)
   const text = node.outcome?.text
   const summary = node.outcome === null

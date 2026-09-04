@@ -407,14 +407,24 @@ describe('ToolRow', () => {
     // The streaming result is the leading edge of a running call — a reader
     // wants to watch it without clicking. On settlement the streaming output
     // is gone (or canonical), so the row snaps back to the closed shape that
-    // already-settled transcript rows use.
+    // already-settled transcript rows use. The SAME row settles here: a fresh
+    // render of a settled row would only prove the mount default.
     const view = render(<ToolRow {...rowProps} state="running" />)
-    expect(view.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')).toBe('true')
-    cleanup()
-    // Re-render the same row with a settled state — the auto-collapse effect
-    // owns the transition, so the settled row opens at the closed default.
-    const settledView = render(<ToolRow {...rowProps} />)
-    expect(settledView.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')).toBe('false')
+    const expanded = () => view.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')
+    expect(expanded()).toBe('true')
+    view.rerender(<ToolRow {...rowProps} state="ok" />)
+    expect(expanded()).toBe('false')
+  })
+
+  it('a row whose resting state is open stays open across settlement', () => {
+    // An ask-user transcript arrives together with settlement. The resting
+    // value must win over the collapse, or the reader loses the row they just
+    // participated in the moment it answers.
+    const view = render(<ToolRow {...rowProps} state="running" />)
+    const expanded = () => view.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')
+    expect(expanded()).toBe('true')
+    view.rerender(<ToolRow {...rowProps} state="ok" restingExpanded />)
+    expect(expanded()).toBe('true')
   })
 
   it('a settled file-mutation row keeps the +/- totals beside the path, with success/error halves', () => {

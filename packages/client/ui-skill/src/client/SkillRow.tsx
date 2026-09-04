@@ -111,6 +111,9 @@ function stateStatus(state: SkillRowState, t: SkillRowProps['t']): string | null
  */
 export function SkillRow({ block, inspect, t }: SkillRowProps) {
   const model = skillRowModel(block)
+  // A running skill call carries no output, so the row is not expandable until
+  // it settles — there is no lifecycle to drive the disclosure with, and the
+  // reader's own click is the only thing that opens it.
   const [expanded, setExpanded] = useState(false)
   const expandable = model.output !== null
   const open = expanded && expandable

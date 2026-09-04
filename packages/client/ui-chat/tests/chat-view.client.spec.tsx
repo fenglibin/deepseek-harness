@@ -204,7 +204,6 @@ function makeHarness(
   init: HarnessUpdate = {},
   sessionOverrides: Partial<SessionSnapshot> = {},
   chatSnapshot?: ChatSnapshot,
-  projections: Record<string, unknown> = {},
 ) {
   const {
     chat: initialChat, nodes, partial, runningCalls, turnTimings, turnEnds, turnUsages,
@@ -349,8 +348,7 @@ function makeHarness(
       createSnapshotStore<SessionPendingInteractionSnapshot>(new Map()),
     ),
     useWorkspaces: emptyWorkspaces(),
-    useProjection: ((key: string, selector?: (v: unknown) => unknown) =>
-      (selector ?? (v => v))(projections[key])),
+    useProjection: (() => undefined),
     useInput: (() => { throw new Error('unused') }),
     inputActions: {
       setDraft: () => {},
@@ -2291,18 +2289,12 @@ describe('ChatView', () => {
     expect(view.getByText('加载中…')).toBeTruthy()
   })
 
-  it('pages back until the loaded window holds a user prompt (rail previews)', () => {
+  it('pages back until the loaded window holds a user prompt, so the drawer can list one', () => {
     // The history cut landed inside Turn 5: the window holds that Turn's
-    // assistant work and none of its prompt. The drawer lists the whole-log
-    // outline regardless, but the rail pages until a loaded prompt lands.
-    const h = makeHarness(
-      { nodes: [assistant(6, 'a', 5, 1)] },
-      { hasMore: true },
-      undefined,
-      { turnOutline: { turns: [{ turn: 5, prompt: 'q' }] } },
-    )
+    // assistant work and none of its prompt, so the drawer has nothing to list.
+    const h = makeHarness({ nodes: [assistant(6, 'a', 5, 1)] }, { hasMore: true })
     render(<h.ChatView {...h.props} />)
-    expect(screen.getByRole('button', { name: '打开用户消息列表' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '打开用户消息列表' })).toBeNull()
     expect(h.loadOlder).toHaveBeenCalledTimes(1)
     // A page already in flight must not queue a second one.
     act(() => { h.setSession({ loadingOlder: true }) })
@@ -2315,14 +2307,13 @@ describe('ChatView', () => {
     act(() => { h.set({ nodes: [userInTurn(5, 'q', 5), assistant(6, 'a', 5, 1)] }) })
     act(() => { h.setSession({ loadingOlder: false }) })
     expect(h.loadOlder).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: '打开用户消息列表' })).toBeTruthy()
   })
 
   it('leaves history alone when the loaded window already holds a user prompt', () => {
     const h = makeHarness(
       { nodes: [userInTurn(5, 'q', 5), assistant(6, 'a', 5, 1)] },
       { hasMore: true },
-      undefined,
-      { turnOutline: { turns: [{ turn: 5, prompt: 'q' }] } },
     )
     render(<h.ChatView {...h.props} />)
     expect(screen.getByRole('button', { name: '打开用户消息列表' })).toBeTruthy()
@@ -2330,8 +2321,8 @@ describe('ChatView', () => {
   })
 
   it('pages until a picked user message renders, then settles on it', () => {
-    // A turn in the outline whose row is not rendered yet: the drawer offers
-    // it, but there is no row to scroll to until an older page brings it in.
+    // A rail item whose row is not rendered yet: the drawer offers it, but
+    // there is no row to scroll to until an older page brings it in.
     vi.stubGlobal('requestAnimationFrame', () => 1)
     const target: TurnNavigationItem = {
       turn: 2, anchorKey: 'fixture:user:2', prompt: '尚未渲染的提问', response: '',
@@ -2343,8 +2334,6 @@ describe('ChatView', () => {
     const h = makeHarness(
       { chat: snapshotWithTarget([userInTurn(5, 'q', 5), assistant(6, 'a', 5, 1)]) },
       { hasMore: true },
-      undefined,
-      { turnOutline: { turns: [{ turn: 2, prompt: '尚未渲染的提问' }, { turn: 5, prompt: 'q' }] } },
     )
     render(<h.ChatView {...h.props} />)
     fireEvent.click(screen.getByRole('button', { name: '打开用户消息列表' }))

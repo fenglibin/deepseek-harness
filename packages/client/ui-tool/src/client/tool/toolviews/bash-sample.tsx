@@ -3,6 +3,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import clsx from 'clsx'
 import {
   IconApiOutline14, IconChevronDownOutline14, IconInspectOutline12, StateDot, TerminalBlock,
+  useLifecycleExpansion,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '../../contract/slots.ts'
@@ -20,12 +21,14 @@ import css from './bash-sample.module.css'
 type BashRowProps = ToolCallViewProps & PropsLocale<'conversation'>
 
 /**
- * Output-height stages: two lines while the row is closed, ten once it is open,
- * and unbounded after the reader asks for the rest. The row's own `data-stage`
- * carries the stage to CSS, which derives each cap from the terminal's line
- * height so the two can never disagree.
+ * Output-height stages of an OPEN row: ten lines by default, unbounded after
+ * the reader asks for the rest. A closed row renders no output at all — it
+ * reads as the same one-line summary every other tool row collapses to, so a
+ * settled transcript is not a stack of short output boxes. The row's own
+ * `data-stage` carries the stage to CSS, which derives the cap from the
+ * terminal's line height so the two can never disagree.
  */
-type OutputStage = 'peek' | 'full' | 'all'
+type OutputStage = 'full' | 'all'
 
 /** Output rows the ten-line cap shows before the reader asks for the rest. */
 const FULL_OUTPUT_LINES = 10
@@ -69,7 +72,9 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
     ? 'error'
     : model.state
   const status = stateStatus(state, t)
-  const [expanded, setExpanded] = useState(false)
+  // A running command opens so the reader watches its output arrive; settling
+  // folds the output away behind the one-line summary, like every other row.
+  const [expanded, toggleExpanded] = useLifecycleExpansion({ running: state === 'running' })
   // Whether the open row has dropped its height cap for the rest of the output.
   const [unbounded, setUnbounded] = useState(false)
   // Execution failures and persistent-shell results have no terminal card.
@@ -81,21 +86,18 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
   const expandable = terminal !== null || genericBody
   const open = expanded && expandable
   const failureLine = model.state === 'error' ? model.errorSummary : null
-  const stage: OutputStage = !open ? 'peek' : unbounded ? 'all' : 'full'
+  const stage: OutputStage = unbounded ? 'all' : 'full'
   // Only an output taller than the open cap has a stage past it to reach.
   const outputLines = outputLineCount(terminal?.card.output)
   const showToggle = terminal !== null && outputLines > FULL_OUTPUT_LINES
-  const toggleExpand = () => {
-    setExpanded(v => !v)
-  }
   const toggleUnbounded = (event: MouseEvent<HTMLButtonElement>) => {
     // The button sits inside the row that expands on its own click; without
     // stopping the event the two handlers would cancel each other out.
     event.stopPropagation()
-    // Asking for the rest opens the row first: from the closed peek the next
-    // stage is the ten-line cap, and only from there is it unbounded.
+    // Asking for the rest opens the row first: a closed row shows no output,
+    // so the ten-line cap is the next stage, and only from there unbounded.
     if (!expanded) {
-      setExpanded(true)
+      toggleExpanded()
       return
     }
     setUnbounded(v => !v)
@@ -108,7 +110,7 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
   const toggleFromKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!expandable || (event.key !== 'Enter' && event.key !== ' ')) return
     event.preventDefault()
-    toggleExpand()
+    toggleExpanded()
   }
   const leading = open
     ? <IconChevronDownOutline14 className={css.chevron} />
@@ -131,7 +133,7 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
         role={expandable ? 'button' : undefined}
         tabIndex={expandable ? 0 : undefined}
         aria-expanded={expandable ? open : undefined}
-        onClick={expandable ? toggleExpand : undefined}
+        onClick={expandable ? toggleExpanded : undefined}
         onKeyDown={expandable ? toggleFromKeyboard : undefined}
       >
         <span className={css.leading}>{leading}</span>
@@ -153,27 +155,31 @@ export function BashRow({ toolName, block, sessionId, useSessions, inspect, t }:
           </button>
         )}
       </div>
+      {/* A closed row renders no output at all: a settled transcript is a list
+          of one-line summaries, not a stack of short terminal boxes. Opening
+          the row is what shows what the command printed, capped at ten lines
+          until the reader asks for the rest. */}
       {terminal !== null
-        ? (
-          <>
-            {/* The closed row still shows what the command printed: two lines
-                under the banner, growing to ten once the row opens. */}
-            <div className={css.terminalWrap} data-stage={stage}>
-              <TerminalBlock
-                {...terminal.card}
-                maxLines={Infinity}
-                labels={terminalBlockLabels(t)}
-                className={css.terminal}
-              />
-            </div>
-            {inspect !== undefined && (
-              <button type="button" className={css.inspectButton} onClick={inspect}>
-                <IconInspectOutline12 />
-                {t('row.inspect')}
-              </button>
-            )}
-          </>
-        )
+        ? open
+          ? (
+            <>
+              <div className={css.terminalWrap} data-stage={stage}>
+                <TerminalBlock
+                  {...terminal.card}
+                  maxLines={Infinity}
+                  labels={terminalBlockLabels(t)}
+                  className={css.terminal}
+                />
+              </div>
+              {inspect !== undefined && (
+                <button type="button" className={css.inspectButton} onClick={inspect}>
+                  <IconInspectOutline12 />
+                  {t('row.inspect')}
+                </button>
+              )}
+            </>
+          )
+          : null
         : open
           ? (
             <div className={css.bodyWrap}>

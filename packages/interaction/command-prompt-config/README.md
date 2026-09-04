@@ -11,6 +11,12 @@ English | [中文](README.zh.md)
 
 `dsh-command-prompt-config` turns a validated list of prompt-command entries into `kind: 'prompt'` slash commands. Adding a reusable prompt shortcut — a frequently used instruction such as a code-review or summarization prompt — needs no code, only a configuration change. Each entry carries the command name, an optional localized title, a discovery description, and the prompt text that is submitted to the model as one user message on invocation. Choose it when you want lightweight, configuration-owned prompt shortcuts rather than a code-owned command handler or a full `SKILL.md` skill.
 
+## Table of Contents
+
+- [Use this package](#use-this-package)
+- [Source map](#source-map)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+
 ## Use this package
 
 Compose the plugin with a `commands` list. Every entry registers one `/name` command whose `prompt` text is submitted to the model as a user message carrying the `command-invocation` source; an optional `title` gives a localized display name, `description` is the discovery summary, and `hint` advertises free-form input so the composer claims the line for extra arguments (appended after the prompt text).
@@ -60,3 +66,13 @@ The shipped `standard` agent preset mounts this plugin with an empty `commands` 
 
 - **Prompt text only** — entries carry static prompt text plus an optional free-form suffix; no template placeholders or parameter substitution.
 - **No per-command images** — prompt entries do not declare image acceptance; a composer submission carrying images is refused.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

@@ -88,7 +88,7 @@ This section explains the design decisions behind the tool and points at the cod
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: tool registration, prompt section, arg validation, escalation, request assembly |
 | [`src/background.ts`](src/background.ts) | Map a settled background process onto generic job outcome vocabulary |
-| [`src/render.ts`](src/render.ts) | Model-facing result text: streams, markers, truncation notices |
+| [`src/render.ts`](src/render.ts) | Model-facing result text: streams, markers, truncation notices, efficiency hints |
 | [`src/invariant.ts`](src/invariant.ts) | Invariant companion (no runtime invariant; execution relations are owned by the capability seam) |
 
 ### Request resolution
@@ -97,7 +97,7 @@ The tool resolves the workdir before `ctx.shell.resolve()` runs: an explicit rel
 
 ### Rendering story
 
-The result text is stdout, then a marked `[stderr]` section, then conditional markers: truncation notice, sandbox denial (plus the same-turn escalation hint when the composition advertises escalation), timeout, signal, and exit code — each on its own line. The exit marker doubles as the UI card's exit-status pill: the shared `parseExitStatus` from `dsh-shell` consumes it from the output body, so replay shows the pill without duplicating the marker.
+The result text is stdout, then a marked `[stderr]` section, then conditional markers: truncation notice, sandbox denial (plus the same-turn escalation hint when the composition advertises escalation), the efficiency hints the command itself triggers, timeout, signal, and exit code — each on its own line. Hints land before the exit block so the exit marker stays last: the shared `parseExitStatus` from `dsh-shell` consumes that marker from the output body, so replay shows the pill without duplicating the marker. The hint matcher is a pure function of the command string, independent of plugin load order.
 
 </details>
 
@@ -160,7 +160,7 @@ Prefix-stable while visibility, background support, and executor sandbox capabil
 
 #### What the model sees
 
-The renderer emits the data-dependent stdout tail, then optional `[stderr]` and the stderr tail. With no output it emits exactly `(no output)`. Conditional lines are exactly `[output truncated; full output: <path-or-(unavailable)>]`, `[sandbox: file access denied under <mode> mode]`, `[timed out after <timeoutMs>ms]`, `[killed by signal: <signal>]`, and `[exit code: <exitCode>]`; the sandbox escalation and runner-failure lines are quoted in [`dsh-bash-sandbox`](../bash-sandbox/README.md).
+The renderer emits the data-dependent stdout tail, then optional `[stderr]` and the stderr tail. With no output it emits exactly `(no output)`. Conditional lines are exactly `[output truncated; full output: <path-or-(unavailable)>]`, `[sandbox: file access denied under <mode> mode]`, `[timed out after <timeoutMs>ms]`, `[killed by signal: <signal>]`, and `[exit code: <exitCode>]`; the sandbox escalation and runner-failure lines are quoted in [`dsh-bash-sandbox`](../bash-sandbox/README.md). Three `[hint: …]` lines are conditional on the command rather than the result — a fixed wait of 30 seconds or more, a leading `grep`/`find`, and an unscoped repository-wide test run each append one before the exit markers; [the runtime-hints Agent Note](../../../.agents/notes/implemented/feature/2026-09-04-bash-result-efficiency-hints.md) owns the triggers and the exact text.
 
 #### Token effect
 

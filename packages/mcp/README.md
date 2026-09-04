@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-The `mcp/` group connects the harness to the Model Context Protocol (MCP) ecosystem of tool servers. The one package in this group attaches an external server — a filesystem, GitHub, database, or memory server — so its tools are available to the model as native tools under stable server-qualified names. Each server is one configuration entry; nothing ships enabled, so you opt in per server. Only the Tools capability is bridged: MCP resources and prompts are not supported. This page maps the group; the package README owns the per-package contract.
+The `mcp/` group connects the harness to the Model Context Protocol (MCP) ecosystem of tool servers. The packages in this group attach external servers — a filesystem, GitHub, database, or memory server — so their tools are available to the model as native tools under stable server-qualified names. Each server is one configuration entry; nothing ships enabled, so you opt in per server. Only the Tools capability is bridged: MCP resources and prompts are not supported. This page maps the group; the package README owns the per-package contract.
 
 ## Table of Contents
 
@@ -22,11 +22,12 @@ The `mcp/` group connects the harness to the Model Context Protocol (MCP) ecosys
 <a id="packages"></a>
 ## Packages
 
-The group holds one package; the package README and the links below own the details.
+The group holds two packages; the package READMEs and the links below own the details.
 
 | Package | What it provides |
 |---|---|
 | [`mcp-client/`](mcp-client/README.md) | Attach one external MCP server so the model can call its tools as native tools |
+| [`mcp-manager/`](mcp-manager/README.md) | Own a user-managed MCP server list and mount one mcp-client instance per enabled server |
 
 -----
 

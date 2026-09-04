@@ -96,7 +96,7 @@ export function SessionChangesPanel({ changes, t }: SessionChangesPanelProps) {
           <span className={css.title}>{t('title')}</span>
           <span className={css.count}>{t('summary', { count: pending.length })}</span>
           <span className={css.chevron} aria-hidden>
-            {expanded ? <IconChevronUpOutline14 /> : <IconChevronDownOutline14 />}
+            {expanded ? <IconChevronDownOutline14 /> : <IconChevronUpOutline14 />}
           </span>
         </button>
         <button type="button" className={css.bulkAccept} onClick={acceptAll}>

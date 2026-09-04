@@ -133,3 +133,13 @@ These limits define when the delivery service is a poor fit or needs special car
 - **State, not policy** — this package enforces the phase order but does not decide when a task advances, retry failures, or require a change record before `implemented`; those policies belong to `dsh-tool-delivery`.
 - **No artifact persistence** — change records live as durable events only; writing `.dsh/changes/` files is a later consumer's job.
 - **Trusted in-process producers** — a plugin with direct `Session` access can append counterfeit `delivery/change` data. Strict replay detects malformed or inconsistent records and leaves delivery access failed at that record until the log is repaired.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

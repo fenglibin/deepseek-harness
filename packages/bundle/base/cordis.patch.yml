@@ -99,6 +99,14 @@
     - id: settings
       name: '@deepseek-ai/dsh-settings-file'
 
+    # The MCP manager owns the user-managed `mcp:` settings section (a list of
+    # MCP servers) and mounts one mcp-client instance per enabled entry. Users
+    # add, edit, enable, and remove servers in Settings → MCP instead of
+    # hand-editing cordis rows; the manager reconciles the live set on change
+    # and exports an `mcp` Remote namespace for live status and refresh.
+    - id: mcp-manager
+      name: '@deepseek-ai/dsh-mcp-manager'
+
     # Credential sources: inherited environment over the managed
     # `$DSH_HOME/.credentials.yaml`, with project and user `.env` fallbacks.
     # Adapters resolve references per request; the Models page writes only the

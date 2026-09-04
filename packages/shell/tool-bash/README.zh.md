@@ -88,7 +88,7 @@ kind: "package-reference"
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：工具注册、提示词区段、参数校验、升权、请求组装 |
 | [`src/background.ts`](src/background.ts) | 把已结算的后台进程映射为通用任务结果词汇 |
-| [`src/render.ts`](src/render.ts) | 模型侧结果文本：流、标记、截断通知 |
+| [`src/render.ts`](src/render.ts) | 模型侧结果文本：流、标记、截断通知、效率提示 |
 | [`src/invariant.ts`](src/invariant.ts) | 不变式伴生插件（无运行时不变式；执行关系归能力 seam 所有） |
 
 ### 请求解析
@@ -97,7 +97,7 @@ kind: "package-reference"
 
 ### 渲染故事
 
-结果文本为 stdout，然后是带标记的 `[stderr]` 区段，再是条件标记：截断通知、沙箱拒绝（组合声明升权时附带同轮次升权提示）、超时、信号与退出码——每个占一行。退出标记同时充当 UI 卡片的退出状态 pill：`dsh-shell` 共享的 `parseExitStatus` 会从输出体中消费它，因此回放显示 pill 而不重复标记。
+结果文本为 stdout，然后是带标记的 `[stderr]` 区段，再是条件标记：截断通知、沙箱拒绝（组合声明升权时附带同轮次升权提示）、命令本身触发的效率提示、超时、信号与退出码——每个占一行。提示排在退出块之前，因此退出标记始终在最后：`dsh-shell` 共享的 `parseExitStatus` 会从输出体中消费该标记，因此回放显示 pill 而不重复标记。提示匹配器是命令字符串的纯函数，与插件加载顺序无关。
 
 </details>
 
@@ -160,7 +160,7 @@ Check the [exit code: N] marker on every bash result; investigate failures befor
 
 #### 模型看到什么
 
-renderer 输出依数据而定的 stdout 尾部，再输出可选的 `[stderr]` 和 stderr 尾部。没有输出时，它精确输出 `(no output)`。条件行精确为 `[output truncated; full output: <path-or-(unavailable)>]`、`[sandbox: file access denied under <mode> mode]`、`[timed out after <timeoutMs>ms]`、`[killed by signal: <signal>]` 与 `[exit code: <exitCode>]`；沙箱升权与 runner 故障行原文列于 [`dsh-bash-sandbox`](../bash-sandbox/README.zh.md)。
+renderer 输出依数据而定的 stdout 尾部，再输出可选的 `[stderr]` 和 stderr 尾部。没有输出时，它精确输出 `(no output)`。条件行精确为 `[output truncated; full output: <path-or-(unavailable)>]`、`[sandbox: file access denied under <mode> mode]`、`[timed out after <timeoutMs>ms]`、`[killed by signal: <signal>]` 与 `[exit code: <exitCode>]`；沙箱升权与 runner 故障行原文列于 [`dsh-bash-sandbox`](../bash-sandbox/README.zh.md)。另有三条 `[hint: …]` 行取决于命令本身而非结果——30 秒及以上的固定等待、以 `grep`/`find` 开头、以及未限定范围的全仓库测试跑法，各在退出标记之前追加一行；触发条件与确切文案归[运行时提示 Agent Note](../../../.agents/notes/implemented/feature/2026-09-04-bash-result-efficiency-hints.zh.md)所有。
 
 #### Token 影响
 

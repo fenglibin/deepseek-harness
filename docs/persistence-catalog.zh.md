@@ -395,6 +395,22 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 
 来源：[`packages/compaction/compaction/src/types.ts:33`](../packages/compaction/compaction/src/types.ts)
 
+### `delivery/*`
+
+<a id="deliverychange--log-only"></a>
+
+#### `delivery/change` — log-only
+
+```ts persistence-catalog
+/**
+ * Complete post-mutation task state, an incremental change record, or a
+ * clear tombstone.
+ */
+'delivery/change': DeliveryChangeMeta
+```
+
+来源：[`packages/delivery/delivery/src/domain.ts:94`](../packages/delivery/delivery/src/domain.ts)
+
 ### `feedback/*`
 
 <a id="feedbackrecord--log-only"></a>

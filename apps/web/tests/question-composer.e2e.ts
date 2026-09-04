@@ -298,8 +298,11 @@ describe('web e2e: resident question composer round trip', () => {
     // Keep the ask_user_question card's readable answer in the expanded golden
     // even though Compact mode hides the process by default.
     await expandTurnProcesses(page)
+    // The answered row rests expanded: the reader just took part in the
+    // exchange, so the transcript is visible without a click.
     const answeredRow = page.getByRole('button', { name: 'Ask question 1/1 answered', exact: true })
-    await answeredRow.click()
+    await answeredRow.waitFor({ timeout: 10_000 })
+    await expect.poll(() => answeredRow.getAttribute('aria-expanded'), { timeout: 10_000 }).toBe('true')
     await page.getByText('Which color do you prefer?', { exact: true }).waitFor({ timeout: 10_000 })
     expect(await page.getByText('Blue', { exact: true }).count()).toBeGreaterThanOrEqual(1)
     expect(await page.getByText('Include accessibility notes', { exact: true }).count()).toBe(1)
