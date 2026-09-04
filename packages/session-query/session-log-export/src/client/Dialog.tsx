@@ -8,7 +8,7 @@ import { NS } from './locales.ts'
 /** Browser operations and state injected into the Session Header contribution. */
 export interface SessionLogDownloadDialogInjected {
   hooks: { sessionLogDownload: ObservableSnapshot<SessionLogDownloadState> }
-  request: (sessionId: SessionId) => Promise<void>
+  request: (sessionId: SessionId, includeDescendants?: boolean) => Promise<void>
   dismiss: (sessionId: SessionId) => void
 }
 
@@ -18,7 +18,9 @@ export type SessionLogDownloadDialogProps =
   & InjectFace<SessionLogDownloadDialogInjected>
 
 /**
- * Modal shared by the Session Header button and this browser's `/export` command.
+ * Failure dialog shared by the Session Header button and this browser's `/export` command.
+ * A download that starts reports itself through the browser download manager, so neither
+ * the preflight nor a started download opens a dialog.
  * @param props - Session runtime, bound controller state, actions, and localized copy.
  * @returns the modal portal contribution.
  */
@@ -27,21 +29,15 @@ export function SessionLogDownloadDialog({
 }: SessionLogDownloadDialogProps) {
   const entry = useSessionLogDownload(state => state.bySession[String(sessionId)])
 
-  const status = entry?.status
-  const open = entry?.open === true
-  const error = status === 'error' ? entry?.error || t('dialog.commandFailed') : null
-  const title = status === 'downloading'
-    ? t('dialog.preparingTitle')
-    : status === 'success' ? t('dialog.successTitle') : t('dialog.errorTitle')
-  const description = status === 'downloading'
-    ? t('dialog.preparingDescription')
-    : status === 'success' ? t('dialog.successDescription') : error ?? t('dialog.commandFailed')
+  const open = entry?.open === true && entry.status === 'error'
+  const detail = entry?.error ?? ''
+  const description = detail === '' ? t('dialog.commandFailed') : detail
 
   return (
     <Modal
       open={open}
       onClose={() => { dismiss(sessionId) }}
-      title={title}
+      title={t('dialog.errorTitle')}
       description={description}
       closeLabel={t('dialog.close')}
       footer={<Button variant="primary" onClick={() => { dismiss(sessionId) }}>{t('dialog.close')}</Button>}

@@ -29,7 +29,7 @@ export type { SessionLogDownloadEntry, SessionLogDownloadState } from './control
 export const inject = ['slots', 'locale']
 
 /**
- * Provide the download controller and mount its modal into the Session Header.
+ * Provide the download controller and mount its Header control and failure dialog.
  * @param ctx - browser context carrying slots and locale services.
  */
 export function apply(ctx: ClientContext): void {
@@ -46,7 +46,7 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: (): SessionLogDownloadDialogInjected => ({
       hooks: { sessionLogDownload: controller.store },
-      request: (sessionId: SessionId) => controller.download(sessionId),
+      request: (sessionId: SessionId, includeDescendants?: boolean) => controller.download(sessionId, includeDescendants),
       dismiss: (sessionId: SessionId) => { controller.dismiss(sessionId) },
     }),
   }, SessionLogDownloadHeaderAction))

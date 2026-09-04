@@ -1841,6 +1841,160 @@ describe('built-in conversation node Definitions', () => {
     })
   })
 
+  it('hides a retry chain whose turn closed without error (the retry recovered)', () => {
+    const recovered = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'llm/retry', {
+        retryId: 'retry-recovered',
+        turn: 1,
+        step: 1,
+        provider: 'fake',
+        mode: 'normal',
+        policyKey: 'fake-normal',
+        retry: 1,
+        maxRetries: 2,
+        delayMs: 10,
+        failure: { code: 'TRANSPORT', message: 'temporary' },
+      }),
+      at(4, 'llm/retry-started', { retryId: 'retry-recovered', turn: 1, step: 1, retry: 1 }),
+      at(5, 'assistant/message', {
+        turn: 1, step: 1, message: assistantMessage('recovered-answer', 'answer'),
+      }, { surfaceOp: 'append' }),
+      at(6, 'step/end', { turn: 1, step: 1 }),
+      at(7, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+    ])
+    // The retry ultimately succeeded, so its failure detail must not render:
+    // the node stays on the timeline but hidden, and no terminal error row.
+    expect(node(snapshot(recovered), 'model-retry')?.visibility).toBe('hidden')
+    expect(node(snapshot(recovered), 'turn-error')).toBeUndefined()
+  })
+
+  it('hides a recoverable mutation failure once a later mutation of the same file succeeds', () => {
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'tool/call', {
+        turn: 1, step: 1, callId: 'edit-1', name: 'edit',
+        arguments: '{"file_path":"a.txt","old_string":"x","new_string":"y"}',
+      }),
+      at(4, 'tool/result', {
+        turn: 1, step: 1,
+        message: toolResult('edit-1', 'edit requires reading "a.txt" first — read the file, then retry', true),
+        error: { name: 'FsError', code: 'FS_NOT_OBSERVED' },
+      }, { surfaceOp: 'append' }),
+      at(5, 'tool/call', {
+        turn: 1, step: 1, callId: 'read-1', name: 'read',
+        arguments: '{"file_path":"a.txt"}',
+      }),
+      at(6, 'tool/result', {
+        turn: 1, step: 1,
+        message: toolResult('read-1', 'contents'),
+      }, { surfaceOp: 'append' }),
+      at(7, 'tool/call', {
+        turn: 1, step: 1, callId: 'edit-2', name: 'edit',
+        arguments: '{"file_path":"a.txt","old_string":"x","new_string":"y"}',
+      }),
+      at(8, 'tool/result', {
+        turn: 1, step: 1,
+        message: toolResult('edit-2', 'Updated file'),
+      }, { surfaceOp: 'append' }),
+      at(9, 'step/end', { turn: 1, step: 1 }),
+      at(10, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+    ])
+    const snap = snapshot(value)
+    const calls = snap.nodes.values().filter(candidate => candidate.kind === 'tool-call')
+    const byCallId = new Map(calls.map(candidate => [(candidate.data as ToolChatData).root.callId, candidate]))
+    expect(byCallId.get('edit-1')?.visibility).toBe('hidden')
+    expect(byCallId.get('read-1')?.visibility).toBe('visible')
+    expect(byCallId.get('edit-2')?.visibility).toBe('visible')
+  })
+
+  it('keeps a recoverable mutation failure visible when no later mutation of that file succeeds', () => {
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'tool/call', {
+        turn: 1, step: 1, callId: 'edit-1', name: 'edit',
+        arguments: '{"file_path":"a.txt","old_string":"x","new_string":"y"}',
+      }),
+      at(4, 'tool/result', {
+        turn: 1, step: 1,
+        message: toolResult('edit-1', 'edit requires reading "a.txt" first', true),
+        error: { name: 'FsError', code: 'FS_NOT_OBSERVED' },
+      }, { surfaceOp: 'append' }),
+      at(5, 'step/end', { turn: 1, step: 1 }),
+      at(6, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+    ])
+    const call = snapshot(value).nodes.values().find(candidate => candidate.kind === 'tool-call')
+    expect(call?.visibility).toBe('visible')
+  })
+
+  it('keeps a non-recoverable mutation failure visible even when a later mutation succeeds', () => {
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'tool/call', {
+        turn: 1, step: 1, callId: 'edit-1', name: 'edit',
+        arguments: '{"file_path":"a.txt","old_string":"x","new_string":"y"}',
+      }),
+      at(4, 'tool/result', {
+        turn: 1, step: 1,
+        message: toolResult('edit-1', 'no match for old_string', true),
+        error: { name: 'FsError', code: 'FS_EDIT_NOT_FOUND' },
+      }, { surfaceOp: 'append' }),
+      at(5, 'tool/call', {
+        turn: 1, step: 1, callId: 'edit-2', name: 'edit',
+        arguments: '{"file_path":"a.txt","old_string":"z","new_string":"w"}',
+      }),
+      at(6, 'tool/result', {
+        turn: 1, step: 1,
+        message: toolResult('edit-2', 'Updated file'),
+      }, { surfaceOp: 'append' }),
+      at(7, 'step/end', { turn: 1, step: 1 }),
+      at(8, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+    ])
+    const snap = snapshot(value)
+    const calls = snap.nodes.values().filter(candidate => candidate.kind === 'tool-call')
+    const byCallId = new Map(calls.map(candidate => [(candidate.data as ToolChatData).root.callId, candidate]))
+    expect(byCallId.get('edit-1')?.visibility).toBe('visible')
+    expect(byCallId.get('edit-2')?.visibility).toBe('visible')
+  })
+
+  it('re-hides an earlier recoverable failure when a later success lands incrementally', () => {
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'tool/call', {
+        turn: 1, step: 1, callId: 'edit-1', name: 'edit',
+        arguments: '{"file_path":"a.txt","old_string":"x","new_string":"y"}',
+      }),
+      at(4, 'tool/result', {
+        turn: 1, step: 1,
+        message: toolResult('edit-1', 'edit requires reading "a.txt" first', true),
+        error: { name: 'FsError', code: 'FS_NOT_OBSERVED' },
+      }, { surfaceOp: 'append' }),
+    ])
+    const before = snapshot(value).nodes.values().find(candidate => candidate.kind === 'tool-call')
+    expect(before?.visibility).toBe('visible')
+
+    value.append(at(5, 'tool/call', {
+      turn: 1, step: 1, callId: 'edit-2', name: 'edit',
+      arguments: '{"file_path":"a.txt","old_string":"x","new_string":"y"}',
+    }))
+    value.append(at(6, 'tool/result', {
+      turn: 1, step: 1,
+      message: toolResult('edit-2', 'Updated file'),
+    }, { surfaceOp: 'append' }))
+    value.flush()
+
+    const snap = snapshot(value)
+    const calls = snap.nodes.values().filter(candidate => candidate.kind === 'tool-call')
+    const byCallId = new Map(calls.map(candidate => [(candidate.data as ToolChatData).root.callId, candidate]))
+    expect(byCallId.get('edit-1')?.visibility).toBe('hidden')
+    expect(byCallId.get('edit-2')?.visibility).toBe('visible')
+  })
+
   it('materializes a max-tokens notice and keeps completed and error turns clean', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),

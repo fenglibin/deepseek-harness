@@ -115,6 +115,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     }
     /** Registered Conversation target Views, rendered one at a time. */
     'conversation.view': { kind: 'list'; scope: 'session'; owner: ConvViewOwnerProps }
+    /** Floating cards pinned to the conversation body's left edge. */
+    'conversation.side.float': { kind: 'list'; scope: 'session' }
     /** Selector-routed replacements for the current Session's resident composer. */
     'conversation.composer': { kind: 'chain'; scope: 'session'; owner: ComposerChainProps }
     /** Workspace picker shown by the blank-session Hero. */
@@ -324,6 +326,7 @@ export type ConversationSlotProps =
     | 'conversation.input.overlay'
     | 'conversation.input.dock' | 'conversation.composer.dock'
     | 'conversation.input.left' | 'conversation.input.right'
+    | 'conversation.side.float'
     | 'conversation.hero.brand.mark'
     | 'conversation.hero.workspace'
     | 'conversation.hero.agentPreset'

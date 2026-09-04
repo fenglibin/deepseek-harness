@@ -1,10 +1,12 @@
 .block {
   --dsl-terminal-radius: 12px;
-  --dsl-terminal-line-height: 22px;
+  --dsl-terminal-line-height: calc(24px + var(--dsh-content-font-delta, 0px));
   /* Rebindable by consumers (CodeBlock's --dsl-code-block-content-font
-     pattern): a surface wanting the smaller code size rebinds this together
-     with --dsl-terminal-line-height on its own container. */
-  --dsl-terminal-font: var(--dsw-font-markdown-code-block);
+     pattern): a surface wanting a different measure rebinds this together
+     with --dsl-terminal-line-height on its own container. The default is the
+     conversation body measure in the code family, so the Settings font size
+     reaches command output like it reaches narration. */
+  --dsl-terminal-font: var(--dsh-content-font-code);
   /* The card's own left inset, holding the run-state dot in a column of its own
      so it never competes with the commands for horizontal space. */
   --dsl-terminal-gutter: 30px;

@@ -12,14 +12,15 @@ import {
   useEffect, useId, useRef, useState, type CSSProperties,
 } from 'react'
 import { useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { TurnOutlineEntry } from '@deepseek-ai/dsh-session-stats/client'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
-import type { TurnNavigationItem } from '../contract/snapshot.ts'
 import css from './UserTurnPanel.module.css'
 
 interface UserTurnPanelProps {
-  readonly items: readonly TurnNavigationItem[]
+  /** Whole-log user-turn outline (turn + prompt), independent of paging. */
+  readonly items: readonly TurnOutlineEntry[]
   readonly activeTurn: number | null
-  readonly onNavigate: (item: TurnNavigationItem) => void
+  readonly onNavigate: (turn: number) => void
   readonly t: ChatViewSlotProps['t']
 }
 
@@ -59,11 +60,9 @@ export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPane
   const headingId = useId()
   const labelId = useId()
 
-  // Only turns whose loaded window contains a user prompt are user messages:
-  // compaction summaries, unknown surfaces, and assistant-only steps leave
-  // prompt empty, and the existing Chat build already trims them.
-  const userTurns = items.filter(item => item.prompt !== '')
-  const count = userTurns.length
+  // `items` is the whole-log outline; the host already omits turns without a
+  // direct user prompt, so every entry is a user message.
+  const count = items.length
 
   useDismissOnOutsidePointer(root, open, setOpen)
 
@@ -80,8 +79,8 @@ export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPane
 
   if (count === 0) return null
 
-  const onPick = (item: TurnNavigationItem): void => {
-    onNavigate(item)
+  const onPick = (turn: number): void => {
+    onNavigate(turn)
     setOpen(false)
   }
 
@@ -103,7 +102,7 @@ export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPane
             </span>
           </header>
           <ol className={css.list} aria-describedby={labelId}>
-            {userTurns.map((item) => {
+            {items.map((item) => {
               const active = item.turn === activeTurn
               return (
                 <li key={item.turn}>
@@ -111,7 +110,7 @@ export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPane
                     type="button"
                     className={active ? `${css.item} ${css.itemActive}` : css.item}
                     aria-current={active ? 'true' : undefined}
-                    onClick={() => { onPick(item) }}
+                    onClick={() => { onPick(item.turn) }}
                   >
                     <span className={css.tag} aria-hidden>#{ZERO_PAD(item.turn)}</span>
                     <span className={css.preview}>{trimPrompt(item.prompt)}</span>

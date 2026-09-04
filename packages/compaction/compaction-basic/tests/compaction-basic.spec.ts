@@ -24,6 +24,7 @@ import type {
   TokenUsage,
 } from '@deepseek-ai/dsh-llm'
 import SessionStore, { Session, SessionId } from '@deepseek-ai/dsh-session'
+import LightweightModelConfig from '@deepseek-ai/dsh-lightweight-model'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { agentEvents, type Agent, type RequestErrorAction } from '@deepseek-ai/dsh-agent'
@@ -1318,6 +1319,43 @@ describe('default one-shot summarizer', () => {
     expect(output.model).toBe('routed')
     expect(adapter.lastOptions?.provider).toBe('routed')
     expect(adapter.lastOptions?.model).toBe('routed')
+  })
+
+  it('prefers the lightweight model over the latest routed pair, and config over both', async () => {
+    const first = await summarizerHarness([{ type: 'text', text: 'summary' }], undefined, 'routed')
+    await first.ctx.plugin(LightweightModelConfig, { provider: 'light-route', model: 'light-model' })
+    const light = new ScriptedAdapter([{ type: 'text', text: 'light summary' }])
+    first.ctx.llm.registerAdapter(['light-route'], light)
+    const output = await first.compact.runSummarize(promptInput('history'), agent(conversation(1), 'fallback'))
+    expect(output.provider).toBe('light-route')
+    expect(output.model).toBe('light-model')
+    expect(light.lastOptions?.provider).toBe('light-route')
+    expect(first.adapter.lastOptions).toBeUndefined()
+
+    const second = await summarizerHarness([{ type: 'text', text: 'summary' }], undefined, 'routed', {
+      auto: false,
+      summarizationProvider: 'routed',
+      summarizationModel: 'routed',
+    })
+    await second.ctx.plugin(LightweightModelConfig, { provider: 'light-route', model: 'light-model' })
+    const forced = await second.compact.runSummarize(promptInput('history'), agent(conversation(1), 'fallback'))
+    expect(forced.provider).toBe('routed')
+    expect(forced.model).toBe('routed')
+    expect(second.adapter.lastOptions?.provider).toBe('routed')
+  })
+
+  it('inherits the latest routed pair when no lightweight model is selected', async () => {
+    const { ctx, adapter, compact } = await summarizerHarness([{ type: 'text', text: 'summary' }], undefined, 'routed')
+    await ctx.plugin(LightweightModelConfig)
+    const session = conversation(1)
+    session.append('request/header', {
+      header: { config: { provider: 'routed', model: 'routed' } },
+      reason: 'initial',
+    })
+    const output = await compact.runSummarize(promptInput('history'), agent(session, 'fallback'))
+    expect(output.provider).toBe('routed')
+    expect(output.model).toBe('routed')
+    expect(adapter.lastOptions?.provider).toBe('routed')
   })
 
   it('records the model actually dispatched after one-shot stream routing', async () => {

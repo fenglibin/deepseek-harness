@@ -6,6 +6,7 @@ import type {
   ISessions,
   SessionListState,
 } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type {
   IWorkspaces, WorkspaceId, WorkspaceView,
 } from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -46,6 +47,15 @@ export interface UiWorkspace {
    * @returns whether the Session is gone, or the refusal the Host reported.
    */
   deleteSession(sessionId: SessionId): Promise<SessionDeleteOutcome>
+  /**
+   * Record one Session's composer draft. The draft belongs to the composer
+   * (ui-conversation), which mirrors every change here; the browsing surfaces
+   * read it because a blank Session with an unsent draft is a session the
+   * operator can still lose by navigating away.
+   * @param sessionId - Session whose composer changed.
+   * @param draft - current composer text; whitespace-only text counts as none.
+   */
+  noteDraft(sessionId: SessionId, draft: string): void
   /**
    * Open the Host-native directory picker.
    * @returns the selected directory, or null when cancelled.
@@ -103,6 +113,20 @@ function refusalOf(reason: unknown): string | undefined {
 /** Implements Workspace archive and directory UI operations. */
 class UiWorkspaceService extends Service implements UiWorkspace {
   private readonly connecting = new Map<WorkspaceId, Promise<SessionId>>()
+  private readonly draftListeners = new Set<() => void>()
+  private drafting: ReadonlySet<SessionId> = new Set()
+  /**
+   * Bare observable face of {@link UiWorkspaceService.drafting}: the browsing
+   * region binds it to a selector hook, so a draft typed into a blank Session
+   * keeps that row listed as soon as the operator navigates away.
+   */
+  readonly drafts: HostObservable<ReadonlySet<SessionId>> = {
+    getSnapshot: () => this.drafting,
+    subscribe: (listener) => {
+      this.draftListeners.add(listener)
+      return () => { this.draftListeners.delete(listener) }
+    },
+  }
 
   /**
    * @param ctx - Client root Context.
@@ -176,6 +200,9 @@ class UiWorkspaceService extends Service implements UiWorkspace {
   async deleteSession(sessionId: SessionId): Promise<SessionDeleteOutcome> {
     try {
       await this.sessions.delete(sessionId)
+      // The draft died with the log; dropping it keeps the registry bounded by
+      // the sessions that still exist.
+      this.noteDraft(sessionId, '')
       return { ok: true }
     } catch (reason: unknown) {
       return {
@@ -184,6 +211,18 @@ class UiWorkspaceService extends Service implements UiWorkspace {
         message: reason instanceof Error ? reason.message : String(reason),
       }
     }
+  }
+
+  noteDraft(sessionId: SessionId, draft: string): void {
+    // Trimming keeps a whitespace-only draft from being read as content: it
+    // sends nothing, so it must not hold a row the operator cannot reclaim.
+    const drafting = draft.trim() !== ''
+    if (drafting === this.drafting.has(sessionId)) return
+    const next = new Set(this.drafting)
+    if (drafting) next.add(sessionId)
+    else next.delete(sessionId)
+    this.drafting = next
+    for (const listener of this.draftListeners) listener()
   }
 
   async pickDirectory(): Promise<string | null> {

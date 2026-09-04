@@ -38,9 +38,24 @@ export interface SessionStatsProjection {
   decodeTokens: number
 }
 
+/** One user-turn entry in the whole-log turn outline. */
+export interface TurnOutlineEntry {
+  /** Turn number, stable for navigation. */
+  turn: number
+  /** Bounded opening user prompt. */
+  prompt: string
+}
+
+/** Whole-log list of turns that opened with a direct user prompt. */
+export interface TurnOutlineProjection {
+  turns: readonly TurnOutlineEntry[]
+}
+
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionMap {
     /** Whole-log turn/step counts and wall times; see {@link SessionStatsProjection}. */
     sessionStats: SessionStatsProjection
+    /** Whole-log user-turn outline (turn + prompt); see {@link TurnOutlineProjection}. */
+    turnOutline: TurnOutlineProjection
   }
 }

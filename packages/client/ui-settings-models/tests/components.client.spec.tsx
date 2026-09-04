@@ -2,16 +2,22 @@
 /** Section, setup-card, and hand-written editor behavior over a scripted wire face. */
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import { bindSnapshotSelector, RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
 import type {
   CredentialInfo, RemoteResult, SettingsNamespaceView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
-import {
-  ModelsSection, needsSetup, providerCopy, providerTargetLabel, removeProviderProfile,
-} from '../src/client/ModelsSection.tsx'
+import { SettingsSchemaService } from '@deepseek-ai/dsh-client-ui-settings/src/client/schema.ts'
+import { SettingsScopeController } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-scope.ts'
+import { ModelsSection, needsSetup, removeProviderProfile } from '../src/client/ModelsSection.tsx'
 import type { ModelsSectionInjected, ModelsSectionProps } from '../src/client/ModelsSection.tsx'
+import {
+  LIGHTWEIGHT_MODEL_SETTINGS_NS, LightweightModelStore, lightweightModelKey,
+} from '../src/client/lightweight-model-store.ts'
+import type { LightweightModelSettings } from '../src/client/lightweight-model-store.ts'
+import { providerCopy, providerTargetLabel } from '../src/client/provider-identity.ts'
 import { pathOps } from '../src/client/ProviderEditor.tsx'
 import {
   DeepSeekModelsEditor, formatCapacity, modelDrafts, parseCapacity, validateDeepSeekModels,
@@ -135,7 +141,37 @@ function wireNamespaces(): SettingsNamespaceView[] {
       secrets: [],
       revision: 4,
     },
+    lightweightNamespace(),
   ]
+}
+
+/** The lightweight-model section the scripted Host serves. */
+function lightweightNamespace(
+  value: { provider: string; model: string } = { provider: '', model: '' },
+  revision = 7,
+): SettingsNamespaceView {
+  return {
+    ns: 'lightweight-model',
+    schema: JSON.parse(JSON.stringify(Schema.object({
+      provider: Schema.string().default(''),
+      model: Schema.string().default(''),
+    }).toJSON())) as JsonValue,
+    value,
+    applies: 'live',
+    secrets: [],
+    revision,
+  }
+}
+
+/** The model catalog the scripted Host answers the lightweight card with. */
+const MODEL_CATALOG = {
+  default: { provider: 'deepseek-official', model: 'deepseek-chat' },
+  routableProviders: ['deepseek-official', 'openai'],
+  groups: [
+    { id: 'deepseek-official', name: 'DeepSeek', models: [{ id: 'deepseek-chat', name: 'DeepSeek Chat' }] },
+    { id: 'openai', name: 'OpenAI', models: [{ id: 'gpt-4o-mini', name: 'GPT-4o mini' }] },
+  ],
+  failures: [],
 }
 
 /** Credentials answers over the Remote carrier, which has no envelope. */
@@ -203,6 +239,9 @@ function scriptedFace(overrides: {
       set,
       unset,
     },
+    session: {
+      modelCatalog: vi.fn(() => Promise.resolve(remoteOk(MODEL_CATALOG))),
+    },
   }
   return { face, update, mutate, set, unset }
 }
@@ -259,27 +298,72 @@ function cardSeatCalls(
     ])
 }
 
-async function mountFace(scripted: ReturnType<typeof scriptedFace>) {
+/**
+ * The lightweight-model store over the page's own mirror. `memory` is the
+ * remote-browser posture this page's other mounts do not need: it keeps the
+ * card read-only, so a section test never sees an enabled picker.
+ * @param ctx - the page context whose `remote.session` answers the catalog.
+ * @param mirror - the shared settings mirror the page store already loaded.
+ * @param persistence - client-selected Host persistence.
+ * @returns the store, bound to the namespace over that mirror.
+ */
+async function lightweightStore(
+  ctx: PageContext,
+  mirror: SettingsDescribeMirror,
+  persistence: 'host' | 'memory' = 'memory',
+): Promise<LightweightModelStore> {
+  const scope = new SettingsScopeController<LightweightModelSettings>(
+    ctx,
+    { namespace: LIGHTWEIGHT_MODEL_SETTINGS_NS },
+    mirror,
+    persistence,
+    new SettingsSchemaService(new Context()),
+  )
+  const store = new LightweightModelStore(scope, ctx)
+  if (persistence === 'host') await mirror.load()
+  return store
+}
+
+async function mountFace(
+  scripted: ReturnType<typeof scriptedFace>,
+  persistence: 'host' | 'memory' = 'memory',
+) {
   const { face, update, mutate, set, unset } = scripted
   const ctx = ctxWith(face)
   const mirror = new SettingsDescribeMirror(ctx)
   const controller = new ModelsSettingsStore(ctx, settingsSchema, mirror)
   await controller.load()
+  const lightweight = await lightweightStore(ctx, mirror, persistence)
   const renderSlot = stubRenderSlot()
   const injected: ModelsSectionProps = {
     controller,
+    lightweight,
     useSnapshot: bindSnapshotSelector(controller.store),
+    useLightweight: bindSnapshotSelector(lightweight.store),
     operations: operationsWith(face),
     schema: settingsSchema,
     t,
     renderSlot: renderSlot as unknown as ModelsSectionProps['renderSlot'],
   }
   const view = render(<ModelsSection {...injected} />)
-  return { view, ctx, face, update, mutate, set, unset, controller, mirror, renderSlot }
+  return { view, ctx, face, update, mutate, set, unset, controller, lightweight, mirror, renderSlot }
 }
 
 async function mountSection(overrides: Parameters<typeof scriptedFace>[0] = {}) {
   return mountFace(scriptedFace(overrides))
+}
+
+/**
+ * The lightweight-model props a direct render needs. These mounts script the
+ * provider directory, not the model catalog, so they take the remote-browser
+ * posture: the card renders locked and reaches no wire of its own.
+ * @param face - the scripted wire face the page context is built from.
+ * @returns the two props ModelsSection reads for the card.
+ */
+async function lockedLightweight(face: object) {
+  const ctx = ctxWith(face)
+  const lightweight = await lightweightStore(ctx, new SettingsDescribeMirror(ctx))
+  return { lightweight, useLightweight: bindSnapshotSelector(lightweight.store) }
 }
 
 /** Open the add dialog on the chooser. */
@@ -299,7 +383,7 @@ async function addProvider(provider: string): Promise<HTMLElement> {
 
 /**
  * Mount for a user who cannot reach any provider yet: no credential is stored
- * anywhere, so the whole-section DeepSeek route owns the first-run setup card.
+ * anywhere, so the whole-section DeepSeek route opens its card by itself.
  */
 async function mountFirstRun(overrides: Parameters<typeof scriptedFace>[0] = {}) {
   const scripted = scriptedFace(overrides)
@@ -339,7 +423,7 @@ describe('ModelsSection', () => {
     ])
   })
 
-  it('dispatches the provider-card seat inside the first-run setup card', async () => {
+  it('dispatches the provider-card seat inside the first-run card', async () => {
     const { renderSlot } = await mountFirstRun()
     expect(cardSeatCalls(renderSlot)).toContainEqual(['deepseek-official', true, false, 'llm-deepseek'])
   })
@@ -382,11 +466,13 @@ describe('ModelsSection', () => {
     expect(screen.getByRole('dialog')).toBeTruthy()
     expect(cardSeatCalls(renderSlot).some(([provider]) => provider === 'anthropic')).toBe(false)
   })
-  it('renders the unkeyed whole-section provider as an open setup card in the first-run posture', async () => {
+  it('opens the unkeyed whole-section provider\'s card in the first-run posture', async () => {
     await mountFirstRun()
     // Nothing is reachable yet, and DeepSeek has no configured credential and
-    // no stored apiKey → setup card.
+    // no stored apiKey → its card opens itself, over a row that keeps its
+    // place in the list.
     expect(screen.getByText('DeepSeek')).toBeTruthy()
+    expect(await screen.findByRole('dialog', { name: deepSeekCopy(en.editProvider) })).toBeTruthy()
     expect(screen.getByLabelText(en.keyInput)).toBeTruthy()
     expect(screen.getByText('openai')).toBeTruthy()
     expect(screen.queryByText('Active')).toBeNull()
@@ -417,8 +503,10 @@ describe('ModelsSection', () => {
     )))
     const controller = new ModelsSettingsStore(ctxWith(face), settingsSchema, new SettingsDescribeMirror(ctxWith(face)))
     await controller.load()
+    const locked = await lockedLightweight(face)
     render(<ModelsSection
       controller={controller}
+      {...locked}
       useSnapshot={bindSnapshotSelector(controller.store)}
       operations={operationsWith(face)}
       schema={settingsSchema}
@@ -426,7 +514,11 @@ describe('ModelsSection', () => {
       renderSlot={() => null}
     />)
 
-    const missing = screen.getByRole('img', { name: en.credentialMissing })
+    // Every row without a confirmed key carries the dot now, the first-run
+    // setup row included: the card lives in its dialog, and the row is a row.
+    const missing = screen.getAllByRole('img', { name: en.credentialMissing })
+      .find(dot => dot.closest('li')?.textContent?.includes('openai') === true)
+    if (missing === undefined) throw new Error('openai carries no missing-key dot')
     expect(missing.getAttribute('title')).toBe(en.credentialMissing)
     expect(missing.className).toContain('credentialDotMissing')
     expect(missing.closest('li')?.textContent).toContain('openai')
@@ -434,16 +526,18 @@ describe('ModelsSection', () => {
     expect(screen.getByText('zombie').closest('li')?.querySelector('[role="img"]')).toBeNull()
   })
 
-  it('turns the setup card into a row once the credential reports configured', async () => {
+  it('turns the first-run card into a row once the credential reports configured', async () => {
     const { face } = await mountFirstRun()
     face.credentials.describe.mockImplementation((refs: string[]) => Promise.resolve(remoteOk(
       Object.fromEntries(refs.map(ref => [ref, { configured: true, writable: true }])),
     )))
     const controller = new ModelsSettingsStore(ctxWith(face), settingsSchema, new SettingsDescribeMirror(ctxWith(face)))
     await controller.load()
+    const locked = await lockedLightweight(face)
     cleanup()
     render(<ModelsSection
       controller={controller}
+      {...locked}
       useSnapshot={bindSnapshotSelector(controller.store)}
       operations={operationsWith(face)}
       schema={settingsSchema}
@@ -494,7 +588,7 @@ describe('ModelsSection', () => {
     expect(pathOps([], { a: 1 }, { a: 1 })).toEqual([])
   })
 
-  it('stores a typed key write-only from the setup card without touching settings', async () => {
+  it('stores a typed key write-only from the first-run card without touching settings', async () => {
     const { set, mutate, face } = await mountFirstRun()
     const key = screen.getByLabelText<HTMLInputElement>(en.keyInput)
     fireEvent.change(key, { target: { value: '  sk-live  ' } })
@@ -1216,8 +1310,10 @@ describe('ModelsSection', () => {
     face.credentials.describe = vi.fn(() => Promise.resolve(remoteFail('no credential provider')))
     const controller = new ModelsSettingsStore(ctxWith(face), settingsSchema, new SettingsDescribeMirror(ctxWith(face)))
     await controller.load()
+    const locked = await lockedLightweight(face)
     render(<ModelsSection
       controller={controller}
+      {...locked}
       useSnapshot={bindSnapshotSelector(controller.store)}
       operations={operationsWith(face)}
       schema={settingsSchema}
@@ -1350,8 +1446,10 @@ describe('ModelsSection', () => {
     const controller = new ModelsSettingsStore(
       ctxWith(face.face), settingsSchema, new SettingsDescribeMirror(ctxWith(face.face)))
     await controller.load()
+    const locked = await lockedLightweight(face.face)
     render(<ModelsSection
       controller={controller}
+      {...locked}
       useSnapshot={bindSnapshotSelector(controller.store)}
       operations={operationsWith(face.face)}
       schema={settingsSchema}
@@ -1372,9 +1470,11 @@ describe('ModelsSection', () => {
     })))
     const controller = new ModelsSettingsStore(ctxWith(face), settingsSchema, new SettingsDescribeMirror(ctxWith(face)))
     await controller.load()
+    const locked = await lockedLightweight(face)
     cleanup()
     render(<ModelsSection
       controller={controller}
+      {...locked}
       useSnapshot={bindSnapshotSelector(controller.store)}
       operations={operationsWith(face)}
       schema={settingsSchema}
@@ -1386,18 +1486,40 @@ describe('ModelsSection', () => {
     expect(screen.getByText<HTMLButtonElement>(en.add).disabled).toBe(true)
   })
 
-  it('toggles the row editor closed on a second edit click and on cancel', async () => {
+  it('opens one row\'s card as a dialog and closes it without writing', async () => {
     const { mutate } = await mountSection()
     const edit = screen.getByRole('button', { name: openaiCopy(en.editProvider) })
     fireEvent.click(edit)
-    await waitFor(() => { expect(screen.queryAllByLabelText(en.keyInput).length).toBe(1) })
+    // The dialog is named by the action that opened it, so a screen reader
+    // announcing the Edit button finds the card it opened carrying that name.
+    const dialog = await screen.findByRole('dialog', { name: openaiCopy(en.editProvider) })
+    expect(within(dialog).getByLabelText(en.keyInput)).toBeTruthy()
+    // The row keeps its place in the list behind the dialog: the card is not
+    // the row's expanded state any more, so the list stays a list of rows.
+    expect(screen.getByText('openai').closest('li')?.textContent).toContain(en.edit)
+
+    // Dismissal by the chrome discards the draft, as the card's own cancel
+    // does, rather than leaving a half-typed key alive behind the rows.
+    fireEvent.click(screen.getByRole('button', { name: en.close }))
+    expect(screen.queryByRole('dialog')).toBeNull()
     fireEvent.click(edit)
-    expect(screen.queryAllByLabelText(en.keyInput)).toHaveLength(0)
-    fireEvent.click(edit)
-    await waitFor(() => { expect(screen.queryAllByLabelText(en.keyInput).length).toBe(1) })
-    fireEvent.click(screen.getByText(en.cancel))
-    expect(screen.queryAllByLabelText(en.keyInput)).toHaveLength(0)
+    fireEvent.click(await screen.findByText(en.cancel))
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(mutate).not.toHaveBeenCalled()
+  })
+
+  it('closes the card when a refresh drops the row it was editing', async () => {
+    const { face, controller } = await mountSection()
+    fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.editProvider) }))
+    expect(await screen.findByRole('dialog', { name: openaiCopy(en.editProvider) })).toBeTruthy()
+    face.llm.listConfigurableProviders.mockImplementation(() => Promise.resolve(remoteOk([
+      { provider: 'deepseek-official', displayName: 'DeepSeek', settingsNs: 'llm-deepseek', settingsPath: [] },
+    ])))
+    await act(async () => { await controller.load() })
+    // The card does not outlive its row: a pushed invalidation or a reload can
+    // remove the route while its card is open, and an editor without a row
+    // would write to a path nothing lists any more.
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('cancels the add dialog\'s card back to the chooser, not out of the dialog', async () => {
@@ -1411,33 +1533,38 @@ describe('ModelsSection', () => {
     expect(screen.getByLabelText(en.provider)).toBeTruthy()
   })
 
-  it('collapses the setup card on cancel without disturbing another open card', async () => {
-    // The regression: the setup card shared the row/add/declare close handler,
-    // so cancelling it discarded the add card's draft while staying open itself.
+  it('opens the first-run card by itself and remembers its dismissal', async () => {
     await mountFirstRun()
-    expect(screen.getAllByLabelText(en.keyInput)).toHaveLength(1)
-    await addProvider('anthropic')
-    expect(screen.getAllByLabelText(en.keyInput)).toHaveLength(2)
-
-    // The setup card is the first one on the page, above the add block.
-    fireEvent.click(screen.getAllByText(en.cancel)[0] as HTMLElement)
-    // The dialog's card kept its draft…
-    expect(screen.getByLabelText(en.keyInput)).toBeTruthy()
-    // …and DeepSeek collapsed to an ordinary row carrying the missing-key dot.
-    expect(screen.getAllByLabelText(en.keyInput)).toHaveLength(1)
+    // Nothing is usable yet, so the unkeyed whole-section provider opens its
+    // own card — the same dialog Edit opens, not a second kind of card.
+    const dialog = await screen.findByRole('dialog', { name: deepSeekCopy(en.editProvider) })
+    expect(within(dialog).getByLabelText(en.keyInput)).toBeTruthy()
+    fireEvent.click(within(dialog).getByText(en.cancel))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    // Dismissal is this card's own: the provider falls back to an ordinary row
+    // carrying the missing-key dot, and reopens through Edit.
     expect(screen.getAllByRole('img', { name: en.credentialMissing })
       .some(dot => dot.closest('li')?.textContent?.includes('DeepSeek') === true)).toBe(true)
-    // Its card reopens through Edit, which closes the dialog as any row does.
     fireEvent.click(screen.getByRole('button', { name: deepSeekCopy(en.editProvider) }))
-    expect(screen.getAllByLabelText(en.keyInput)).toHaveLength(1)
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(await screen.findByRole('dialog', { name: deepSeekCopy(en.editProvider) })).toBeTruthy()
+  })
+
+  it('hands the section to the add dialog over the first-run card', async () => {
+    await mountFirstRun()
+    await screen.findByRole('dialog', { name: deepSeekCopy(en.editProvider) })
+    // One card at a time: reaching for a new provider closes the card the
+    // posture opened, so no draft is left open behind the dialog.
+    await addDialog()
+    expect(screen.queryByRole('dialog', { name: deepSeekCopy(en.editProvider) })).toBeNull()
   })
 
   it('loads on first render of an idle controller', async () => {
     const { face } = scriptedFace()
     const controller = new ModelsSettingsStore(ctxWith(face), settingsSchema, new SettingsDescribeMirror(ctxWith(face)))
+    const locked = await lockedLightweight(face)
     render(<ModelsSection
       controller={controller}
+      {...locked}
       useSnapshot={bindSnapshotSelector(controller.store)}
       operations={operationsWith(face)}
       schema={settingsSchema}
@@ -1582,5 +1709,148 @@ describe('apiKeyFailure', () => {
     // heuristic leaves them alone rather than guessing at a paste error.
     expect(apiKeyFailure('"')).toBeUndefined()
     expect(apiKeyFailure('"a')).toBeUndefined()
+  })
+})
+
+/** The lightweight card's route keys, resolved by lookup exactly as the card does. */
+const LW_DEEPSEEK = lightweightModelKey({ provider: 'deepseek-official', model: 'deepseek-chat' })
+const LW_OPENAI = lightweightModelKey({ provider: 'openai', model: 'gpt-4o-mini' })
+const LW_GHOST = lightweightModelKey({ provider: 'ghost', model: 'ghost-1' })
+
+/** One lightweight-model answer, as the Host folds a write into the mirror. */
+function lightweightAnswer(value: { provider: string; model: string }, revision = 8) {
+  return remoteOk(lightweightNamespace(value, revision))
+}
+
+/** The scripted Host's namespaces with the lightweight section replaced. */
+function wireWithLightweight(value: { provider: string; model: string }): SettingsNamespaceView[] {
+  return wireNamespaces().map(row => row.ns === 'lightweight-model' ? lightweightNamespace(value) : row)
+}
+
+/**
+ * Mount the section with the lightweight-model card writable, so the card's
+ * own picker and actions are reachable.
+ * @param script - wire overrides applied before the mount.
+ * @returns the mount, once the card's catalog has answered.
+ */
+async function mountLightweight(script?: (face: ReturnType<typeof scriptedFace>['face']) => void) {
+  const scripted = scriptedFace()
+  script?.(scripted.face)
+  const mounted = await mountFace(scripted, 'host')
+  await waitFor(() => {
+    expect(['ready', 'error']).toContain(mounted.lightweight.store.getSnapshot().catalogStatus)
+  })
+  return mounted
+}
+
+describe('lightweight model card', () => {
+  it('disables the picker and says so when the browser cannot write', async () => {
+    await mountSection()
+    expect(screen.getByText(en.lightweightModelReadOnly)).toBeTruthy()
+    expect(screen.getByLabelText<HTMLSelectElement>(en.lightweightModel).disabled).toBe(true)
+    const save = screen.getByText(en.lightweightModelSave).closest('button')
+    expect(save?.disabled).toBe(true)
+  })
+
+  it('offers the catalog, stages one route, and saves it', async () => {
+    const { face, lightweight } = await mountLightweight((wire) => {
+      wire.settings.mutate = vi.fn(() => Promise.resolve(lightweightAnswer({ provider: 'openai', model: 'gpt-4o-mini' })))
+    })
+    const select = screen.getByLabelText<HTMLSelectElement>(en.lightweightModel)
+    expect([...select.options].map(option => option.textContent)).toEqual([
+      en.lightweightModelUnset,
+      'DeepSeek / DeepSeek Chat',
+      'OpenAI / GPT-4o mini',
+    ])
+    fireEvent.change(select, { target: { value: LW_OPENAI } })
+    await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(true) })
+    fireEvent.click(screen.getByText(en.lightweightModelSave))
+    await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(false) })
+    expect(face.settings.mutate.mock.calls[0]?.[0]).toBe('lightweight-model')
+  })
+
+  it('drops a stored route the catalog no longer advertises', async () => {
+    const scripted = scriptedFace()
+    scripted.face.settings.describe = vi.fn(() => Promise.resolve(remoteOk({
+      writable: true,
+      hasDocument: false,
+      namespaces: wireWithLightweight({ provider: 'ghost', model: 'ghost-1' }),
+    })))
+    scripted.face.settings.mutate = vi.fn(() => Promise.resolve(lightweightAnswer({ provider: '', model: '' })))
+    const { lightweight } = await mountFace(scripted, 'host')
+    await waitFor(() => { expect(lightweight.store.getSnapshot().catalogStatus).toBe('ready') })
+    // A vanished route stays listed, which is the only way to clear it.
+    expect(screen.getByLabelText<HTMLSelectElement>(en.lightweightModel).value).toBe(LW_GHOST)
+    expect(screen.getByText('ghost / ghost-1')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(en.lightweightModel), { target: { value: '' } })
+    await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(true) })
+    fireEvent.click(screen.getByText(en.lightweightModelSave))
+    await waitFor(() => { expect(lightweight.store.getSnapshot().selected).toBeUndefined() })
+    expect(scripted.face.settings.mutate.mock.calls[0]?.[1]).toEqual([
+      { op: 'set', path: ['provider'], value: '' },
+      { op: 'set', path: ['model'], value: '' },
+    ])
+  })
+
+  it('discards a staged route without writing', async () => {
+    const { face, lightweight } = await mountLightweight()
+    const select = screen.getByLabelText<HTMLSelectElement>(en.lightweightModel)
+    fireEvent.change(select, { target: { value: LW_DEEPSEEK } })
+    await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(true) })
+    fireEvent.click(screen.getByText(en.lightweightModelDiscard))
+    await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(false) })
+    select.value = LW_DEEPSEEK
+    expect(face.settings.mutate.mock.calls).toHaveLength(0)
+  })
+
+  it('announces the catalog request while it is in flight', async () => {
+    let release: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const scripted = scriptedFace()
+    scripted.face.session.modelCatalog = vi.fn(() => gate.then(() => remoteOk(MODEL_CATALOG)))
+    const { lightweight } = await mountFace(scripted, 'host')
+    expect(screen.getByText(en.lightweightModelRetrying)).toBeTruthy()
+    expect(lightweight.store.getSnapshot().catalogStatus).toBe('loading')
+    release?.()
+    await waitFor(() => { expect(screen.queryByText(en.lightweightModelRetrying)).toBeNull() })
+  })
+
+  it('retries a failed catalog request and reports an empty catalog', async () => {
+    const scripted = scriptedFace()
+    scripted.face.session.modelCatalog = vi.fn()
+      .mockResolvedValueOnce(remoteFail('catalog down', 'gateway/internal'))
+      .mockResolvedValue(remoteOk({ ...MODEL_CATALOG, groups: [] }))
+    const { lightweight } = await mountFace(scripted, 'host')
+    await waitFor(() => { expect(screen.getByText(en.retry)).toBeTruthy() })
+    fireEvent.click(screen.getByText(en.retry))
+    await waitFor(() => { expect(screen.getByText(en.lightweightModelEmpty)).toBeTruthy() })
+    expect(lightweight.store.getSnapshot().candidates).toHaveLength(0)
+    // Only the "no model" option survives an empty catalog.
+    expect(screen.getByLabelText<HTMLSelectElement>(en.lightweightModel).options).toHaveLength(1)
+  })
+
+  it('keeps the picker disabled and labelled while the save is in flight', async () => {
+    let release: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const { lightweight } = await mountLightweight((wire) => {
+      wire.settings.mutate = vi.fn(() => gate.then(() => lightweightAnswer({ provider: 'deepseek-official', model: 'deepseek-chat' })))
+    })
+    fireEvent.change(screen.getByLabelText(en.lightweightModel), { target: { value: LW_DEEPSEEK } })
+    fireEvent.click(screen.getByText(en.lightweightModelSave))
+    await waitFor(() => { expect(screen.getByText(en.lightweightModelSaving)).toBeTruthy() })
+    expect(screen.getByText(en.lightweightModelSaving).closest('button')?.disabled).toBe(true)
+    expect(screen.getByLabelText<HTMLSelectElement>(en.lightweightModel).disabled).toBe(true)
+    release?.()
+    await waitFor(() => { expect(lightweight.store.getSnapshot().saving).toBe(false) })
+  })
+
+  it('reports a save the Host did not land', async () => {
+    const { lightweight } = await mountLightweight((wire) => {
+      wire.settings.mutate = vi.fn(() => Promise.resolve(lightweightAnswer({ provider: '', model: '' })))
+    })
+    fireEvent.change(screen.getByLabelText(en.lightweightModel), { target: { value: LW_DEEPSEEK } })
+    fireEvent.click(screen.getByText(en.lightweightModelSave))
+    await waitFor(() => { expect(screen.getByText(en.lightweightModelFailed)).toBeTruthy() })
+    expect(lightweight.store.getSnapshot()).toMatchObject({ failed: true, dirty: true })
   })
 })

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import LlmRuntime, { createUserMessage, ToolCallId, isAgentLoopRequest, LlmAdapter  } from '@deepseek-ai/dsh-llm'
 import type { FinishReason, GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import LightweightModelConfig from '@deepseek-ai/dsh-lightweight-model'
 import { SessionTitleProviderId } from '@deepseek-ai/dsh-session-title'
 import type { SessionTitleProviderRequest } from '@deepseek-ai/dsh-session-title'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
@@ -202,6 +203,59 @@ describe('generateSessionTitleWithLlm', () => {
       provider: 'explicit-route',
       model: 'explicit-model',
     })
+  })
+
+  it('prefers the lightweight model over the inherited route, and explicit overrides over both', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(LightweightModelConfig, { provider: 'light-route', model: 'light-model' })
+    const light = new RecordingAdapter(SCRIPT)
+    const explicit = new RecordingAdapter(SCRIPT)
+    ctx.llm.registerAdapter(['light-route'], light)
+    ctx.llm.registerAdapter(['explicit-route'], explicit)
+
+    const inherited = request(ctx)
+    const result = await generateSessionTitleWithLlm(
+      ctx,
+      resolveSessionTitleLlmConfig(CONFIG),
+      inherited,
+      inherited.messages,
+      TITLE_PROVIDER,
+    )
+    expect(result.model).toEqual({ provider: 'light-route', model: 'light-model' })
+    expect(light.requests[0]).toMatchObject({ provider: 'light-route', model: 'light-model' })
+    expect(inherited.session.events.findLast(event => event.type === 'session/title-llm-request')?.data)
+      .toMatchObject({ route: { provider: 'light-route', model: 'light-model' } })
+
+    const routed = request(ctx)
+    await generateSessionTitleWithLlm(
+      ctx,
+      resolveSessionTitleLlmConfig({ ...CONFIG, provider: 'explicit-route', model: 'explicit-model' }),
+      routed,
+      routed.messages,
+      TITLE_PROVIDER,
+    )
+    expect(explicit.requests[0]).toMatchObject({ provider: 'explicit-route', model: 'explicit-model' })
+    expect(light.requests).toHaveLength(1)
+  })
+
+  it('inherits the logged route when no lightweight model is selected', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(LightweightModelConfig)
+    const adapter = new RecordingAdapter(SCRIPT)
+    ctx.llm.registerAdapter(['current-route'], adapter)
+    const providerRequest = request(ctx)
+    const result = await generateSessionTitleWithLlm(
+      ctx,
+      resolveSessionTitleLlmConfig(CONFIG),
+      providerRequest,
+      providerRequest.messages,
+      TITLE_PROVIDER,
+    )
+    expect(result.model).toEqual({ provider: 'current-route', model: 'current-model' })
   })
 
   it('requires every deployment limit and a complete optional route pair', () => {

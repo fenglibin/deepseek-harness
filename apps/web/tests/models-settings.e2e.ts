@@ -79,6 +79,13 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     const options = await pick.locator('option').allTextContents()
     expect(options).toContain('anthropic')
     expect(options).toContain('minimax-cn')
+    // Every label in the dialog fits its button on one line: the manual-
+    // endpoint row gives the field the slack it lacks, so a squeezed capsule
+    // never breaks its label into one line per character.
+    const wrappedLabels = await addDialog.getByRole('button').evaluateAll(elements => elements
+      .filter(element => element.scrollHeight - element.clientHeight > 1)
+      .map(element => element.textContent?.trim() ?? ''))
+    expect(wrappedLabels).toEqual([])
     await pick.selectOption('minimax-cn')
     await addDialog.getByRole('textbox', { name: 'API 密钥', exact: true }).waitFor({ timeout: 10_000 })
     const snapshot = await captureStableAria(
@@ -146,15 +153,16 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-add'))
     const dialog = page.getByRole('dialog', { name: '设置' })
     await dialog.getByRole('button', { name: '编辑 minimax-cn' }).click()
-    await dialog.getByRole('textbox', { name: 'API 密钥', exact: true }).fill('sk-e2e-minimax')
-    await dialog.getByRole('button', { name: '保存', exact: true }).click()
+    // The card is a dialog over the section, named by the action that opened
+    // it, rather than an expansion of the row.
+    const editor = page.getByRole('dialog', { name: '编辑 minimax-cn' })
+    await editor.waitFor({ timeout: 10_000 })
+    await editor.getByRole('textbox', { name: 'API 密钥', exact: true }).fill('sk-e2e-minimax')
+    await editor.getByRole('button', { name: '保存', exact: true }).click()
     // The profile lands in settings.yaml with only the derived reference, the
     // key value lands in the harness home's .credentials.yaml, the dormant route
     // registers, and the topology frame invalidates the page into the row.
-    await expect.poll(
-      async () => dialog.getByRole('textbox', { name: 'API 密钥', exact: true }).count(),
-      { timeout: 10_000 },
-    ).toBe(0)
+    await expect.poll(async () => editor.count(), { timeout: 10_000 }).toBe(0)
     await dialog.getByRole('img', { name: 'API 密钥已配置' }).waitFor({ timeout: 10_000 })
     await dialog.getByText('已保存 minimax-cn。', { exact: true }).waitFor({ timeout: 10_000 })
     const document = await readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8')
@@ -173,14 +181,16 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-customized'))
     const dialog = page.getByRole('dialog', { name: '设置' })
     await dialog.getByRole('button', { name: '编辑 minimax-cn' }).click()
-    await dialog.getByText('自定义设置').click()
-    const url = dialog.getByLabel('API 地址')
+    const editor = page.getByRole('dialog', { name: '编辑 minimax-cn' })
+    await editor.waitFor({ timeout: 10_000 })
+    await editor.getByText('自定义设置').click()
+    const url = editor.getByLabel('API 地址')
     await url.waitFor({ timeout: 10_000 })
     await url.fill('https://gateway.minimax.example/v1')
-    await dialog.getByRole('button', { name: '保存', exact: true }).click()
-    // The editor closes back to the row; the fold's write merged into the
+    await editor.getByRole('button', { name: '保存', exact: true }).click()
+    // The dialog closes back to the row; the fold's write merged into the
     // stored profile beside the reference.
-    await expect.poll(async () => dialog.getByLabel('API 地址').count(), { timeout: 10_000 }).toBe(0)
+    await expect.poll(async () => editor.count(), { timeout: 10_000 }).toBe(0)
     await dialog.getByText('已保存 minimax-cn。', { exact: true }).waitFor({ timeout: 10_000 })
     const document = await readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8')
     expect(document).toContain('baseURL: https://gateway.minimax.example/v1')
@@ -194,8 +204,10 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-picker'))
     const settingsDialog = page.getByRole('dialog', { name: '设置' })
     await settingsDialog.getByRole('button', { name: '编辑 minimax-cn' }).click()
-    await settingsDialog.getByText('自定义设置').click()
-    await settingsDialog.getByRole('button', { name: '获取可用模型' }).click()
+    const editor = page.getByRole('dialog', { name: '编辑 minimax-cn' })
+    await editor.waitFor({ timeout: 10_000 })
+    await editor.getByText('自定义设置').click()
+    await editor.getByRole('button', { name: '获取可用模型' }).click()
 
     const picker = page.getByRole('dialog', { name: '选择要添加的模型' })
     await picker.waitFor({ timeout: 10_000 })
@@ -223,7 +235,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
       Array.from({ length: count }, () => true),
     )
     await picker.getByRole('button', { name: '取消', exact: true }).click()
-    await settingsDialog.getByRole('button', { name: '取消', exact: true }).click()
+    await editor.getByRole('button', { name: '取消', exact: true }).click()
   }, 60_000)
 
   it('declares a route the adapter does not ship', async () => {
@@ -237,7 +249,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     const addDialog = page.getByRole('dialog', { name: '添加模型' })
     await addDialog.waitFor({ timeout: 10_000 })
     await addDialog.getByLabel('或手动输入 API 地址').fill('https://gateway.acme.example/v1')
-    await addDialog.getByRole('button', { name: '使用此地址' }).click()
+    await addDialog.getByRole('button', { name: '继续' }).click()
     await addDialog.getByLabel('Provider ID').fill('acme-gateway')
     await addDialog.getByLabel('显示名称').fill('Acme Gateway')
     expect(await addDialog.getByLabel('API 地址').inputValue()).toBe('https://gateway.acme.example/v1')
@@ -269,22 +281,30 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-declared-identity'))
     const dialog = page.getByRole('dialog', { name: '设置' })
     await dialog.getByRole('button', { name: '编辑 Acme Gateway (acme-gateway)' }).click()
-    await dialog.getByText('自定义设置').click()
+    const editor = page.getByRole('dialog', { name: '编辑 Acme Gateway (acme-gateway)' })
+    await editor.waitFor({ timeout: 10_000 })
+    await editor.getByText('自定义设置').click()
     // The create card asked this route for a name and a protocol because
     // nothing can default them; the editor reaches the same two fields rather
     // than sending the user to settings.yaml for what only this route names.
-    const protocol = dialog.getByLabel('API 协议')
+    const protocol = editor.getByLabel('API 协议')
     await protocol.waitFor({ timeout: 10_000 })
     expect(await protocol.inputValue()).toBe('openai-completions')
-    const name = dialog.getByLabel('显示名称', { exact: true })
+    const name = editor.getByLabel('显示名称', { exact: true })
     expect(await name.inputValue()).toBe('Acme Gateway')
-    const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    // The card is a dialog of its own, so the golden names it rather than
+    // taking whichever dialog the page happens to put first.
+    const snapshot = await captureStableAria(
+      page,
+      '[role="dialog"][aria-label="编辑 Acme Gateway (acme-gateway)"]',
+      scaffold.workspaceCwd,
+    )
     await compareOrRefreshGolden(DECLARED_EDIT_EXPECTED, snapshot, MODE)
 
     await protocol.selectOption('anthropic-messages')
     await name.fill('Acme 网关')
-    await dialog.getByRole('button', { name: '保存', exact: true }).click()
-    await expect.poll(async () => dialog.getByLabel('API 协议').count(), { timeout: 10_000 }).toBe(0)
+    await editor.getByRole('button', { name: '保存', exact: true }).click()
+    await expect.poll(async () => editor.count(), { timeout: 10_000 }).toBe(0)
     // The adapter re-resolved the route under the new protocol and re-registered
     // it under the new name: an unserviceable profile would have been refused
     // at the write instead, and a rename that did not re-register would leave

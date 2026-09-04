@@ -8,7 +8,7 @@ import type {
   ChatViewSlotProps, CommandNode, CompactionSummaryNode, ContextMessageNode, ConversationNode,
   LegacyConversationSlice, ModelRetryNode, RunningToolCall, SelectionTarget, SteeringMessageNode,
   ToolCallBlock, ToolResultNode, TurnErrorNode, TurnMaxTokensNode, UseChatNodeTurnData,
-  TranscriptViewMode, UserMessageNode,
+  TranscriptViewMode, TurnNavigationItem, UserMessageNode,
 } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {
   SessionListState, SessionSnapshot,
@@ -204,6 +204,7 @@ function makeHarness(
   init: HarnessUpdate = {},
   sessionOverrides: Partial<SessionSnapshot> = {},
   chatSnapshot?: ChatSnapshot,
+  projections: Record<string, unknown> = {},
 ) {
   const {
     chat: initialChat, nodes, partial, runningCalls, turnTimings, turnEnds, turnUsages,
@@ -348,7 +349,8 @@ function makeHarness(
       createSnapshotStore<SessionPendingInteractionSnapshot>(new Map()),
     ),
     useWorkspaces: emptyWorkspaces(),
-    useProjection: (() => undefined),
+    useProjection: ((key: string, selector?: (v: unknown) => unknown) =>
+      (selector ?? (v => v))(projections[key])),
     useInput: (() => { throw new Error('unused') }),
     inputActions: {
       setDraft: () => {},
@@ -629,8 +631,8 @@ describe('ChatView', () => {
     Object.defineProperty(scroller, 'scrollHeight', { value: 800, writable: true })
     Object.defineProperty(scroller, 'clientHeight', { value: 200, writable: true })
     readerScroll(scroller, 50)
-    fireEvent.click(view.getByText('加载更早'))
-    // The reader moves after the request starts; this, not the click-time
+    readerScroll(scroller, 0)
+    // The reader moves after the request starts; this, not the trigger-time
     // row, is the intent the arriving page must preserve.
     firstTop = -200
     nextTop = 60
@@ -710,7 +712,7 @@ describe('ChatView', () => {
     })
     try {
       rowRectCalls = 0
-      fireEvent.click(view.getByText('加载更早'))
+      readerScroll(scroller, 0)
       expect(hitTest).toHaveBeenCalledTimes(1)
       expect(hitTest.mock.calls[0]?.[1]).toBe(1)
       expect(rowRectCalls).toBeLessThanOrEqual(6)
@@ -720,7 +722,7 @@ describe('ChatView', () => {
       act(() => {
         h.setChat({ nodes: [assistant(2, 'older'), ...nodes] })
       })
-      expect(scroller.scrollTop).toBe(450) // reader offset 50 + first visible row's 400px shift
+      expect(scroller.scrollTop).toBe(400) // reader at the top + first visible row's 400px shift
     } finally {
       if (originalHitTest !== undefined) {
         Object.defineProperty(document, 'elementsFromPoint', originalHitTest)
@@ -2031,14 +2033,14 @@ describe('ChatView', () => {
       () => ({ top: anchoredTop, bottom: anchoredTop + 40 } as DOMRect),
     )
     readerScroll(scroller, 80)
-    // Arm the paging anchor, then deliver an older page (head seq decreases).
-    fireEvent.click(view.getByText('加载更早'))
+    // Scroll into the top to arm the paging anchor, then deliver an older page.
+    readerScroll(scroller, 0)
     Object.defineProperty(scroller, 'scrollHeight', { value: 1600, writable: true })
     anchoredTop = 700
     act(() => {
       h.setChat({ nodes: [user(1, 'old'), assistant(2, 'b'), user(5, 'later'), assistant(6, 'a')] })
     })
-    expect(scroller.scrollTop).toBe(680) // reader offset 80 + the anchored row's 600px shift
+    expect(scroller.scrollTop).toBe(600) // reader at the top + the anchored row's 600px shift
     // A new trailing user bubble (own words) force-scrolls to the bottom.
     act(() => {
       h.setChat({
@@ -2055,7 +2057,7 @@ describe('ChatView', () => {
     Object.defineProperty(scroller, 'scrollHeight', { value: 800, writable: true })
     Object.defineProperty(scroller, 'clientHeight', { value: 200, writable: true })
     readerScroll(scroller, 50)
-    fireEvent.click(view.getByText('加载更早'))
+    readerScroll(scroller, 0)
     fireEvent.click(view.getByLabelText('回到底部'))
     Object.defineProperty(scroller, 'scrollHeight', { value: 1_300, writable: true })
     act(() => { h.setChat({ nodes: [assistant(2, 'older'), user(9, 'late')] }) })
@@ -2276,13 +2278,106 @@ describe('ChatView', () => {
     }
   })
 
-  it('paging button loads older and shows its busy label', () => {
+  it('auto-loads older at the list top and shows its busy label', () => {
     const h = makeHarness({ nodes: [user(5, 'later')] }, { hasMore: true })
     const view = render(<h.ChatView {...h.props} />)
-    fireEvent.click(view.getByText('加载更早'))
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLDivElement
+    Object.defineProperty(scroller, 'scrollHeight', { value: 800, writable: true })
+    Object.defineProperty(scroller, 'clientHeight', { value: 200, writable: true })
+    readerScroll(scroller, 50)
+    readerScroll(scroller, 0)
     expect(h.loadOlder).toHaveBeenCalledTimes(1)
     act(() => { h.setSession({ loadingOlder: true }) })
     expect(view.getByText('加载中…')).toBeTruthy()
+  })
+
+  it('pages back until the loaded window holds a user prompt (rail previews)', () => {
+    // The history cut landed inside Turn 5: the window holds that Turn's
+    // assistant work and none of its prompt. The drawer lists the whole-log
+    // outline regardless, but the rail pages until a loaded prompt lands.
+    const h = makeHarness(
+      { nodes: [assistant(6, 'a', 5, 1)] },
+      { hasMore: true },
+      undefined,
+      { turnOutline: { turns: [{ turn: 5, prompt: 'q' }] } },
+    )
+    render(<h.ChatView {...h.props} />)
+    expect(screen.getByRole('button', { name: '打开用户消息列表' })).toBeTruthy()
+    expect(h.loadOlder).toHaveBeenCalledTimes(1)
+    // A page already in flight must not queue a second one.
+    act(() => { h.setSession({ loadingOlder: true }) })
+    expect(h.loadOlder).toHaveBeenCalledTimes(1)
+    // A page that settles without moving the window head changed nothing, so
+    // asking again would only repeat it: the loop stops instead of retrying.
+    act(() => { h.setSession({ loadingOlder: false }) })
+    expect(h.loadOlder).toHaveBeenCalledTimes(1)
+    // The page that brings the Turn's own prompt in retires the need.
+    act(() => { h.set({ nodes: [userInTurn(5, 'q', 5), assistant(6, 'a', 5, 1)] }) })
+    act(() => { h.setSession({ loadingOlder: false }) })
+    expect(h.loadOlder).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves history alone when the loaded window already holds a user prompt', () => {
+    const h = makeHarness(
+      { nodes: [userInTurn(5, 'q', 5), assistant(6, 'a', 5, 1)] },
+      { hasMore: true },
+      undefined,
+      { turnOutline: { turns: [{ turn: 5, prompt: 'q' }] } },
+    )
+    render(<h.ChatView {...h.props} />)
+    expect(screen.getByRole('button', { name: '打开用户消息列表' })).toBeTruthy()
+    expect(h.loadOlder).not.toHaveBeenCalled()
+  })
+
+  it('pages until a picked user message renders, then settles on it', () => {
+    // A turn in the outline whose row is not rendered yet: the drawer offers
+    // it, but there is no row to scroll to until an older page brings it in.
+    vi.stubGlobal('requestAnimationFrame', () => 1)
+    const target: TurnNavigationItem = {
+      turn: 2, anchorKey: 'fixture:user:2', prompt: '尚未渲染的提问', response: '',
+    }
+    const snapshotWithTarget = (nodes: readonly ConversationNode[]): ChatSnapshot => {
+      const base = chatSnapshotFixture({ nodes })
+      return { ...base, navigation: { items: () => [target, ...base.navigation.items()] } }
+    }
+    const h = makeHarness(
+      { chat: snapshotWithTarget([userInTurn(5, 'q', 5), assistant(6, 'a', 5, 1)]) },
+      { hasMore: true },
+      undefined,
+      { turnOutline: { turns: [{ turn: 2, prompt: '尚未渲染的提问' }, { turn: 5, prompt: 'q' }] } },
+    )
+    render(<h.ChatView {...h.props} />)
+    fireEvent.click(screen.getByRole('button', { name: '打开用户消息列表' }))
+    fireEvent.click(screen.getByText('尚未渲染的提问'))
+    expect(h.loadOlder).toHaveBeenCalledTimes(1)
+    // A page that does not carry the target keeps the history coming.
+    act(() => {
+      h.set({
+        chat: snapshotWithTarget([
+          assistant(3, 'a0', 4, 1), userInTurn(5, 'q', 5), assistant(6, 'a', 5, 1),
+        ]),
+      })
+    })
+    expect(h.loadOlder).toHaveBeenCalledTimes(2)
+    // The page that renders it stops the paging and settles the scroll there.
+    act(() => {
+      h.set({
+        chat: snapshotWithTarget([
+          userInTurn(2, '更早的提问', 9), assistant(3, 'a0', 4, 1),
+          userInTurn(5, 'q', 5), assistant(6, 'a', 5, 1),
+        ]),
+      })
+    })
+    expect(h.loadOlder).toHaveBeenCalledTimes(2)
+    // A page that lands without moving the head adds nothing, so the click's
+    // paging stops instead of retrying forever.
+    act(() => { h.setSession({ loadingOlder: true }) })
+    act(() => { h.setSession({ loadingOlder: false }) })
+    expect(h.loadOlder).toHaveBeenCalledTimes(2)
+    fireEvent.click(screen.getByRole('button', { name: '打开用户消息列表' }))
+    const drawer = screen.getByRole('dialog')
+    expect(within(drawer).getByText('尚未渲染的提问').closest('button')?.getAttribute('aria-current'))
+      .toBe('true')
   })
 
   it('shows open error and loading states', () => {

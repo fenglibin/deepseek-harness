@@ -56,10 +56,19 @@
       name: '@deepseek-ai/dsh-session-title-first-prompt-llm'
       config:
         targetWords: 5
-        targetCjkCharacters: 10
+        targetCjkCharacters: 20
         maxInputBytes: 4096
-        maxOutputTokens: 64
+        # A thinking route spends this whole cap on reasoning tokens before it
+        # emits any title: a GLM-5.3-Flash title measured 228 reasoning tokens,
+        # and 64 left every thinking route with an empty completion.
+        maxOutputTokens: 512
         timeoutMs: 60000
+
+    # Optional route for auxiliary model calls (session titles, compaction
+    # summaries). Empty until the user picks one in Settings → Models; the
+    # settings document layers over this composition entry.
+    - id: lightweight-model
+      name: '@deepseek-ai/dsh-lightweight-model'
 
     - id: user-questions
       name: '@deepseek-ai/dsh-user-questions'
@@ -299,6 +308,14 @@
       name: '@deepseek-ai/dsh-command-prompt-config'
       config:
         commands: []
+
+    - id: delivery
+      name: '@deepseek-ai/dsh-delivery'
+
+    - id: tool-delivery
+      name: '@deepseek-ai/dsh-tool-delivery'
+      config:
+        enforcement: stateful
 
     - id: goal
       name: '@deepseek-ai/dsh-goal'

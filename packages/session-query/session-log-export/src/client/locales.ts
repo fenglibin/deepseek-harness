@@ -4,10 +4,9 @@ export const NS = 'session-log-download'
 /** Simplified-Chinese Session export strings. */
 export const zh = {
   'header.action': 'Session 日志',
-  'dialog.preparingTitle': '正在导出 Session',
-  'dialog.preparingDescription': '正在准备包含当前 Session、子 Session 和附件的 ZIP 文件。',
-  'dialog.successTitle': 'Session 导出已开始下载',
-  'dialog.successDescription': '浏览器正在下载 Session ZIP 文件。',
+  'header.menu': '更多导出选项',
+  'header.scopeCurrent': '仅当前 Session',
+  'header.scopeTree': '包含子 Session',
   'dialog.errorTitle': 'Session 导出失败',
   'dialog.close': '关闭',
   'dialog.commandFailed': '无法启动 Session 导出。',
@@ -16,10 +15,9 @@ export const zh = {
 /** English Session export strings. */
 export const en: Record<keyof typeof zh, string> = {
   'header.action': 'Session log',
-  'dialog.preparingTitle': 'Exporting Session',
-  'dialog.preparingDescription': 'Preparing a ZIP containing this Session, its sub-Sessions, and attachments.',
-  'dialog.successTitle': 'Session download started',
-  'dialog.successDescription': 'The browser is downloading the Session ZIP.',
+  'header.menu': 'More export options',
+  'header.scopeCurrent': 'Current Session only',
+  'header.scopeTree': 'Include sub-Sessions',
   'dialog.errorTitle': 'Session export failed',
   'dialog.close': 'Close',
   'dialog.commandFailed': 'Could not start the Session export.',

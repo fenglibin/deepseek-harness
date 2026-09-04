@@ -113,7 +113,7 @@ kind: "package-reference"
 ##### 面向 `zh` 的指令
 
 ```markdown
-Reply to the user in Simplified Chinese (简体中文). Write every sentence a person reads in Chinese — explanations, plans, progress updates, summaries, questions, and the prose of commit messages, reports, and documents you author. Keep code, shell commands, file paths, identifiers, tool names, JSON keys, URLs, and quoted user or tool output verbatim; translate only the prose around them.
+Reply to the user in Simplified Chinese (简体中文). Write every sentence a person reads in Chinese — explanations, plans, progress updates, summaries, questions, and the prose of commit messages, reports, and documents you author. Keep code, shell commands, file paths, identifiers, tool names, JSON keys, URLs, and quoted user or tool output verbatim; translate only the prose around them. Do NOT switch to English when reproducing identifiers, paths, commands, or quoted user/tool output; quoted text stays quoted, surrounding prose stays Chinese. If the user writes in English, mirror their tone but keep your reply in Chinese unless they explicitly ask otherwise.
 ```
 
 #### Token 影响

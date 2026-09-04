@@ -36,6 +36,19 @@ async function bench(isLoopback = true, settings?: object, services: object = {}
       discoverModels: vi.fn(() => Promise.resolve({ ok: true, value: [] })),
       ...services,
     },
+    // The lightweight-model card reads the Host model catalog here, and only
+    // once the section it belongs to is actually open.
+    session: {
+      modelCatalog: vi.fn(() => Promise.resolve({
+        ok: true,
+        value: {
+          default: { provider: 'deepseek-official', model: 'deepseek-chat' },
+          routableProviders: [],
+          groups: [],
+          failures: [],
+        },
+      })),
+    },
     // Without a settings face the mirror's reads fail and stay contained; the
     // Models join itself never fetches until a section actually loads. The real
     // ui-settings apply also provides the settingsSchema service.
@@ -63,8 +76,8 @@ function declare(slots: SlotRegistry): () => void {
 describe('ui-settings-models apply', () => {
   it('declares the services it uses', () => {
     expect(inject).toEqual([
-      'slots', 'locale', 'remote', 'remote.credentials', 'remote.llm', 'remote.settings',
-      'settingsScope', 'settingsSchema',
+      'slots', 'locale', 'remote', 'remote.credentials', 'remote.llm', 'remote.session',
+      'remote.settings', 'settingsScope', 'settingsSchema',
     ])
   })
 

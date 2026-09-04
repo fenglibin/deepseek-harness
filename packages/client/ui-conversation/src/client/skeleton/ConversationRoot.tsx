@@ -516,9 +516,11 @@ export function ConversationRoot({
       {hero && heroWorkspaceRow}
       {zone !== undefined && renderSlot('conversation.input.dock', zone)}
       {/* The handle rides the input card's top edge, so the seat it is
-          positioned against is the card's own, never the dock above it. */}
+          positioned against is the card's own, never the dock above it.
+          Every settled phase offers it: the hero card is the same composer
+          as the docked one, so a fresh session resizes like a live one. */}
       <div className={css.composerResizeSeat}>
-        {phase === 'active' && (
+        {phase !== 'settling' && (
           <HeightHandle
             label={t('input.resize')}
             title={t('input.resizeTitle')}
@@ -559,6 +561,7 @@ export function ConversationRoot({
           {sessionId === undefined ? null : renderSlot('conversation.session', {})}
           {composerSeat}
         </div>
+        {sessionId !== undefined && renderSlot('conversation.side.float', {})}
         {/* Width handles only while a transcript is on screen; the hero has no
             content column to size. */}
         {phase === 'active' && (['left', 'right'] as const).map(side => (

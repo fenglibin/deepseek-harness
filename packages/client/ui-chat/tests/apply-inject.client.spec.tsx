@@ -54,6 +54,7 @@ async function bench() {
   )
   new TestRemote(runtime.ctx, { session: { openWorkspacePath } })
   runtime.ctx.provide('uiWorkspace', {
+    noteDraft: vi.fn(),
     connectWorkspace: vi.fn(async () => ROOT),
   } as never)
   const session = sessionFakeFor()

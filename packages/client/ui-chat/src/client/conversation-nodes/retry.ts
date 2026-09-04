@@ -75,6 +75,15 @@ export const retryDefinition: ConversationNodeDefinition<RetryState> = {
   buildViewNode: (context) => {
     if (context.state === undefined || context.state.attempts.length === 0) return null
     const location = context.start?.location ?? context.matches[0]?.location ?? { kind: 'unresolved' as const }
+    // A retry chain whose owning turn closed without an error reason was
+    // resolved (or abandoned) without a terminal failure, so its failure
+    // detail must not render. Hidden, not null, because a live turn renders
+    // the neutral "retrying" state first and the assembler forbids withdrawing
+    // a materialized node. Only a turn still open, unresolved, or closed in
+    // error keeps the node visible; turn-error owns the terminal row then.
+    const turn = location.kind === 'turn' || location.kind === 'step' ? location.turn : undefined
+    const hidden = turn !== undefined && turn.status === 'closed' && turn.end !== undefined
+      && turn.end.data.reason.kind !== 'error'
     const stateAttempts = context.state.attempts
     const attempts = stateAttempts.map((attempt, index) =>
       index === stateAttempts.length - 1
@@ -85,7 +94,7 @@ export const retryDefinition: ConversationNodeDefinition<RetryState> = {
     const current = attempts.at(-1)
     if (current === undefined) return null
     const data: RetryChatData = { attempts, current }
-    return chatNode(context, 'model-retry', attempts[0]?.seq ?? current.seq, data)
+    return chatNode(context, 'model-retry', attempts[0]?.seq ?? current.seq, data, hidden ? { visibility: 'hidden' } : {})
   },
 }
 

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-02-models-add-dialog-and-picker-defaults.md
-2026-09-02-models-add-dialog-and-picker-defaults.md: a6d863e25759a0e9d4eb32c900e0a7f65af2d41d
-2026-09-02-models-add-dialog-and-picker-defaults.zh.md: 725f6bb8752fcb78b754dae5b0c9b6c6e8dc9123
+2026-09-02-models-add-dialog-and-picker-defaults.md: 369d85c18c576d89d950f7dd073447c4d079a51e
+2026-09-02-models-add-dialog-and-picker-defaults.zh.md: 0a5a8d3413e0826fef29f038862c2bee879433b3

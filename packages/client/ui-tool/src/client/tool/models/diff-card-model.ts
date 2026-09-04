@@ -4,15 +4,17 @@ import type { ToolCallBlock } from './tool-call-model.ts'
 import { parsedToolCall, validEscalationFields } from './raw-tool-call.ts'
 
 /**
- * Diff-body lines the chat row shows before collapsing the middle — half the
- * primitive's own default, which the details panel keeps. A chat row is a
- * summary surface inside the message flow: the flow must stay scannable across
- * many calls, while the details panel is the single-call reading surface. The
- * same split {@link CHAT_TERMINAL_MAX_LINES} draws for a terminal card, so the
- * two card kinds cap a long body at the same place in the flow. A design
- * constant of this UI's row geometry, not a deployment choice.
+ * Diff-body lines the chat row shows before collapsing the middle — the
+ * chat-row cap, lower than the primitive's own default, which the details panel
+ * keeps. A chat row is a summary surface inside the message flow: the flow
+ * must stay scannable across many calls, while the details panel is the
+ * single-call reading surface. The cap matches the running tool's
+ * auto-expanded height limit (a running row opens its body to this many lines
+ * so a reader can keep up with the streaming diff output without it spilling
+ * the chat flow). A design constant of this UI's row geometry, not a
+ * deployment choice.
  */
-export const CHAT_DIFF_MAX_LINES = 8
+export const CHAT_DIFF_MAX_LINES = 10
 
 /**
  * File-operation kind a mutation row names beside its title.

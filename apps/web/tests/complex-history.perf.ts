@@ -32,7 +32,7 @@ import {
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage } from './support.ts'
+import { connectFreshWorkspace, newEnglishPage, wheelConversationToTop } from './support.ts'
 
 const SIDEBAR_SESSION_COUNT = 1_000
 const LONG_SESSION_ID = 'perf-long-history'
@@ -1250,7 +1250,7 @@ describe('manual web performance: complex workspace and history', () => {
       while (turns < LONG_HISTORY_TURNS) {
         const previousTurns = turns
         const older = await measure(cdp, async () => {
-          await page.getByRole('button', { name: 'Load earlier', exact: true }).click()
+          await wheelConversationToTop(page)
           await expect.poll(() => conversationTurns(page), { timeout: 30_000 })
             .toBeGreaterThan(previousTurns)
           return conversationTurns(page)
@@ -1352,7 +1352,7 @@ describe('manual web performance: complex workspace and history', () => {
       while (turns < LONG_HISTORY_TURNS) {
         const previousTurns = turns
         const older = await measure(cdp, async () => {
-          await world.page.getByRole('button', { name: 'Load earlier', exact: true }).click()
+          await wheelConversationToTop(world.page)
           await expect.poll(() => conversationTurns(world.page), { timeout: 30_000 })
             .toBeGreaterThan(previousTurns)
           return conversationTurns(world.page)

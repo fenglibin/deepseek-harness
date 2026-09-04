@@ -15,6 +15,7 @@ The browser Chat target for Conversation assembly. It registers Chat event defin
 - [System prompt row](#system-prompt-row)
 - [Turn token usage](#turn-token-usage)
 - [Turn Process Folding](#turn-process-folding)
+- [User message drawer](#user-message-drawer)
 - [Model Experience](#model-experience)
 - [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
 - [Dev Note](#dev-note)
@@ -42,6 +43,13 @@ Settings → General exposes a persisted `Normal` / `Compact` conversation-displ
 
 -----
 
+<a id="user-message-drawer"></a>
+## User message drawer
+
+The right gutter carries a collapsed badge counting the loaded user prompts; expanding it lists each one with a trimmed first-line preview and jumps the reader to the row when picked. The drawer lists loaded Turns only, and a history window whose cut landed inside one long Turn holds no user prompt at all, so opening such a session pages older history back until one lands — the reader stays where they were while pages arrive above. Picking an entry whose row is not rendered yet keeps paging until that row arrives, then scrolls to it. A session with no user prompt anywhere pages to the start of its history and shows no drawer.
+
+-----
+
 <a id="model-experience"></a>
 ## Model Experience
 
@@ -55,7 +63,7 @@ None; Chat presentation does not assemble or mutate provider requests.
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **The view reflects the loaded Session window** — older transcript nodes become available only after Session Controller loads the preceding event page. Turn navigation likewise represents only loaded Turns; loading an earlier page preserves existing Turn marks and redistributes the complete loaded set in a compact rail without an unloaded-history placeholder. Marks stay 10px apart until the loaded set exceeds the available height, then compress to fit.
+- **The view reflects the loaded Session window** — older transcript nodes become available only after Session Controller loads the preceding event page. Turn navigation likewise represents only loaded Turns; loading an earlier page preserves existing Turn marks and redistributes the complete loaded set in a compact rail without an unloaded-history placeholder. Marks stay 10px apart until the loaded set exceeds the available height, then compress to fit. The user-message drawer needs at least one loaded user prompt, so opening a window that holds none loads older pages until one arrives.
 
 
 <a id="dev-note"></a>

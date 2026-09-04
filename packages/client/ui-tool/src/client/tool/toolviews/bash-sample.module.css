@@ -13,10 +13,9 @@
    the margin replaces the primitive's standalone vertical margin with the
    flow's. The row shows the card at every stage — closed included — so the
    output height is the stage's, not the open row's. Each cap derives from the
-   terminal's own line height, so the two can never disagree. */
+   terminal's own line height, so the two can never disagree; the font measure
+   stays the primitive's default, which reads the Settings size. */
 .terminal {
-  --dsl-terminal-font: var(--dsw-font-markdown-code-block-small);
-  --dsl-terminal-line-height: 18px;
   margin: 4px 0 4px 4px;
   border: 1px solid var(--dsw-alias-border-l1);
 }
@@ -57,7 +56,7 @@
   border: none;
   background: none;
   font: inherit;
-  font-size: var(--dsh-content-font-size-secondary, 13px);
+  font-size: var(--dsh-content-font-size, 14px);
   line-height: calc(24px + var(--dsh-content-font-delta, 0px));
   color: var(--dsw-alias-label-tertiary);
   white-space: nowrap;
@@ -85,7 +84,7 @@
   border: 1px solid var(--dsw-alias-border-l1);
   border-radius: 12px;
   background: var(--dsw-alias-markdown-code-block);
-  font: var(--dsw-font-markdown-code-block-small);
+  font: var(--dsh-content-font-code);
 }
 
 .ioSection {
@@ -225,7 +224,7 @@
 
 .title {
   flex: none;
-  font-size: var(--dsh-content-font-size-secondary, 13px);
+  font-size: var(--dsh-content-font-size, 14px);
   line-height: calc(24px + var(--dsh-content-font-delta, 0px));
   color: var(--dsw-alias-label-secondary);
 }

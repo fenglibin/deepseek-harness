@@ -126,11 +126,26 @@ describe('TodoRow', () => {
     expect(screen.getByText('todo_write · {"other":1}')).toBeTruthy()
   })
 
-  it('leading toggle expands the raw args body', () => {
+  it('expands into a structured todo list with per-status labels', () => {
     render(<TodoRow {...rowProps(resultNode(ARGS))} />)
     fireEvent.click(screen.getByRole('button', { expanded: false }))
     expect(screen.getByRole('button', { expanded: true })).toBeTruthy()
-    expect(screen.getByText(/搭骨架/)).toBeTruthy()
+    // Each item renders as a list row carrying its content and localized status.
+    expect(screen.getByText('搭骨架')).toBeTruthy()
+    expect(screen.getByText('写组件')).toBeTruthy()
+    expect(screen.getByText('补测试')).toBeTruthy()
+    expect(screen.getByText('已完成')).toBeTruthy()
+    expect(screen.getByText('进行中')).toBeTruthy()
+    expect(screen.getByText('待处理')).toBeTruthy()
+    // The raw JSON envelope is replaced by the structured card.
+    expect(screen.queryByText(/"todos"/)).toBeNull()
+  })
+
+  it('keeps the raw JSON body when the args are unusable for a list', () => {
+    render(<TodoRow {...rowProps(resultNode('not json'))} />)
+    fireEvent.click(screen.getByRole('button', { expanded: false }))
+    expect(screen.getByRole('button', { expanded: true })).toBeTruthy()
+    expect(screen.getByText('not json')).toBeTruthy()
   })
 
   it.each([

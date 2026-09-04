@@ -71,7 +71,10 @@ describe('resolveResponseLanguage', () => {
 
 describe('directiveText', () => {
   it('names Simplified Chinese for zh and produces empty text otherwise', () => {
-    expect(ResponseLanguage.directiveText('zh')).toContain('简体中文')
+    const zh = ResponseLanguage.directiveText('zh')
+    expect(zh).toContain('简体中文')
+    expect(zh).toContain('Do NOT switch to English')
+    expect(zh).toContain('mirror their tone but keep your reply in Chinese')
     expect(ResponseLanguage.directiveText(undefined)).toBe('')
   })
 })

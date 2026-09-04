@@ -4,9 +4,13 @@
    (--dsh-content-font-size-secondary: one step under the body — setting −1 at
    ≤14, setting −2 above), and the row height, leading box, and glyph edge
    shift by the body px delta so the icon keeps its optical share of the
-   line. */
+   line. A header whose body reads at the body size (a tool row, the reasoning
+   row) rebinds --dsl-disclosure-title-font-size on its own root, so the title
+   and the summary it sits beside stay one size. */
 
 .root {
+  --dsl-disclosure-title-font-size: var(--dsh-content-font-size-secondary, 13px);
+
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -78,7 +82,7 @@ button.leading {
 
 .title {
   flex: none;
-  font-size: var(--dsh-content-font-size-secondary, 13px);
+  font-size: var(--dsl-disclosure-title-font-size);
   line-height: calc(24px + var(--dsh-content-font-delta, 0px));
   color: var(--dsw-alias-label-secondary);
 }

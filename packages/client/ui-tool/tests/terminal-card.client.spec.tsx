@@ -334,9 +334,10 @@ describe('chat row terminal body', () => {
     expect(view.getByText('Terminal 3')).toBeTruthy()
   })
 
-  it('a running terminal call expands to the prompt line with no output yet', () => {
+  it('a running terminal call opens by default to the prompt line with no output yet', () => {
+    // A running terminal opens by default — the prompt line is the leading
+    // edge the reader wants to see stream in.
     const view = render(<GenericToolCard {...ownerProps(running())} />)
-    toggleRow(view)
     expect(view.getByText('ls -la')).toBeTruthy()
     expect(view.queryByText('复制')).toBeNull()
     // The card states its own run state: a running command reads as running
@@ -354,7 +355,8 @@ describe('chat row terminal body', () => {
     })
     const view = render(<GenericToolCard {...ownerProps(block)} toolName="terminal_send" t={translate} />)
     expect(view.getByText(description)).toBeTruthy()
-    toggleRow(view)
+    // A running terminal_send opens by default; the command copy is already
+    // visible without toggling.
     expect(view.getByText(command)).toBeTruthy()
   })
 

@@ -12,6 +12,7 @@
     { "path": "../../runtime-diagnostics/invariants" },
     { "path": "../../llm/llm" },
     { "path": "../../util/timeout" },
-    { "path": "../session-title" }
+    { "path": "../session-title" },
+    { "path": "../../core/lightweight-model" }
   ]
 }

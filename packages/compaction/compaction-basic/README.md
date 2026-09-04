@@ -66,8 +66,8 @@ All settings are optional. The defaults start condensing at 80% of the routed mo
 | `thresholdRatio` | `0.8` | Start condensing at `floor(routedContextWindow × ratio)`. |
 | `retainRatio` | `0.16` | Recent conversation kept verbatim as a fraction of the routed context window; mutually exclusive with `retainTokens`. |
 | `retainTokens` | — | Absolute recent-conversation budget kept verbatim; mutually exclusive with `retainRatio` and must be below the resolved threshold. |
-| `summarizationProvider` | `''` | Set together with `summarizationModel`; an empty pair uses the latest routed request target, then the `AgentOptions` pair. |
-| `summarizationModel` | `''` | Set together with `summarizationProvider`; an empty pair uses the latest routed request target, then the `AgentOptions` pair. |
+| `summarizationProvider` | `''` | Set together with `summarizationModel`; an empty pair uses the [lightweight model](../../core/lightweight-model/README.md) when one is selected, then the latest routed request target, then the `AgentOptions` pair. |
+| `summarizationModel` | `''` | Set together with `summarizationProvider`; an empty pair uses the [lightweight model](../../core/lightweight-model/README.md) when one is selected, then the latest routed request target, then the `AgentOptions` pair. |
 | `maxTokens` | `8192` | Output cap for the summarization request; may include reasoning tokens. |
 | `compactionRetries` | `1` | Extra condensation attempts after the first when pressure remains above threshold. |
 | `maxOverflowRetries` | `1` | Maximum retries after a confirmed context-window overflow; `0` disables recovery only. |

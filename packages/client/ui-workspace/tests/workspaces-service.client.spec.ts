@@ -527,4 +527,47 @@ describe('UiWorkspaceService', () => {
       rpcError: { code: 'directory-picker/exists' },
     })
   })
+
+  it('publishes unsent drafts as an observable set the browsing surfaces can bind', () => {
+    const b = bench()
+    const held = sid('held')
+    const empty = sid('empty')
+    const drafts = b.uiWorkspace.drafts
+    const seen: string[][] = []
+    const disposer = drafts.subscribe(() => {
+      seen.push([...drafts.getSnapshot()].map(id => id as string))
+    })
+    expect([...drafts.getSnapshot()]).toEqual([])
+    b.uiWorkspace.noteDraft(held, 'half-typed prompt')
+    expect([...drafts.getSnapshot()]).toEqual([held])
+    // A repeat of the same content changes nothing, so the snapshot identity
+    // (and every consumer's memo) survives.
+    const stable = drafts.getSnapshot()
+    b.uiWorkspace.noteDraft(held, 'half-typed prompt')
+    expect(drafts.getSnapshot()).toBe(stable)
+    // Whitespace-only text sends nothing, so it must not hold a row.
+    b.uiWorkspace.noteDraft(empty, '   ')
+    expect([...drafts.getSnapshot()]).toEqual([held])
+    b.uiWorkspace.noteDraft(held, '')
+    expect([...drafts.getSnapshot()]).toEqual([])
+    // Whitespace-only and repeated writes notify nobody.
+    expect(seen).toEqual([['held'], []])
+    disposer()
+  })
+
+  it('drops a Session from the draft registry when its log is deleted', async () => {
+    const b = bench()
+    const gone = sid('gone')
+    b.uiWorkspace.noteDraft(gone, 'never sent')
+    expect(b.uiWorkspace.drafts.getSnapshot().has(gone)).toBe(true)
+    await expect(b.uiWorkspace.deleteSession(gone)).resolves.toEqual({ ok: true })
+    expect(b.uiWorkspace.drafts.getSnapshot().has(gone)).toBe(false)
+    // A Host refusal removes nothing, so the draft stays.
+    b.uiWorkspace.noteDraft(gone, 'still here')
+    b.sessions.onDelete = async () => {
+      throw new Error('nope')
+    }
+    await expect(b.uiWorkspace.deleteSession(gone)).resolves.toMatchObject({ ok: false })
+    expect(b.uiWorkspace.drafts.getSnapshot().has(gone)).toBe(true)
+  })
 })

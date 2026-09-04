@@ -121,7 +121,7 @@
   border-radius: 8px;
   background: var(--dsw-alias-markdown-code-block);
   color: var(--dsw-alias-label-secondary);
-  font: var(--dsw-font-markdown-code-block-small);
+  font: var(--dsh-content-font-code);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

@@ -123,15 +123,26 @@ function byRecency(a: SessionSummary, b: SessionSummary): number {
 }
 
 /**
- * Ordinary sessions are visible; among blank sessions, only the current one
- * is visible. Subagent children use their parent header catalog; archived
- * sessions are visible nowhere, while their accounting slots remain so
- * unarchiving restores position.
+ * Ordinary sessions are visible; among blank sessions, the current one and
+ * any session still carrying an unsent composer draft are visible, so typed
+ * content the operator has not sent cannot be dropped by navigating away.
+ * Subagent children use their parent header catalog; archived sessions are
+ * visible nowhere, while their accounting slots remain so unarchiving
+ * restores position.
+ * @param session - candidate list row.
+ * @param current - selected Session id.
+ * @param archived - archived Session ids.
+ * @param drafting - Sessions whose composer holds an unsent draft.
  */
-function sessionVisible(session: SessionSummary, current: SessionId | undefined, archived: ReadonlySet<SessionId>): boolean {
+function sessionVisible(
+  session: SessionSummary,
+  current: SessionId | undefined,
+  archived: ReadonlySet<SessionId>,
+  drafting: ReadonlySet<SessionId>,
+): boolean {
   return session.origin !== 'subagent'
     && !archived.has(session.id)
-    && (!session.blank || session.id === current)
+    && (!session.blank || session.id === current || drafting.has(session.id))
 }
 
 /**
@@ -193,6 +204,7 @@ function groupByWorkspace(
   list: SessionListState,
   workspaces: readonly WorkspaceView[],
   archived: ReadonlySet<SessionId>,
+  drafting: ReadonlySet<SessionId>,
   ungroupedOrder: readonly string[] | undefined,
 ): Group[] {
   const groups: Group[] = []
@@ -203,7 +215,7 @@ function groupByWorkspace(
       const summary = list.byId[id]
       if (summary === undefined) continue // account may lead the list pull; the row appears when the summary lands
       accounted.add(id)
-      if (!sessionVisible(summary, list.current, archived)) continue
+      if (!sessionVisible(summary, list.current, archived, drafting)) continue
       members.push(summary)
     }
     groups.push(buildGroup(
@@ -214,7 +226,7 @@ function groupByWorkspace(
   const stray = list.ids
     .map(id => list.byId[id])
     .filter((s): s is SessionSummary =>
-      s !== undefined && !accounted.has(s.id) && sessionVisible(s, list.current, archived))
+      s !== undefined && !accounted.has(s.id) && sessionVisible(s, list.current, archived, drafting))
   if (stray.length > 0) {
     groups.push(buildGroup(
       UNGROUPED_KEY,
@@ -265,12 +277,13 @@ function sessionNode(
  *
  * Every group shows; sessions populate under expanded groups in the selected
  * local order. Blank sessions are excluded except for the selected
- * provisional New Session row; archived sessions are excluded everywhere.
- * Content search lives outside this derivation
- * (see {@link deriveSearchResults}).
+ * provisional New Session row and any session still carrying an unsent
+ * composer draft; archived sessions are excluded everywhere. Content search
+ * lives outside this derivation (see {@link deriveSearchResults}).
  * @param list - sessions list snapshot (`current` feeds containsCurrent).
  * @param workspaces - real workspaces in stable Host order.
  * @param archivedSessionIds - registry-global archive set.
+ * @param draftingSessions - Sessions whose composer holds an unsent draft.
  * @param pendingInteractions - pending UI interactions by Session.
  * @param view - local expansion arrays.
  * @returns group sections in render order.
@@ -279,6 +292,7 @@ export function deriveGroups(
   list: SessionListState,
   workspaces: readonly WorkspaceView[],
   archivedSessionIds: readonly SessionId[],
+  draftingSessions: ReadonlySet<SessionId>,
   pendingInteractions: SessionPendingInteractions,
   view: TreeView,
 ): GroupNode[] {
@@ -290,7 +304,7 @@ export function deriveGroups(
     : (workspaces.find(w => w.sessionIds.includes(list.current as SessionId))?.workspaceId as string | undefined)
         ?? UNGROUPED_KEY
   const groups: GroupNode[] = []
-  for (const g of groupByWorkspace(list, workspaces, archived, view.ungroupedOrder)) {
+  for (const g of groupByWorkspace(list, workspaces, archived, draftingSessions, view.ungroupedOrder)) {
     const expanded = expandedGroups.has(g.key)
     groups.push({
       key: g.key,
@@ -316,12 +330,14 @@ export function deriveGroups(
  * (see {@link deriveSearchResults}).
  * @param list - sessions list snapshot.
  * @param archivedSessionIds - registry-global archive set.
+ * @param draftingSessions - Sessions whose composer holds an unsent draft.
  * @param pendingInteractions - pending UI interactions by Session.
  * @returns flat rows in render order.
  */
 export function deriveFlat(
   list: SessionListState,
   archivedSessionIds: readonly SessionId[],
+  draftingSessions: ReadonlySet<SessionId>,
   pendingInteractions: SessionPendingInteractions,
 ): SessionNode[] {
   const archived = new Set(archivedSessionIds)
@@ -329,7 +345,7 @@ export function deriveFlat(
   const rows: SessionSummary[] = []
   for (const id of list.ids) {
     const s = list.byId[id]
-    if (s === undefined || !sessionVisible(s, list.current, archived)) continue
+    if (s === undefined || !sessionVisible(s, list.current, archived, draftingSessions)) continue
     rows.push(s)
   }
   rows.sort(byRecency)
@@ -370,6 +386,8 @@ export function deriveArchived(
  * @param workspaces - Workspace membership and display labels.
  * @param query - caller text; surrounding whitespace is ignored.
  * @param archivedSessionIds - registry-global archive set (members never match).
+ * @param draftingSessions - Sessions with an unsent composer draft; a blank
+ *   row never matches, so this only keeps the signature aligned with the tree.
  * @param pendingInteractions - pending UI interactions by Session.
  * @param content - ranked Host content-search page.
  * @param limit - protocol-owned maximum merged row count.
@@ -380,6 +398,7 @@ export function deriveSearchResults(
   workspaces: readonly WorkspaceView[],
   query: string,
   archivedSessionIds: readonly SessionId[],
+  draftingSessions: ReadonlySet<SessionId>,
   pendingInteractions: SessionPendingInteractions,
   content: { items: readonly SessionSearchResultItem[]; hasMore: boolean },
   limit: number,
@@ -407,7 +426,7 @@ export function deriveSearchResults(
     const summary = list.byId[id]
     // Blank placeholders never match a query (their canonical title displays
     // localized, so matching it would tie search to one language).
-    if (summary === undefined || summary.blank || !sessionVisible(summary, list.current, archived)) continue
+    if (summary === undefined || summary.blank || !sessionVisible(summary, list.current, archived, draftingSessions)) continue
     if (
       sessionTitle(summary).toLowerCase().includes(q)
       || labelOf(summary).toLowerCase().includes(q)
@@ -427,7 +446,7 @@ export function deriveSearchResults(
   for (const summary of local) include(summary)
   for (const item of content.items) {
     const summary = list.byId[item.sessionId]
-    if (summary !== undefined && !summary.blank && sessionVisible(summary, list.current, archived)) include(summary)
+    if (summary !== undefined && !summary.blank && sessionVisible(summary, list.current, archived, draftingSessions)) include(summary)
   }
 
   return {

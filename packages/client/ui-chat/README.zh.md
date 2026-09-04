@@ -15,6 +15,7 @@ Conversation 组装的浏览器 Chat target。本包注册 Chat event definition
 - [系统提示词行](#system-prompt-row)
 - [轮次 token 用量](#turn-token-usage)
 - [轮次过程折叠](#turn-process-folding)
+- [用户消息抽屉](#user-message-drawer)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -42,6 +43,13 @@ Chat 会为每个非空的初始或恢复请求、显式消息序列起点或真
 
 -----
 
+<a id="user-message-drawer"></a>
+## 用户消息抽屉
+
+右侧留白区有一枚折叠徽标，显示已加载用户提示词的数量；展开后逐条列出并给出裁剪后的首行预览，点击即把读者带到对应行。抽屉只列出已加载轮次，而历史窗口的切分点若落在一个很长的轮次内部，窗口内就一条用户提示词都没有，因此打开这样的会话会自动向前翻页直到其中出现一条；翻页内容从上方进入，读者位置保持不变。若点击的条目所在行尚未渲染，则继续翻页直到该行出现，再滚动到该行。任何位置都没有用户提示词的会话会一直翻到历史开头，且不显示抽屉。
+
+-----
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -55,7 +63,7 @@ Chat 会为每个非空的初始或恢复请求、显式消息序列起点或真
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **视图只反映已加载的 Session 窗口**——只有 Session Controller 加载前一页 event 后，更早的 transcript node 才会出现。轮次导航同样只表示已加载的 Turn；加载更早一页时，已有 Turn 刻度保持身份不变，完整的已加载集合在紧凑轨道中重新排布，不显示未加载历史占位。刻度默认相隔 10px，仅在已加载集合超过可用高度时压缩间距。
+- **视图只反映已加载的 Session 窗口**——只有 Session Controller 加载前一页 event 后，更早的 transcript node 才会出现。轮次导航同样只表示已加载的 Turn；加载更早一页时，已有 Turn 刻度保持身份不变，完整的已加载集合在紧凑轨道中重新排布，不显示未加载历史占位。刻度默认相隔 10px，仅在已加载集合超过可用高度时压缩间距。用户消息抽屉至少需要一条已加载的用户提示词，因此打开一个窗口内没有任何提示词的会话时，会自动加载更早的分页直到出现一条。
 
 
 <a id="dev-note"></a>

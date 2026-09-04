@@ -282,14 +282,18 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     await details.getByRole('button', { name: 'Close details' }).click()
   }, 60_000)
 
-  it.skipIf(MODE === 'record')('downloads through the Session Header and /export with one dialog', async () => {
+  it.skipIf(MODE === 'record')('downloads through the Session Header and /export without a dialog', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-navigation-export'))
     await ensureSeedOpen(page)
     const exportButton = page.getByRole('button', { name: 'Session log' })
     expect(await exportButton.isDisabled()).toBe(false)
+    // The capsule's arrow is the control the Header now aligns to its right
+    // edge; the label sits one arrow-width further in.
+    const rangeMenu = page.getByRole('button', { name: 'More export options' })
+    expect(await rangeMenu.isDisabled()).toBe(false)
     const header = exportButton.locator('xpath=ancestor::header[1]')
     const [buttonBox, headerBox] = await Promise.all([
-      exportButton.boundingBox(), header.boundingBox(),
+      rangeMenu.boundingBox(), header.boundingBox(),
     ])
     if (buttonBox === null || headerBox === null) {
       throw new Error('Session Header export geometry is unavailable')
@@ -304,8 +308,8 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     expect(response.status()).toBe(200)
     const download = await downloadPromise
     expect(download.suggestedFilename()).toMatch(/^dsh-session-.+\.zip$/)
-    const dialog = page.getByRole('dialog', { name: 'Session download started' })
-    await dialog.waitFor({ timeout: 30_000 })
+    // The browser download manager reports a started download; the page stays dialog-free.
+    expect(await page.getByRole('dialog').count()).toBe(0)
     // The real host streamed the ZIP; its root entry is the persisted log
     // text verbatim (the assembled seam: real route, real persistence read).
     const files = unzipSync(await readFile(await download.path()))
@@ -313,7 +317,6 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
     const content = strFromU8(files['session.jsonl'] as Uint8Array)
     expect(content.split('\n')[0]).toContain(SEED_ID)
     expect(content).toContain('FIRST_DONE')
-    await dialog.getByText('Close', { exact: true }).click()
 
     const observer = await newEnglishPage(browser)
     const observerTripwire = watchConsole(observer)
@@ -350,12 +353,10 @@ describe('web e2e: navigation & panes over a rich seeded session', () => {
       const exportDone = slashEvents.find(event =>
         event.type === 'command/done' && event.data.commandId === exportRun.data.commandId)
       expect(exportDone?.type).toBe('command/done')
-      await page.getByRole('dialog', { name: 'Session download started' }).waitFor({ timeout: 30_000 })
-      await page.getByRole('dialog', { name: 'Session download started' })
-        .getByText('Close', { exact: true }).click()
+      expect(await page.getByRole('dialog').count()).toBe(0)
       await observer.getByText('Session log download requested.', { exact: true }).waitFor({ timeout: 30_000 })
       expect(observerDownloads).toBe(0)
-      expect(await observer.getByRole('dialog', { name: 'Session download started' }).count()).toBe(0)
+      expect(await observer.getByRole('dialog').count()).toBe(0)
       expect({
         pageErrors: observerTripwire.pageErrors,
         slotErrors: observerSlotErrors,

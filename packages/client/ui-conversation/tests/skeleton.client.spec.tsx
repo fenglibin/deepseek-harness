@@ -724,8 +724,40 @@ describe('ConversationRoot resident composer', () => {
     expect(root.style.getPropertyValue('--dsh-composer-user-height')).toBe('')
   })
 
-  it('hero phase renders no height handle (the centered composer sizes itself)', () => {
+  it('hero phase offers the height handle, so a fresh session resizes like a live one', () => {
     const b = mount(sessionSnapshotOf({ blank: true }))
+    const root = b.view.container.querySelector('[data-phase]') as HTMLElement
+    expect(root.getAttribute('data-phase')).toBe('hero')
+    expect(b.view.container.querySelector('[data-height-handle]')).not.toBeNull()
+  })
+
+  it('drag → persist round-trip on the hero height handle', () => {
+    const b = mount(sessionSnapshotOf({ blank: true }))
+    const root = b.view.container.querySelector('[data-phase]') as HTMLElement
+    Object.defineProperty(root, 'clientHeight', { value: 900, configurable: true })
+    act(() => { fireResize(root) })
+    const handle = b.view.container.querySelector('[data-height-handle]') as HTMLElement
+    expect(handle).not.toBeNull()
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => { cb(0); return 1 })
+    const restore = stubPointerCapture()
+    try {
+      // Same base as the docked bar: no preference yet, so 336 (the
+      // stylesheet cap), and max = 900 − 240 = 660.
+      fireEvent.pointerDown(handle, { pointerId: 1, clientY: 300 })
+      fireEvent.pointerMove(handle, { pointerId: 1, clientY: 260 })
+      expect(root.style.getPropertyValue('--dsh-composer-user-height')).toBe('376px')
+      fireEvent.pointerUp(handle, { pointerId: 1, clientY: 240 })
+      expect(localStorage.getItem('dsh.conversation.composerHeight')).toBe('396')
+    } finally {
+      restore()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('settling phase renders no height handle (the composer is not on screen yet)', () => {
+    const b = mount(sessionSnapshotOf({ blank: true, openState: 'loading' }))
+    const root = b.view.container.querySelector('[data-phase]') as HTMLElement
+    expect(root.getAttribute('data-phase')).toBe('settling')
     expect(b.view.container.querySelector('[data-height-handle]')).toBeNull()
   })
 })

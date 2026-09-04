@@ -109,6 +109,13 @@ export type WorkspaceBrowserInjected = {
      * saw. Select the field the surface needs (`info => info.home`).
      */
     hostInfo: HostObservable<RemoteHostFacts>
+    /**
+     * Sessions whose composer holds an unsent draft. A blank Session is the
+     * provisional New Session row and is normally listed only while it is
+     * selected; membership here keeps it listed after the operator navigates
+     * away, so typed-but-unsent content stays reachable.
+     */
+    sessionDrafts: HostObservable<ReadonlySet<SessionId>>
   }
   /**
    * Start a New Session in a Workspace: reuse-or-create its blank session and

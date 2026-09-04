@@ -21,9 +21,9 @@
   padding: 16px;
   border-radius: 12px;
   background: var(--dsw-alias-markdown-code-block);
-  font-family: var(--ds-font-family-code);
-  font-size: 13px;
-  line-height: 22px;
+  /* The same measure the transcript's tool cards use, so the details drawer's
+     raw payload reads at the Settings font size too. */
+  font: var(--dsh-content-font-code);
   color: var(--dsw-alias-label-primary);
   white-space: pre-wrap;
   word-break: break-word;
@@ -40,7 +40,7 @@
 
 .empty {
   padding: 8px 0;
-  font-size: 13px;
-  line-height: 20px;
+  font-size: var(--dsh-content-font-size, 14px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
   color: var(--dsw-alias-label-tertiary);
 }

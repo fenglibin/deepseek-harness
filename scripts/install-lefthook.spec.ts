@@ -491,7 +491,7 @@ describe('worktree-local Lefthook installer', { timeout: 90_000 }, () => {
     expect(existsSync(hooksPath(fixture, fixture.main))).toBe(false)
   })
 
-  it('leaves stale installer locks for explicit recovery', async () => {
+  it('recovers a stale installer lock whose owner process is dead', async () => {
     const fixture = createFixture()
     const lockPath = installLockPath(fixture)
     const completed = spawnSync(process.execPath, ['-e', ''])
@@ -499,19 +499,14 @@ describe('worktree-local Lefthook installer', { timeout: 90_000 }, () => {
     const staleRecord = `${String(completed.pid)} 00000000-0000-4000-8000-000000000000\n`
     writeFileSync(lockPath, staleRecord)
 
-    const results = await Promise.all(Array.from(
-      { length: 4 },
-      () => runInstaller(fixture, fixture.main),
-    ))
+    const result = await runInstaller(fixture, fixture.main)
 
-    for (const result of results) {
-      expect(result.status).toBe(1)
-      expect(result.stderr).toContain('stale Lefthook installer lock')
-      expect(result.stderr).toContain('remove it manually')
-    }
-    expect(readFileSync(lockPath, 'utf8')).toBe(staleRecord)
-    expect(existsSync(hooksPath(fixture, fixture.main))).toBe(false)
-    expect(gitResult(fixture, fixture.main, ['config', '--get', 'extensions.worktreeConfig']).status).toBe(1)
+    expect(result.status, result.stderr).toBe(0)
+    expect(existsSync(lockPath)).toBe(false)
+    expect(existsSync(join(hooksPath(fixture, fixture.main), 'pre-commit'))).toBe(true)
+    expect(git(fixture, fixture.main, ['config', '--worktree', '--get', 'core.hooksPath'])).toBe(
+      hooksPath(fixture, fixture.main),
+    )
   })
 
   it('leaves invalid installer locks for explicit recovery', async () => {

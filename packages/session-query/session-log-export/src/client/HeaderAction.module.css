@@ -1,3 +1,9 @@
+.sessionLogCluster {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
 .sessionLogButton {
   display: inline-flex;
   align-items: center;
@@ -7,7 +13,7 @@
   padding: 6px 12px;
   gap: 4px;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 18px;
+  border-radius: 18px 0 0 18px;
   color: var(--dsw-alias-label-primary);
   background: transparent;
   font-family: var(--dsw-font-family);
@@ -33,4 +39,31 @@
 
 .sessionLogButton span {
   white-space: nowrap;
+}
+
+.sessionLogMenuButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 32px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-left: none;
+  border-radius: 0 18px 18px 0;
+  color: var(--dsw-alias-label-primary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sessionLogMenuButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.sessionLogMenuButton:disabled {
+  color: var(--dsw-alias-label-dimmed);
+  cursor: wait;
+}
+
+.sessionLogMenuButton svg {
+  flex: none;
 }

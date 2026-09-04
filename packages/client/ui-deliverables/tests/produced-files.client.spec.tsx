@@ -25,7 +25,8 @@ import {
   fitProducedFiles, ProducedFiles, type ProducedFilesInjected, type ProducedFilesProps,
 } from '../src/client/ProducedFiles.tsx'
 import {
-  basename, deliverablesDefinition, producedFileMentions, producedForClosing, selectProducedFiles,
+  basename, deliverablesDefinition, producedFileMentions,
+  producedForClosing, selectProducedFiles,
   type DeliverablesTurnData,
 } from '../src/client/turn-deliverables.ts'
 import { apply, inject } from '../src/client/index.ts'
@@ -70,7 +71,7 @@ const turnLocation = (turn: number, deliverables?: DeliverablesTurnData): TurnLo
 }
 
 const produced = (...values: ReadonlyArray<readonly [seq: number, path: string]>): DeliverablesTurnData => ({
-  produced: values.map(([seq, path]) => ({ seq, path })),
+  produced: values.map(([seq, path]) => ({ seq, path, operation: 'write' as const })),
 })
 
 function tailOwner(

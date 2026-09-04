@@ -153,19 +153,36 @@
   justify-content: center;
 }
 
-.older button {
-  border: none;
+.olderLoading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border-radius: 14px;
   padding: 4px 12px;
   font-size: 12px;
   color: var(--dsw-alias-label-secondary);
   background: var(--dsw-alias-interactive-bg-hover-solid);
-  cursor: pointer;
 }
 
-.older button:disabled {
-  cursor: default;
-  opacity: 0.6;
+.olderSpinner {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--dsw-alias-border-l2);
+  border-top-color: var(--dsw-alias-label-secondary);
+  border-radius: 50%;
+  animation: older-loading-spin 700ms linear infinite;
+}
+
+@keyframes older-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .olderSpinner {
+    animation: none;
+  }
 }
 
 /* Back-to-bottom: zero-height sticky slot so the control does not extend

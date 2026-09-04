@@ -2,14 +2,22 @@
 /** Model-list editing, endpoint interrogation, and hand-declared provider creation. */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import { bindSnapshotSelector, RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SettingsNamespaceView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
-import { ModelsSection, providerCopy } from '../src/client/ModelsSection.tsx'
+import { SettingsSchemaService } from '@deepseek-ai/dsh-client-ui-settings/src/client/schema.ts'
+import { SettingsScopeController } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-scope.ts'
+import { ModelsSection } from '../src/client/ModelsSection.tsx'
 import type { ModelsSectionInjected, ModelsSectionProps } from '../src/client/ModelsSection.tsx'
+import { providerCopy } from '../src/client/provider-identity.ts'
 import { CustomProviderCard } from '../src/client/CustomProviderCard.tsx'
 import { formatCapacity, parseCapacity } from '../src/client/DeepSeekModelsEditor.tsx'
+import {
+  LIGHTWEIGHT_MODEL_SETTINGS_NS, LightweightModelStore,
+} from '../src/client/lightweight-model-store.ts'
+import type { LightweightModelSettings } from '../src/client/lightweight-model-store.ts'
 import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import { ModelsSettingsStore, deriveKeyRef, protocolChoices } from '../src/client/store.ts'
 import { createModelsOperations } from '../src/client/operations.ts'
@@ -198,6 +206,27 @@ function firstMutate(mutate: ReturnType<typeof vi.fn>): MutateCall {
   return { ns, ops, ...expectedRevision === undefined ? {} : { expectedRevision } }
 }
 
+/**
+ * The lightweight-model props a section mount needs. This spec scripts the
+ * provider directory rather than the model catalog, so the card takes the
+ * remote-browser posture: a memory-mode scope, which never answers and never
+ * accepts a write.
+ * @param face - the scripted wire face the page context is built from.
+ * @returns the two props ModelsSection reads for the card.
+ */
+function lockedLightweight(face: object) {
+  const ctx = ctxWith(face)
+  const scope = new SettingsScopeController<LightweightModelSettings>(
+    ctx,
+    { namespace: LIGHTWEIGHT_MODEL_SETTINGS_NS },
+    new SettingsDescribeMirror(ctx, 'memory'),
+    'memory',
+    new SettingsSchemaService(new Context()),
+  )
+  const lightweight = new LightweightModelStore(scope, ctx)
+  return { lightweight, useLightweight: bindSnapshotSelector(lightweight.store) }
+}
+
 async function mountSection(options: Parameters<typeof scriptedFace>[0] = {}) {
   const scripted = scriptedFace(options)
   const controller = new ModelsSettingsStore(
@@ -205,6 +234,7 @@ async function mountSection(options: Parameters<typeof scriptedFace>[0] = {}) {
   await controller.load()
   const injected: ModelsSectionProps = {
     controller,
+    ...lockedLightweight(scripted.face),
     useSnapshot: bindSnapshotSelector(controller.store),
     operations: operationsWith(scripted.face),
     schema: settingsSchema,
@@ -660,7 +690,9 @@ describe('endpoint interrogation', () => {
     openEditor('openai')
 
     fireEvent.click(screen.getByText(en.fetchModels))
-    const dialog = await screen.findByRole('dialog')
+    // The editor is itself a dialog now, so the picker is named rather than
+    // being the only dialog on the page.
+    const dialog = await screen.findByRole('dialog', { name: en.fetchTitle })
     // The editor card carries a Cancel of its own; this one is the dialog's.
     fireEvent.click(within_(dialog, en.cancel))
 
@@ -697,7 +729,9 @@ describe('endpoint interrogation', () => {
     openEditor('openai')
 
     fireEvent.click(screen.getByText(en.fetchModels))
-    const dialog = await screen.findByRole('dialog')
+    // The editor is itself a dialog now, so the picker is named rather than
+    // being the only dialog on the page.
+    const dialog = await screen.findByRole('dialog', { name: en.fetchTitle })
     const boxes = [...dialog.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
     expect(boxes.map(box => box.checked)).toEqual([true, true, true])
 
@@ -724,7 +758,9 @@ describe('candidate filtering', () => {
     await mountSection({ discover })
     openEditor('openai')
     fireEvent.click(screen.getByText(en.fetchModels))
-    return await screen.findByRole('dialog')
+    // The editor is itself a dialog now, so the picker is named rather than
+    // being the only dialog on the page.
+    return await screen.findByRole('dialog', { name: en.fetchTitle })
   }
 
   /** Type `text` into the picker's filter field. */
@@ -764,7 +800,9 @@ describe('candidate filtering', () => {
     const { mutate } = await mountSection({ discover })
     openEditor('openai')
     fireEvent.click(screen.getByText(en.fetchModels))
-    const dialog = await screen.findByRole('dialog')
+    // The editor is itself a dialog now, so the picker is named rather than
+    // being the only dialog on the page.
+    const dialog = await screen.findByRole('dialog', { name: en.fetchTitle })
 
     // Every discovered candidate starts picked, so clearing the whole list
     // takes one unfiltered action; from there each filter selects its own rows.
@@ -795,7 +833,7 @@ describe('candidate filtering', () => {
     await waitFor(() => { expect(screen.queryByText(en.fetchTitle)).toBeNull() })
 
     fireEvent.click(screen.getByText(en.fetchModels))
-    const reopened = await screen.findByRole('dialog')
+    const reopened = await screen.findByRole('dialog', { name: en.fetchTitle })
     const field = within(reopened).getByRole('searchbox', { name: en.fetchFilter })
     expect((field as HTMLInputElement).value).toBe('')
     expect(listedCandidates(reopened)).toEqual(['acme-mini', 'other-nano'])
@@ -836,6 +874,7 @@ describe('provider rows', () => {
     await controller.load()
     render(<ModelsSection
       controller={controller}
+      {...lockedLightweight(scripted.face)}
       useSnapshot={bindSnapshotSelector(controller.store)}
       operations={operationsWith(scripted.face)}
       schema={settingsSchema}

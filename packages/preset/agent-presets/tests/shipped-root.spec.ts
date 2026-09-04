@@ -111,4 +111,20 @@ describe('the shipped preset root', () => {
       expect(toolWeb.config.fetch, id).toBe(true)
     }
   })
+
+  it('mounts the delivery-discipline tools in each tool-bearing Web app preset', async () => {
+    for (const id of ['cordis', 'ptc', 'standard']) {
+      const source = await readFile(join(SHIPPED_PRESET_ROOT, id, 'agent.cordis.yml'), 'utf8')
+      const entries: unknown = yaml.load(source, { schema: entryListSchema })
+      if (!Array.isArray(entries)) throw new TypeError(`${id} preset must contain a Cordis entry list`)
+      const delivery: unknown = entries.find((entry: unknown) =>
+        typeof entry === 'object' && entry !== null && 'id' in entry && entry.id === 'tool-delivery')
+      expect(delivery, id).toBeDefined()
+      if (typeof delivery !== 'object' || delivery === null || !('config' in delivery)
+        || typeof delivery.config !== 'object' || delivery.config === null || !('enforcement' in delivery.config)) {
+        throw new TypeError(`${id} preset must configure tool-delivery.enforcement`)
+      }
+      expect(delivery.config.enforcement, id).toBe('stateful')
+    }
+  })
 })

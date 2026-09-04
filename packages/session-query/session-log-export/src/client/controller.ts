@@ -3,13 +3,15 @@
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
-/** Download phases presented by the shared modal. */
+/** Phases of one Session's browser download. */
 export type SessionLogDownloadStatus = 'downloading' | 'success' | 'error'
 
-/** One Session's current download-dialog state. */
+/** One Session's current download state. */
 export interface SessionLogDownloadEntry {
+  /** Whether the failure dialog is visible; a download that starts never opens one. */
   readonly open: boolean
   readonly status: SessionLogDownloadStatus
+  /** Preflight failure detail, or `null` while the download is in flight or settled. */
   readonly error: string | null
 }
 
@@ -54,9 +56,13 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-/** Owns one in-flight browser download per Session and publishes modal state. */
+/**
+ * Owns one in-flight browser download per Session and publishes its state.
+ * The browser download manager reports a started download, so only a failed
+ * preflight opens a dialog.
+ */
 export class SessionLogDownloadController {
-  /** uSES-safe state source shared by every Session-scoped modal contribution. */
+  /** uSES-safe state source shared by every Session-scoped download contribution. */
   readonly store: SnapshotStore<SessionLogDownloadState> = createSnapshotStore(INITIAL)
 
   private readonly active = new Map<SessionId, { readonly abort: AbortController; readonly done: Promise<void> }>()
@@ -72,16 +78,18 @@ export class SessionLogDownloadController {
   ) {}
 
   /**
-   * Download one Session tree; concurrent gestures for the same Session share one operation.
-   * @param sessionId - root Session whose ZIP includes descendants and attachments.
+   * Download one Session; concurrent gestures for the same Session share one operation.
+   * @param sessionId - root Session whose ZIP carries its own log and attachments.
+   * @param includeDescendants - export every subagent descendant's log and the
+   * media those logs reference, not just this Session's own.
    * @returns after the browser save starts, an error state is published, or a late post-disposal request is ignored.
    */
-  download(sessionId: SessionId): Promise<void> {
+  download(sessionId: SessionId, includeDescendants = false): Promise<void> {
     const existing = this.active.get(sessionId)
     if (existing !== undefined) return existing.done
     if (this.disposed) return Promise.resolve()
     const abort = new AbortController()
-    const done = this.run(sessionId, abort.signal).finally(() => {
+    const done = this.run(sessionId, includeDescendants, abort.signal).finally(() => {
       this.active.delete(sessionId)
     })
     this.active.set(sessionId, { abort, done })
@@ -89,8 +97,8 @@ export class SessionLogDownloadController {
   }
 
   /**
-   * Close one Session's dialog without cancelling an in-flight browser download.
-   * @param sessionId - Session whose modal closes.
+   * Close one Session's failure dialog without cancelling an in-flight browser download.
+   * @param sessionId - Session whose dialog closes.
    */
   dismiss(sessionId: SessionId): void {
     const current = this.store.getSnapshot().bySession[String(sessionId)]
@@ -109,24 +117,22 @@ export class SessionLogDownloadController {
     await Promise.allSettled(active.map(operation => operation.done))
   }
 
-  private async run(sessionId: SessionId, signal: AbortSignal): Promise<void> {
-    this.publish(sessionId, { open: true, status: 'downloading', error: null })
+  private async run(sessionId: SessionId, includeDescendants: boolean, signal: AbortSignal): Promise<void> {
+    this.publish(sessionId, { open: false, status: 'downloading', error: null })
     try {
       const url = new URL('/api/session.export', hostBase())
       url.searchParams.set('sessionId', sessionId)
-      url.searchParams.set('includeDescendants', 'true')
+      url.searchParams.set('includeDescendants', String(includeDescendants))
       const response = await this.fetcher(url, { method: 'HEAD', signal })
       if (!response.ok) {
         const detail = await response.text().catch(() => '')
         throw new Error(`Export failed: HTTP ${response.status}${detail === '' ? '' : ` ${detail}`}`)
       }
       this.save(url.toString(), sessionLogZipFilename(sessionId))
-      const open = this.store.getSnapshot().bySession[String(sessionId)]?.open ?? true
-      this.publish(sessionId, { open, status: 'success', error: null })
+      this.publish(sessionId, { open: false, status: 'success', error: null })
     } catch (error: unknown) {
       if (signal.aborted) return
-      const open = this.store.getSnapshot().bySession[String(sessionId)]?.open ?? true
-      this.publish(sessionId, { open, status: 'error', error: messageOf(error) })
+      this.publish(sessionId, { open: true, status: 'error', error: messageOf(error) })
     }
   }
 

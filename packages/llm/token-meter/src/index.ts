@@ -19,6 +19,7 @@ import type {
   TokenMeterConfig,
 } from './types.ts'
 import { contextBreakdownProjectionDefinition } from './breakdown-projection.ts'
+import { turnUsageProjectionDefinition } from './turn-usage-projection.ts'
 import { contextPressureProjectionDefinition, tokenUsageProjectionDefinition } from './usage-projection.ts'
 import { estimateContent, estimateHeader, estimateMessage, ROLE_OVERHEAD } from './estimate.ts'
 import { commitSurfaceTokens, planSurfaceTokens } from './surface-fold.ts'
@@ -31,6 +32,7 @@ export type * from './types.ts'
 // in aggregate programs that only import the package root.
 export type * from './usage-projection.ts'
 export type * from './breakdown-projection.ts'
+export type * from './turn-usage-projection.ts'
 
 /**
  * Raw anchor facts captured at the latest successful call; the baseline is
@@ -102,6 +104,7 @@ export class TokenMeter extends Service {
     ctx.sessionProjections.register(tokenUsageProjectionDefinition)
     ctx.sessionProjections.register(contextPressureProjectionDefinition)
     ctx.sessionProjections.register(contextBreakdownProjectionDefinition)
+    ctx.sessionProjections.register(turnUsageProjectionDefinition)
 
     // Readers catch up independently, while eager observation bounds ordinary
     // read latency without creating state for sessions no consumer has read.

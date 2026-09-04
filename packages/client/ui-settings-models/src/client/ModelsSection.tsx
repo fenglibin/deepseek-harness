@@ -2,14 +2,16 @@
  * Models settings section: the provider rows joined from the configurable
  * directory, settings namespaces, and credential states, with one editor
  * card at a time. Rows expose only confirmed API-key state through accessible
- * solid configured or missing dots. A whole-section provider without a
- * configured key renders as its open setup card instead of a row, but only in
- * the first-run posture — no provider on the page can serve requests yet — and
- * only until the user closes that card; the add flow is a card carrying the
- * dormant-provider select. Each card kind owns its own open state, so closing
- * one never discards a draft in another. Every mutation writes through the
- * wire, while a provider removal first requires confirmation; the page
- * re-renders from pushed invalidations or the post-apply reload.
+ * solid configured or missing dots. Editing a row opens its card as a dialog
+ * over the section rather than expanding the row, so the list stays a list and
+ * the card keeps the width it has everywhere else on this page; the add flow
+ * is a dialog carrying the dormant-provider select. In the first-run posture —
+ * no provider on the page can serve requests yet — a whole-section provider
+ * without a configured key opens that same dialog by itself, and only until
+ * the user closes it. One card is open at a time, so closing one never
+ * discards a draft in another. Every mutation writes through the wire, while a
+ * provider removal first requires confirmation; the page re-renders from
+ * pushed invalidations or the post-apply reload.
  */
 
 import { useState } from 'react'
@@ -19,11 +21,15 @@ import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-sl
 // Type-only: pulls this package's SlotMap merge (the two Models child slots).
 import type {} from './slot-contract.ts'
 import { AddModelDialog } from './AddModelDialog.tsx'
+import { EditProviderDialog } from './EditProviderDialog.tsx'
+import { LightweightModelCard } from './LightweightModelCard.tsx'
 import { deriveKeyRef, keyConfiguredOf, protocolChoices, providerUsable } from './store.ts'
 import type { ModelsSettingsStore, ProviderRow } from './store.ts'
+import type { LightweightModelStore } from './lightweight-model-store.ts'
 import type { ModelsOperations } from './operations.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
-import { ProviderEditor, type ProviderEditorProps } from './ProviderEditor.tsx'
+import { providerCopy } from './provider-identity.ts'
+import type { ProviderIdentity } from './provider-identity.ts'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
@@ -31,9 +37,13 @@ import styles from './ModelsSection.module.css'
 export interface ModelsSectionInjected {
   /** The page store (loaded on mount, refreshed on pushed invalidations). */
   controller: ModelsSettingsStore
+  /** The lightweight-model preference store (one staged route over the catalog). */
+  lightweight: LightweightModelStore
   hooks: {
     /** Page snapshot bound by the UI renderer as useSnapshot. */
     snapshot: ModelsSettingsStore['store']
+    /** Lightweight-model snapshot bound by the UI renderer as useLightweight. */
+    lightweight: LightweightModelStore['store']
   }
   /** The Host operations the section and its cards invoke. */
   operations: ModelsOperations
@@ -60,43 +70,14 @@ export type ModelsSectionProps = Partial<InjectFace<ModelsSectionInjected>> & Pr
 
 type ModelsSectionFace = InjectFace<ModelsSectionInjected>
 
-/** Provider identity shared by row actions and confirmation copy. */
-export interface ProviderIdentity {
-  /** Stable provider route id. */
-  provider: string
-  /** Human-facing provider name. */
-  displayName: string
-}
-
 /** One existing row or dormant directory entry addressed by an editor action. */
 interface EditorTarget extends ProviderIdentity {
   settingsNs: string
   settingsPath: readonly string[]
   /** Writable credential identified under this page's conventional reference. */
   credentialRef?: string
-  /** The adapter reports this route as one it does not ship (see {@link ProviderEditorProps.declared}). */
+  /** The adapter reports this route as one it does not ship (see {@link ProviderEditor}). */
   declared?: boolean
-}
-
-/** Values that vary around the shared provider-editor rendering. */
-interface ProviderEditorRenderProps extends Pick<
-  ProviderEditorProps,
-  'namespace' | 'schema' | 'operations' | 't' | 'readOnly' | 'onClose'
-> {
-  target: EditorTarget
-}
-
-/** Render an editor for either the setup posture or an expanded provider row. */
-function renderProviderEditor({ target, ...props }: ProviderEditorRenderProps): ReactNode {
-  return (
-    <ProviderEditor
-      provider={target.provider}
-      displayName={target.displayName}
-      settingsPath={target.settingsPath}
-      {...target.declared === true ? { declared: true } : {}}
-      {...props}
-    />
-  )
 }
 
 /**
@@ -131,12 +112,13 @@ export async function removeProviderProfile(
 
 /**
  * Whether a whole-section provider still needs its first key: an unconfigured
- * credential opens the setup card instead of showing a row. This is the
- * first-run posture alone — a user who can already reach some provider gets an
- * ordinary row with the missing-key dot, since nothing here is blocking them.
+ * credential opens its card as a dialog instead of leaving it a row. This is
+ * the first-run posture alone — a user who can already reach some provider
+ * gets an ordinary row with the missing-key dot, since nothing here is
+ * blocking them.
  * @param row - the joined provider row.
  * @param anyUsable - whether any joined row can already serve requests.
- * @returns whether to render the setup card.
+ * @returns whether to open the card over the section.
  */
 export function needsSetup(row: ProviderRow, anyUsable: boolean): boolean {
   if (anyUsable) return false
@@ -162,35 +144,30 @@ function targetOf(row: ProviderRow): EditorTarget {
   }
 }
 
-/** Stable visible and accessible identity for one provider target. */
-export function providerTargetLabel(target: ProviderIdentity): string {
-  return target.provider === target.displayName
-    ? target.provider
-    : `${target.displayName} (${target.provider})`
-}
-
-/** Replace the one provider placeholder in localized destructive-action copy. */
-export function providerCopy(template: string, target: ProviderIdentity): string {
-  return template.replace('{provider}', () => providerTargetLabel(target))
-}
-
 /**
  * Render the Models section content column.
  * @param props - slot-delivered injected dependencies.
  * @returns the section, or null while the shell has not injected yet.
  */
 export function ModelsSection(props: ModelsSectionProps): ReactNode {
-  const { controller, useSnapshot, operations, schema, t, renderSlot } = props
+  const { controller, lightweight, useSnapshot, useLightweight, operations, schema, t, renderSlot } = props
   if (
-    controller === undefined || useSnapshot === undefined || operations === undefined
+    controller === undefined || lightweight === undefined || useSnapshot === undefined
+    || useLightweight === undefined || operations === undefined
     || schema === undefined || t === undefined
   ) return null
-  return <Loaded injected={{ controller, useSnapshot, operations, schema, t }} renderSlot={renderSlot} />
+  return (
+    <Loaded
+      injected={{ controller, lightweight, useSnapshot, useLightweight, operations, schema, t }}
+      renderSlot={renderSlot}
+    />
+  )
 }
 
 function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderSlot: ModelsRenderSlot }): ReactNode {
-  const { controller, operations, schema, t } = injected
+  const { controller, lightweight, operations, schema, t } = injected
   const state = injected.useSnapshot(snapshot => snapshot)
+  const lightweightState = injected.useLightweight(snapshot => snapshot)
   const [editing, setEditing] = useState<EditorTarget | undefined>(undefined)
   const [adding, setAdding] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<EditorTarget | undefined>(undefined)
@@ -206,22 +183,23 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
     void controller.load().then(() => { setSavedTarget(target) })
   }
 
-  const closeEditor = (changed: boolean, target: ProviderIdentity): void => {
+  /** Close the card the user opened: the row keeps its place in the list. */
+  const closeEditor = (changed: boolean, row: ProviderRow): void => {
     setEditing(undefined)
     setAdding(false)
-    if (changed) announceSaved(target)
+    if (changed) announceSaved(row.entry)
   }
 
   /**
-   * Close a setup card, which owns none of the state above: the row-editor,
-   * add, and declare cards each own one of those, so clearing them here would
-   * discard a draft the user opened beside this card. Dismissal is this card's
-   * own — the provider falls back to an ordinary row for the rest of the
-   * session, and reopens through Edit.
+   * Close the card the first-run posture opened by itself, which owns none of
+   * the state above: the row-editor, add, and declare cards each own one of
+   * those, so clearing them here would discard a draft the user opened beside
+   * this card. Dismissal is this card's own — the provider falls back to an
+   * ordinary row for the rest of the session, and reopens through Edit.
    */
-  const closeSetup = (changed: boolean, target: ProviderIdentity): void => {
-    setDismissedSetup(previous => new Set([...previous, target.provider]))
-    if (changed) announceSaved(target)
+  const closeSetup = (changed: boolean, row: ProviderRow): void => {
+    setDismissedSetup(previous => new Set([...previous, row.entry.provider]))
+    if (changed) announceSaved(row.entry)
   }
 
   const closeDelete = (): void => {
@@ -247,6 +225,9 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
   }
 
   if (state.status === 'idle') void controller.load()
+  // The card asks for its catalog only once the namespace it writes answers:
+  // an unopened Models page owes the wire nothing.
+  if (lightweightState.available) void lightweight.load()
   if (state.status === 'error') {
     /* v8 ignore next -- an error status always carries text; the fallback satisfies the nullable type */
     const errorText = state.error ?? ''
@@ -281,6 +262,39 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
   // there is nothing to declare and the entry point stays disabled.
   const protocols = protocolChoices(state.namespaces.get('llm-pi-ai'), schema)
 
+  // The one card open over the section, and the row it belongs to. Edit opens
+  // it; while nothing else is open, the first-run posture opens it itself for
+  // the row whose missing key is what stands between the user and a working
+  // model. A row a refresh dropped closes the card rather than leaving it
+  // editing something the directory no longer lists.
+  const editedRow = editing === undefined
+    ? undefined
+    : configured.find(row => row.entry.provider === editing.provider)
+  const setupRow = editing === undefined && !adding
+    ? configured.find(row => needsSetup(row, anyUsable) && !dismissedSetup.has(row.entry.provider))
+    : undefined
+  const cardRow = editedRow ?? setupRow
+  const closeCard = editedRow === undefined ? closeSetup : closeEditor
+
+  /** The one card, as the dialog every provider card on this page opens in. */
+  const card = (row: ProviderRow): ReactNode => {
+    const namespace = state.namespaces.get(row.entry.settingsNs)
+    /* v8 ignore next -- the join marks a row configured only when its namespace resolved */
+    if (namespace === undefined) return null
+    return (
+      <EditProviderDialog
+        row={row}
+        namespace={namespace}
+        schema={schema}
+        operations={operations}
+        t={t}
+        readOnly={!state.writable}
+        renderSlot={renderSlot}
+        onClose={(changed) => { closeCard(changed, row) }}
+      />
+    )
+  }
+
   return (
     <div className={styles['section']}>
       <h2 className={styles['title']}>{t('title')}</h2>
@@ -296,32 +310,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
       <ul className={styles['rows']}>
         {configured.map((row) => {
           const target = targetOf(row)
-          const namespace = state.namespaces.get(target.settingsNs)
-          /* v8 ignore next -- the join marks a row configured only when its namespace resolved */
-          if (namespace === undefined) return null
-          if (needsSetup(row, anyUsable) && !dismissedSetup.has(row.entry.provider)) {
-            // First-run posture: the provider exists but has no key — the
-            // setup card IS its presence on the page, until the user closes it.
-            return (
-              <li key={row.entry.provider} className={styles['setupCard']}>
-                {renderProviderEditor({
-                  target,
-                  namespace,
-                  schema,
-                  operations,
-                  t,
-                  readOnly: !state.writable,
-                  onClose: (changed) => { closeSetup(changed, target) },
-                })}
-                {renderSlot(
-                  'settings.models.provider-card',
-                  { provider: row.entry, configured: row.configured, keyConfigured: keyConfiguredOf(row) },
-                  { entryKey: row.entry.settingsNs },
-                )}
-              </li>
-            )
-          }
-          const open = !adding && editing?.provider === row.entry.provider
+          const open = cardRow === row
           const credentialConfigured = row.credential?.configured === true
           const credentialMissing = !credentialConfigured
             && row.apiKeyEnv !== undefined
@@ -365,10 +354,10 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                     onClick={() => {
                       setSavedTarget(undefined)
                       // One card at a time: an add dialog left open beside
-                      // this editor would be dismissed by closing either one,
+                      // this card would be dismissed by closing either one,
                       // discarding the other's draft.
                       setAdding(false)
-                      setEditing(open ? undefined : target)
+                      setEditing(target)
                     }}
                   >
                     {t('edit')}
@@ -392,26 +381,29 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                     : null}
                 </span>
               </div>
-              {renderSlot(
-                'settings.models.provider-card',
-                { provider: row.entry, configured: row.configured, keyConfigured: keyConfiguredOf(row) },
-                { entryKey: row.entry.settingsNs },
-              )}
+              {/* The adapter-family extension area rides the card: while this
+                  row's dialog is open it renders there, so the seat never
+                  reaches the page twice for one row. */}
               {open
-                ? renderProviderEditor({
-                  target,
-                  namespace,
-                  schema,
-                  operations,
-                  t,
-                  readOnly: !state.writable,
-                  onClose: (changed) => { closeEditor(changed, target) },
-                })
-                : null}
+                ? null
+                : renderSlot(
+                  'settings.models.provider-card',
+                  { provider: row.entry, configured: row.configured, keyConfigured: keyConfiguredOf(row) },
+                  { entryKey: row.entry.settingsNs },
+                )}
             </li>
           )
         })}
       </ul>
+      <LightweightModelCard
+        state={lightweightState}
+        t={t}
+        onSelect={(key) => { lightweight.select(key) }}
+        onClear={() => { lightweight.clear() }}
+        onSave={() => { void lightweight.save() }}
+        onDiscard={() => { lightweight.discard() }}
+        onRetry={() => { lightweight.retry() }}
+      />
       <div className={styles['addBlock']}>
         {/* One entry point for the two ways to gain a provider — adopt one the
             adapter already knows, or declare one by its endpoint — because
@@ -454,6 +446,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
           )
           : null}
       </div>
+      {cardRow === undefined ? null : card(cardRow)}
       {renderSlot('settings.models.footer', {})}
       <Modal
         open={deleteTarget !== undefined}

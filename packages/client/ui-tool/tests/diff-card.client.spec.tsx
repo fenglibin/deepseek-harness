@@ -220,9 +220,12 @@ describe('chat row diff body', () => {
     expect(view.getByText('hello fixture')).toBeTruthy()
   })
 
-  it('a running diff call expands to its intended change', () => {
+  it('a running diff call opens by default to its intended change', () => {
+    // A running row opens by default — the reader wants to see the intended
+    // change stream in. The body stays under the row's normal height cap
+    // (DiffBlock's own maxLines), so the chat flow never spills.
     const view = render(<GenericToolCard {...ownerProps(running())} />)
-    fireEvent.click(view.container.querySelector('[data-expandable]')!)
+    expect(view.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')).toBe('true')
     expect(view.container.querySelector('[data-diff]')).not.toBeNull()
   })
 
@@ -357,8 +360,14 @@ describe('FileMutationRow diff card', () => {
       call: { name: 'write', argsRaw: writeArgs },
       meta: { diffs: [] },
     }), 'write')} />)
-    // The collapsed row already carries the card's +/- totals beside the path.
-    expect(view.getByText('+1 -0')).toBeTruthy()
+    // The collapsed row already carries the card's +/- totals beside the path;
+    // each side is a coloured inner span (the +/- split halves) so screen
+    // readers and copy-paste see a single `+1 -0` textContent on the
+    // wrapping `.diffStat` carrier.
+    const stat = view.container.querySelector('[class*="diffStat_"]')
+    expect(stat?.textContent).toBe('+1 -0')
+    expect(stat?.querySelector('[class*="diffStatAdded_"]')?.textContent).toBe('+1')
+    expect(stat?.querySelector('[class*="diffStatRemoved_"]')?.textContent).toBe('-0')
     // The footer counts live inside the collapsed diff card.
     toggleRow(view)
     expect(view.getByText('└ +1 -0 · 1 个文件')).toBeTruthy()

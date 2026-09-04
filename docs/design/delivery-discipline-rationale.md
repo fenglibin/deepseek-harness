@@ -1,125 +1,128 @@
-# 交付纪律子系统（Delivery Discipline）方案
+# Delivery Discipline Subsystem Design
 
-> 状态：决策已对齐，待最终确认（编码暂缓）
-> 目标读者：维护者与决策者
-> 关联诉求：为每个执行的任务引入「变更记录 + 设计方案 + openspec 任务拆分 + 验证验收 + 后置自检 + 程序化门禁 + 页面呈现 + 配置化」的强制工程流程。
+English | [中文](delivery-discipline-rationale.zh.md)
 
----
-
-## 1. 背景与动机
-
-DeepSeek Harness 是一个纯插件化的 Cordis agent harness。模型（LLM）在默认情况下对任务的执行是**自由且无约束**的：它可以直接改代码、直接声称"完成"，而不产生任何设计、拆分、变更记录或验证证据。这带来三类风险：
-
-1. **不可追溯**：任务做完了，但"为什么这么做、改了什么、是否覆盖了需求"没有留痕。
-2. **不可验证**：LLM 会偷懒——只保证"代码没报错"，不保证"功能在业务/需求层面真的正确"。纯 prompt 约束（"请自检"）不可靠，因为 LLM 可以口头应承而不实际执行。
-3. **不可控**：大改动和小修复走同一条自由路径，没有按规模分级的强制流程，也没有可配置的开关让 token 充裕/匮乏的用户各取所需。
-
-本方案在 harness 之上引入一套**工程交付纪律（delivery discipline）子系统**，用「程序性验证 + 可配置门禁 + 可视化呈现」对抗 LLM 偷懒，强制任务按 `设计 → 拆分 → 实现 → 验证 → 验收 → 后置自检` 闭环执行。核心原则是：**流程约束不能只依赖 LLM 自觉，必须由程序（状态机 + 校验脚本 + 外部工具）强制执行。**
+> Status: decisions aligned, awaiting final confirmation (implementation on hold)
+> Audience: maintainers and decision makers
+> Related request: give every executed task a mandatory engineering flow — change records + design documents + openspec task splitting + verification and acceptance + post-execution self-check + programmatic gates + page presentation + configurability.
 
 ---
 
-## 2. 目标
+## 1. Background and motivation
 
-- 为每个执行的任务建立可追溯的产物（变更记录 / 设计 / 拆分），落到项目工作目录下。
-- 用**程序性门禁**保证任务不能跳过必需阶段、不能被错误地标记为"完成/验收"。
-- 支持**任务完成后执行后置命令**，驱动更多验证动作（如深度自检、全量回归、openspec validate）。
-- 全部能力**可配置**：阈值（多大任务写设计/拆分）、开关（是否强制 openspec）、后置命令列表，适配不同 token 预算的用户。
-- 全流程**可视化**：不同阶段在页面上有对应呈现，用户能感知进度与门禁状态。
-- 复用成熟生态（真实 openspec），不重复造轮子。
+DeepSeek Harness is a purely plugin-based Cordis agent harness. By default a model (LLM) executes tasks **freely and without constraints**: it can change code directly and declare "done" without producing any design, split, change record, or verification evidence. That creates three risks:
 
-## 3. 非目标
+1. **Not traceable**: the task finishes, but "why it was done this way, what changed, whether the requirement is covered" leaves no trace.
+2. **Not verifiable**: LLMs take shortcuts — they guarantee only "the code does not error", not "the feature is really correct at the business/requirement level". Pure prompt constraints ("please self-check") are unreliable, because an LLM can agree verbally without actually doing it.
+3. **Not controllable**: large changes and small fixes travel the same free path, with no size-tiered mandatory flow and no configurable switch that lets token-rich and token-poor users each get what they need.
 
-- 不改变 agent-loop 本身（遵循"Plugins, not loop changes"）。
-- 不重新实现一套 spec/任务拆分格式——复用 openspec。
-- 不提供跨会话/跨项目的任务数据库——任务与产物以项目工作目录为单位，会话内状态走 session log。
-- 不负责 token/货币/时间的精确预算（那是独立策略层，与 goal 的 round cap 同类）。
-- 第一阶段不做强制拦截子代理（subagent/workflow 子任务）的门禁，默认只约束根 agent 的任务。
+This design introduces an **engineering delivery discipline subsystem** on top of the harness, using "programmatic verification + configurable gates + visual presentation" to counter LLM shortcuts and force tasks through a closed loop of `design → split → implement → verify → accept → post self-check`. The core principle: **flow constraints must not depend on LLM self-discipline; they must be enforced by programs (state machine + validation scripts + external tools).**
 
 ---
 
-## 4. 现状分析
+## 2. Goals
 
-### 4.1 既有可复用能力
+- Establish traceable artifacts for every executed task (change records / design / split), written under the project working directory.
+- Use **programmatic gates** so a task cannot skip a required phase or be wrongly marked "complete/accepted".
+- Support **post-execution commands** once a task completes, driving further verification actions (deep self-check, full regression, `openspec validate`).
+- Make every capability **configurable**: thresholds (how large a task must be to require a design or a split), switches (whether openspec is mandatory), and the post-hook command list, so users with different token budgets can tune it.
+- Make the whole flow **visible**: each phase has a corresponding presentation in the UI, so the user perceives progress and gate status.
+- Reuse the mature ecosystem (real openspec) instead of reinventing the wheel.
 
-| 能力 | 包 | 与本方案的关系 |
+## 3. Non-goals
+
+- Do not change `agent-loop` itself (following "Plugins, not loop changes").
+- Do not reimplement a spec/task-split format — reuse openspec.
+- Do not provide a cross-session/cross-project task database — tasks and artifacts are scoped to the project working directory, and in-session state lives in the session log.
+- Do not own precise token/currency/time budgets (that is a separate policy layer, of the same kind as goal's round cap).
+- Phase one does not gate subagents (subagent/workflow subtasks); by default only the root agent's tasks are constrained.
+
+---
+
+## 4. Current state
+
+### 4.1 Reusable existing capabilities
+
+| Capability | Package | Relation to this design |
 |---|---|---|
-| 持久化单目标 | `dsh-goal` + `dsh-goal-round-driver` | 任务生命周期参照物；round cap 续跑语义与"后置命令"重叠，需厘清边界 |
-| 计划模式 | `dsh-plan-mode` | "guidance not enforcement"，是设计态的软参照，非强制门禁 |
-| 任务清单 | `dsh-tool-todo` | whole-list replace、单 owner，粒度太粗，不适合做 openspec 拆分 |
-| 工作流编排 | `dsh-workflow` | 子代理 fan-out，可用于"后置验证"的多路并行 |
-| 用户设置 | `dsh-settings` + `dsh-settings-file` | 门禁阈值/开关的运行时配置载体 |
-| 会话投影 | `dsh-session-projection` | 严格 replay，是页面呈现的载体 |
-| 运行时断言 | `ctx.invariants` | 程序性验证的强地基 |
-| 工作区 | `dsh-workspace` | host-only 项目分组，不面向模型，不作为产物落盘依据 |
+| Persistent single goal | `dsh-goal` + `dsh-goal-round-driver` | Reference model for the task lifecycle; the round-cap continuation semantics overlap with "post-execution commands", so the boundary must be clarified |
+| Plan mode | `dsh-plan-mode` | "guidance not enforcement" — a soft design-time reference, not a mandatory gate |
+| Task list | `dsh-tool-todo` | Whole-list replace, single owner, too coarse for openspec splitting |
+| Workflow orchestration | `dsh-workflow` | Subagent fan-out; usable for parallel lanes of "post verification" |
+| User settings | `dsh-settings` + `dsh-settings-file` | Runtime configuration carrier for gate thresholds and switches |
+| Session projection | `dsh-session-projection` | Strict replay; the carrier for page presentation |
+| Runtime assertions | `ctx.invariants` | Strong foundation for programmatic verification |
+| Workspace | `dsh-workspace` | Host-only project grouping, not model-facing, not a basis for artifact placement |
 
-### 4.2 关键架构约束（决定方案骨架）
+### 4.2 Key architectural constraints (they determine the skeleton)
 
-1. **模型可见 ⟺ 已记录**：任何进入模型请求的内容必须能从 session log 重建。变更/设计/拆分是模型通过 `fs` 工具写到磁盘的，**磁盘文件不是 session log**，必须设计"磁盘产物如何投影进 log"。
-2. **enforcement 哲学偏软**：`plan-mode` 是 guidance，`guard/*` 是 advisory，真正 enforce 靠 sandbox + approval。本方案要的"程序性强制门禁"是**新范式**，但 `tools/post-execute` 的 `PostToolDecision` 已支持 blocking，`agent/turn-stopping`、`agent/pre-step`、`ctx.invariants` 均可作为强制点。
-3. **harness home 是 `~/.dsh`**（`dsh-home-paths`，可 `$DSH_HOME` 覆盖）。与"项目工作目录下的 `.dsh`"同名不同位，需显式区分。
-4. **capability seam 三角色**：Service Definition / Provider / Consumer 必须齐全。
+1. **Model-visible ⟺ logged**: anything that reaches a model request must be reconstructable from the session log. Change/design/split artifacts are written to disk by the model through the `fs` tools, and **files on disk are not the session log**, so "how disk artifacts project into the log" must be designed.
+2. **The enforcement philosophy is soft**: `plan-mode` is guidance, `guard/*` is advisory, and real enforcement comes from sandbox + approval. The "programmatic mandatory gate" this design wants is a **new paradigm**, but `tools/post-execute`'s `PostToolDecision` already supports blocking, and `agent/turn-stopping`, `agent/pre-step`, and `ctx.invariants` can all serve as enforcement points.
+3. **The harness home is `~/.dsh`** (`dsh-home-paths`, overridable with `$DSH_HOME`). It shares the name but not the location with the project working directory's `.dsh`, so the two must be distinguished explicitly.
+4. **A capability seam has three roles**: Service Definition / Provider / Consumer must all be present.
 
-### 4.3 真实 openspec 的调研结论
+### 4.3 Findings from investigating real openspec
 
-- 目录固定为**项目根下的 `openspec/`**，不支持自定义根目录（无 `spec-dir`/`root` 配置）。
-- 结构：`openspec/specs/<capability>/spec.md`（正式规格）+ `openspec/changes/<name>/`（活跃变更）+ `openspec/changes/archive/`（归档）。
-- 一个 change 目录**天然四位一体**：`proposal.md`（变更意图）+ `design.md`（技术方案）+ `tasks.md`（checkbox 任务清单）+ `specs/`（delta spec，`ADDED/MODIFIED/REMOVED/RENAMED Requirements`，`### Requirement` + `#### Scenario` + `SHALL/MUST`）。
-- CLI：`openspec init` / `list` / `validate [--strict]` / `archive` / `show` / `config` 等。
-- 配置：`openspec/config.yaml`（`schema` / `context` / `rules` / `operations`）。
+- The directory is fixed at **`openspec/` under the project root**; a custom root is not supported (no `spec-dir`/`root` config).
+- Structure: `openspec/specs/<capability>/spec.md` (the formal spec) + `openspec/changes/<name>/` (active changes) + `openspec/changes/archive/` (archived).
+- A change directory is **naturally four-in-one**: `proposal.md` (change intent) + `design.md` (technical design) + `tasks.md` (checkbox task list) + `specs/` (delta spec, `ADDED/MODIFIED/REMOVED/RENAMED Requirements`, `### Requirement` + `#### Scenario` + `SHALL/MUST`).
+- CLI: `openspec init` / `list` / `validate [--strict]` / `archive` / `show` / `config`, and others.
+- Config: `openspec/config.yaml` (`schema` / `context` / `rules` / `operations`).
 
-**结论**：引入真实 openspec 后，用户诉求里的"变更记录、设计方案、任务拆分"在 L2 大任务场景已被 openspec 的一个 change 目录统一承载，`.dsh/` 目录只需承载 openspec 之外的轻量产物。这正是"复用成熟能力"的红利。
-
----
-
-## 5. 方案对比与选型
-
-### 方案 A：独立「交付纪律」capability seam（选定）
-
-新增包族 `packages/delivery/`，严格遵循三角色：
-- **Service Definition**：交付门禁接口 + 阶段状态机 + 配置 schema + `delivery/*` 事件。
-- **Provider**：默认实现，读 `.dsh/` 与 `openspec/` 产物做程序性验证 + 基于 session log 的严格 replay 状态机。
-- **Consumer**：模型工具（记变更/写设计/写拆分/提交验收）+ 门禁拦截（`turn-stopping` 软 + `pre-execute` 硬）+ client UI（projection + conversation node）。
-
-### 方案 B：组合既有能力 + 薄门禁层（否决）
-
-复用 goal（任务）+ plan-mode（设计）+ tool-todo（拆分）+ workflow（验证），只新增 guard 插件。否决理由：`tool-todo` 是 whole-list replace 不适合 openspec 拆分；`plan-mode` 是 guidance 无法强制；强行扭曲三者的语义会制造大量兼容债务。
-
-### 方案 C：MVP 最小层先行（否决）
-
-只做「变更记录 + 后置命令 + 自检脚本」。否决理由：无 domain 模型，后续补设计/拆分必然重构，成本更高。
-
-**选型结论**：方案 A + 分阶段实施。架构上先立好 seam 与 domain 模型，功能按批次增量落地。
+**Conclusion**: once real openspec is adopted, the "change record, design document, task split" in the user request are already carried together by a single openspec change directory in the L2 large-task scenario, so `.dsh/` only needs to carry lightweight artifacts outside openspec. That is exactly the dividend of "reusing a mature capability".
 
 ---
 
-## 6. 推荐方案详解
+## 5. Options considered
 
-### 6.1 领域模型：交付任务（Delivery Task）与规模分级
+### Option A: a standalone "delivery discipline" capability seam (chosen)
 
-引入一个轻量的 **DeliveryTask** 工作单元（锚定用户所说的"每个执行的任务"），而非复用 goal：
+Add a package family `packages/delivery/`, strictly following the three roles:
 
-- **唯一 id**（`Branded`），会话内归属。
-- **规模分级**（由程序化度量 + 配置阈值决定，见 6.4）：
+- **Service Definition**: delivery gate interface + phase state machine + config schema + `delivery/*` events.
+- **Provider**: the default implementation, reading `.dsh/` and `openspec/` artifacts for programmatic verification plus a strict replay state machine over the session log.
+- **Consumer**: model tools (record a change / write a design / write a split / submit for acceptance) + gate interception (`turn-stopping` soft + `pre-execute` hard) + client UI (projection + conversation node).
 
-| 级别 | 判定 | 必经阶段 | 产物 |
+### Option B: compose existing capabilities plus a thin gate layer (rejected)
+
+Reuse goal (task) + plan-mode (design) + tool-todo (split) + workflow (verification), adding only a guard plugin. Rejected because: `tool-todo` is whole-list replace and unsuited to openspec splitting; `plan-mode` is guidance and cannot enforce; forcing the semantics of all three would create heavy compatibility debt.
+
+### Option C: MVP minimal layer first (rejected)
+
+Do only "change record + post-execution command + self-check script". Rejected because: with no domain model, adding design/split later forces a refactor and costs more.
+
+**Decision**: Option A, implemented in phases. Establish the seam and domain model first, then land features incrementally by batch.
+
+---
+
+## 6. The recommended design in detail
+
+### 6.1 Domain model: delivery task and size tiers
+
+Introduce a lightweight **DeliveryTask** work unit (anchoring what the user calls "every executed task") instead of reusing goal:
+
+- **Unique id** (`Branded`), owned within the session.
+- **Size tier** (decided by programmatic measures plus configured thresholds, see 6.4):
+
+| Tier | Determination | Required phases | Artifacts |
 |---|---|---|---|
-| L0 小微修复 | 低于 design 阈值 | `created → implemented → verified → accepted` | `.dsh/changes/` 一条变更记录 |
-| L1 稍大需求 | ≥ design 阈值，< openspec 阈值 | `created → designed → implemented → verified → accepted` | `.dsh/design/` 设计 + `.dsh/changes/` 变更 |
-| L2 大需求/非小微 bug | ≥ openspec 阈值，或强制 bug 修复 | `created → designed → specified → implemented → verified → accepted` | openspec change（proposal+design+tasks+specs）+ `.dsh/changes/` 变更 |
+| L0 small fix | below the design threshold | `created → implemented → verified → accepted` | one change record under `.dsh/changes/` |
+| L1 larger requirement | ≥ design threshold, < openspec threshold | `created → designed → implemented → verified → accepted` | `.dsh/design/` design + `.dsh/changes/` change |
+| L2 large requirement / non-small bug | ≥ openspec threshold, or a mandatory bug fix | `created → designed → specified → implemented → verified → accepted` | openspec change (proposal+design+tasks+specs) + `.dsh/changes/` change |
 
-- **阶段状态机**（可扩展，merge-extensible 默认分支走 `assertNever` 的闭集）：
+- **Phase state machine** (extensible; the merge-extensible default branch falls through `assertNever` on the closed set):
 
 ```text
 created → designed → specified → implemented → verified → accepted
 ```
 
-状态迁移是 **compare-and-set（CAS）** 的：迁移到某阶段前，程序校验前置产物存在且有效，不满足则拒绝写入。
+Transitions are **compare-and-set (CAS)**: before moving to a phase, the program verifies that the prerequisite artifacts exist and are valid, and refuses the write otherwise.
 
-### 6.2 目录布局（含 openspec 原生目录的协调）
+### 6.2 Directory layout (coordinating with openspec's native directory)
 
 ```text
-<project>/                        # 项目工作目录（模型 fs 工具的 cwd）
-├── openspec/                     # 真实 openspec（L2 任务），用原生目录
+<project>/                        # project working directory (cwd of the model's fs tools)
+├── openspec/                     # real openspec (L2 tasks), using its native directory
 │   ├── config.yaml
 │   ├── specs/
 │   └── changes/
@@ -129,109 +132,109 @@ created → designed → specified → implemented → verified → accepted
 │       │   ├── tasks.md
 │       │   └── specs/
 │       └── archive/
-└── .dsh/                         # dsh 自身交付产物（L0/L1 任务）
-    ├── design/                   # L1 设计方案
-    └── changes/                  # 全部任务的变更记录（含 L2 的索引）
+└── .dsh/                         # dsh's own delivery artifacts (L0/L1 tasks)
+    ├── design/                   # L1 design documents
+    └── changes/                  # change records for every task (including the L2 index)
 
-~/.dsh/                           # harness home（通用设置，已存在）
+~/.dsh/                           # harness home (general settings, already exists)
 ```
 
-**协调说明（已确认）**：真实 openspec 固定项目根 `openspec/` 目录，不支持自定义根。故 L2 任务使用项目根原生 `openspec/`，`.dsh/` 承载 openspec 之外的轻量产物，并在 `.dsh/changes/` 里为每个 L2 任务留一条指向对应 openspec change 的索引记录，保证"每个任务都有变更记录"不落空。符号链接 `.dsh/openspec` 方案已否决（跨平台与 git 友好性差）。
+**Coordination note (confirmed)**: real openspec is fixed to the project-root `openspec/` directory and does not support a custom root. L2 tasks therefore use the project-root native `openspec/`, while `.dsh/` carries the lightweight artifacts outside openspec and keeps one index record per L2 task in `.dsh/changes/` pointing at the corresponding openspec change, so "every task has a change record" never comes up empty. The `.dsh/openspec` symlink option was rejected (poor cross-platform and git behavior).
 
-### 6.3 程序性验证机制（双保险）
+### 6.3 Programmatic verification (belt and braces)
 
-1. **运行时状态机守门（主闸）**：
-   - 用 `ctx.invariants` 断言状态迁移的合法性（前置产物存在、阶段顺序不跳步）。
-   - 用 `agent/pre-step` / `agent/turn-stopping` 做**软提醒**：任务处于某阶段但缺前置产物时，注入提醒上下文，不 veto 模型探索。
-   - 用 `tools/pre-execute` 的 `PostToolDecision` blocking 做**硬拦截**：仅拦截"把任务标记为 completed/accepted"这一类收尾动作（不拦截探索性工具调用，避免误伤）。
-2. **后置命令（后置闸）**：任务完成后执行配置的验证命令（如 `openspec validate --strict`、自定义深度自检脚本、全量回归），全绿才允许进入 `accepted`。后置命令失败则任务停留在 `verified` 并回注修复指令。
+1. **Runtime state-machine gating (the main gate)**:
+   - Use `ctx.invariants` to assert that a transition is legal (prerequisite artifacts exist, phase order is not skipped).
+   - Use `agent/pre-step` / `agent/turn-stopping` for **soft reminders**: when a task is in a phase but its prerequisite artifacts are missing, inject a reminder context without vetoing model exploration.
+   - Use `tools/pre-execute`'s `PostToolDecision` blocking for **hard interception**: block only the wrap-up action of marking a task completed/accepted (not exploratory tool calls, to avoid collateral damage).
+2. **Post-execution commands (the rear gate)**: once a task completes, run the configured verification commands (for example `openspec validate --strict`, a custom deep self-check script, a full regression); only when all pass may the task enter `accepted`. If a post-hook fails, the task stays in `verified` and a fix instruction is injected back.
 
-### 6.4 配置 schema（可配置阈值/开关）
+### 6.4 Config schema (configurable thresholds and switches)
 
-通过 `dsh-settings` 命名空间 + cordis `config` 双载（composition base + 运行时可改）：
+Carried both by the `dsh-settings` namespace and cordis `config` (composition base plus runtime overrides):
 
 ```yaml
 - name: '@deepseek-ai/dsh-delivery'
   config:
-    enabled: true                    # 总开关
-    designThreshold:                 # 触发 L1 的规模度量（程序化 proxy）
-      todoCount: 5                   #   todo 项数
-      descriptionChars: 300          #   任务描述字符数
-      touchedFiles: 3                #   预估改动文件数
-    openspecThreshold:               # 触发 L2 的规模度量
+    enabled: true                    # master switch
+    designThreshold:                 # size measures that trigger L1 (programmatic proxy)
+      todoCount: 5                   #   number of todo items
+      descriptionChars: 300          #   characters in the task description
+      touchedFiles: 3                #   estimated number of files changed
+    openspecThreshold:               # size measures that trigger L2
       todoCount: 15
       descriptionChars: 1200
-    requireOpenspecForBugs: true     # 非小微 bug 修复是否强制 L2
-    postHooks:                       # 后置命令
+    requireOpenspecForBugs: true     # whether non-small bug fixes force L2
+    postHooks:                       # post-execution commands
       - 'openspec validate --strict'
-      - 'pnpm run test'              # 可替换为自定义深度自检
+      - 'pnpm run test'              # replaceable with a custom deep self-check
     enforcement: 'stateful'          # 'stateful' | 'advisory' | 'off'
 ```
 
-- **规模 proxy 说明**：任务开始前"规模"无可靠信号，故用程序化可度量的 proxy（todo 数、描述长度、改动文件数）做**启发式分级**，并在任务进行中可被显式升/降级（模型或用户手动手动覆盖），避免"误判简单任务为复杂流程"。
-- **`enforcement` 分档**：`off` 纯自由；`advisory` 只提醒不拦；`stateful` 状态机硬约束 + 边界软提醒（默认，已确认）。
-- **后置命令可覆盖**：`postHooks` 来自配置基线，任务运行时允许用户追加/覆盖命令；最终以任务级配置为准。
+- **On the size proxy**: before a task starts there is no reliable size signal, so programmatically measurable proxies (todo count, description length, number of touched files) drive a **heuristic tiering**, and the tier can be explicitly raised or lowered while the task runs (manual override by the model or the user), so a simple task is not misjudged as a complex flow.
+- **`enforcement` tiers**: `off` is fully free; `advisory` only reminds and never blocks; `stateful` adds hard state-machine constraints plus soft boundary reminders (the default, confirmed).
+- **Post-hooks can be overridden**: `postHooks` comes from the config baseline, and the user may append or override commands while a task runs; the task-level config wins.
 
-### 6.5 事件与 session log 投影
+### 6.5 Events and session-log projection
 
-- 新增 `delivery/task-created`、`delivery/task-phase-changed`、`delivery/artifact-written` 等 durable session event（声明合并进 `SessionEventMap`）。
-- **"磁盘产物如何进 log"**：模型写 `.dsh/` 或 `openspec/` 文件时，通过监听 `fs/*` 事件（或 `tools/post-execute` 识别写文件工具调用）投影出 `delivery/artifact-written` 事件，使门禁状态机在 session log 内可重建，满足"模型可见 ⟺ 已记录"。
-- 注册 `delivery` session projection 单元，client view 暴露当前任务的分级、阶段、产物清单、门禁状态。
+- Add durable session events such as `delivery/task-created`, `delivery/task-phase-changed`, and `delivery/artifact-written` (merged into `SessionEventMap` by declaration).
+- **"How disk artifacts enter the log"**: when the model writes a file under `.dsh/` or `openspec/`, project a `delivery/artifact-written` event by listening to `fs/*` events (or by recognizing file-writing tool calls in `tools/post-execute`), so the gate state machine is reconstructable from the session log and "model-visible ⟺ logged" holds.
+- Register a `delivery` session projection unit; the client view exposes the current task's tier, phase, artifact list, and gate status.
 
-### 6.6 页面呈现（分阶段可视化）
+### 6.6 Page presentation (phased visualization)
 
-- 新增 `delivery` projection → client 消费：
-  - **会话侧边栏/卡片**：当前任务的 L0/L1/L2 分级徽标 + 阶段进度条（created → … → accepted）。
-  - **Conversation node**：任务创建、阶段迁移、门禁通过/失败、后置命令结果作为可折叠节点呈现。
-  - **产物视图**：`.dsh/` 与 `openspec/` 产物的只读预览。
-- 复用 `dsh-plan-mode` 的 reviewed-exit 呈现模式，门禁"提交验收"走类似 review 交互。
+- Add a `delivery` projection for clients to consume:
+  - **Session sidebar/card**: an L0/L1/L2 tier badge for the current task plus a phase progress bar (created → … → accepted).
+  - **Conversation node**: task creation, phase transitions, gate pass/failure, and post-hook results appear as collapsible nodes.
+  - **Artifact view**: read-only previews of `.dsh/` and `openspec/` artifacts.
+- Reuse `dsh-plan-mode`'s reviewed-exit presentation style; the "submit for acceptance" gate uses a similar review interaction.
 
-### 6.7 与既有能力的边界
+### 6.7 Boundaries with existing capabilities
 
-- 与 `goal`：goal 是"同一会话单一长期目标 + 自动续跑"；DeliveryTask 是"单次任务的交付纪律 + 门禁"。两者可并存：一个 goal 下可串行产生多个 DeliveryTask。后置命令触发的"深度自检"是**一次有界验证**，不是 goal 的无限续跑轮次。
-- 与 `workflow`：后置命令若需多路并行验证（如并行 review 多个文件），可用 workflow 编排，但默认是串行命令列表。
+- Versus `goal`: a goal is "one long-lived objective in a single session with automatic continuation"; a DeliveryTask is "delivery discipline plus gates for one task". The two coexist: one goal can produce several DeliveryTasks in sequence. The "deep self-check" triggered by a post-hook is **one bounded verification**, not goal's unbounded continuation rounds.
+- Versus `workflow`: if post-hooks need parallel verification lanes (for example reviewing several files in parallel), workflow can orchestrate them, but the default is a serial command list.
 
 ---
 
-## 7. 分阶段实施批次
+## 7. Implementation batches
 
-每批独立可验证、可回滚，配置开关控制启用。
+Each batch is independently verifiable and rollback-able, and a config switch controls enablement.
 
-| 批次 | 内容 | 产物 | 验收标志 |
+| Batch | Content | Artifact | Acceptance signal |
 |---|---|---|---|
-| B1 | 包族骨架 + DeliveryTask domain + 状态机 + `delivery/*` 事件 + 配置 schema + `.dsh/changes` 变更记录工具 + 门禁（stateful/advisory 两档） | 变更记录闭环 | L0 任务能强制落变更记录，状态机拒绝跳步 |
-| B2 | `.dsh/design` 设计方案工具 + 规模分级（proxy + 手动覆盖）+ designThreshold 门禁 | L1 设计闭环 | 稍大任务强制写设计 |
-| B3 | 真实 openspec 集成（change 创建/校验/归档）+ openspecThreshold 门禁 + `openspec validate` 接入后置命令 | L2 拆分闭环 | 大任务走 openspec 全流程，validate 全绿才 accepted |
-| B4 | 后置命令框架（postHooks 执行 + 失败回注）+ 深度自检驱动 | 后置自检闭环 | 任务完成后自动跑配置命令并据此验收 |
-| B5 | session projection + client UI（分级徽标/阶段进度/产物预览/门禁节点）+ 配置设置卡片 | 可视化闭环 | 页面能完整呈现各阶段与门禁状态 |
+| B1 | Package skeleton + DeliveryTask domain + state machine + `delivery/*` events + config schema + `.dsh/changes` change-record tool + gates (stateful/advisory tiers) | Change-record loop | An L0 task is forced to record a change, and the state machine refuses to skip phases |
+| B2 | `.dsh/design` design-document tool + size tiering (proxy plus manual override) + designThreshold gate | L1 design loop | A larger task is forced to write a design |
+| B3 | Real openspec integration (change create/validate/archive) + openspecThreshold gate + `openspec validate` wired into post-hooks | L2 split loop | A large task goes through the full openspec flow, and validate must be green before accepted |
+| B4 | Post-hook framework (postHooks execution + failure re-injection) + deep self-check driver | Post self-check loop | Once a task completes, the configured commands run automatically and acceptance follows their result |
+| B5 | Session projection + client UI (tier badge / phase progress / artifact preview / gate nodes) + config settings card | Visualization loop | The UI presents every phase and gate state completely |
 
 ---
 
-## 8. 风险与回滚
+## 8. Risks and rollback
 
-| 风险 | 影响 | 缓解 |
+| Risk | Impact | Mitigation |
 |---|---|---|
-| 强制门禁误伤简单任务 | 简单修复被迫走复杂流程 | 规模分级 proxy + 手动覆盖 + `enforcement` 分档 |
-| "磁盘产物投影进 log"破坏 session log 纯度 | 违反架构约束 | 用 `fs/*` 事件投影为 durable event，而非门禁直接读磁盘做运行时判断 |
-| 硬门禁违背"guidance/enforcement 分离"哲学 | 被核心维护者质疑 | 默认 `stateful` 只拦"收尾动作"，不 veto 探索；方案文档正面论证 |
-| openspec 目录与 `.dsh/` 冲突 | 用户心智混淆 | 6.2 协调说明 + UI 明确区分两目录 |
-| token 成本显著增加 | 设计/拆分/验证成倍耗 token | 配置开关 + 分级阈值，L0 最小化开销 |
-| 规模 proxy 不可靠 | 分级误判 | 手动升降级覆盖 + 分阶段演进 proxy 精度 |
-| openspec CLI 外部依赖 | 环境缺 CLI 则 L2 不可用 | `openspecThreshold` 开关 + 缺 CLI 时 fail loud 提示 |
+| Mandatory gates hurt simple tasks | A simple fix is forced through a complex flow | Size-tier proxy + manual override + `enforcement` tiers |
+| Projecting disk artifacts into the log breaks session-log purity | Violates an architectural constraint | Project `fs/*` events as durable events rather than having gates read disk directly for runtime decisions |
+| Hard gates contradict the "guidance/enforcement separation" philosophy | Questioned by core maintainers | The default `stateful` blocks only "wrap-up actions" and does not veto exploration; the design document argues the case directly |
+| The openspec directory conflicts with `.dsh/` | User confusion | The 6.2 coordination note plus a UI that distinguishes the two directories clearly |
+| Token cost grows significantly | Design/split/verification multiply token use | Config switches + tiered thresholds, with L0 minimizing overhead |
+| The size proxy is unreliable | Tier misjudgment | Manual raise/lower override + evolving the proxy's precision in phases |
+| External dependency on the openspec CLI | L2 is unusable when the CLI is missing | The `openspecThreshold` switch plus a fail-loud message when the CLI is absent |
 
-**回滚**：每批独立，`enabled: false` 即整体关闭；包族独立挂载，卸载即移除能力，不改 agent-loop，不污染既有 session 事件格式（新增 `delivery/*` 事件带 `ignorable: true` 语义，旧构建可忽略）。
+**Rollback**: each batch is independent and `enabled: false` turns the whole thing off; the package family mounts independently, so unloading removes the capability, `agent-loop` is untouched, and existing session event formats are not polluted (new `delivery/*` events carry `ignorable: true` semantics, so older builds can ignore them).
 
 ---
 
-## 9. 已确认决策（Decision Log）
+## 9. Confirmed decisions (decision log)
 
-| # | 决策点 | 结论 |
+| # | Decision point | Conclusion |
 |---|---|---|
-| 1 | openspec 目录位置 | 项目根原生 `openspec/`（非 `.dsh/` 下），`.dsh/changes/` 为每个 L2 任务留索引指向对应 change |
-| 2 | 任务锚点 | 新增 `DeliveryTask` domain，不复用 `goal` |
-| 3 | 门禁强度默认值 | `stateful`（状态机硬约束 + 边界软提醒） |
-| 4 | 后置命令执行权 | 任务完成后由门禁框架自动执行 postHooks 并据结果验收；允许用户在运行时追加/覆盖命令 |
+| 1 | openspec directory location | The project-root native `openspec/` (not under `.dsh/`); `.dsh/changes/` keeps one index per L2 task pointing at the corresponding change |
+| 2 | Task anchor | Add a `DeliveryTask` domain; do not reuse `goal` |
+| 3 | Default gate strength | `stateful` (hard state-machine constraints plus soft boundary reminders) |
+| 4 | Who runs post-execution commands | Once a task completes, the gate framework runs postHooks automatically and accepts based on the result; the user may append or override commands at runtime |
 
 ---
 
-> 本文档待确认后进入实施；实施中的每批变更将另落 `.agents/notes/` Agent Note 与测试，遵循仓库现有约定。
+> Once this document is confirmed, implementation starts; each implementation batch lands its own `.agents/notes/` Agent Note and tests, following existing repository conventions.

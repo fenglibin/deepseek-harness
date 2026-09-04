@@ -35,7 +35,7 @@ import {
   type PreviewFixtureManifest,
 } from '@deepseek-ai/dsh-experimental-webworker-runtime'
 import { captureStableAria, compareOrRefreshGolden, webSnapshotMode } from './scaffold.ts'
-import { newEnglishPage, REPO_ROOT, saveFailureShot } from './support.ts'
+import { newEnglishPage, REPO_ROOT, saveFailureShot, wheelConversationToTop } from './support.ts'
 
 const DIST_ROOT = fileURLToPath(new URL('../dist', import.meta.url))
 
@@ -407,7 +407,7 @@ async function bootPreview(origin: string, browser: Browser): Promise<void> {
     await catalog.getByRole('treeitem', { name: /Continue preview verification/ }).waitFor()
     await catalog.press('Escape')
 
-    await page.getByRole('button', { name: 'Load earlier', exact: true }).click()
+    await wheelConversationToTop(page)
     await page.getByText(SHOWCASE_OLDEST, { exact: true }).waitFor({ timeout: 15_000 })
     expect(pageErrors.map(error => error.message)).toEqual([])
     expect(consoleErrors.filter(line =>

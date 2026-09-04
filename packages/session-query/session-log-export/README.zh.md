@@ -9,7 +9,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-session-log-export` 让 Web 界面可以下载会话的完整历史：Session Header 中的 `Session log` 按钮与 `/export` 斜杠命令都会把会话树——会话本身、其子会话与附件——作为 ZIP 交给浏览器下载。本包拥有 Host 归档流、经过认证的 Fetch 路由以及浏览器控制和反馈。下载目标位置由浏览器选择。设置与用法在前，随后说明实现细节。
+`dsh-session-log-export` 让 Web 界面可以下载会话的历史：Session Header 中的 `Session log` 按钮与 `/export` 斜杠命令都会把当前会话自身的日志及其附件作为 ZIP 交给浏览器下载。按钮的范围菜单可以把单次下载扩大到整棵会话树——当前会话加上每一个 subagent 后代，以及这些日志引用的媒体。本包拥有 Host 归档流、经过认证的 Fetch 路由以及浏览器控制和反馈。下载目标位置由浏览器选择。设置与用法在前，随后说明实现细节。
 
 ## 目录
 
@@ -25,11 +25,11 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-当 Web bundle 需要让用户导出会话日志时使用本包。它需要 Connection、命令注册表、Session 查询与持久化以及附件服务。挂载插件，然后点击 Session Header 中的 `Session log` 或输入 `/export`；浏览器会下载 `dsh-session-<id>.zip`。
+当 Web bundle 需要让用户导出会话日志时使用本包。它需要 Connection、命令注册表、Session 查询与持久化以及附件服务。挂载插件，然后点击 Session Header 中的 `Session log` 或输入 `/export`；浏览器会下载只包含当前会话的 `dsh-session-<id>.zip`。按钮右侧的箭头打开范围菜单，其中的 `包含子 Session` 一行会把每一个 subagent 后代的日志也加入该次下载。
 
 ### 何时选择
 
-为需要带可见下载弹窗的用户级会话导出的 Web 部署选择它。需要程序化或 Host 侧导出时避免使用：本包产生的是浏览器下载，而非 Host 路径写入，并且它要求持久化后端保存逐会话原始产物（随附 JSONL 后端支持明文与 zstd；不支持 SQLite 导出）。
+为需要用户级会话导出的 Web 部署选择它：导出由 Header 控件发起，仅在失败时弹出失败弹窗。需要程序化或 Host 侧导出时避免使用：本包产生的是浏览器下载，而非 Host 路径写入，并且它要求持久化后端保存逐会话原始产物（随附 JSONL 后端支持明文与 zstd；不支持 SQLite 导出）。
 
 ### 组合
 
@@ -50,16 +50,16 @@ Web bundle 将本包与 Connection、`dsh-commands`、`dsh-client-ui-commands` �
 
 | 输入 | 结果 |
 |---|---|
-| `/export` | 记录一组用户命令生命周期；提交命令的浏览器下载 `GET /api/session.export?sessionId=<id>&includeDescendants=true` |
+| `/export` | 记录一组用户命令生命周期；提交命令的浏览器下载 `GET /api/session.export?sessionId=<id>&includeDescendants=false` |
 | `/export <path>` | 错误；浏览器下载通过浏览器的普通下载行为选择目标位置 |
 
 ### 预期行为
 
-弹窗报告三个阶段：准备中、开始下载或失败。关闭弹窗不会取消正在进行的下载，该操作随后完成时弹窗也不会重新打开。每个会话同时只允许一项下载，重复操作共用该任务。导出包含实时会话的最新事件：Host 端点在读取前会 flush 活动的根会话，因此斜杠命令触发的 ZIP 会包含启动下载的 `command/run` 与 `command/done` 事件对；冷持久化会话不需要 flush。
+下载在发起它的那一次手势中就开始，浏览器下载管理器本身就是反馈：预检进行中与保存开始后都不会弹窗，因此下面的失败弹窗是本包唯一的弹窗。每个会话同时只允许一项下载，重复操作共用该任务。两条入口默认都只导出当前会话；选择 `包含子 Session` 是唯一能把归档扩大到后代树的浏览器操作，且该选择只对发起它的那一次手势生效，不会影响之后的下载。导出包含实时会话的最新事件：Host 端点在读取前会 flush 活动的根会话，因此斜杠命令触发的 ZIP 会包含启动下载的 `command/run` 与 `command/done` 事件对；冷持久化会话不需要 flush。
 
 ### 失败
 
-当 ZIP 流式传输开始前的预检失败时——例如 Host 端点不可达或配置错误——弹窗显示准备阶段错误。浏览器接受 GET 后发生的子会话或附件读取失败由浏览器下载管理器报告，不通过弹窗报告。
+当 ZIP 流式传输开始前的预检失败时——例如 Host 端点不可达或配置错误——失败弹窗打开并显示 HTTP 细节，响应没有细节时显示一句通用文案。浏览器接受 GET 后发生的子会话或附件读取失败由浏览器下载管理器报告，不通过弹窗报告。
 
 -----
 
@@ -77,7 +77,7 @@ Web bundle 将本包与 Connection、`dsh-commands`、`dsh-client-ui-commands` �
 
 ### 下载流程
 
-两条入口都会对 `GET /api/session.export?...` 发出 `HEAD` 预检，然后把 GET URL 交给浏览器下载管理器，JavaScript 不缓冲 ZIP。一个控制器按会话持有一项进行中的下载，把并发操作折叠进该任务，并在插件释放时取消预检。弹窗状态存放在按会话键控的快照存储中，因此按钮与命令按会话共享一个弹窗。
+两条入口都会对 `GET /api/session.export?...` 发出 `HEAD` 预检，然后把 GET URL 交给浏览器下载管理器，JavaScript 不缓冲 ZIP。两条入口都带一个范围：默认 `includeDescendants=false`，只有 Header 菜单的子 Session 行发起下载时才为 `true`，因此默认归档只带当前会话自身的日志及其引用的媒体。一个控制器按会话持有一项进行中的下载，把并发操作折叠进该任务，并在插件释放时取消预检。下载状态存放在按会话键控的快照存储中，因此按钮与命令按会话共享一个失败弹窗；只有预检失败才会发布打开状态，而每个已开始的下载都由浏览器下载管理器报告。
 
 Host 路由是业务拥有的精确 Fetch contribution。Connection 应用 Host/Origin 与浏览器会话检查并桥接流式 `Response`；本包拥有查询校验、活动会话 flush、原始产物与附件读取、ZIP 生成和 HTTP 状态语义。
 

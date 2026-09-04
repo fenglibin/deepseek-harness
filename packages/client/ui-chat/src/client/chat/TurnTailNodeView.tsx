@@ -1,5 +1,7 @@
 import { memo } from 'react'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+// Type-only: the `turnUsage` projection key merge (whole-log per-turn usage).
+import type {} from '@deepseek-ai/dsh-token-meter/client'
 import type { ChatNodeViewProps, TurnTailOwnerProps } from '../contract/slots.ts'
 import { MessageIconActions } from './MessageIconActions.tsx'
 import { TurnTimePanel, TurnUsagePanel } from './TurnUsagePanel.tsx'
@@ -11,9 +13,15 @@ type TurnTailNodeViewProps = ChatNodeViewProps<'turn-tail'>
 
 /** Turn-local actions and feature tail over the Location index, independent of Assistant placement. */
 export const TurnTailNodeView = memo(function TurnTailNodeView({
-  node, openFile, forkAt, renderSlot, renderSlotChain, t, useChat,
+  node, openFile, forkAt, renderSlot, renderSlotChain, t, useChat, useProjection,
 }: TurnTailNodeViewProps) {
   const data = node.data
+  // Whole-log per-turn usage wins over the window fold: a turn whose
+  // `turn/start` is paged out still discloses its billed usage from the
+  // projection, while an assembly without the unit falls back to the
+  // window-derived value.
+  const projectedUsage = useProjection('turnUsage')
+  const tokenUsage = projectedUsage?.turns[String(data.turn)] ?? data.tokenUsage
   const hasLaterChatNode = useChat(snapshot =>
     snapshot.locations.getTurn(data.turn).at(-1) !== node.key)
   const isLatestTurn = useChat(snapshot => snapshot.timeline.turnOrder.at(-1) === data.turn)
@@ -51,7 +59,7 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
         extraActions={assistantActions}
         usageAction={(
           <>
-            {data.tokenUsage !== undefined && <TurnUsagePanel usage={data.tokenUsage} t={t} />}
+            {tokenUsage !== undefined && <TurnUsagePanel usage={tokenUsage} t={t} />}
             {runMs !== undefined && (
               <TurnTimePanel
                 runMs={runMs}

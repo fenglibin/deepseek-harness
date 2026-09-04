@@ -1,4 +1,5 @@
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import type { Plugin } from 'vite'
@@ -6,6 +7,17 @@ import react from '@vitejs/plugin-react'
 import { clientBuildEnvironmentDefines } from '../../scripts/client-build-environment.ts'
 
 const src = (rel: string): string => fileURLToPath(new URL(rel, import.meta.url))
+/**
+ * The build stages beside `dist` so the completed tree can replace the served
+ * one with a same-filesystem atomic rename. Pointing Vite straight at `dist`
+ * lets its default `emptyOutDir` clear the directory at build start, briefly
+ * removing the index.html that `dsh web` serves by reading files per request
+ * — a refresh mid-build then gets an empty 404 instead of the shell.
+ */
+const STAGING_DIST = src('./dist.staging')
+/** The served `dist` the staged build replaces, plus its swap-time backup. */
+const FINAL_DIST = src('./dist')
+const PREVIOUS_DIST = src('./dist.previous')
 const STANDALONE_ERROR = 'apps/web is not a standalone application: bare Vite cannot inject window.__DSH_BOOT__. '
   + 'From a repository checkout, run `pnpm dsh web`; an installed package uses `dsh web`. '
   + 'For client-plugin HMR, run `pnpm dsh web` together with `pnpm run dev:web`.'
@@ -38,30 +50,50 @@ function rejectStandaloneServe(): Plugin {
 }
 
 /**
- * Emit preview.html beside index.html: the built index page with one module
- * script — the worker bootstrap entry — spliced ahead of its entry tag. Both
- * pages share every chunk; the extra tag is the only difference, so the
- * static worker deployment ships the served page verbatim plus its
- * bootstrap.
+ * Stage the build beside `dist`, splice the worker preview page, then swap the
+ * staged tree into `dist` atomically.
+ *
+ * The preview splice and the swap must happen in one hook: Rollup runs
+ * `writeBundle` and `closeBundle` hooks in parallel, so two plugins could not
+ * order the splice before the rename, and `generateBundle` runs before files
+ * reach disk. `generateBundle` therefore only records the bootstrap entry, and
+ * this plugin's own `writeBundle` splices `preview.html` into the staged tree
+ * and then swaps it into place. The swap moves the old `dist` aside, renames
+ * the staged tree in, then removes the backup: two renames on one filesystem,
+ * so the served tree flips old→new without the missing-file window a straight
+ * `emptyOutDir` produces.
  */
-function emitPreviewPage(): Plugin {
+function stageDistOutput(): Plugin {
   let bootstrapFile: string | undefined
   return {
-    name: 'dsh-emit-preview-page',
+    name: 'dsh-stage-dist-output',
+    config() {
+      return { build: { outDir: STAGING_DIST } }
+    },
     generateBundle(_options, bundle) {
       for (const item of Object.values(bundle)) {
         if (item.type === 'chunk' && item.isEntry && item.name === 'bootstrap') bootstrapFile = item.fileName
       }
       if (bootstrapFile === undefined) throw new Error('vite: preview bootstrap entry missing from the bundle')
     },
-    async closeBundle() {
-      // A build that failed before generateBundle has no page to splice.
-      if (bootstrapFile === undefined) return
-      const page = await readFile(src('./dist/index.html'), 'utf8')
-      const anchor = page.indexOf('<script type="module"')
-      if (anchor === -1) throw new Error('vite: built index.html lost its module entry tag')
-      const tag = `<script type="module" crossorigin src="./${bootstrapFile}"></script>`
-      await writeFile(src('./dist/preview.html'), `${page.slice(0, anchor)}${tag}${page.slice(anchor)}`)
+    async writeBundle() {
+      // Splice the worker preview page before the swap; a build that failed
+      // before generateBundle has no bootstrap entry to splice.
+      if (bootstrapFile !== undefined) {
+        const page = await readFile(join(STAGING_DIST, 'index.html'), 'utf8')
+        const anchor = page.indexOf('<script type="module"')
+        if (anchor === -1) throw new Error('vite: built index.html lost its module entry tag')
+        const tag = `<script type="module" crossorigin src="./${bootstrapFile}"></script>`
+        await writeFile(join(STAGING_DIST, 'preview.html'), `${page.slice(0, anchor)}${tag}${page.slice(anchor)}`)
+      }
+      await rm(PREVIOUS_DIST, { recursive: true, force: true })
+      try {
+        await rename(FINAL_DIST, PREVIOUS_DIST)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+      }
+      await rename(STAGING_DIST, FINAL_DIST)
+      await rm(PREVIOUS_DIST, { recursive: true, force: true })
     },
   }
 }
@@ -141,7 +173,7 @@ export default defineConfig({
   // Relative asset URLs: preview.html mounts the same output under any base
   // directory, and the served index resolves identically from the site root.
   base: './',
-  plugins: [rejectStandaloneServe(), clientDocumentTitle(), react(), emitPreviewPage()],
+  plugins: [rejectStandaloneServe(), clientDocumentTitle(), react(), stageDistOutput()],
   build: {
     // The worker bootstrap holds its page at top-level await; Vite's default
     // `modules` target (es2020-era) rejects that syntax.

@@ -11,6 +11,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { sessionStatsProjectionDefinition } from './projection.ts'
+import { turnOutlineProjectionDefinition } from './turn-outline.ts'
 
 export type * from './types.ts'
 
@@ -20,10 +21,11 @@ export const name = 'session-stats'
 export const inject = ['sessionProjections']
 
 /**
- * Register the `sessionStats` unit; the registration is an effect on this
- * plugin's fiber, so unloading removes the key.
+ * Register the `sessionStats` and `turnOutline` units; the registration is an
+ * effect on this plugin's fiber, so unloading removes the keys.
  * @param ctx - registrant context carrying the projection registry.
  */
 export function apply(ctx: Context): void {
   ctx.sessionProjections.register(sessionStatsProjectionDefinition)
+  ctx.sessionProjections.register(turnOutlineProjectionDefinition)
 }

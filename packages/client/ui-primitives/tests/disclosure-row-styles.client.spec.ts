@@ -1,9 +1,9 @@
 /**
  * DisclosureRow's font-size-axis adoption as CSS text. jsdom has no layout,
- * so these read the declarations that make every flow row (tool calls, think,
- * commands) follow the Settings font-size preference: title size on the axis
- * variable, row/leading geometry on the shared px delta, and the leading
- * glyph override that scales registered icons while exempting StateDot.
+ * so these read the declarations that make every flow row follow the Settings
+ * font-size preference: title size on a rebindable variable, row/leading
+ * geometry on the shared px delta, and the leading glyph override that scales
+ * registered icons while exempting StateDot.
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -19,10 +19,17 @@ function declarations(selector: string): string[] {
 }
 
 describe('DisclosureRow.module.css font-size axis', () => {
-  it('sizes the title from the secondary content tier on the shared row line', () => {
+  it('sizes the title from a rebindable variable that defaults to the secondary tier', () => {
+    // The flow's meta rows (command cards, context injection) keep the
+    // secondary tier; a row whose body reads at the body size — a tool row, the
+    // reasoning row — rebinds the variable on its own root so its title matches
+    // the text beside it.
     expect(declarations('.title')).toEqual(expect.arrayContaining([
-      'font-size: var(--dsh-content-font-size-secondary, 13px)',
+      'font-size: var(--dsl-disclosure-title-font-size)',
       'line-height: calc(24px + var(--dsh-content-font-delta, 0px))',
+    ]))
+    expect(declarations('.root')).toEqual(expect.arrayContaining([
+      '--dsl-disclosure-title-font-size: var(--dsh-content-font-size-secondary, 13px)',
     ]))
   })
 

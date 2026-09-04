@@ -9,7 +9,7 @@ English | [中文](README.zh.md)
 
 ## Summary
 
-`dsh-session-log-export` lets the Web interface download a session's full history: a `Session log` button in the Session Header and an `/export` slash command both hand the session tree — the session, its sub-sessions, and attachments — to the browser as a ZIP download. The package owns the Host archive stream, its authenticated Fetch route, and the browser controls and feedback. The browser chooses the download destination. Setup and usage come first; implementation details follow.
+`dsh-session-log-export` lets the Web interface download a session's history: a `Session log` button in the Session Header and an `/export` slash command both hand the current session's own log and its attachments to the browser as a ZIP download. The button's range menu widens one download to the whole session tree — the session plus every subagent descendant and the media those logs reference. The package owns the Host archive stream, its authenticated Fetch route, and the browser controls and feedback. The browser chooses the download destination. Setup and usage come first; implementation details follow.
 
 ## Table of Contents
 
@@ -25,11 +25,11 @@ English | [中文](README.zh.md)
 <a id="use-this-package"></a>
 ## Use this package
 
-Use this package when the Web bundle should let users export a session log. It requires Connection, the command registry, Session query and persistence, and attachments. Mount the plugin, then click `Session log` in the Session Header or type `/export`; the browser downloads `dsh-session-<id>.zip`.
+Use this package when the Web bundle should let users export a session log. It requires Connection, the command registry, Session query and persistence, and attachments. Mount the plugin, then click `Session log` in the Session Header or type `/export`; the browser downloads `dsh-session-<id>.zip` carrying the current session alone. The arrow beside the button opens a range menu whose `Include sub-Sessions` row adds every subagent descendant's log to that download.
 
 ### When to choose it
 
-Choose it for a Web deployment that needs user-facing session export with a visible download dialog. Avoid it when a programmatic or Host-side export is needed: this package produces a browser download, not a Host path write, and it requires a persistence backend that stores a per-session raw artifact (the shipped JSONL backend supports plaintext and zstd; SQLite export is not supported).
+Choose it for a Web deployment that needs user-facing session export with a Header control and a failure dialog. Avoid it when a programmatic or Host-side export is needed: this package produces a browser download, not a Host path write, and it requires a persistence backend that stores a per-session raw artifact (the shipped JSONL backend supports plaintext and zstd; SQLite export is not supported).
 
 ### Composition
 
@@ -50,16 +50,16 @@ The Web bundle mounts the package with Connection, `dsh-commands`, `dsh-client-u
 
 | Input | Result |
 |---|---|
-| `/export` | Records a human-command lifecycle; the submitting browser downloads `GET /api/session.export?sessionId=<id>&includeDescendants=true` |
+| `/export` | Records a human-command lifecycle; the submitting browser downloads `GET /api/session.export?sessionId=<id>&includeDescendants=false` |
 | `/export <path>` | An error; browser downloads choose their destination through the browser's ordinary download behavior |
 
 ### What to expect
 
-The dialog reports three phases: preparing, download started, or failed. Closing the dialog does not cancel an in-flight download, and the dialog does not reopen when that operation later settles. One session admits one active download at a time; repeated gestures share that operation. The export includes the live session's newest events: the host endpoint flushes a live root session before reading, so a slash-triggered ZIP includes the `command/run` and `command/done` pair that started the download; cold persisted sessions need no flush.
+A download starts in the gesture that requested it, and the browser download manager is the feedback: no dialog appears while the preflight runs or after the save starts, so the failure dialog below is the only dialog this package opens. One session admits one active download at a time; repeated gestures share that operation. Both paths export the current session alone; choosing `Include sub-Sessions` is the only browser action that widens the archive to the descendant tree, and that choice applies to the one gesture that made it, never to later downloads. The export includes the live session's newest events: the host endpoint flushes a live root session before reading, so a slash-triggered ZIP includes the `command/run` and `command/done` pair that started the download; cold persisted sessions need no flush.
 
 ### Failures
 
-The dialog shows a preparation error when the preflight fails before ZIP streaming starts — for example an unreachable or misconfigured host endpoint. A descendant or attachment read failure after the browser accepts the GET is reported by the browser download manager, not by the dialog.
+The failure dialog opens when the preflight fails before ZIP streaming starts — for example an unreachable or misconfigured host endpoint — and shows the HTTP detail, or a generic sentence when the response carries none. A descendant or attachment read failure after the browser accepts the GET is reported by the browser download manager, not by the dialog.
 
 -----
 
@@ -77,7 +77,7 @@ The package has two halves. The Host half ([`src/index.ts`](src/index.ts)) regis
 
 ### Download flow
 
-Both entry paths issue a `HEAD` preflight to `GET /api/session.export?...`, then hand the GET URL to the browser download manager without buffering the ZIP in JavaScript. One controller owns one in-flight download per session, collapses concurrent gestures into that operation, and cancels the preflight on plugin disposal. Modal state lives in a snapshot store keyed by session, so the button and the command share one dialog per session.
+Both entry paths issue a `HEAD` preflight to `GET /api/session.export?...`, then hand the GET URL to the browser download manager without buffering the ZIP in JavaScript. Both pass one range: `includeDescendants=false` by default and `true` only when the Header menu's sub-Session row started the download, so the default archive carries the current session's own log and the media it references. One controller owns one in-flight download per session, collapses concurrent gestures into that operation, and cancels the preflight on plugin disposal. Download state lives in a snapshot store keyed by session, so the button and the command share one failure dialog per session; only a failed preflight publishes an open dialog, and the browser download manager reports every download that starts.
 
 The Host route is a feature-owned exact Fetch contribution. Connection applies its Host/Origin and browser-session checks and bridges the streaming `Response`; this package owns query validation, live-session flushes, raw artifact and attachment reads, ZIP generation, and HTTP status semantics.
 

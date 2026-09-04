@@ -108,7 +108,7 @@ export function AddModelDialog(props: AddModelDialogProps): ReactNode {
       className={styles['addDialog'] as string}
       contentClassName={styles['addDialogContent'] as string}
     >
-      <div className={styles['addDialogBody']}>
+      <div className={styles['providerDialogBody']}>
         {stage.kind !== 'manual' && (
           <div className={styles['addDialogStep']}>
             {addable.length === 0
@@ -154,6 +154,7 @@ export function AddModelDialog(props: AddModelDialogProps): ReactNode {
                   <Button
                     variant="outline"
                     size="sm"
+                    className={styles['addManualContinue']}
                     disabled={props.readOnly || props.protocols.length === 0 || trimmedUrl.length === 0}
                     onClick={() => { setStage({ kind: 'manual', baseURL: trimmedUrl }) }}
                   >

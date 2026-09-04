@@ -66,8 +66,8 @@ kind: "package-reference"
 | `thresholdRatio` | `0.8` | 在 `floor(routedContextWindow × ratio)` 处开始压缩。 |
 | `retainRatio` | `0.16` | 以已路由上下文窗口的一部分表示逐字保留的近期对话；与 `retainTokens` 互斥。 |
 | `retainTokens` | — | 逐字保留的近期对话绝对预算；与 `retainRatio` 互斥，并且必须低于已解析阈值。 |
-| `summarizationProvider` | `''` | 与 `summarizationModel` 一起设置；空对使用最新已路由请求目标，再回退到 `AgentOptions` 对。 |
-| `summarizationModel` | `''` | 与 `summarizationProvider` 一起设置；空对使用最新已路由请求目标，再回退到 `AgentOptions` 对。 |
+| `summarizationProvider` | `''` | 与 `summarizationModel` 一起设置；空对在已选中[轻量模型](../../core/lightweight-model/README.zh.md)时使用该路由，然后使用最新已路由请求目标，再回退到 `AgentOptions` 对。 |
+| `summarizationModel` | `''` | 与 `summarizationProvider` 一起设置；空对在已选中[轻量模型](../../core/lightweight-model/README.zh.md)时使用该路由，然后使用最新已路由请求目标，再回退到 `AgentOptions` 对。 |
 | `maxTokens` | `8192` | 摘要请求的输出上限；可包含推理 token。 |
 | `compactionRetries` | `1` | 压力仍高于阈值时，在首次压缩后进行的额外尝试次数。 |
 | `maxOverflowRetries` | `1` | 已确认上下文窗口溢出后的最大重试次数；`0` 只禁用恢复。 |

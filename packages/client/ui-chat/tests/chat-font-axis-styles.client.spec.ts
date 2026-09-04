@@ -19,14 +19,21 @@ function declarationsFrom(source: string, selector: string): string[] {
 }
 
 describe('chat flow font-size axis', () => {
-  it('think text reads the secondary tier (one step under the body size)', () => {
+  it('think text reads the body size, not the secondary tier', () => {
+    // A thought is read as prose: the Settings font size governs it like the
+    // narration, not one step below it.
     const css = read('ReasoningRow.module.css')
     for (const selector of ['.summary', '.thinkBody']) {
       expect(declarationsFrom(css, selector)).toEqual(expect.arrayContaining([
-        'font-size: var(--dsh-content-font-size-secondary, 13px)',
-        'line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px))',
+        'font-size: var(--dsh-content-font-size, 14px)',
+        'line-height: calc(24px + var(--dsh-content-font-delta, 0px))',
       ]))
     }
+    // The shared header defaults to the secondary tier; the reasoning row lifts
+    // its title to the body size so the row reads one size end to end.
+    expect(declarationsFrom(css, '.root')).toEqual(expect.arrayContaining([
+      '--dsl-disclosure-title-font-size: var(--dsh-content-font-size, 14px)',
+    ]))
   })
 
   it('the reasoning body caps at ten lines and scrolls past them', () => {
@@ -34,7 +41,7 @@ describe('chat flow font-size axis', () => {
     // stays ten lines tall and scrolls inside itself instead of pushing the
     // reply off the viewport. The 8px is the block's own vertical padding.
     expect(declarationsFrom(read('ReasoningRow.module.css'), '.thinkBody')).toEqual(expect.arrayContaining([
-      'max-height: calc((20px + var(--dsh-content-font-delta-secondary, 0px)) * 10 + 8px)',
+      'max-height: calc((24px + var(--dsh-content-font-delta, 0px)) * 10 + 8px)',
       'overflow-y: auto',
     ]))
   })

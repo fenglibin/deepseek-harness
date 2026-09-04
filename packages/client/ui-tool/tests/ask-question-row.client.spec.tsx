@@ -64,15 +64,15 @@ describe('AskQuestionRow', () => {
     expect(screen.getByText('3/3 已回答')).toBeTruthy()
   })
 
-  it('expands a successful result as paired questions and readable answer lines', () => {
-    render(<AskQuestionRow {...rowProps(resultNode(READABLE_ARGS, answers([
+  it('a settled result opens by default and lists paired questions with readable answer lines', () => {
+    const view = render(<AskQuestionRow {...rowProps(resultNode(READABLE_ARGS, answers([
       { id: 'scope', selected: ['deepseek-harness'] },
       { id: 'goal', selected: ['Develop a feature'], custom: 'Keep the API small' },
       { id: 'notes', selected: [] },
     ])))} />)
 
-    fireEvent.click(screen.getByRole('button', { expanded: false }))
-
+    // The user just answered: the transcript must read expanded without a click.
+    expect(screen.getByRole('button', { expanded: true })).toBeTruthy()
     expect(screen.getByText('What do you want to accomplish?')).toBeTruthy()
     expect(screen.getByText('Develop a feature')).toBeTruthy()
     expect(screen.getByText('Keep the API small')).toBeTruthy()
@@ -82,6 +82,9 @@ describe('AskQuestionRow', () => {
     expect(screen.getByText('未回答')).toBeTruthy()
     expect(screen.queryByText(/"questions"/)).toBeNull()
     expect(screen.queryByText(/"answers"/)).toBeNull()
+    // The reader can still collapse it.
+    fireEvent.click(view.getByRole('button', { expanded: true }))
+    expect(screen.getByRole('button', { expanded: false })).toBeTruthy()
   })
 
   it('keeps generic diagnostics when a valid answer result includes a non-text block', () => {
@@ -173,7 +176,9 @@ describe('AskQuestionRow', () => {
       { isError: true, error: { name: 'UserQuestionError', code: 'ASK_CANCELLED' } }))} />)
     expect(screen.getByText('已取消')).toBeTruthy()
     expect(view.container.querySelector('[data-state="ok"]')).not.toBeNull()
-    fireEvent.click(screen.getByRole('button', { expanded: false }))
+    // A cancellation is also a user-participated Q&A: the unanswered transcript
+    // is visible without a click.
+    expect(screen.getByRole('button', { expanded: true })).toBeTruthy()
     expect(screen.getByText('本轮已取消，未提交回答')).toBeTruthy()
     expect(screen.getByText('What do you want to accomplish?')).toBeTruthy()
     expect(screen.getByText('Which project should this apply to?')).toBeTruthy()
@@ -189,7 +194,9 @@ describe('AskQuestionRow', () => {
       { isError: true, error: { name: 'UserQuestionError', code: 'ASK_ABORTED' } }))} />)
     expect(screen.getByText('已中断')).toBeTruthy()
     expect(view.container.querySelector('[data-state="stopped"]')).not.toBeNull()
-    fireEvent.click(screen.getByRole('button', { expanded: false }))
+    // The abort also lands the user-participated transcript open by default so
+    // the reader sees what was pending without re-running the question.
+    expect(screen.getByRole('button', { expanded: true })).toBeTruthy()
     expect(screen.getByText('本轮已中断，未提交回答')).toBeTruthy()
     expect(screen.getByText('What do you want to accomplish?')).toBeTruthy()
     expect(view.container.querySelector('[class*="ioCard"]')).toBeNull()

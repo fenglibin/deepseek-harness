@@ -60,6 +60,21 @@ export async function expandOwningTurnProcess(page: Page, target: Locator): Prom
   if (await control.getAttribute('aria-expanded') !== 'true') await control.click()
 }
 
+/**
+ * Scroll the conversation transcript to its very top, arming the automatic
+ * older-history load (there is no "Load earlier" button anymore). Setting
+ * `scrollTop` on the scrollport fires its native scroll event, which the
+ * reader-input ledger reads as a wheel/scrollbar move into the top threshold.
+ * @param page - page containing the Chat view.
+ */
+export async function wheelConversationToTop(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const scroller = document.querySelector<HTMLElement>('[data-conversation-scroll]')
+    if (scroller === null) throw new Error('conversation scrollport is missing')
+    scroller.scrollTop = 0
+  })
+}
+
 /** Fail loud on a stale checkout instead of testing yesterday's bundle. */
 export function requireDist(): void {
   if (!existsSync(DIST_INDEX)) {

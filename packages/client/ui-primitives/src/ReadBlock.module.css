@@ -1,9 +1,12 @@
 .block {
   --dsl-read-radius: 12px;
-  --dsl-read-line-height: 22px;
+  --dsl-read-line-height: calc(24px + var(--dsh-content-font-delta, 0px));
   /* Fixed-width gutter column for the line numbers, so the content edge stays
-     put down the whole window regardless of how wide the numbers grow. */
-  --dsl-read-gutter: 48px;
+     put down the whole window regardless of how wide the numbers grow. `ch`
+     resolves against the rows' own font, so the column keeps holding four
+     digits as the Settings font size moves; the 48px floor is the figma width,
+     which the smaller settings keep rather than narrow. */
+  --dsl-read-gutter: max(48px, calc(4ch + 14px));
 
   position: relative;
   margin: 16px 0;
@@ -65,7 +68,7 @@
 
 .body {
   padding: 12px 0;
-  font: var(--dsw-font-markdown-code-block);
+  font: var(--dsh-content-font-code);
   overflow-x: auto;
   overflow-y: hidden;
 }

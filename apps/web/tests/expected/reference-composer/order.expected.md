@@ -4,6 +4,8 @@
   - button "Session log":
     - text: Session log
     - img
+  - button "More export options":
+    - img
   - tablist:
     - tab "Chat" [selected]
     - tab "Trajectory"

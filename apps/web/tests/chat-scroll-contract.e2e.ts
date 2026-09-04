@@ -430,20 +430,12 @@ async function expectMarkerAboveComposer(page: Page, marker: string): Promise<vo
 
 async function loadEarlierWithAnchor(page: Page): Promise<void> {
   await wheelToHistoryStart(page)
-  const older = page.getByRole('button', { name: 'Load earlier', exact: true })
-  const loading = page.getByRole('button', { name: 'Loading…', exact: true })
-  await older.waitFor({ timeout: 10_000 })
   const anchor = await visibleFlowAnchor(page)
   const before = await loadedFlowRows(page)
-  await older.click()
   await expect.poll(async () => (
-    await loadedFlowRows(page) > before && await loading.count() === 0
+    await loadedFlowRows(page) > before
   ), { timeout: 30_000 }).toBe(true)
   await nextPaint(page)
-  if (await page.getByRole('button', { name: 'Load earlier', exact: true }).count() === 0) {
-    expect(await page.locator('[data-turn-process][aria-expanded="false"]').count()).toBeGreaterThan(0)
-    return
-  }
   await expectSameFlowTop(page, anchor)
 }
 
@@ -515,7 +507,6 @@ describe('web e2e: long Chat scroll contract', () => {
         await world.page.getByText(LIVE_TEXT_FIRST, { exact: false }).last().waitFor({ timeout: 15_000 })
         await wheelToHistoryStart(world.page)
         const beforeRows = await loadedFlowRows(world.page)
-        await world.page.getByRole('button', { name: 'Load earlier', exact: true }).click()
         await expect.poll(() => held, { timeout: 10_000 }).toBe(true)
 
         await wheelTranscript(world.page, 420)
@@ -541,18 +532,16 @@ describe('web e2e: long Chat scroll contract', () => {
 
       let additionalPages = 0
       while (additionalPages < 8) {
-        await wheelToHistoryStart(world.page)
-        if (await world.page.getByRole('button', { name: 'Load earlier', exact: true }).count() === 0) break
+        if (await world.page.locator('[data-conversation-scroll]')
+          .getByText(HISTORY_FIXTURE.markers.user(1), { exact: false }).count() > 0) break
         await loadEarlierWithAnchor(world.page)
         additionalPages += 1
       }
       expect(additionalPages).toBeGreaterThan(0)
       // The whole log is loaded: turn 1's unique marker renders in the
-      // transcript (scoped: the sidebar search row also carries it) and no
-      // page remains.
+      // transcript (scoped: the sidebar search row also carries it).
       expect(await world.page.locator('[data-conversation-scroll]')
         .getByText(HISTORY_FIXTURE.markers.user(1), { exact: false }).count()).toBe(1)
-      expect(await world.page.getByRole('button', { name: 'Load earlier', exact: true }).count()).toBe(0)
       assertClean(world)
     })
   }, 180_000)

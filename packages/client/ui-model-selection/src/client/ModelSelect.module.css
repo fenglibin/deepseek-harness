@@ -214,9 +214,10 @@
   color: var(--dsw-alias-label-primary);
 }
 
-/* Two-level root cells (figma 496:26454 .Menu_cell): 40px row, 10px side
-   padding, 8px gap, 10px radius; 14/22 label in primary, value in the
-   #81858C tertiary tone, right chevron drilling into the sub-list. */
+/* Drill-in cells (figma 496:26454 .Menu_cell): 40px row, 10px side padding,
+   8px gap, 10px radius; 14/22 label in primary, value in the tertiary tone.
+   The effort row ends in a right chevron and sits above the model list; the
+   efforts' back row leads with a left one and carries no value. */
 .cell {
   box-sizing: border-box;
   display: flex;

@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
 import clsx from 'clsx'
 import {
   CodeBlock, DiffBlock, DisclosureRow, IconInspectOutline12, ReadBlock, SearchBlock, StateDot, TerminalBlock, WebBlock,
@@ -20,6 +20,7 @@ import type { AskQuestionCardModel } from '../models/ask-question-card-model.ts'
 import type { ToolRowState, ToolRowVariant } from '../models/tool-call-model.ts'
 import type { WebCardModelProps } from '../models/web-card-model.ts'
 import { AskQuestionCard } from './AskQuestionCard.tsx'
+import { TodoCard, type TodoCardItem } from './TodoCard.tsx'
 import css from './ToolRow.module.css'
 
 export interface ToolRowProps {
@@ -52,6 +53,8 @@ export interface ToolRowProps {
   read?: ReadCardModel | null | undefined
   search?: SearchCardModel | null | undefined
   web?: WebCardModelProps | null | undefined
+  /** Structured todo list; card fields are mutually exclusive and replace text sections. */
+  todo?: readonly TodoCardItem[] | null | undefined
   state: ToolRowState
   /**
    * Filesystem path from tool args; when set with onOpenFile, the summary
@@ -65,6 +68,13 @@ export interface ToolRowProps {
    * over the expanded body. Absent = no affordance.
    */
   inspect?: (() => void) | undefined
+  /**
+   * Open the row by default. A row that owns the answer (ask-user transcript,
+   * todo checklist) reads naturally in the expanded state; leaving it collapsed
+   * forces the reader to click through a row they just participated in.
+   * User can still collapse; affects only the initial state.
+   */
+  defaultExpanded?: boolean | undefined
 }
 
 /** Locale key per file-operation kind, so the row's label stays locale-owned. */
@@ -112,12 +122,35 @@ export function ToolRow({
   read,
   search,
   web,
+  todo,
   state,
   filePath,
   onOpenFile,
   inspect,
+  defaultExpanded = false,
 }: ToolRowProps) {
-  const [expanded, setExpanded] = useState(false)
+  // A running call needs its expanded body in view from the start — the reader
+  // wants to watch the streaming result, not have to click through the row to
+  // see what is happening. The expanded body stays under the row's normal height
+  // cap (DiffBlock/ReadBlock/etc. each own theirs), so a long result stays
+  // bounded inside its scroll surface.
+  const initialExpanded = defaultExpanded || state === 'running'
+  const [expanded, setExpanded] = useState(initialExpanded)
+  // A running call auto-collapses the moment it settles: the streaming output
+  // no longer needs the row to be open, and a settled row's collapsed footer
+  // is the canonical shape (so an already-settled transcript reads the same way
+  // it does on first load). The ref tracks the previous render's state so the
+  // effect only fires on the running → settled transition, not on every render.
+  // User-driven toggles (clicking the row / change toggle) keep their target:
+  // the effect runs after the state change commits, and any click on a still-
+  // running row writes through `setExpanded(v => !v)` without us touching it.
+  const prevStateRef = useRef(state)
+  useEffect(() => {
+    if (prevStateRef.current === 'running' && state !== 'running') {
+      setExpanded(false)
+    }
+    prevStateRef.current = state
+  }, [state])
   const terminalLabels = useMemo(() => terminalBlockLabels(t), [t])
   const diffLabels = useMemo(() => diffBlockLabels(t), [t])
   const readLabels = useMemo(() => readBlockLabels(t), [t])
@@ -130,9 +163,10 @@ export function ToolRow({
   const readBody = read ?? null
   const searchBody = search ?? null
   const webBody = web ?? null
+  const todoBody = todo ?? null
   const askQuestionBody = askQuestion ?? null
   const outputText = output ?? null
-  const card = askQuestionBody ?? terminalBody ?? diffBody ?? readBody ?? searchBody ?? webBody
+  const card = askQuestionBody ?? terminalBody ?? diffBody ?? readBody ?? searchBody ?? webBody ?? todoBody
   const expandable = body !== null || outputText !== null || card !== null
   const open = expanded && expandable
   const status = stateStatus(state, t)
@@ -141,12 +175,36 @@ export function ToolRow({
   const summaryText = failureLine ?? terminalBody?.description ?? summary
   // A diff row's collapsed line carries the card's +/- totals (the same
   // numbers the expanded footer prints) so the change size reads without
-  // expanding; an explicit summarySuffix (none today on diff rows) wins.
-  const diffStat = useMemo(() => {
+  // expanding; an explicit summarySuffix (none today on diff rows) wins. The
+  // split spans colour the totals — added in success, removed in error — so
+  // the change size reads the same way the expanded footer does. Returning
+  // a `DiffStat` node (not a string) lets the JSX paint two styled spans;
+  // the wrapping `.diffStat` carrier keeps the combined `+N -M` textContent
+  // as one readable token (the literal space between the halves) so screen
+  // readers and copy-paste read the sign-attached digits as a unit.
+  const hasDiffStat = diffBody !== null
+  const diffStat = useMemo<ReactNode>(() => {
     if (diffBody === null) return null
     const { added, removed } = diffTotals(diffBody.card.diffs)
-    return `+${added} -${removed}`
+    // Co-locate the sign with its digit inside the inner span so each side
+    // owns a single text node; the wrapping `.diffStat` carrier then has a
+    // textContent of `+N -M` that screen-reader / copy-paste reads as one
+    // token and any per-text-node query (e.g. `getByText('+1 -0')`) can
+    // still locate the diff stat in the collapsed row.
+    return (
+      <span className={css.diffStat}>
+        <span className={css.diffStatAdded}>{`+${added}`}</span>
+        {' '}
+        <span className={css.diffStatRemoved}>{`-${removed}`}</span>
+      </span>
+    )
   }, [diffBody])
+  // A diff-stat suffix takes the code-font framing (.diffStat) so the digits
+  // match the diff body's mono look; an explicit summarySuffix stays in the
+  // plain sans summary-fragment font. The flag is the diffStat intent, not a
+  // ReactNode reference compare — useMemo's node identity isn't stable enough
+  // to identify the rendered branch in CSS.
+  const suffixIsDiffStat = failureLine === null && summarySuffix === undefined && hasDiffStat
   const suffix = failureLine === null ? summarySuffix ?? diffStat : null
   const fileLink = filePath !== undefined && onOpenFile !== undefined && failureLine === null
   // Only a file-mutation row names what it did to the path; every other row
@@ -215,7 +273,7 @@ export function ToolRow({
               <span className={css.operation}>{t(OPERATION_KEYS[operation])}</span>
             )}
             {suffix !== null && (
-              <span className={clsx(css.summarySuffix, suffix === diffStat && css.diffStat)}>{suffix}</span>
+              <span className={clsx(css.summarySuffix, suffixIsDiffStat && css.diffStat)}>{suffix}</span>
             )}
             {operation !== null && (
               <button
@@ -265,36 +323,38 @@ export function ToolRow({
                     )
                     : webBody !== null
                       ? <WebBlock {...webBody} labels={webLabels} className={css.webBody} />
-                      : (
-                        <>
-                          {variant === 'code' && body !== null && (
-                            <div className={css.bodyScroll}>
-                              <CodeBlock code={body} lang="typescript" copyLabel={t('copy')} copiedLabel={t('copied')} className={css.codeBody} />
-                            </div>
-                          )}
-                          {(cardBody !== null || outputText !== null) && (
-                            <div className={css.ioCard}>
-                              {cardBody !== null && (
-                                <div className={css.ioSection}>
-                                  <span className={css.ioLabel}>{t('row.input')}</span>
-                                  <span className={css.ioText}>{cardBody}</span>
-                                </div>
-                              )}
-                              {cardBody !== null && outputText !== null && (
-                                <span className={css.ioDivider} aria-hidden />
-                              )}
-                              {outputText !== null && (
-                                <div className={css.ioSection}>
-                                  <span className={css.ioLabel}>{t('row.output')}</span>
-                                  <span className={css.ioText} data-error={state === 'error' || undefined}>
-                                    {outputText}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </>
-                      )}
+                      : todoBody !== null
+                        ? <TodoCard todos={todoBody} t={t} />
+                        : (
+                          <>
+                            {variant === 'code' && body !== null && (
+                              <div className={css.bodyScroll}>
+                                <CodeBlock code={body} lang="typescript" copyLabel={t('copy')} copiedLabel={t('copied')} className={css.codeBody} />
+                              </div>
+                            )}
+                            {(cardBody !== null || outputText !== null) && (
+                              <div className={css.ioCard}>
+                                {cardBody !== null && (
+                                  <div className={css.ioSection}>
+                                    <span className={css.ioLabel}>{t('row.input')}</span>
+                                    <span className={css.ioText}>{cardBody}</span>
+                                  </div>
+                                )}
+                                {cardBody !== null && outputText !== null && (
+                                  <span className={css.ioDivider} aria-hidden />
+                                )}
+                                {outputText !== null && (
+                                  <div className={css.ioSection}>
+                                    <span className={css.ioLabel}>{t('row.output')}</span>
+                                    <span className={css.ioText} data-error={state === 'error' || undefined}>
+                                      {outputText}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
           {inspect !== undefined && (
             <button
               type="button"

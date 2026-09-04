@@ -4,6 +4,8 @@
  * @module @deepseek-ai/dsh-token-meter/projection
  */
 
+import type { TurnTokenUsage } from './turn-usage.ts'
+
 /**
  * Durable cumulative provider usage for a complete session log.
  *
@@ -65,6 +67,14 @@ export interface ContextBreakdownProjection {
   messageTokens: number
 }
 
+/**
+ * Per-turn billed usage for a complete session log, keyed by turn number.
+ * A turn with no billed attempt is absent from the map.
+ */
+export interface TurnUsageProjection {
+  turns: Record<string, TurnTokenUsage>
+}
+
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionMap {
     /** Provider-reported usage accumulated across the complete durable log. */
@@ -73,5 +83,7 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
     contextPressure: ContextPressureProjection
     /** Heuristic system/tools/message composition of the next request. */
     contextBreakdown: ContextBreakdownProjection
+    /** Per-turn billed token usage across the complete durable log. */
+    turnUsage: TurnUsageProjection
   }
 }

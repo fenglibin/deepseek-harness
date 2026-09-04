@@ -101,7 +101,10 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     const deepSeekRow = settings.getByText('DeepSeek', { exact: true }).first()
     await deepSeekRow.waitFor({ timeout: 10_000 })
     await deepSeekRow.locator('xpath=ancestor::li').getByRole('button', { name: '编辑' }).click()
-    const configuredInput = settings.getByLabel('API 密钥', { exact: true })
+    // The card is its own dialog over the section, not an expansion of the row.
+    const editor = page.getByRole('dialog', { name: '编辑 DeepSeek (deepseek-official)' })
+    await editor.waitFor({ timeout: 10_000 })
+    const configuredInput = editor.getByLabel('API 密钥', { exact: true })
     await configuredInput.waitFor({ timeout: 10_000 })
     await expect.poll(
       () => configuredInput.getAttribute('placeholder'),
@@ -201,22 +204,28 @@ describe.skipIf(MODE === 'record')('web e2e: first-run DeepSeek credential setup
     const deepSeek = settings.getByText('DeepSeek', { exact: true }).first()
     await deepSeek.waitFor({ timeout: 10_000 })
     await deepSeek.locator('xpath=ancestor::li').getByRole('button', { name: '编辑' }).click()
-    await settings.getByText('自定义设置').click()
-    await settings.getByRole('button', { name: /删除模型/ }).first().click()
+    const editor = page.getByRole('dialog', { name: '编辑 DeepSeek (deepseek-official)' })
+    await editor.waitFor({ timeout: 10_000 })
+    await editor.getByText('自定义设置').click()
+    await editor.getByRole('button', { name: /删除模型/ }).first().click()
     // The model catalog's own row button: adding a row by hand, beside the
     // button that fetches them from the endpoint.
-    await settings.getByRole('button', { name: '手动添加' }).click()
-    const customModelId = settings.getByLabel('模型 ID 3')
+    await editor.getByRole('button', { name: '手动添加' }).click()
+    const customModelId = editor.getByLabel('模型 ID 3')
     await customModelId.fill('private-preview')
-    await settings.getByLabel('显示名称 3').fill('Private Preview')
+    await editor.getByLabel('显示名称 3').fill('Private Preview')
     // Capacities live behind the row's own disclosure, as in the pi-ai form.
-    await settings.getByRole('button', { name: '容量 3' }).click()
-    await settings.getByLabel('上下文窗口 3').fill('131072')
-    await settings.getByLabel('最大输出 token 数 3').fill('64K')
+    await editor.getByRole('button', { name: '容量 3' }).click()
+    await editor.getByLabel('上下文窗口 3').fill('131072')
+    await editor.getByLabel('最大输出 token 数 3').fill('64K')
 
-    const modelEditor = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
+    const modelEditor = await captureStableAria(
+      page,
+      '[role="dialog"][aria-label="编辑 DeepSeek (deepseek-official)"]',
+      scaffold.workspaceCwd,
+    )
     await compareOrRefreshGolden(MODELS_EXPECTED, modelEditor, MODE)
-    await settings.getByRole('button', { name: '保存', exact: true }).click()
+    await editor.getByRole('button', { name: '保存', exact: true }).click()
     await customModelId.waitFor({ state: 'detached', timeout: 15_000 })
 
     const document = await readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8')

@@ -15,9 +15,13 @@ export interface TurnTokenUsage {
   readonly outputTokens: number
   /** Exact aggregate prompt plus output total across all attempts. */
   readonly totalTokens: number
-  /** Present only when every attempt reported the bucket. */
+  /**
+   * Sum of the bucket over the attempts that reported it; absent when none
+   * did. An attempt that withholds the bucket contributes zero, so a Turn
+   * mixing reporting and silent requests still discloses its cache traffic.
+   */
   readonly cacheReadTokens?: number
-  /** Present only when every attempt reported the bucket. */
+  /** Sum of the bucket over the attempts that reported it, as for `cacheReadTokens`. */
   readonly cacheWriteTokens?: number
   /** Output subset, present only when every attempt reported it. */
   readonly reasoningTokens?: number
@@ -66,6 +70,28 @@ function safeSum(values: readonly number[]): number | undefined {
     if (!Number.isSafeInteger(total)) return undefined
   }
   return total
+}
+
+/**
+ * Sum one optional bucket across the attempts that disclosed it.
+ *
+ * Billing buckets follow the harness `TokenUsage` convention an absent bucket
+ * contributes zero, so the sum stays exact against `totalTokens` even when a
+ * request stays silent. The bucket is withheld only when no attempt reported
+ * it, which is what keeps a provider without that concept from disclosing a
+ * fabricated zero row.
+ * @param values - one entry per attempt, undefined where the attempt was silent.
+ * @returns the disclosed sum, undefined when nothing was reported or the sum overflows.
+ */
+function sumDisclosed(values: readonly (number | undefined)[]): number | undefined {
+  let sawValue = false
+  const reported: number[] = []
+  for (const value of values) {
+    if (value === undefined) continue
+    sawValue = true
+    reported.push(value)
+  }
+  return sawValue ? safeSum(reported) : undefined
 }
 
 function messageRoute(message: AssistantMessage): TurnTokenUsageRoute | undefined {
@@ -132,8 +158,10 @@ function aggregateAttempts(attempts: readonly NormalizedAttempt[]): TurnTokenUsa
   const cacheRead = attempts.map(attempt => attempt.cacheReadTokens)
   const cacheWrite = attempts.map(attempt => attempt.cacheWriteTokens)
   const reasoning = attempts.map(attempt => attempt.reasoningTokens)
-  const cacheReadTokens = cacheRead.every(isCount) ? safeSum(cacheRead) : undefined
-  const cacheWriteTokens = cacheWrite.every(isCount) ? safeSum(cacheWrite) : undefined
+  const cacheReadTokens = sumDisclosed(cacheRead)
+  const cacheWriteTokens = sumDisclosed(cacheWrite)
+  // Reasoning is an output subset with no "silent means zero" convention, so
+  // it stays all-or-nothing: a partial sum would read as a real count.
   const reasoningTokens = reasoning.every(isCount) ? safeSum(reasoning) : undefined
   // A present cache bucket is bounded by exact prompt, and reasoning is bounded
   // by output. Safe required aggregates therefore imply safe optional sums.

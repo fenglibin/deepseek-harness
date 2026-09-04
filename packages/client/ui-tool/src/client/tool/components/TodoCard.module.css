@@ -1,0 +1,67 @@
+/* Structured todo-list card shown as a todo_write row's expanded body. The
+   list surface reuses the IN/OUT card's code-block background and radius so a
+   todo list reads as part of the same row family, while the per-item markers
+   mirror TodoPanel's three status glyphs in a lighter dot form. */
+
+.list {
+  list-style: none;
+  margin: 4px 0 4px 4px;
+  padding: 0;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 12px;
+  background: var(--dsw-alias-markdown-code-block);
+  overflow: hidden;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 16px;
+  font-size: var(--dsh-content-font-size, 14px);
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.item + .item {
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+/* Status marker: a 12px disc whose fill distinguishes the three states —
+   hollow ring for pending, solid business-blue for in-progress, solid success
+   for completed. Colour plus shape carry the state, so the text label stays a
+   caption affordance rather than the only signal. */
+.marker {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.marker[data-status='pending'] {
+  border: 1.5px solid var(--dsw-alias-label-caption);
+}
+
+.marker[data-status='in_progress'] {
+  background: var(--dsw-alias-state-business-primary);
+}
+
+.marker[data-status='completed'] {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+.content {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status {
+  flex: none;
+  font-size: calc(var(--dsh-content-font-size, 14px) - 2px);
+  color: var(--dsw-alias-label-caption);
+}

@@ -169,7 +169,7 @@ describe('deriveTurnTokenUsage', () => {
     expect(deriveTurnTokenUsage(completeAttempt(message(3, invalidUsage)))).toBeUndefined()
   })
 
-  it('omits optional aggregates and routes unless every attempt reports them', () => {
+  it('sums a billing bucket over the attempts that report it and omits the rest', () => {
     const events = [
       event(1, 'turn/start', { turn: 1 }),
       event(2, 'step/start', { turn: 1, step: 1 }),
@@ -188,7 +188,41 @@ describe('deriveTurnTokenUsage', () => {
       event(7, 'step/end', { turn: 1, step: 2 }),
       event(8, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
     ]
-    expect(deriveTurnTokenUsage(events)).toEqual({ uncachedInputTokens: 200, outputTokens: 40, totalTokens: 345 })
+    // The silent attempt contributes zero to each billing bucket, so step 1's
+    // disclosures survive a later request that reported nothing; reasoning has
+    // no such convention and stays all-or-nothing, and the unattributed route
+    // withholds the whole roster.
+    expect(deriveTurnTokenUsage(events)).toEqual({
+      uncachedInputTokens: 200,
+      outputTokens: 40,
+      totalTokens: 345,
+      cacheReadTokens: 50,
+      cacheWriteTokens: 5,
+    })
+  })
+
+  it('keeps a cache-read disclosure when most attempts report it', () => {
+    // The whole-log tokenUsage projection defaults a silent request to zero, so
+    // a Turn must not drop its cache traffic because one request stayed silent.
+    const events = [
+      event(1, 'turn/start', { turn: 1 }),
+      event(2, 'step/start', { turn: 1, step: 1 }),
+      message(3, usage({ inputTokens: 10, outputTokens: 1, totalTokens: 111, cacheReadTokens: 100 }), 'deepseek', 'deepseek-chat', 1),
+      event(4, 'step/end', { turn: 1, step: 1 }),
+      event(5, 'step/start', { turn: 1, step: 2 }),
+      message(6, usage({ inputTokens: 20, outputTokens: 2, totalTokens: 22, cacheReadTokens: undefined }), 'deepseek', 'deepseek-chat', 2),
+      event(7, 'step/end', { turn: 1, step: 2 }),
+      event(8, 'step/start', { turn: 1, step: 3 }),
+      message(9, usage({ inputTokens: 30, outputTokens: 3, totalTokens: 233, cacheReadTokens: 200 }), 'deepseek', 'deepseek-chat', 3),
+      event(10, 'step/end', { turn: 1, step: 3 }),
+      event(11, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+    ]
+    expect(deriveTurnTokenUsage(events)).toMatchObject({
+      uncachedInputTokens: 60,
+      outputTokens: 6,
+      totalTokens: 366,
+      cacheReadTokens: 300,
+    })
   })
 
   it('sums multiple steps and preserves distinct attributed routes', () => {

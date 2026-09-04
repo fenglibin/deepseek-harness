@@ -61,6 +61,20 @@ describe('ModelsSection theme styles', () => {
     expect(block('.rowCard')).not.toMatch(/\bbackground\s*:/)
   })
 
+  it('gives both provider dialogs one width the primitive cannot cap', () => {
+    // The regression: `max-width` alone never widened this dialog — the Modal
+    // primitive's own dialog rule is `width: min(380px, 100%)`, and a larger
+    // `max-width` leaves that definite width in place, so the card rendered
+    // 380px wide however wide its rule asked for. Both provider dialogs must
+    // declare `width`, and they must agree: they open the same editor card.
+    const dialogs = /\.addDialog,\s*\.editDialog \{([^}]*)\}/.exec(css)?.[1] ?? ''
+    expect(dialogs).toContain('width: min(570px, 100%)')
+    expect(dialogs).not.toContain('max-width')
+    // The body scrolls in both, so a tall card never outgrows the viewport.
+    const bodies = /\.addDialogContent,\s*\.editDialogContent \{([^}]*)\}/.exec(css)?.[1] ?? ''
+    expect(bodies).toContain('overflow-y: auto')
+  })
+
   it('gives every dropdown the shared chevron instead of the OS arrow', () => {
     // `select.input` caps the control at 240px, and the OS arrow is painted
     // flush inside that shrunk right edge — visibly tighter than every other

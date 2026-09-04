@@ -28,11 +28,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /**
      * One provider card's adapter extension area, dispatched with
-     * `entryKey = settingsNs` on every card that renders a directory row: a
-     * saved row's card (its first-run setup posture included) and the add
-     * dialog's card for a picked route. The hand-declared draft card has no
-     * directory row yet, so it dispatches nothing until saved. Without a
-     * registrant the area renders nothing.
+     * `entryKey = settingsNs` on whichever surface renders that row's card:
+     * the dialog 编辑 opens for a saved row, the same dialog when the
+     * first-run posture opens it by itself, and the add dialog's card for a
+     * picked route. A row whose dialog is open dispatches the seat there and
+     * not on the row, so one card never receives it twice. The hand-declared
+     * draft card has no directory row yet, so it dispatches nothing until
+     * saved. Without a registrant the area renders nothing.
      */
     'settings.models.provider-card': { kind: 'keyed'; scope: 'root'; owner: ProviderCardExtrasOwnerProps }
     /**

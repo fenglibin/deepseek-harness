@@ -22,6 +22,10 @@ import type { DeepSeekOnboardingInjected } from './DeepSeekOnboardingDialog.tsx'
 import { WelcomeNotice } from './WelcomeNotice.tsx'
 import type { WelcomeNoticeInjected } from './WelcomeNotice.tsx'
 import { decodeWelcomeSection, WelcomeNoticeStore } from './welcome-store.ts'
+import {
+  LIGHTWEIGHT_MODEL_SETTINGS_NS, LightweightModelStore,
+} from './lightweight-model-store.ts'
+import type { LightweightModelSettings } from './lightweight-model-store.ts'
 import { ModelsSettingsStore } from './store.ts'
 import { createModelsOperations } from './operations.ts'
 import { createSettingsSchemaOperations } from './schema-operations.ts'
@@ -62,8 +66,8 @@ export function refreshIfLoaded(controller: ModelsSettingsStore): void {
  * constrained; registration depends on each slot through `slots.inject()`.
  */
 export const inject = [
-  'slots', 'locale', 'remote', 'remote.credentials', 'remote.llm', 'remote.settings',
-  'settingsScope', 'settingsSchema',
+  'slots', 'locale', 'remote', 'remote.credentials', 'remote.llm', 'remote.session',
+  'remote.settings', 'settingsScope', 'settingsSchema',
 ]
 
 /**
@@ -85,7 +89,8 @@ export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind(NS) as ModelsSectionInjected['t']
   const injected = (): ModelsSectionInjected => ({
     controller,
-    hooks: { snapshot: controller.store },
+    lightweight,
+    hooks: { snapshot: controller.store, lightweight: lightweight.store },
     operations,
     schema,
     t,
@@ -98,7 +103,11 @@ export function apply(ctx: ClientContext): void {
     t,
   })
   // The scope's own memory mode is what keeps a remote browser process-local,
-  // so the store needs no isLoopback branch of its own.
+  // so neither store needs an isLoopback branch of its own.
+  const lightweight = new LightweightModelStore(
+    ctx.settingsScope.bind<LightweightModelSettings>({ namespace: LIGHTWEIGHT_MODEL_SETTINGS_NS }),
+    ctx,
+  )
   const welcomeController = new WelcomeNoticeStore(ctx.settingsScope.bind({
     namespace: WELCOME_NOTICE_SETTINGS_NAMESPACE,
     decode: decodeWelcomeSection,
@@ -116,13 +125,20 @@ export function apply(ctx: ClientContext): void {
   // follows its settings scope, so it needs no subscription here.
   ctx.effect(() => {
     const refreshModels = (): void => { refreshIfLoaded(controller) }
+    const refreshAdapters = (): void => {
+      refreshModels()
+      // The adapter topology moved, so the card's catalog is stale too. A card
+      // that never requested one stays idle and reaches no wire.
+      lightweight.refresh()
+    }
     const disposers = [
       ctx.remote.$on('settings/document-updated', () => { refreshModels() }),
       ctx.remote.$on('credentials/reference-updated', refreshModels),
-      ctx.remote.$on('llm/adapters-updated', refreshModels),
+      ctx.remote.$on('llm/adapters-updated', refreshAdapters),
       ctx.on('connection/reset', refreshModels),
     ]
     return () => {
+      lightweight.dispose()
       welcomeController.dispose()
       for (const dispose of disposers) dispose()
     }

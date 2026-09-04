@@ -488,6 +488,36 @@ export interface Config {
 
 来源：[`packages/code-runtime/code-runtime-worker-thread/src/index.ts:25`](../packages/code-runtime/code-runtime-worker-thread/src/index.ts)
 
+<a id="deepseek-aidsh-command-prompt-config"></a>
+
+## `@deepseek-ai/dsh-command-prompt-config`
+
+需要：`commands`
+
+```ts config-catalog
+/** Prompt-command configuration. */
+export interface Config {
+  /** Prompt commands to register, in configuration order. */
+  commands?: PromptCommandEntry[]
+}
+
+/** One prompt-command entry: discovery metadata plus the prompt text. */
+export interface PromptCommandEntry {
+  /** Lowercase command name without the leading slash. */
+  name: string
+  /** Localized display title (e.g. a Chinese name). */
+  title?: string
+  /** Human-readable summary shown in discovery UI. */
+  description: string
+  /** The prompt text submitted to the model on invocation. */
+  prompt: string
+  /** Optional free-form input hint advertised to capable clients. */
+  hint?: string
+}
+```
+
+来源：[`packages/interaction/command-prompt-config/src/index.ts:50`](../packages/interaction/command-prompt-config/src/index.ts)
+
 <a id="deepseek-aidsh-compaction-basic"></a>
 
 ## `@deepseek-ai/dsh-compaction-basic`
@@ -960,6 +990,22 @@ export interface Config {
 ```
 
 来源：[`packages/jobs/jobs-local/src/index.ts:31`](../packages/jobs/jobs-local/src/index.ts)
+
+<a id="deepseek-aidsh-lightweight-model"></a>
+
+## `@deepseek-ai/dsh-lightweight-model`
+
+```ts config-catalog
+/** Optional deployment base for the route. */
+export interface Config {
+  /** Provider inherited when the user document leaves the route unset. */
+  provider?: string
+  /** Model inherited when the user document leaves the route unset. */
+  model?: string
+}
+```
+
+来源：[`packages/core/lightweight-model/src/index.ts:45`](../packages/core/lightweight-model/src/index.ts)
 
 <a id="deepseek-aidsh-llm-deepseek"></a>
 
@@ -2594,7 +2640,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/core/system-prompt/src/index.ts:238`](../packages/core/system-prompt/src/index.ts)
+来源：[`packages/core/system-prompt/src/index.ts:239`](../packages/core/system-prompt/src/index.ts)
 
 <a id="deepseek-aidsh-terminal-bash"></a>
 
@@ -2730,6 +2776,50 @@ export interface Config {
 ```
 
 来源：[`packages/shell/tool-bash-persistent/src/index.ts:432`](../packages/shell/tool-bash-persistent/src/index.ts)
+
+<a id="deepseek-aidsh-tool-delivery"></a>
+
+## `@deepseek-ai/dsh-tool-delivery`
+
+需要：`agents` · `delivery` · `tools` · `fs` · `shell` · `systemPrompt`
+
+```ts config-catalog
+/** Deployment policy for the delivery tools. */
+export interface Config {
+  /** Whether the delivery tools are registered at all. */
+  enabled?: boolean
+  /** Gate strength: off (no tools), advisory (remind), stateful (block). */
+  enforcement?: string
+  /** Size proxy: any measure at or above a threshold auto-tiers to `l1`. */
+  designThreshold?: DesignThresholdConfig
+  /** Size proxy: any measure at or above a threshold auto-tiers to `l2`. */
+  openspecThreshold?: OpenspecThresholdConfig
+  /** Whether a non-small bug fix (past the design threshold) forces `l2`. */
+  requireOpenspecForBugs?: boolean
+  /** Post-execution commands run before a task may reach accepted. */
+  postHooks?: string[]
+}
+
+/** Size proxy that auto-tiers a task to `l1` when the model omits one. */
+export interface DesignThresholdConfig {
+  /** Auto-tier to `l1` at or above this estimated todo-item count. */
+  todoCount?: number
+  /** Auto-tier to `l1` when the objective is at least this many characters. */
+  descriptionChars?: number
+  /** Auto-tier to `l1` at or above this estimated changed-file count. */
+  touchedFiles?: number
+}
+
+/** Size proxy that auto-tiers a task to `l2` when the model omits one. */
+export interface OpenspecThresholdConfig {
+  /** Auto-tier to `l2` at or above this estimated todo-item count. */
+  todoCount?: number
+  /** Auto-tier to `l2` when the objective is at least this many characters. */
+  descriptionChars?: number
+}
+```
+
+来源：[`packages/delivery/tool-delivery/src/index.ts:41`](../packages/delivery/tool-delivery/src/index.ts)
 
 <a id="deepseek-aidsh-tool-fs"></a>
 
@@ -3451,6 +3541,7 @@ export interface Config {
 - `@deepseek-ai/dsh-client-ui-conversation`（[`packages/client/ui-conversation/src/index.ts`](../packages/client/ui-conversation/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-cordis`（[`packages/extensions/ui-cordis/src/index.ts`](../packages/extensions/ui-cordis/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-deliverables` — 需要 `systemPrompt`（[`packages/client/ui-deliverables/src/index.ts`](../packages/client/ui-deliverables/src/index.ts)）
+- `@deepseek-ai/dsh-client-ui-delivery`（[`packages/client/ui-delivery/src/index.ts`](../packages/client/ui-delivery/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-directory-picker-browse`（[`packages/client/ui-directory-picker-browse/src/index.ts`](../packages/client/ui-directory-picker-browse/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-directory-picker-native`（[`packages/client/ui-directory-picker-native/src/index.ts`](../packages/client/ui-directory-picker-native/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-goal`（[`packages/client/ui-goal/src/index.ts`](../packages/client/ui-goal/src/index.ts)）
@@ -3465,7 +3556,9 @@ export interface Config {
 - `@deepseek-ai/dsh-client-ui-renderer`（[`packages/client/ui-renderer/src/index.ts`](../packages/client/ui-renderer/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-schedule`（[`packages/client/ui-schedule/src/index.ts`](../packages/client/ui-schedule/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-session`（[`packages/client/ui-session/src/index.ts`](../packages/client/ui-session/src/index.ts)）
+- `@deepseek-ai/dsh-client-ui-session-changes`（[`packages/client/ui-session-changes/src/index.ts`](../packages/client/ui-session-changes/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings`（[`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts)）
+- `@deepseek-ai/dsh-client-ui-settings-commands`（[`packages/client/ui-settings-commands/src/index.ts`](../packages/client/ui-settings-commands/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings-general`（[`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings-models`（[`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings-plugin-inventory`（[`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts)）
@@ -3485,6 +3578,7 @@ export interface Config {
 - `@deepseek-ai/dsh-commands`（[`packages/interaction/commands/src/index.ts`](../packages/interaction/commands/src/index.ts)）
 - `@deepseek-ai/dsh-cordis-client-runner`（[`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts)）
 - `@deepseek-ai/dsh-deepseek-llm-api-extensions`（[`packages/llm/deepseek-llm-api-extensions/src/index.ts`](../packages/llm/deepseek-llm-api-extensions/src/index.ts)）
+- `@deepseek-ai/dsh-delivery` — 需要 `agents` · `sessionProjections`（[`packages/delivery/delivery/src/index.ts`](../packages/delivery/delivery/src/index.ts)）
 - `@deepseek-ai/dsh-experimental-client-ui-agent-team`（[`packages/experimental/client-ui-agent-team/src/index.ts`](../packages/experimental/client-ui-agent-team/src/index.ts)）
 - `@deepseek-ai/dsh-fs-e2b` — 需要 `e2b`（[`packages/e2b/fs-e2b/src/index.ts`](../packages/e2b/fs-e2b/src/index.ts)）
 - `@deepseek-ai/dsh-fs-observation-policy`（[`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts)）

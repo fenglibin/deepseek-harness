@@ -1,6 +1,6 @@
 .block {
   --dsl-search-radius: 12px;
-  --dsl-search-line-height: 22px;
+  --dsl-search-line-height: calc(24px + var(--dsh-content-font-delta, 0px));
 
   position: relative;
   margin: 16px 0;
@@ -42,7 +42,7 @@
 
 .body {
   padding: 8px 14px 12px 0;
-  font: var(--dsw-font-markdown-code-block);
+  font: var(--dsh-content-font-code);
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -107,6 +107,6 @@
 
 .empty {
   padding: 12px 14px;
-  font: var(--dsw-font-markdown-code-block);
+  font: var(--dsh-content-font-code);
   color: var(--dsw-alias-label-tertiary);
 }

@@ -21,6 +21,9 @@ import type {
   SessionTitleProviderResult,
   SessionTitleUserMessage,
 } from '@deepseek-ai/dsh-session-title'
+// Optional route owner: mounted deployments let the user point auxiliary calls
+// at a cheaper model; absent, the main request's own route is inherited.
+import type {} from '@deepseek-ai/dsh-lightweight-model'
 
 /** Exact model-visible request recorded before one auxiliary title dispatch. */
 export interface SessionTitleLlmRequestEventData {
@@ -169,14 +172,24 @@ export function registerSessionTitleLlmProvider(
   })
 }
 
-/** Resolve the explicit pair or the exact route captured from `request/header`. */
+/**
+ * Resolve the explicit pair, the user's lightweight model, or the exact route
+ * captured from `request/header`.
+ * @param ctx - context exposing the optional lightweight-model service.
+ * @param config - validated model-provider policy.
+ * @param request - service-owned session, route, message snapshot, and cancellation.
+ * @returns the exact auxiliary route to dispatch.
+ */
 function resolveRoute(
+  ctx: Context,
   config: ResolvedSessionTitleLlmConfig,
   request: SessionTitleProviderRequest,
 ): SessionTitleModelProvenance {
   if (config.provider !== undefined && config.model !== undefined) {
     return { provider: config.provider, model: config.model }
   }
+  const lightweight = ctx.get('lightweightModel')?.currentSelection()
+  if (lightweight !== undefined) return lightweight
   if (request.route === undefined) {
     throw new Error('session-title-llm: no logged request route is available; configure provider and model together')
   }
@@ -243,7 +256,7 @@ export async function generateSessionTitleWithLlm(
   if (inputBytes > config.maxInputBytes) {
     throw new Error(`session-title-llm: input is ${inputBytes} bytes, exceeding maxInputBytes ${config.maxInputBytes}`)
   }
-  const route = resolveRoute(config, request)
+  const route = resolveRoute(ctx, config, request)
   const messages: Message[] = [createUserMessage({
     content: [{ type: 'text', text: framedInput }],
     source: { kind: 'plugin', plugin: 'dsh-session-title-llm' },

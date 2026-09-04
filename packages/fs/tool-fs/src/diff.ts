@@ -7,9 +7,6 @@
 import { structuredPatch } from 'diff'
 import type { FileDiff } from '@deepseek-ai/dsh-tools'
 
-/** Context lines shown on each side of an applied hunk. */
-export const DIFF_CONTEXT = 3
-
 /**
  * The `write`/`edit` tools' private `tool/result` `meta` payload: the applied
  * contextual-diff hunks. Attached opaquely (as `unknown`) on the tool result and
@@ -20,9 +17,14 @@ export const DIFF_CONTEXT = 3
 export type FsDiffMeta = { diffs: FileDiff[] }
 
 /**
- * Compute one {@link FileDiff} per hunk between `before` and `after`, each carrying the
- * applied change plus {@link DIFF_CONTEXT} context lines. Pure insertions use `oldText: null`,
- * patch-only no-newline markers are omitted, and scattered replacements remain separate hunks.
+ * Compute one {@link FileDiff} per hunk between `before` and `after`, each carrying ONLY the
+ * truly applied lines — removed lines in `oldText`, added lines in `newText`. Surrounding
+ * context lines are deliberately excluded so the result-time line-count totals
+ * (`+A -R`) and the rendered card both reflect the actual change rather than the
+ * surrounding `±N` context lines that would otherwise inflate both. Hunk grouping
+ * still uses {@link CONTEXT_FOR_GROUPING} (the `diff` library default of 3) so a
+ * scattered replaceAll produces distinct hunks in file order; pure insertions
+ * use `oldText: null`, patch-only no-newline markers are omitted.
  *
  * @param path - the path stamped on every produced diff (the model-facing `file_path`; the
  *   bridge relativizes it).
@@ -31,7 +33,7 @@ export type FsDiffMeta = { diffs: FileDiff[] }
  * @returns one diff per applied hunk, in file order; empty when the texts are identical.
  */
 export function computeHunkDiffs(path: string, before: string, after: string): FileDiff[] {
-  const patch = structuredPatch('', '', before, after, undefined, undefined, { context: DIFF_CONTEXT })
+  const patch = structuredPatch('', '', before, after, undefined, undefined, { context: CONTEXT_FOR_GROUPING })
   const diffs: FileDiff[] = []
   for (const hunk of patch.hunks) {
     const oldLines: string[] = []
@@ -45,11 +47,12 @@ export function computeHunkDiffs(path: string, before: string, after: string): F
         oldLines.push(text)
       } else if (line.startsWith('+')) {
         newLines.push(text)
-      } else {
-        // A context (unchanged) line appears on both sides.
-        oldLines.push(text)
-        newLines.push(text)
       }
+      // Context (unchanged) lines are intentionally dropped: a per-hunk change
+      // is the +/- block, not the diff's surrounding neighborhood. Counting
+      // context as +/- would inflate both the footer totals and the chat row's
+      // `+N -M` summary; rendering them as ghost rows would confuse the reader
+      // about which lines actually moved.
     }
     diffs.push({ path, oldText: oldLines.length > 0 ? oldLines.join('\n') : null, newText: newLines.join('\n') })
   }
@@ -77,3 +80,12 @@ export function diffsFromMeta(meta: unknown): FileDiff[] | undefined {
   if (!Array.isArray(diffs) || diffs.length === 0 || !diffs.every(isFileDiff)) return undefined
   return diffs
 }
+
+/**
+ * Number of unchanged lines `structuredPatch` keeps around each change when
+ * grouping applied hunks. Kept as a tunable so a future caller can widen or
+ * narrow the hunk-coalescing window without rewriting {@link computeHunkDiffs}.
+ * The value itself never reaches the rendered card — the +/- block a hunk
+ * carries is the only thing that lands in `oldText` / `newText`.
+ */
+export const CONTEXT_FOR_GROUPING = 3

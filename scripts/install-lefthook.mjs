@@ -378,6 +378,33 @@ function releaseInstallLock(lockPath, ownedRecord, ownedStat) {
   }
 }
 
+// A stale lock's recorded owner is already known to be dead (`kill(pid, 0)`
+// returned ESRCH), so its PID has not been reused and the lock is safe to
+// break. Verify the file identity and exact contents still match before
+// unlinking to avoid disturbing a concurrent installer that has just replaced
+// the lock. Two installers breaking the same dead lock concurrently remain a
+// rare race: the `openSync` exclusive create re-serializes them, and the
+// ownership check at release fails safe rather than corrupting the hooks.
+function removeStaleInstallLock(lockPath, staleRecord, staleStat) {
+  const currentStat = installLockStat(lockPath)
+  if (
+    currentStat === undefined
+    || !currentStat.isFile()
+    || currentStat.isSymbolicLink()
+    || currentStat.dev !== staleStat.dev
+    || currentStat.ino !== staleStat.ino
+    || readInstallLock(lockPath) !== staleRecord
+  ) {
+    return
+  }
+  try {
+    unlinkSync(lockPath)
+  } catch (error) {
+    if (errorCode(error) === 'ENOENT') return
+    throw error
+  }
+}
+
 async function acquireInstallLock(commonDirectory) {
   const lockPath = join(commonDirectory, INSTALL_LOCK)
   const deadline = Date.now() + INSTALL_LOCK_TIMEOUT_MS
@@ -447,7 +474,10 @@ async function acquireInstallLock(commonDirectory) {
         continue
       }
       initializingLock = undefined
-      if (!lockOwnerIsAlive(owner)) throw manualLockRecoveryError(lockPath, 'stale')
+      if (!lockOwnerIsAlive(owner)) {
+        removeStaleInstallLock(lockPath, existingRecord, verifiedStat)
+        continue
+      }
       if (Date.now() >= deadline) {
         throw new Error(`timed out waiting for Lefthook installer lock ${lockPath}`)
       }

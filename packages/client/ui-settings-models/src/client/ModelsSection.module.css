@@ -326,24 +326,6 @@
   border-radius: 12px;
 }
 
-.addCard,
-.setupCard {
-  border-radius: 12px;
-  background: var(--dsw-alias-bg-module-platform);
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  list-style: none;
-}
-
-/* Nested in a card that already carries the module chrome. */
-.addCard .editor,
-.setupCard .editor {
-  background: none;
-  padding: 0;
-}
-
 .customized {
   border-top: 1px solid var(--dsw-alias-border-l2);
   padding-top: 10px;
@@ -396,9 +378,10 @@
   padding-top: 12px;
 }
 
-/* Add-model dialog body: the chooser's two entries, then whichever card the
-   choice opened, stacked with the gap the cards use internally. */
-.addDialogBody {
+/* Body of a dialog carrying a provider card: the add dialog's chooser and the
+   card it opened, or the edit dialog's card, stacked with the gap the cards
+   use internally. */
+.providerDialogBody {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -411,26 +394,44 @@
 }
 
 /* Endpoint entry of the add dialog: field, then commit button beside it
-   rather than below, so entering a URL reads as one gesture. */
+   rather than below, so entering a URL reads as one gesture. The field grows
+   from a zero basis and may shrink to nothing, so the slack the row lacks
+   comes out of the field — shrinking the button instead broke its label into
+   one line per character. */
 .addManualRow {
   display: flex;
   gap: 8px;
 }
 
 .addManualRow .input {
-  flex: 1 1 auto;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
-/* Add-model dialog: roomier than the confirmations, because it carries a whole
-   provider card; the body scrolls instead of the mask. */
-.addDialog {
-  max-width: 560px;
+/* The commit button keeps the width its label needs: a squeezed capsule
+   wrapped even a two-character label. */
+.addManualContinue {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* The two dialogs that carry a provider card: adding a route and editing one.
+   Both open the same editor, so they name this rule together — a narrower edit
+   dialog would wrap the model row the add dialog lays out side by side.
+   `width`, not `max-width`: the Modal primitive's own dialog rule is
+   `width: min(380px, 100%)`, and a `max-width` larger than that has no
+   effect — the primitive's definite width wins and the card it caps stays
+   380px wide. The body scrolls instead of the mask. */
+.addDialog,
+.editDialog {
+  width: min(570px, 100%);
 
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
-.addDialogContent {
+.addDialogContent,
+.editDialogContent {
   max-height: min(72vh, 640px);
   overflow-y: auto;
 }

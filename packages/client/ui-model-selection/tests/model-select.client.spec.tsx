@@ -136,7 +136,6 @@ describe('ModelSelect reasoning effort', () => {
     expect(trigger.textContent).toContain('deepseek-official/removed-model')
     fireEvent.click(trigger)
     expect(screen.queryByRole('menuitem', { name: /推理等级/ })).toBeNull()
-    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
     expect(screen.queryByRole('menuitemradio', { name: 'removed-model' })).toBeNull()
     expect(screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })).toBeTruthy()
     expect(screen.queryByText('Fast catalog description')).toBeNull()
@@ -192,7 +191,6 @@ describe('ModelSelect reasoning effort', () => {
     />)
 
     fireEvent.click(screen.getByRole('button', { name: /选择模型|当前/ }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: /DeepSeek-V4-Pro/ }))
     const toast = await screen.findByRole('alert')
     expect(toast.textContent).toContain('模型操作失败：session/model-unavailable: session already contains images')
@@ -213,5 +211,95 @@ describe('ModelSelect reasoning effort', () => {
 
     expect(screen.queryByRole('button')).toBeNull()
     expect(load).not.toHaveBeenCalled()
+  })
+})
+
+describe('ModelSelect opens on the model list', () => {
+  // The composer's model seat used to open a two-row root menu (Model /
+  // Effort) and required a second click to reach any model. One click now
+  // lands on the list itself; effort is a row inside it.
+  it('shows the model list on the first click, with effort as a row inside it', () => {
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={createSnapshotStore(state())}
+      load={vi.fn()}
+      select={vi.fn().mockResolvedValue(true)}
+      t={t}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: /选择模型/ }))
+
+    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
+      .toEqual(['DeepSeek-V4-Flash'])
+    expect(screen.getByRole('menuitem', { name: /推理等级/ })).toBeTruthy()
+  })
+
+  it('drills into the efforts from the model list and returns through the back row', () => {
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={createSnapshotStore(state())}
+      load={vi.fn()}
+      select={vi.fn().mockResolvedValue(true)}
+      t={t}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: /选择模型/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
+    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
+      .toEqual(['Off', 'High', 'Max'])
+
+    fireEvent.click(screen.getByRole('menuitem', { name: '返回模型列表' }))
+    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
+      .toEqual(['DeepSeek-V4-Flash'])
+  })
+
+  it('backs out of the efforts with Escape before it closes the menu', () => {
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={createSnapshotStore(state())}
+      load={vi.fn()}
+      select={vi.fn().mockResolvedValue(true)}
+      t={t}
+    />)
+
+    fireEvent.click(screen.getByRole('button', { name: /选择模型/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
+
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
+    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
+      .toEqual(['DeepSeek-V4-Flash'])
+
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' })
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+
+  it('reopens on the model list after a drilled-in selection is closed', async () => {
+    const directory = createSnapshotStore(state())
+    render(<ModelSelect
+      locked={false}
+      available
+      directory={directory}
+      load={vi.fn()}
+      select={vi.fn(async (selection: ModelSelection) => {
+        directory.set(state({ current: selection }))
+        return true
+      })}
+      t={t}
+    />)
+
+    const trigger = screen.getByRole('button', { name: /选择模型/ })
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Max/ }))
+    // The selection closes the menu from a microtask, so the trigger's next
+    // click is an open only once that has landed.
+    await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
+
+    fireEvent.click(trigger)
+    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
+      .toEqual(['DeepSeek-V4-Flash'])
   })
 })

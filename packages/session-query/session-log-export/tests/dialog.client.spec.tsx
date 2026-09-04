@@ -35,7 +35,9 @@ describe('SessionLogDownloadDialog', () => {
     const b = bench()
     act(() => {
       b.controller.store.set({
-        bySession: { [SID]: { open: true, status: 'error', error: 'toolbar failed' } },
+        bySession: {
+          [SID]: { open: true, status: 'error', error: 'toolbar failed' },
+        },
       })
     })
     const dialog = await b.view.findByRole('dialog', { name: 'Session export failed' })
@@ -46,24 +48,26 @@ describe('SessionLogDownloadDialog', () => {
     await waitFor(() => { expect(b.dismiss).toHaveBeenCalledWith(SID) })
   })
 
-  it('renders the in-flight state and the settled browser download state', async () => {
+  it('renders no dialog while a download is in flight or after the browser save starts', async () => {
     let release!: (response: Response) => void
     const pending = new Promise<Response>((resolve) => { release = resolve })
     const controller = new SessionLogDownloadController(() => pending, vi.fn())
     const b = bench(controller)
 
-    const download = controller.download(SID)
-    expect(await b.view.findByRole('dialog', { name: 'Exporting Session' })).toBeTruthy()
+    const download = controller.download(SID, true)
+    expect(b.view.queryByRole('dialog')).toBeNull()
     release(new Response('zip', { status: 200 }))
     await download
-    expect(await b.view.findByRole('dialog', { name: 'Session download started' })).toBeTruthy()
+    expect(b.view.queryByRole('dialog')).toBeNull()
   })
 
   it('uses fallback copy when a failure has no detail', async () => {
     const b = bench()
     act(() => {
       b.controller.store.set({
-        bySession: { [SID]: { open: true, status: 'error', error: '' } },
+        bySession: {
+          [SID]: { open: true, status: 'error', error: '' },
+        },
       })
     })
     const dialog = await b.view.findByRole('dialog', { name: 'Session export failed' })

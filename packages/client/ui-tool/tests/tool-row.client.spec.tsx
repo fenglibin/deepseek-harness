@@ -252,10 +252,15 @@ describe('ToolRow', () => {
     expect(view.getByText('List files')).toBeTruthy()
   })
 
-  it('running keeps the icon (row sweep carries the signal); error swaps in a StateDot', () => {
+  it('running opens by default so the streaming output reads at a glance; error swaps in a StateDot', () => {
+    // A running row opens by default — the reader wants to watch the streaming
+    // output without clicking through. The DisclosureRow then swaps the icon
+    // for a chevron (its own expand affordance) and the row's sweep on the
+    // outer wrapper carries the running signal.
     const runningView = render(<ToolRow {...rowProps} state="running" />)
-    expect(runningView.queryByTestId('tool-icon')).not.toBeNull()
     expect(runningView.container.querySelector('[data-state="running"]')).not.toBeNull()
+    expect(runningView.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')).toBe('true')
+    expect(runningView.container.querySelector('[data-testid="tool-icon"]')).toBeNull()
     const errorView = render(<ToolRow {...rowProps} state="error" />)
     expect(errorView.container.querySelector('[data-testid="tool-icon"]')).toBeNull()
     // The dot rides the idle slot, so an expandable error row keeps the
@@ -397,6 +402,41 @@ describe('ToolRow', () => {
     expect(outputOnly.getByText('输出')).toBeTruthy()
     expect(outputOnly.getByText('only out')).toBeTruthy()
   })
+
+  it('opens by default while running, then collapses the moment the call settles', () => {
+    // The streaming result is the leading edge of a running call — a reader
+    // wants to watch it without clicking. On settlement the streaming output
+    // is gone (or canonical), so the row snaps back to the closed shape that
+    // already-settled transcript rows use.
+    const view = render(<ToolRow {...rowProps} state="running" />)
+    expect(view.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')).toBe('true')
+    cleanup()
+    // Re-render the same row with a settled state — the auto-collapse effect
+    // owns the transition, so the settled row opens at the closed default.
+    const settledView = render(<ToolRow {...rowProps} />)
+    expect(settledView.container.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')).toBe('false')
+  })
+
+  it('a settled file-mutation row keeps the +/- totals beside the path, with success/error halves', () => {
+    // The collapsed summary carries the same +/- totals the expanded footer
+    // prints. The split halves colour each side — added in success, removed
+    // in error — so a quick glance tells the change shape; the wrapping
+    // `.diffStat` carrier keeps the combined `+N -M` textContent as one
+    // readable token for screen-reader / copy-paste.
+    const diff = {
+      card: { diffs: [{ path: 'src/x.ts', oldText: 'before', newText: 'after\nand-more' }] },
+      operation: 'modified' as const,
+    }
+    const view = render(<ToolRow
+      t={t} variant="edit" toolName="edit" icon={null}
+      title="编辑 src/x.ts" summary="src/x.ts" body={null} output={null}
+      diff={diff} state="ok" filePath="src/x.ts"
+    />)
+    const stat = view.container.querySelector('[class*="diffStat_"]')
+    expect(stat?.textContent).toBe('+2 -1')
+    expect(stat?.querySelector('[class*="diffStatAdded_"]')?.textContent).toBe('+2')
+    expect(stat?.querySelector('[class*="diffStatRemoved_"]')?.textContent).toBe('-1')
+  })
 })
 
 describe('GenericToolCard', () => {
@@ -428,7 +468,11 @@ describe('GenericToolCard', () => {
       }))} />,
     )
     expect(view.getByText('编辑')).toBeTruthy()
-    expect(view.getByText('src/x.ts')).toBeTruthy()
+    // A running row auto-expands — both the summary path link and the diff
+    // header inside the card carry the path, so the reader sees it twice
+    // (collapsed-link form, then expanded hunk header). Use the summary form
+    // (the fileLink) to disambiguate.
+    expect(view.container.querySelector('[class*="fileLink"]')?.textContent).toBe('src/x.ts')
     expect(view.container.querySelector('[data-variant="edit"]')).not.toBeNull()
     expect(view.container.querySelector('svg')).not.toBeNull()
   })
@@ -441,7 +485,7 @@ describe('GenericToolCard', () => {
       }))} />,
     )
     expect(view.getByText('写入')).toBeTruthy()
-    expect(view.getByText('src/x.ts')).toBeTruthy()
+    expect(view.container.querySelector('[class*="fileLink"]')?.textContent).toBe('src/x.ts')
     expect(view.container.querySelector('[data-variant="write"]')).not.toBeNull()
     expect(view.container.querySelector('svg')).not.toBeNull()
   })

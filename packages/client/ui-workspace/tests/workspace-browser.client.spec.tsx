@@ -45,6 +45,8 @@ const workspaceState = (
   archivedSessionIds: readonly SessionId[] = [],
 ): WorkspaceSnapshot => ({ items, archivedSessionIds, state: 'idle', phase: 'ready', error: null })
 const noPendingInteraction: SessionPendingInteractionSnapshot = new Map()
+/** No Session carries an unsent draft until a test says otherwise. */
+const noDrafts: ReadonlySet<SessionId> = new Set()
 /** A delete the Host accepted; a refusal names why nothing was removed. */
 const DELETED: SessionDeleteOutcome = { ok: true }
 const refused = (message: string, refusal: 'live' | 'failed' = 'failed'): SessionDeleteOutcome =>
@@ -72,6 +74,7 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     expandSidebar: vi.fn(),
     useSessions: hook(sessionState([])),
     useSessionPendingInteraction: hook(noPendingInteraction),
+    useSessionDrafts: hook(noDrafts),
     useWorkspaces: hook(workspaceState([])),
     useStore: bindSnapshotSelector(store),
     actions: store.actions,
@@ -686,6 +689,33 @@ describe('WorkspaceBrowser', () => {
     fireEvent.change(screen.getByPlaceholderText('搜索会话…'), { target: { value: 'new session' } })
     expect(screen.queryByText('新会话')).toBeNull()
     fireEvent.change(screen.getByPlaceholderText('搜索会话…'), { target: { value: '新会话' } })
+    expect(screen.queryByText('新会话')).toBeNull()
+  })
+
+  it('keeps a blank session listed after the operator types and navigates away', () => {
+    const typedBlank = summary('alpha-blank', 9, { blank: true })
+    const staleBlank = summary('beta-blank', 8, { blank: true })
+    const sessions = sessionState([typedBlank, staleBlank], { current: typedBlank.id })
+    const b = mount({
+      useSessions: hook(sessions),
+      useWorkspaces: hook(workspaceState([
+        workspace('alpha', ['alpha-blank']), workspace('beta', ['beta-blank']),
+      ])),
+    })
+    expect(screen.getByText('新会话')).toBeTruthy()
+    // Typing into the provisional Session, then reading another Session: the
+    // row survives because its composer still holds unsent content, while the
+    // untouched blank in the other Workspace stays hidden.
+    rerender(b, {
+      useSessions: hook({ ...sessions, current: undefined }),
+      useSessionDrafts: hook(new Set([typedBlank.id]) as ReadonlySet<SessionId>),
+    })
+    expect(screen.getAllByText('新会话')).toHaveLength(1)
+    expect(screen.getByText('新会话').closest('[role="treeitem"]')).toBeTruthy()
+    // Clearing the draft retires the row again.
+    rerender(b, {
+      useSessionDrafts: hook(new Set() as ReadonlySet<SessionId>),
+    })
     expect(screen.queryByText('新会话')).toBeNull()
   })
 

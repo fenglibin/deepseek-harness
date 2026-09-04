@@ -1,4 +1,9 @@
 .root {
+  /* The shared disclosure header defaults to the secondary tier for the flow's
+     meta rows; a thought is read as prose, so its title takes the body size
+     like the text under it. */
+  --dsl-disclosure-title-font-size: var(--dsh-content-font-size, 14px);
+
   display: flex;
   flex-direction: column;
 }
@@ -50,16 +55,15 @@
   background: var(--dsw-alias-label-caption);
 }
 
-/* Think text reads the secondary tier — one step under the body size
-   (setting −1 at ≤14, setting −2 above), shared with every flow-row title
-   and summary. */
+/* Think text reads the body size itself — the Settings font size governs it
+   like the narration, not the secondary tier the flow's meta rows use. */
 .summary {
   min-width: 0;
   overflow: hidden;
   flex: 1 1 auto;
   color: var(--dsw-alias-label-tertiary);
-  font-size: var(--dsh-content-font-size-secondary, 13px);
-  line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
+  font-size: var(--dsh-content-font-size, 14px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -68,7 +72,7 @@
   text-overflow: clip;
 }
 
-/* The reasoning body: ten lines of the secondary tier, then it scrolls. A chat
+/* The reasoning body: ten lines of the body size, then it scrolls. A chat
    flow reads many blocks at once, so an unbounded thought would push the
    reply — and every row under it — off the viewport while it streams. The cap
    rides the font-size axis, and the 8px is the block's own vertical padding. */
@@ -76,11 +80,11 @@
   /* Indent under the title, which starts at leading (16 + delta) + gap 6. */
   padding: 4px 0 4px calc(22px + var(--dsh-content-font-delta, 0px));
   color: var(--dsw-alias-label-tertiary);
-  font-size: var(--dsh-content-font-size-secondary, 13px);
-  line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px));
+  font-size: var(--dsh-content-font-size, 14px);
+  line-height: calc(24px + var(--dsh-content-font-delta, 0px));
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: calc((20px + var(--dsh-content-font-delta-secondary, 0px)) * 10 + 8px);
+  max-height: calc((24px + var(--dsh-content-font-delta, 0px)) * 10 + 8px);
   overflow-y: auto;
 }
 

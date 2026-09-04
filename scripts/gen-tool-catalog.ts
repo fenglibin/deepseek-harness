@@ -52,6 +52,8 @@ import * as ToolFsSearch from '@deepseek-ai/dsh-tool-fs-search'
 import * as ToolStrReplaceEditor from '@deepseek-ai/dsh-tool-str-replace-editor'
 import TerminalSessionService from '@deepseek-ai/dsh-terminal'
 import * as ToolPty from '@deepseek-ai/dsh-tool-terminal'
+import DeliveryService from '@deepseek-ai/dsh-delivery'
+import * as ToolDelivery from '@deepseek-ai/dsh-tool-delivery'
 import * as ToolGoal from '@deepseek-ai/dsh-tool-goal'
 import * as ToolSchedule from '@deepseek-ai/dsh-schedule'
 import Lsp from '@deepseek-ai/dsh-lsp'
@@ -373,6 +375,23 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'create, edit, pause, and resume require direct-human root authority; complete and blocked also accept the exact current goal round. The default blocked lower bound is three admitted rounds.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-delivery',
+    dir: 'tool-delivery',
+    source: 'packages/delivery/tool-delivery/src/index.ts',
+    requires: ['ctx.tools', 'ctx.agents', 'ctx.delivery', 'ctx.fs', 'ctx.shell', 'ctx.systemPrompt'],
+    writes: ['tool/call', 'delivery/change for mutations', '.dsh/changes and .dsh/design artifact files', 'post-hook shell runs before accepted', 'tool/result'],
+    async mount(ctx) {
+      await ctx.plugin(AgentRegistry)
+      await ctx.plugin(LocalFileSystem)
+      await ctx.plugin(LocalSubprocessRuntime)
+      await ctx.plugin(LocalBashExecutor)
+      await ctx.plugin(DeliveryService)
+      await ctx.plugin(ToolDelivery)
+    },
+    note:
+      'advance to implemented requires at least one change record under the default stateful enforcement; advisory reminds instead of blocking, and off registers no tools.',
   },
   {
     pkg: '@deepseek-ai/dsh-schedule',

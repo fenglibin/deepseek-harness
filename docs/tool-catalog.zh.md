@@ -32,6 +32,7 @@
 | `@deepseek-ai/dsh-tool-fs-search` | `glob`、`grep` | `ctx.tools`、`ctx.subprocess`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | glob 和 grep 是无条件可用的发现工具，通过 ctx.subprocess spawn 随包提供的 ripgrep 二进制文件（`@vscode/ripgrep`），并作为普通前台调用运行，绝不作为后台任务；无需在宿主机安装 `rg`，也不经过 shell 层。本目录使用 `sampleOverCapGlobResults: true`；部署必须显式选择该行为。结果超过上限时，会通过可选的 ctx.spillStore 后端保存完整的格式化列表；在共置部署中，如果后端公开本地路径，返回的定位信息可供后续读取／搜索。 |
 | `@deepseek-ai/dsh-tool-terminal` | `terminal_close`、`terminal_list`、`terminal_open`、`terminal_read`、`terminal_send`、`terminal_signal` | `ctx.tools`、`ctx.terminals`、`ctx.systemPrompt`、`ctx.jobs at call time for run_in_background` | `tool/call`、`tool/result` | - | 这 6 个终端工具需要选择启用，用于补充一次性 bash／文件系统工具。`terminal_send(run_in_background: true)` 会注册到 `ctx.jobs`；schema 不包含 TUI、具名按键序列、BEL、调整尺寸、自动启动和跨 agent 共享。 |
 | `@deepseek-ai/dsh-tool-goal` | `create_goal`、`get_goal`、`update_goal` | `ctx.tools`、`ctx.agents`、`ctx.goals`、`ctx.systemPrompt`、`a calling Agent in an authorized open turn` | `tool/call`、`goal/change for mutations`、`tool/result` | - | create、edit、pause 和 resume 要求直接来自人类的根权限；complete 和 blocked 也接受确切的当前 Goal Round。blocked 的默认下限是 3 个获准的 Round。 |
+| `@deepseek-ai/dsh-tool-delivery` | `advance_delivery_task`、`create_delivery_task`、`get_delivery_task`、`record_change`、`record_design`、`record_spec` | `ctx.tools`、`ctx.agents`、`ctx.delivery`、`ctx.fs`、`ctx.shell`、`ctx.systemPrompt` | `tool/call`、`delivery/change for mutations`、`.dsh/changes 与 .dsh/design 产物文件`、`验收前运行 post-hook shell`、`tool/result` | - | 在默认的 stateful 强制模式下，推进到 implemented 至少需要一条变更记录；advisory 只提醒而不阻断，off 则不注册任何工具。 |
 | `@deepseek-ai/dsh-schedule` | `schedule_create`、`schedule_delete`、`schedule_list` | `ctx.tools`、`ctx.sessions`、Session 持久化、未来创建的 live 根 Agent | `tool/call`、`schedule/change create or delete`、`tool/result` | - | 仅在选择启用的 Schedule 插件加载后创建的 live 根 Agent scope 内注册。版本 1 接受 after_seconds、显式绝对 at 和有界固定速率 every_seconds，并披露 session-local 交付；管理读取与变更必须通过共享的 Session 持久化 barrier。 |
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.tools`、`ctx.lsp`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，因此其模型可见 schema 在更换提供方时保持稳定。运行时要求已注册提供方，例如 `@deepseek-ai/dsh-lsp-stdio`；如果没有提供方，查询会返回结构化 `LSP_UNAVAILABLE` 错误，而不会改变 schema。 |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`、`ctx.workflowEngine`、`ctx.subagents`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents every fresh round)` | `tool/call`、`tool/result`、`workflow and child session events during execution` | - | 固定的前台工作流会在每个 Round 启动一个全新的结构化子级；模型只能选择不可变目标和可选的 Round 上限。 |
@@ -1102,6 +1103,199 @@ glob 和 grep 是无条件可用的发现工具，通过 ctx.subprocess spawn �
 来源：[`packages/goal/tool-goal/src/index.ts`](../packages/goal/tool-goal/src/index.ts)
 
 create、edit、pause 和 resume 要求直接来自人类的根权限；complete 和 blocked 也接受确切的当前 Goal Round。blocked 的默认下限是 3 个获准的 Round。
+
+<a id="deepseek-aidsh-tool-delivery"></a>
+
+## `@deepseek-ai/dsh-tool-delivery`
+
+### `advance_delivery_task`
+
+按所属 level 的阶段顺序（created | designed | specified | implemented | verified | accepted）将当前交付任务推进到下一阶段。目标阶段必须是唯一合法的下一阶段；跳过必需阶段会被拒绝。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Exact id returned by get_delivery_task."
+    },
+    "revision": {
+      "type": "number",
+      "description": "Exact positive revision returned by get_delivery_task."
+    },
+    "phase": {
+      "type": "string",
+      "description": "The target next phase.",
+      "enum": [
+        "created",
+        "designed",
+        "specified",
+        "implemented",
+        "verified",
+        "accepted"
+      ]
+    }
+  },
+  "required": [
+    "task_id",
+    "revision",
+    "phase"
+  ]
+}
+```
+
+来源：[`packages/delivery/tool-delivery/src/index.ts`](../packages/delivery/tool-delivery/src/index.ts)
+
+### `create_delivery_task`
+
+在 created 阶段创建一个交付任务。用于应当产出变更记录的具体工作；level 选择纪律路径（l0 小型修复，l1 增加设计，l2 增加 openspec 拆分）。省略 level 时，根据目标长度以及可选的 todo_count、touched_files 预估值推断。已 accepted 的任务可以被替换。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "objective": {
+      "type": "string",
+      "description": "The concrete task objective."
+    },
+    "level": {
+      "type": "string",
+      "description": "Task-size class; inferred when omitted.",
+      "enum": [
+        "l0",
+        "l1",
+        "l2"
+      ]
+    },
+    "todo_count": {
+      "type": "number",
+      "description": "Estimated todo-item count used for size tiering."
+    },
+    "touched_files": {
+      "type": "number",
+      "description": "Estimated changed-file count used for size tiering."
+    },
+    "is_bug": {
+      "type": "boolean",
+      "description": "Whether this is a bug fix; may force l2 under requireOpenspecForBugs."
+    }
+  },
+  "required": [
+    "objective"
+  ]
+}
+```
+
+来源：[`packages/delivery/tool-delivery/src/index.ts`](../packages/delivery/tool-delivery/src/index.ts)
+
+### `get_delivery_task`
+
+读取当前交付任务，包括其确切的 id／revision、目标、阶段、level、已记录的变更数量和时间戳。推进阶段或记录变更前请先调用此工具。
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+来源：[`packages/delivery/tool-delivery/src/index.ts`](../packages/delivery/tool-delivery/src/index.ts)
+
+### `record_change`
+
+针对当前交付任务记录一条变更，不改变其阶段，并追加到 .dsh/changes/<task-id>.md。每个任务在到达 implemented 之前必须至少记录一条变更。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Exact id returned by get_delivery_task."
+    },
+    "revision": {
+      "type": "number",
+      "description": "Exact positive revision returned by get_delivery_task."
+    },
+    "text": {
+      "type": "string",
+      "description": "Non-empty description of the change."
+    }
+  },
+  "required": [
+    "task_id",
+    "revision",
+    "text"
+  ]
+}
+```
+
+来源：[`packages/delivery/tool-delivery/src/index.ts`](../packages/delivery/tool-delivery/src/index.ts)
+
+### `record_design`
+
+针对当前交付任务记录一条设计，不改变其阶段，并追加到 .dsh/design/<task-id>.md。任务在到达 designed 之前必须至少记录一条设计。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Exact id returned by get_delivery_task."
+    },
+    "revision": {
+      "type": "number",
+      "description": "Exact positive revision returned by get_delivery_task."
+    },
+    "text": {
+      "type": "string",
+      "description": "Non-empty description of the design."
+    }
+  },
+  "required": [
+    "task_id",
+    "revision",
+    "text"
+  ]
+}
+```
+
+来源：[`packages/delivery/tool-delivery/src/index.ts`](../packages/delivery/tool-delivery/src/index.ts)
+
+### `record_spec`
+
+针对当前交付任务记录一条 spec，不改变其阶段，并追加到 openspec/changes/<task-id>/spec.md。任务在到达 specified 之前必须至少记录一条 spec。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Exact id returned by get_delivery_task."
+    },
+    "revision": {
+      "type": "number",
+      "description": "Exact positive revision returned by get_delivery_task."
+    },
+    "text": {
+      "type": "string",
+      "description": "Non-empty description of the spec."
+    }
+  },
+  "required": [
+    "task_id",
+    "revision",
+    "text"
+  ]
+}
+```
+
+来源：[`packages/delivery/tool-delivery/src/index.ts`](../packages/delivery/tool-delivery/src/index.ts)
+
+在默认的 stateful 强制模式下，推进到 implemented 至少需要一条变更记录；advisory 只提醒而不阻断，off 则不注册任何工具。
 
 <a id="deepseek-aidsh-schedule"></a>
 

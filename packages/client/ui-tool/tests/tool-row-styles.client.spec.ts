@@ -54,10 +54,13 @@ describe('bash row output-height stages', () => {
     ])
   })
 
-  it('derives both caps from the line height the row binds, never a copied px value', () => {
+  it('derives both caps from the line height the row reads, never a copied px value', () => {
     // A cap written in px would drift from the terminal's own line height the
-    // moment that binding changed, leaving the row showing half a line.
-    expect(bashDeclarations('.terminal')).toEqual(expect.arrayContaining([
+    // moment that binding changed, leaving the row showing half a line. The row
+    // no longer rebinds the measure: the primitive's default rides the content
+    // font-size axis, so the Settings size reaches command output too.
+    expect(bashDeclarations('.terminal')).not.toEqual(expect.arrayContaining([
+      expect.stringContaining('--dsl-terminal-font'),
       '--dsl-terminal-line-height: 18px',
     ]))
     for (const stage of ['peek', 'full']) {
@@ -110,15 +113,23 @@ describe('ToolRow.module.css summary line', () => {
     expect(declarations('.summarySuffix')).not.toEqual(expect.arrayContaining(['text-overflow: ellipsis']))
   })
 
-  it('sizes the summary texts from the secondary content tier', () => {
-    // The Settings font-size preference must reach tool-call rows, not only
-    // the narration body: summary, suffix, and file link read the secondary
-    // tier (one step under the body), matching think text.
+  it('sizes the summary texts at the body size, not the secondary tier', () => {
+    // The Settings font-size preference must reach tool-call rows at the size
+    // it names: summary, suffix, and file link read the body size itself, so a
+    // row does not stay one step below the narration it sits among.
     for (const selector of ['.summary', '.summarySuffix', '.fileLink']) {
       expect(declarations(selector)).toEqual(expect.arrayContaining([
-        'font-size: var(--dsh-content-font-size-secondary, 13px)',
+        'font-size: var(--dsh-content-font-size, 14px)',
         'line-height: calc(24px + var(--dsh-content-font-delta, 0px))',
       ]))
     }
+  })
+
+  it('rebinds the shared disclosure title so the whole row reads one size', () => {
+    // The shared header defaults to the secondary tier for the flow's meta
+    // rows; a tool row's title sits beside body-size text, so it lifts with it.
+    expect(declarations('.root')).toEqual(expect.arrayContaining([
+      '--dsl-disclosure-title-font-size: var(--dsh-content-font-size, 14px)',
+    ]))
   })
 })

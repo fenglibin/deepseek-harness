@@ -232,6 +232,11 @@
     - id: ui-deliverables
       name: '@deepseek-ai/dsh-client-ui-deliverables'
 
+    # Session changed-files dock above the composer: the list of files the agent
+    # mutated this session, with per-file accept. Remove to turn the surface off.
+    - id: ui-session-changes
+      name: '@deepseek-ai/dsh-client-ui-session-changes'
+
 
     - id: ui-workspace
       name: '@deepseek-ai/dsh-client-ui-workspace'
@@ -267,6 +272,13 @@
     # Goal surface: GoalBar in the input dock over the goal session projection.
     - id: ui-goal
       name: '@deepseek-ai/dsh-client-ui-goal'
+
+    # Delivery-discipline surface: a durable task timeline card (Conversation
+    # node) plus a floating task card over the delivery session projection.
+    # Remove to turn the surface off; the task is advanced through the
+    # model-facing tools.
+    - id: ui-delivery
+      name: '@deepseek-ai/dsh-client-ui-delivery'
 
     # Per-message feedback: Like/Dislike plus an optional note in the
     # assistant-message action strip, over the messageFeedback Remote.
@@ -430,6 +442,12 @@
   disabled: true
 
 - id: tool-todo
+  disabled: true
+
+# The delivery DISCIPLINE service stays on the host plane (it owns the
+# process-wide `delivery` session projection); the model-facing tools move
+# behind presets like every other agent-plane tool.
+- id: tool-delivery
   disabled: true
 
 - id: tool-web

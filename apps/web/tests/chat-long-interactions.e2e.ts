@@ -19,7 +19,7 @@ import {
   webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
-import { conversationContextKey, expandOwningTurnProcess, newEnglishPage, saveFailureShot } from './support.ts'
+import { conversationContextKey, expandOwningTurnProcess, newEnglishPage, saveFailureShot, wheelConversationToTop } from './support.ts'
 
 const MODE = webSnapshotMode()
 const SESSION_ID = 'chat-long-interactions-e2e'
@@ -216,8 +216,7 @@ describe('web e2e: long Chat interaction contract', () => {
     ))
     expect(firstTurnPosition).toBe('0%')
 
-    const loadEarlier = page.getByRole('button', { name: 'Load earlier', exact: true })
-    await loadEarlier.click()
+    await wheelConversationToTop(page)
     await expect.poll(() => turnNavigation.getByRole('button').count(), { timeout: 15_000 })
       .toBeGreaterThan(initialTurnCount)
     const stableFirstTurnButton = turnNavigation.getByRole('button', { name: firstTurnLabel })

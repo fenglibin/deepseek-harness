@@ -35,7 +35,8 @@ async function bench() {
   const runtime = await SlotTestRuntime.create()
   runtime.ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
   const connectWorkspace = vi.fn(async () => ROOT)
-  runtime.ctx.provide('uiWorkspace', { connectWorkspace } as never)
+  const noteDraft = vi.fn()
+  runtime.ctx.provide('uiWorkspace', { connectWorkspace, noteDraft } as never)
   const sessionFake = sessionFakeFor()
   await runtime.sessions.add({
     id: ROOT,
@@ -78,7 +79,7 @@ async function bench() {
     conversationApi(id).injected.hooks.conversationViews
   return {
     runtime, feature, slots: runtime.slots, entryOf, conversationApi, residentApi, composerApi,
-    inputApi, viewSource, sessionFake, connectWorkspace,
+    inputApi, viewSource, sessionFake, connectWorkspace, noteDraft,
   }
 }
 
@@ -125,6 +126,9 @@ describe('Conversation inject API', () => {
     const unbind = injected.bindDraftMirror(text => mirrored.push(text))
     actions.setDraft('mirrored text')
     expect(mirrored).toEqual(['mirrored text'])
+    // The browsing surfaces keep a blank Session listed while its composer
+    // holds unsent content, so every mirated change leaves the store sink too.
+    expect(b.noteDraft).toHaveBeenCalledWith(ROOT, 'mirrored text')
     unbind()
     expect(b.inputApi(ROOT).state).toBe(state)
 

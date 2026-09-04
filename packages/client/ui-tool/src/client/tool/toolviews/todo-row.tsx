@@ -4,6 +4,7 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '../../contract/slots.ts'
 import { toolRowModel } from '../models/tool-call-model.ts'
 import { ToolRow } from '../components/ToolRow.tsx'
+import type { TodoCardItem } from '../components/TodoCard.tsx'
 import { CONVERSATION_NS as NS } from '../../locale.ts'
 import { planSummary, type PlanItemLike } from './plan-summary.ts'
 
@@ -44,11 +45,37 @@ function summarize(argsRaw: string, t: TodoRowProps['t']): RowSummary | null {
   }
 }
 
+/** The three statuses the tool accepts; mirrors the tool's schema enum. */
+const STATUSES = ['pending', 'in_progress', 'completed'] as const
+
+/** Parse the whole todo list into card items, or null when the args are unusable. */
+function parseTodos(argsRaw: string): TodoCardItem[] | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(argsRaw)
+  } catch {
+    return null
+  }
+  if (typeof parsed !== 'object' || parsed === null) return null
+  const todos = (parsed as { todos?: unknown }).todos
+  if (!Array.isArray(todos)) return null
+  const items: TodoCardItem[] = []
+  for (const item of todos) {
+    if (typeof item !== 'object' || item === null) return null
+    const { content, status } = item as { content?: unknown; status?: unknown }
+    if (typeof content !== 'string' || content.trim() === '') return null
+    if (!(STATUSES as readonly unknown[]).includes(status)) return null
+    items.push({ content, status: status as TodoCardItem['status'] })
+  }
+  return items
+}
+
 /** Summarizes a plan update without presenting a cancelled call as completed. */
 export function TodoRow({ toolName, block, inspect, t }: TodoRowProps) {
   const model = toolRowModel(toolName, block)
   const argsRaw = ('kind' in block ? block.call?.argsRaw : block.argsRaw) ?? ''
   const summary = summarize(argsRaw, t) ?? { text: model.summary, extra: 0 }
+  const todos = parseTodos(argsRaw)
   return (
     <ToolRow
       t={t}
@@ -58,7 +85,8 @@ export function TodoRow({ toolName, block, inspect, t }: TodoRowProps) {
       title={t('todo.rowTitle')}
       summary={summary.text}
       summarySuffix={summary.extra > 0 ? `+${summary.extra}` : null}
-      body={model.body}
+      body={todos === null ? model.body : null}
+      todo={todos}
       output={model.output}
       errorSummary={model.errorSummary}
       state={model.state}

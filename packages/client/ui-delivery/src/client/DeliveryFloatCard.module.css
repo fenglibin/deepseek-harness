@@ -1,0 +1,118 @@
+/* Pinned to the conversation body's left edge: the body is the positioning
+   context, so the card floats over the transcript without taking layout space. */
+.root {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 10;
+  width: min(260px, calc(100% - 24px));
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-shadow-lv2);
+  cursor: pointer;
+  text-align: left;
+}
+
+.level {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.phase {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.objective {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.chevron {
+  flex: none;
+  display: inline-flex;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dsw-shadow-lv3);
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.step {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.step[data-state='done'] {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.step[data-state='current'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  font-weight: 600;
+}
+
+.step[data-state='todo'] {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.gate {
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.artifacts {
+  margin: 0;
+  padding: 0 0 0 14px;
+  list-style: none;
+}
+
+.artifactPath {
+  font-family: var(--ds-font-family-code);
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

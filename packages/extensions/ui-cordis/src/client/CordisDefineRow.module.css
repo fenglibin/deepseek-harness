@@ -245,7 +245,7 @@
   background: var(--dsw-alias-markdown-code-block);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font: var(--dsw-font-markdown-code-block-small);
+  font: var(--dsh-content-font-code);
   color: var(--dsw-alias-label-secondary);
 }
 

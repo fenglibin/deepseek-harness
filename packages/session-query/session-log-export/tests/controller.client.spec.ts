@@ -13,7 +13,7 @@ afterEach(() => {
 })
 
 describe('SessionLogDownloadController', () => {
-  it('downloads the host ZIP and publishes one shared success state', async () => {
+  it('downloads the current Session alone by default and publishes one shared success state', async () => {
     const fetcher = vi.fn(async () => new Response('zip', { status: 200 }))
     const save = vi.fn()
     const controller = new SessionLogDownloadController(fetcher, save)
@@ -24,7 +24,7 @@ describe('SessionLogDownloadController', () => {
     const [url, init] = fetcher.mock.calls[0] as unknown as [URL, RequestInit]
     expect(url.pathname).toBe('/api/session.export')
     expect(url.searchParams.get('sessionId')).toBe(SID)
-    expect(url.searchParams.get('includeDescendants')).toBe('true')
+    expect(url.searchParams.get('includeDescendants')).toBe('false')
     expect(init.method).toBe('HEAD')
     expect(init.signal).toBeInstanceOf(AbortSignal)
     expect(save).toHaveBeenCalledWith(
@@ -32,11 +32,22 @@ describe('SessionLogDownloadController', () => {
       'dsh-session-session-export-controller.zip',
     )
     expect(controller.store.getSnapshot().bySession[SID]).toEqual({
-      open: true, status: 'success', error: null,
+      open: false, status: 'success', error: null,
     })
   })
 
-  it('collapses concurrent gestures and preserves a dismissed dialog', async () => {
+  it('requests the descendant tree when the caller asks for it', async () => {
+    const fetcher = vi.fn(async () => new Response('zip', { status: 200 }))
+    const controller = new SessionLogDownloadController(fetcher, vi.fn())
+
+    await controller.download(SID, true)
+
+    const [url] = fetcher.mock.calls[0] as unknown as [URL]
+    expect(url.searchParams.get('includeDescendants')).toBe('true')
+    expect(controller.store.getSnapshot().bySession[SID]?.status).toBe('success')
+  })
+
+  it('collapses concurrent gestures and keeps the dialog closed while downloading', async () => {
     const response = Promise.withResolvers<Response>()
     const fetcher = vi.fn(() => response.promise)
     const controller = new SessionLogDownloadController(fetcher, vi.fn())
@@ -44,13 +55,17 @@ describe('SessionLogDownloadController', () => {
     const first = controller.download(SID)
     const second = controller.download(SID)
     expect(first).toBe(second)
+    expect(controller.store.getSnapshot().bySession[SID]).toEqual({
+      open: false, status: 'downloading', error: null,
+    })
     controller.dismiss(SID)
     response.resolve(new Response('zip', { status: 200 }))
     await first
 
     expect(fetcher).toHaveBeenCalledOnce()
-    expect(controller.store.getSnapshot().bySession[SID]?.open).toBe(false)
-    controller.dismiss(SID)
+    expect(controller.store.getSnapshot().bySession[SID]).toEqual({
+      open: false, status: 'success', error: null,
+    })
   })
 
   it('publishes HTTP and transport failures without leaking rejections', async () => {
@@ -113,14 +128,16 @@ describe('SessionLogDownloadController', () => {
     expect(click).toHaveBeenCalledOnce()
   })
 
-  it('defaults dialog openness when state is externally cleared before settlement', async () => {
+  it('settles from externally cleared state with no dialog on success and one on failure', async () => {
     const success = Promise.withResolvers<Response>()
     const successful = new SessionLogDownloadController(() => success.promise, vi.fn())
     const successRun = successful.download(SID)
     successful.store.set({ bySession: {} })
     success.resolve(new Response('zip'))
     await successRun
-    expect(successful.store.getSnapshot().bySession[SID]?.open).toBe(true)
+    expect(successful.store.getSnapshot().bySession[SID]).toEqual({
+      open: false, status: 'success', error: null,
+    })
 
     const failure = Promise.withResolvers<Response>()
     const failing = new SessionLogDownloadController(() => failure.promise, vi.fn())
@@ -128,7 +145,9 @@ describe('SessionLogDownloadController', () => {
     failing.store.set({ bySession: {} })
     failure.reject(new Error('failed after clear'))
     await failureRun
-    expect(failing.store.getSnapshot().bySession[SID]?.open).toBe(true)
+    expect(failing.store.getSnapshot().bySession[SID]).toEqual({
+      open: true, status: 'error', error: 'failed after clear',
+    })
   })
 })
 

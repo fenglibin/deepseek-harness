@@ -130,12 +130,6 @@
   margin-right: 4px;
 }
 
-/* The centered hero composer sizes itself from its content: a height dragged
-   on the docked bar belongs to the docked bar. */
-.hero .scroll {
-  height: auto;
-}
-
 /* The card's 22px corner arc still overlaps the scrollport's top (10px top
    pad reaches only y=10): start the thumb's travel below the arc so it never
    pokes outside the capsule. WebKit-path only; Firefox's thin bar has no

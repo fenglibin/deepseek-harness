@@ -1,9 +1,10 @@
 // Keyless browser e2e: a user who configures some OTHER provider is not asked
-// for the official DeepSeek key again, and the first-run setup card is a card
-// they can close. The shipped DeepSeek adapter stays mounted without a
-// credential throughout, so the only thing that ends onboarding here is the
-// pi-ai route the user configures through the real wire. Zero model calls:
-// configuration is pure settings/credentials/llm-domain traffic.
+// for the official DeepSeek key again, and the card the Models page opens in
+// the first-run posture is one they can close. The shipped DeepSeek adapter
+// stays mounted without a credential throughout, so the only thing that ends
+// onboarding here is the pi-ai route the user configures through the real wire.
+// Zero model calls: configuration is pure settings/credentials/llm-domain
+// traffic.
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
@@ -42,7 +43,7 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
     await scaffold?.close()
   })
 
-  it('keeps the add dialog draft and the setup card state apart', async () => {
+  it('remembers the dismissed first-run card and keeps the add dialog\'s draft to itself', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-onboarding-setup-card-cancel'))
     const credentialStep = page.getByRole('dialog', { name: CREDENTIAL_STEP })
     await credentialStep.waitFor({ timeout: 15_000 })
@@ -55,34 +56,33 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
     // Dismissing the onboarding step leaves Settings closed, so enter the
     // Models section explicitly before exercising its normal cards.
     await settings.getByRole('button', { name: '模型' }).click()
-    const setupKey = settings.getByRole('textbox', { name: 'API 密钥', exact: true })
-    await setupKey.waitFor({ timeout: 10_000 })
+    // Nothing is usable yet, so the unkeyed provider opens its own card — the
+    // same dialog Edit opens for a saved row, over the row it belongs to.
+    const setup = page.getByRole('dialog', { name: '编辑 DeepSeek (deepseek-official)' })
+    await setup.waitFor({ timeout: 10_000 })
+    await setup.getByRole('textbox', { name: 'API 密钥', exact: true }).waitFor({ timeout: 10_000 })
 
+    // Cancelling dismisses it for the session: the provider falls back to an
+    // ordinary row rather than opening over the user again.
+    await setup.getByRole('button', { name: '取消', exact: true }).click()
+    await expect.poll(async () => setup.count(), { timeout: 10_000 }).toBe(0)
+    await settings.getByRole('button', { name: '编辑 DeepSeek (deepseek-official)' }).waitFor({ timeout: 10_000 })
+
+    // One dialog carries the draft now, over the section rather than beside
+    // it, and closing it discards that draft without touching the rows.
     const add = settings.getByRole('button', { name: '添加模型' })
     await expect.poll(async () => add.isEnabled(), { timeout: 10_000 }).toBe(true)
     await add.click()
-    // One dialog carries the draft now, over the section rather than beside it.
     const addDialog = page.getByRole('dialog', { name: '添加模型' })
     await addDialog.waitFor({ timeout: 10_000 })
     const pick = addDialog.getByLabel('提供方')
     await pick.waitFor({ timeout: 10_000 })
     await pick.selectOption('minimax-cn')
-    await expect.poll(
-      async () => page.getByRole('textbox', { name: 'API 密钥', exact: true }).count(),
-      { timeout: 10_000 },
-    ).toBe(2)
-
-    // Leaving the draft uncommitted: closing the dialog discards it and
-    // leaves the setup card's own state alone — the two close independently
-    // because the dialog owns its draft and the section owns the card.
+    await addDialog.getByRole('textbox', { name: 'API 密钥', exact: true }).fill('sk-discarded')
     await addDialog.getByRole('button', { name: '关闭' }).click()
     await expect.poll(async () => addDialog.count(), { timeout: 10_000 }).toBe(0)
-    await expect.poll(
-      async () => page.getByRole('textbox', { name: 'API 密钥', exact: true }).count(),
-      { timeout: 10_000 },
-    ).toBe(1)
-    await settings.getByRole('button', { name: '取消', exact: true }).first().click()
-    await settings.getByRole('button', { name: '编辑 DeepSeek (deepseek-official)' }).waitFor({ timeout: 10_000 })
+    expect(await page.getByRole('textbox', { name: 'API 密钥', exact: true }).count()).toBe(0)
+
     const dismissed = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(DISMISSED_EXPECTED, dismissed, MODE)
 
@@ -122,7 +122,7 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
     expect(await page.locator('#root').evaluate(root => (root as HTMLElement).inert)).toBe(false)
 
     // The Models page agrees: DeepSeek stays a row rather than reopening its
-    // setup card over a user who already has somewhere to send a request.
+    // card over a user who already has somewhere to send a request.
     await page.getByRole('button', { name: '设置', exact: true }).click()
     await settings.waitFor({ timeout: 10_000 })
     await settings.getByRole('button', { name: '模型' }).click()

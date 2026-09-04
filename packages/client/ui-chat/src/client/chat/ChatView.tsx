@@ -6,6 +6,8 @@ import type {
   ConversationTimelineSnapshot, RenderMessageImages,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { Button, IconChevronDownOutline14, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+// Type-only: the `turnOutline` projection key merge (whole-log user-turn list).
+import type {} from '@deepseek-ai/dsh-session-stats/client'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import type { ChatSnapshot, TurnNavigationItem } from '../contract/snapshot.ts'
 import { PendingSteeringBubble, PendingSubmissionBubble } from './MessageItem.tsx'
@@ -16,6 +18,12 @@ import { formatRunDuration } from './message-chrome.ts'
 import css from './ChatView.module.css'
 
 const FOLLOW_THRESHOLD = 24
+/** Gap left above a Turn navigation target, so its row is not flush to the edge. */
+const TURN_SCROLL_MARGIN = 24
+/** Distance from the list top that arms automatic older-history loading. */
+const OLDER_LOAD_THRESHOLD_PX = 48
+/** Empty whole-log turn outline while the projection has not delivered a value. */
+const EMPTY_TURN_ITEMS: readonly never[] = []
 
 /** Active column host when present; otherwise the view-local scroller. */
 function scrollerOf(from: HTMLElement): HTMLElement {
@@ -205,7 +213,7 @@ function TurnStatus({ startTime, t }: {
  */
 export function ChatView({
   useSession, useChat, useSessions, useStore, actions, renderSlot, sessionId, openFile, loadOlder, loadImage, openView, chatScroll, forkAt,
-  fileMentions, useTranscriptView, t,
+  fileMentions, useTranscriptView, useProjection, t,
 }: ChatViewSlotProps) {
   const order = useChat(s => s.order)
   const nodeStore = useChat(s => s.nodes)
@@ -213,6 +221,10 @@ export function ChatView({
   // both the data and its change signal: the array identity moves only when a
   // Turn enters, leaves, or changes its preview.
   const turnNavigationItems = useChat(s => s.navigation.items())
+  // Whole-log user-turn outline (turn + prompt): the drawer lists every user
+  // message regardless of paging, and navigation pages back on demand.
+  const turnOutline = useProjection('turnOutline')
+  const userTurnItems = turnOutline?.turns ?? EMPTY_TURN_ITEMS
   const timeline = useChat(s => s.timeline)
   const inbox = useSession(s => s.queue)
   // Workspace root off the session list row: path summaries display relative to it.
@@ -361,6 +373,41 @@ export function ChatView({
 
   activeTurnRef.current = scheduleActiveTurn
 
+  /** Navigation target turn whose row has not rendered yet; paging continues until it lands. */
+  const pendingTurnRef = useRef<number | null>(null)
+  /**
+   * Window head when the last automatic page was requested. A page that lands
+   * without moving the head changed nothing, so asking again would only repeat
+   * it: a connection that refuses every page must not turn either automatic
+   * path into an unbounded retry.
+   */
+  const autoPagedSeqRef = useRef<number | null>(null)
+
+  /**
+   * Scroll one rendered row to the reading line and publish the new position.
+   * @param local - the ChatView list element.
+   * @param row - the target's rendered row.
+   * @param item - the navigation item the row belongs to.
+   */
+  const settleAt = useCallback((local: HTMLDivElement, row: HTMLElement, item: TurnNavigationItem): void => {
+    const el = scrollerOf(local)
+    el.scrollTop += flowTop(row, el) - TURN_SCROLL_MARGIN
+    observedTopRef.current = el.scrollTop
+    // A pending older page still has to compensate the prepended height, so
+    // navigation moves that anchor to the new position instead of dropping it.
+    const landed = loadingOlder ? pagingAnchor(local, el) : null
+    anchorRef.current = landed === null || landed.dataset.chatAnchorKey === undefined
+      ? null
+      : { key: landed.dataset.chatAnchorKey, top: flowTop(landed, el) }
+    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1
+    atBottomRef.current = isAtBottom
+    setAtBottom(isAtBottom)
+    setActiveTurn(item.turn)
+    const position = isAtBottom ? null : scrollPosition(local, el)
+    if (isAtBottom) chatScroll.save(null)
+    else if (position !== null) chatScroll.save(position)
+  }, [chatScroll, loadingOlder])
+
   useLayoutEffect(() => {
     scheduleActiveTurn()
   }, [scheduleActiveTurn])
@@ -413,9 +460,21 @@ export function ChatView({
     if (anchorRef.current !== null && firstSeq !== null && firstSeqRef.current !== null && firstSeq < firstSeqRef.current) {
       const anchor = anchorRef.current
       anchorRef.current = null
-      const row = anchorElement(local, anchor.key)
-      if (row !== null) el.scrollTop += flowTop(row, el) - anchor.top
-      observedTopRef.current = el.scrollTop
+      // A page loaded to reach a navigation target settles there instead of
+      // restoring the reader's pre-page position.
+      const pendingTurn = pendingTurnRef.current
+      const pendingItem = pendingTurn === null
+        ? undefined
+        : turnNavigationItems.find(item => item.turn === pendingTurn)
+      const target = pendingItem === undefined ? null : anchorElement(local, pendingItem.anchorKey)
+      if (pendingItem !== undefined && target !== null) {
+        pendingTurnRef.current = null
+        settleAt(local, target, pendingItem)
+      } else {
+        const row = anchorElement(local, anchor.key)
+        if (row !== null) el.scrollTop += flowTop(row, el) - anchor.top
+        observedTopRef.current = el.scrollTop
+      }
       firstSeqRef.current = firstSeq
       /* v8 ignore next -- ?? arm: a prepend adds nodes, so the flow list here is never empty. */
       lastKeyRef.current = lastKey
@@ -476,6 +535,15 @@ export function ChatView({
     else if (position !== null) chatScroll.save(position)
     observedTopRef.current = el.scrollTop
     scheduleActiveTurn()
+    // Automatic older-history loading: a reader who scrolls into the list top
+    // keeps receiving pages without a manual "load more" affordance. The
+    // already-computed position anchors the reader across the prepend.
+    if (hasMore && !loadingOlder && el.scrollTop <= OLDER_LOAD_THRESHOLD_PX) {
+      if (position !== null) {
+        anchorRef.current = { key: position.anchorKey, top: position.anchorTop }
+      }
+      loadOlder()
+    }
   }
 
   // Bind the scroll listener on the resolved scrollport once per mount;
@@ -533,7 +601,7 @@ export function ChatView({
 
   const loadOlderAnchored = (): void => {
     const local = listRef.current
-    /* v8 ignore next -- ref-null guard: the paging button renders inside the list tree. */
+    /* v8 ignore next -- ref-null guard: paging only runs while the list is mounted. */
     if (local !== null) {
       const el = scrollerOf(local)
       const row = pagingAnchor(local, el)
@@ -546,30 +614,78 @@ export function ChatView({
     }
     loadOlder()
   }
+  // The paging entry point the two automation paths below call; a ref keeps the
+  // navigation callback's identity stable despite the closure per render.
+  const loadOlderAnchoredRef = useRef<() => void>(() => {})
+  loadOlderAnchoredRef.current = loadOlderAnchored
+
+  // Latest loaded navigation items, read through a ref so `navigateToTurn`
+  // keeps a stable identity for the memoized rail while still finding a turn
+  // by number (a loaded item is optional — the drawer may target an unloaded
+  // turn and page back to it).
+  const turnNavigationItemsRef = useRef(turnNavigationItems)
+  turnNavigationItemsRef.current = turnNavigationItems
 
   // Identity feeds the memoized rail; a fresh closure per render would defeat it.
-  const navigateToTurn = useCallback((item: TurnNavigationItem): void => {
+  const navigateToTurn = useCallback((turn: number): void => {
+    const item = turnNavigationItemsRef.current.find(entry => entry.turn === turn)
+    if (item === undefined) {
+      // The turn is not loaded: keep paging until it lands (see the pending effect).
+      if (!hasMore) return
+      pendingTurnRef.current = turn
+      autoPagedSeqRef.current = firstSeq
+      loadOlderAnchoredRef.current()
+      return
+    }
     const local = listRef.current
     if (local === null) return
     const row = anchorElement(local, item.anchorKey)
-    if (row === null) return
-    const el = scrollerOf(local)
-    el.scrollTop += flowTop(row, el) - 24
-    observedTopRef.current = el.scrollTop
-    // A pending older page still has to compensate the prepended height, so
-    // navigation moves that anchor to the new position instead of dropping it.
-    const landed = loadingOlder ? pagingAnchor(local, el) : null
-    anchorRef.current = landed === null || landed.dataset.chatAnchorKey === undefined
-      ? null
-      : { key: landed.dataset.chatAnchorKey, top: flowTop(landed, el) }
-    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_THRESHOLD + 1
-    atBottomRef.current = isAtBottom
-    setAtBottom(isAtBottom)
-    setActiveTurn(item.turn)
-    const position = isAtBottom ? null : scrollPosition(local, el)
-    if (isAtBottom) chatScroll.save(null)
-    else if (position !== null) chatScroll.save(position)
-  }, [loadingOlder, chatScroll])
+    if (row === null) {
+      // The turn is loaded but its row has not rendered: page until it lands.
+      if (!hasMore) return
+      pendingTurnRef.current = turn
+      autoPagedSeqRef.current = firstSeq
+      loadOlderAnchoredRef.current()
+      return
+    }
+    pendingTurnRef.current = null
+    settleAt(local, row, item)
+  }, [firstSeq, hasMore, settleAt])
+
+  // The drawer now lists the whole-log outline, so its entries no longer depend
+  // on the loaded window. The rail's hover previews still read the loaded
+  // window, so page until a loaded turn carries a prompt; an empty rail means
+  // the first page is still in flight and nothing more can correct it yet.
+  const awaitingUserPrompt = turnNavigationItems.length > 0
+    && !turnNavigationItems.some(item => item.prompt !== '')
+  useEffect(() => {
+    if (!awaitingUserPrompt || !hasMore || loadingOlder) return
+    if (autoPagedSeqRef.current === firstSeq) return
+    autoPagedSeqRef.current = firstSeq
+    loadOlderAnchoredRef.current()
+  }, [awaitingUserPrompt, hasMore, loadingOlder, firstSeq])
+
+  // A navigation target a landed page did not bring in keeps the older history
+  // coming; each hop re-arms the paging anchor so the reader's position holds
+  // until the turn is loaded AND its row renders (the prepend branch settles).
+  useEffect(() => {
+    const pendingTurn = pendingTurnRef.current
+    if (pendingTurn === null || loadingOlder || !hasMore) return
+    const item = turnNavigationItems.find(entry => entry.turn === pendingTurn)
+    if (item === undefined) {
+      if (autoPagedSeqRef.current === firstSeq) return
+      autoPagedSeqRef.current = firstSeq
+      loadOlderAnchoredRef.current()
+      return
+    }
+    const local = listRef.current
+    /* v8 ignore next -- ref-null guard: the effect only runs while mounted. */
+    if (local === null) return
+    if (anchorElement(local, item.anchorKey) !== null) return
+    if (autoPagedSeqRef.current === firstSeq) return
+    autoPagedSeqRef.current = firstSeq
+    loadOlderAnchoredRef.current()
+  }, [turnNavigationItems, hasMore, loadingOlder, firstSeq])
 
   return (
     <div className={css.root}>
@@ -581,11 +697,11 @@ export function ChatView({
           t={t}
         />
         {/* User-message drawer sits beside the rail on the same right gutter.
-            Both widgets read the same navigation items, so the list grows in
-            lockstep with the rail's marks and the active highlight tracks
-            `activeTurn`. */}
+            It reads the whole-log turn outline (every user message, paged or
+            not), while the rail reads the loaded navigation items; the active
+            highlight tracks `activeTurn` for both. */}
         <UserTurnPanel
-          items={turnNavigationItems}
+          items={userTurnItems}
           activeTurn={activeTurn}
           onNavigate={navigateToTurn}
           t={t}
@@ -597,11 +713,12 @@ export function ChatView({
               {t('chat.loadError', { message: openError.message, code: openError.code })}
             </div>
           )}
-          {hasMore && (
-            <div className={css.older}>
-              <button type="button" disabled={loadingOlder} onClick={loadOlderAnchored}>
-                {loadingOlder ? t('loading') : t('chat.loadOlder')}
-              </button>
+          {loadingOlder && (
+            <div className={css.older} role="status" aria-live="polite">
+              <span className={css.olderLoading}>
+                <span className={css.olderSpinner} aria-hidden="true" />
+                <span>{t('loading')}</span>
+              </span>
             </div>
           )}
           {order.map(nodeKey => (

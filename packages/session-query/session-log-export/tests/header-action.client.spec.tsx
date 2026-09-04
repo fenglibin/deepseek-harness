@@ -21,7 +21,9 @@ function bindSessionExport(controller: SessionLogDownloadController) {
 
 function bench() {
   const controller = new SessionLogDownloadController(async () => new Response('zip'), vi.fn())
-  const request = vi.fn((sessionId: SessionId) => controller.download(sessionId))
+  const request = vi.fn(
+    (sessionId: SessionId, includeDescendants?: boolean) => controller.download(sessionId, includeDescendants),
+  )
   const dismiss = vi.fn((sessionId: SessionId) => { controller.dismiss(sessionId) })
   const useSessionLogDownload = bindSessionExport(controller)
   const props = {
@@ -44,7 +46,26 @@ describe('Session export Header action', () => {
     expect(button.querySelector('svg')).not.toBeNull()
     fireEvent.click(button)
     await waitFor(() => { expect(b.request).toHaveBeenCalledWith(SID) })
-    expect(await b.view.findByRole('dialog', { name: 'Session download started' })).toBeTruthy()
+    await waitFor(() => { expect(b.controller.store.getSnapshot().bySession[SID]?.status).toBe('success') })
+    expect(b.view.queryByRole('dialog')).toBeNull()
+  })
+
+  it('opens the failure dialog only when the preflight fails', async () => {
+    const controller = new SessionLogDownloadController(
+      async () => new Response('endpoint unavailable', { status: 500 }), vi.fn(),
+    )
+    const useSessionLogDownload = bindSessionExport(controller)
+    const view = render(<SessionLogDownloadHeaderAction {...({
+      sessionId: SID,
+      useSessionLogDownload,
+      request: (sessionId: SessionId) => controller.download(sessionId),
+      dismiss: (sessionId: SessionId) => { controller.dismiss(sessionId) },
+      t: (key: keyof typeof en): string => en[key],
+    } as unknown as SessionLogDownloadDialogProps)} />)
+
+    fireEvent.click(view.getByRole('button', { name: 'Session log' }))
+    const dialog = await view.findByRole('dialog', { name: 'Session export failed' })
+    expect(dialog.textContent).toContain('endpoint unavailable')
   })
 
   it('disables the capsule while either entry path downloads this Session', async () => {
@@ -68,5 +89,40 @@ describe('Session export Header action', () => {
     release(new Response('zip'))
     await download
     await waitFor(() => { expect(button.getAttribute('aria-busy')).toBe('false') })
+  })
+
+  it('exports the descendant tree from the range menu and closes it after the choice', async () => {
+    const b = bench()
+    const trigger = b.view.getByRole('button', { name: 'More export options' })
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
+
+    fireEvent.click(trigger)
+    const tree = await b.view.findByRole('menuitem', { name: 'Include sub-Sessions' })
+    expect(b.view.getByRole('menuitem', { name: 'Current Session only' })).toBeTruthy()
+    fireEvent.click(tree)
+
+    await waitFor(() => { expect(b.request).toHaveBeenCalledWith(SID, true) })
+    await waitFor(() => { expect(trigger.getAttribute('aria-expanded')).toBe('false') })
+  })
+
+  it('exports only the current Session when the menu row of that range is chosen', async () => {
+    const b = bench()
+
+    fireEvent.click(b.view.getByRole('button', { name: 'More export options' }))
+    fireEvent.click(await b.view.findByRole('menuitem', { name: 'Current Session only' }))
+
+    await waitFor(() => { expect(b.request).toHaveBeenCalledWith(SID, false) })
+  })
+
+  it('closes the range menu on Escape without exporting', async () => {
+    const b = bench()
+    const trigger = b.view.getByRole('button', { name: 'More export options' })
+
+    fireEvent.click(trigger)
+    expect(trigger.getAttribute('aria-expanded')).toBe('true')
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    await waitFor(() => { expect(trigger.getAttribute('aria-expanded')).toBe('false') })
+    expect(b.request).not.toHaveBeenCalled()
   })
 })

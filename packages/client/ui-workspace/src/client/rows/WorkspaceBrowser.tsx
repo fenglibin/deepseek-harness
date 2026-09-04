@@ -232,8 +232,8 @@ function workspaceGroupHalf(e: { clientY: number; currentTarget: HTMLElement }):
 
 type SessionTreeProps = Pick<
   WorkspaceBrowserProps,
-  'useSessions' | 'useSessionPendingInteraction' | 'startSession' | 'open' | 'forkSession'
-  | 'insertWorkspaceBefore' | 'insertSessionBefore' | 't'
+  'useSessions' | 'useSessionPendingInteraction' | 'useSessionDrafts' | 'startSession' | 'open'
+  | 'forkSession' | 'insertWorkspaceBefore' | 'insertSessionBefore' | 't'
 > & {
   /** Host account home for POSIX hover-path abbreviation. */
   home?: string | undefined
@@ -274,7 +274,8 @@ type SessionTreeProps = Pick<
 
 /** The scrolling session tree; unmounting drops the sessions subscription and expand-all state. */
 function SessionTree({
-  useSessions, useSessionPendingInteraction, startSession, open, forkSession, workspaces, archivedSessionIds,
+  useSessions, useSessionPendingInteraction, useSessionDrafts, startSession, open, forkSession, workspaces,
+  archivedSessionIds,
   archivedExpanded, setArchivedExpanded, onSessionRestore, onSessionDelete,
   onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive,
   insertWorkspaceBefore, insertSessionBefore, orderBy,
@@ -283,6 +284,7 @@ function SessionTree({
 }: SessionTreeProps) {
   const list = useSessions(s => s)
   const pendingInteractions = useSessionPendingInteraction(s => s)
+  const draftingSessions = useSessionDrafts(s => s)
   const current = list.current
   const [expandedSessionGroups, setExpandedSessionGroups] = useState<string[]>([])
   // Transient drag marker state; the selected mode owns the resulting order.
@@ -348,13 +350,14 @@ function SessionTree({
     [sessionOrderByAccount, ungroupedSessionIds],
   )
   const groups = useMemo(
-    () => deriveGroups(list, orderedWorkspaces, archivedSessionIds, pendingInteractions, {
+    () => deriveGroups(list, orderedWorkspaces, archivedSessionIds, draftingSessions, pendingInteractions, {
       expandedGroups,
       ...(sessionOrderByAccount[UNGROUPED_KEY] === undefined
         ? {}
         : { ungroupedOrder: sessionOrderByAccount[UNGROUPED_KEY] }),
     }),
-    [list, orderedWorkspaces, archivedSessionIds, pendingInteractions, expandedGroups, sessionOrderByAccount],
+    [list, orderedWorkspaces, archivedSessionIds, draftingSessions, pendingInteractions, expandedGroups,
+      sessionOrderByAccount],
   )
   const now = Date.now()
   const commitSessionDrag = (activeDrag: DragState, over: NonNullable<DragState['over']>): void => {
@@ -616,13 +619,15 @@ function SessionTree({
 
 /** The flat "In one list" body: every session is one draggable top-level row. */
 function FlatList({
-  useSessions, useSessionPendingInteraction, open, forkSession, onSessionRename, onSessionArchive,
-  archivedSessionIds, archivedExpanded, setArchivedExpanded, onSessionRestore, onSessionDelete,
-  orderBy, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount, setSessionOrder, t,
+  useSessions, useSessionPendingInteraction, useSessionDrafts, open, forkSession, onSessionRename,
+  onSessionArchive, archivedSessionIds, archivedExpanded, setArchivedExpanded, onSessionRestore,
+  onSessionDelete, orderBy, sessionOrderByAccount, sessionUpdatedAtByAccount, syncSessionOrderAccount,
+  setSessionOrder, t,
 }: Pick<
   SessionTreeProps,
   | 'useSessions'
   | 'useSessionPendingInteraction'
+  | 'useSessionDrafts'
   | 'open'
   | 'forkSession'
   | 'onSessionRename'
@@ -641,9 +646,10 @@ function FlatList({
 >) {
   const list = useSessions(s => s)
   const pendingInteractions = useSessionPendingInteraction(s => s)
+  const draftingSessions = useSessionDrafts(s => s)
   const baseRows = useMemo(
-    () => deriveFlat(list, archivedSessionIds, pendingInteractions),
-    [list, archivedSessionIds, pendingInteractions],
+    () => deriveFlat(list, archivedSessionIds, draftingSessions, pendingInteractions),
+    [list, archivedSessionIds, draftingSessions, pendingInteractions],
   )
   const sessionIds = useMemo(() => baseRows.map(row => row.id), [baseRows])
   const previousOrderBy = useRef(orderBy)
@@ -834,6 +840,7 @@ interface RemoteSearchState {
 function SearchResults({
   useSessions,
   useSessionPendingInteraction,
+  useSessionDrafts,
   open,
   workspaces,
   archivedSessionIds,
@@ -841,7 +848,7 @@ function SearchResults({
   remote,
   resultLimit,
   t,
-}: Pick<SessionTreeProps, 'useSessions' | 'useSessionPendingInteraction' | 'open' | 't'> & {
+}: Pick<SessionTreeProps, 'useSessions' | 'useSessionPendingInteraction' | 'useSessionDrafts' | 'open' | 't'> & {
   workspaces: readonly WorkspaceView[]
   archivedSessionIds: readonly SessionNode['id'][]
   query: string
@@ -850,6 +857,7 @@ function SearchResults({
 }) {
   const list = useSessions(s => s)
   const pendingInteractions = useSessionPendingInteraction(s => s)
+  const draftingSessions = useSessionDrafts(s => s)
   const currentRemote = remote.query === query
     ? remote
     : { query, status: 'loading' as const, items: [], hasMore: false }
@@ -859,11 +867,13 @@ function SearchResults({
       workspaces,
       query,
       archivedSessionIds,
+      draftingSessions,
       pendingInteractions,
       currentRemote,
       resultLimit,
     ),
-    [list, workspaces, query, archivedSessionIds, pendingInteractions, currentRemote, resultLimit],
+    [list, workspaces, query, archivedSessionIds, draftingSessions, pendingInteractions, currentRemote,
+      resultLimit],
   )
   const pending = currentRemote.status === 'loading'
   const failed = currentRemote.status === 'error'
@@ -933,6 +943,7 @@ export function WorkspaceBrowser({
   searchResultLimit,
   useDirectoryFlow,
   useHostInfo,
+  useSessionDrafts,
   renderSlot,
   t,
 }: WorkspaceBrowserProps) {
@@ -1357,6 +1368,7 @@ export function WorkspaceBrowser({
             <SearchResults
               useSessions={useSessions}
               useSessionPendingInteraction={useSessionPendingInteraction}
+              useSessionDrafts={useSessionDrafts}
               open={open}
               workspaces={workspaces}
               archivedSessionIds={archivedSessionIds}
@@ -1370,6 +1382,7 @@ export function WorkspaceBrowser({
             ? (
               <FlatList
                 useSessions={useSessions} useSessionPendingInteraction={useSessionPendingInteraction}
+                useSessionDrafts={useSessionDrafts}
                 open={open} forkSession={forkSession}
                 onSessionRename={onSessionRename} onSessionArchive={onSessionArchive}
                 archivedSessionIds={archivedSessionIds}
@@ -1389,6 +1402,7 @@ export function WorkspaceBrowser({
               <SessionTree
                 useSessions={useSessions}
                 useSessionPendingInteraction={useSessionPendingInteraction}
+                useSessionDrafts={useSessionDrafts}
                 onSessionRename={onSessionRename}
                 onSessionArchive={onSessionArchive}
                 forkSession={forkSession}

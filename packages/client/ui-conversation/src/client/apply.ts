@@ -69,6 +69,13 @@ interface WorkspaceNavigation {
   connectWorkspace(
     workspaceId: Parameters<ConversationInjected['selectWorkspace']>[0],
   ): Promise<SessionId>
+  /**
+   * Publish one Session's composer draft to the browsing surfaces, which keep
+   * a blank Session listed while it still carries unsent content.
+   * @param sessionId - Session whose composer changed.
+   * @param draft - current composer text.
+   */
+  noteDraft(sessionId: SessionId, draft: string): void
 }
 
 /** Resolve the session-scoped Conversation action face, failing loud. */
@@ -182,6 +189,7 @@ export function apply(ctx: Context): void {
       'conversation.composer.dock': { kind: 'list', scope: 'session' },
       'conversation.input.left': { kind: 'list', scope: 'session' },
       'conversation.input.right': { kind: 'list', scope: 'session' },
+      'conversation.side.float': { kind: 'list', scope: 'session' },
       'conversation.hero.brand.mark': { kind: 'single', scope: 'root' },
       'conversation.hero.workspace': { kind: 'single', scope: 'root' },
       'conversation.hero.agentPreset': { kind: 'single', scope: 'root' },
@@ -220,7 +228,15 @@ export function apply(ctx: Context): void {
     store: conversationStore,
     inject: (sessionId: SessionId, _actions: BoundActions<typeof conversationStore>): ConversationSessionInjected => ({
       hooks: { conversationViews },
-      bindDraftMirror: write => inputHub.shell(sessionId).bindMirror(write),
+      bindDraftMirror: (write) => {
+        const shell = inputHub.shell(sessionId)
+        // Two sinks per draft change: the per-Session persistence store, and
+        // the browsing surface's "has unsent content" registry.
+        return shell.bindMirror((text) => {
+          write(text)
+          workspaceNavigation.noteDraft(sessionId, text)
+        })
+      },
     }),
   }, ConversationSession)
 

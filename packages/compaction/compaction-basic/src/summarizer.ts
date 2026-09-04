@@ -10,6 +10,9 @@ import type {
   ContentBlock, FinishReason, GenerateOptions, Message, TokenUsage, ToolSchema,
 } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+// Optional route owner: mounted deployments let the user point auxiliary calls
+// at a cheaper model; absent, the summarized request's own route is reused.
+import type {} from '@deepseek-ai/dsh-lightweight-model'
 
 interface SummaryConfig {
   readonly summarizationProvider: string
@@ -135,7 +138,7 @@ export async function summarizeWithLlm(
     && agent.options.model.length > 0
     ? { provider: agent.options.provider, model: agent.options.model }
     : undefined
-  const target = configured ?? latest ?? agentTarget
+  const target = configured ?? ctx.get('lightweightModel')?.currentSelection() ?? latest ?? agentTarget
   if (target === undefined) {
     throw new Error(
       'no provider/model available for summarization: set both BasicCompactionConfig summarization fields, route one request, or set both AgentOptions fields',

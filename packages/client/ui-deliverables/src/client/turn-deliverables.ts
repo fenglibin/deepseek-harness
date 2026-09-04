@@ -8,9 +8,14 @@ import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ConversationNodeDefinition } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
 
+/** A mutation's user-visible kind, for the session-changes surface. */
+export type MutationOperation = 'write' | 'edit'
+
 interface ProducedPath {
   readonly seq: number
   readonly path: string
+  /** `write` (new/overwrite) or `edit` (in-place mutation). */
+  readonly operation: MutationOperation
 }
 
 /** Immutable produced-file facts published against one Turn. */
@@ -25,9 +30,15 @@ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   }
 }
 
+/** Path + operation resolved from one `tool/call`, before its result seq. */
+interface MutationTarget {
+  readonly path: string
+  readonly operation: MutationOperation
+}
+
 interface DeliverablesState extends DeliverablesTurnData {
   readonly turn: number
-  readonly calls: ReadonlyMap<string, string | null>
+  readonly calls: ReadonlyMap<string, MutationTarget | null>
 }
 
 /**
@@ -56,6 +67,23 @@ function mutationPath(name: string, argsRaw: string): string | null {
     default:
       return null
   }
+}
+
+/** The user-visible mutation kind for one supported wire tool name. */
+function mutationOperation(name: string): MutationOperation | null {
+  switch (name) {
+    case 'write': return 'write'
+    case 'edit':
+    case 'str_replace_editor': return 'edit'
+    default: return null
+  }
+}
+
+/** Resolve one supported mutation call to its path and operation, else null. */
+function mutationTarget(name: string, argsRaw: string): MutationTarget | null {
+  const path = mutationPath(name, argsRaw)
+  const operation = mutationOperation(name)
+  return path === null || operation === null ? null : { path, operation }
 }
 
 /** Validate the fields that an `edit` execution requires. */
@@ -164,7 +192,7 @@ export const deliverablesDefinition: ConversationNodeDefinition<DeliverablesStat
       const calls = new Map(context.state.calls)
       calls.set(
         String(match.event.data.callId),
-        mutationPath(match.event.data.name, match.event.data.arguments),
+        mutationTarget(match.event.data.name, match.event.data.arguments),
       )
       return { ...context.state, calls }
     }
@@ -172,10 +200,13 @@ export const deliverablesDefinition: ConversationNodeDefinition<DeliverablesStat
     const result = match.event.data.message.content[0]
     if (result.isError === true) return context.state
     const callId = String(match.event.data.message.source.callId)
-    const path = context.state.calls.get(callId)
-    return path === null || path === undefined
+    const target = context.state.calls.get(callId)
+    return target === null || target === undefined
       ? context.state
-      : { ...context.state, produced: [...context.state.produced, { seq: match.event.seq, path }] }
+      : {
+        ...context.state,
+        produced: [...context.state.produced, { seq: match.event.seq, path: target.path, operation: target.operation }],
+      }
   },
   buildLocationData: (context, scope) => scope !== 'turn' || context.state === undefined
     ? null

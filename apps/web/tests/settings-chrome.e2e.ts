@@ -373,8 +373,21 @@ describe('web e2e: settings modal and General preferences', () => {
       probe.remove()
       return size
     })
+    // The tool-output and thinking measure, resolved the same way: every tool
+    // card and the reasoning body read --dsh-content-font-code, which must
+    // evaluate to the setting itself — a ladder size here would mean the
+    // setting never reaches command output or a thought.
+    const readCodeFontSize = async (): Promise<string> => await page.evaluate(() => {
+      const probe = document.createElement('div')
+      probe.style.font = 'var(--dsh-content-font-code)'
+      document.body.appendChild(probe)
+      const size = getComputedStyle(probe).fontSize
+      probe.remove()
+      return size
+    })
     expect(await readFontSize()).toBe('14px')
     expect(await readSecondaryFontSize()).toBe('13px')
+    expect(await readCodeFontSize()).toBe('14px')
     await page.getByRole('button', { name: '设置', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: '设置' })
     await dialog.waitFor({ timeout: 10_000 })
@@ -390,6 +403,7 @@ describe('web e2e: settings modal and General preferences', () => {
     await dialog.getByText('16', { exact: true }).waitFor({ timeout: 5_000 })
     await expect.poll(readFontSize, { timeout: 5_000 }).toBe('16px')
     await expect.poll(readSecondaryFontSize, { timeout: 5_000 }).toBe('14px')
+    await expect.poll(readCodeFontSize, { timeout: 5_000 }).toBe('16px')
     await expect.poll(async () => readFile(join(scaffold.harnessHome, 'settings.yaml'), 'utf8'), { timeout: 5_000 })
       .toMatch(/ui-theme:\n(?:\s+\w+: .*\n)*?\s+fontSize: 16/)
     await page.keyboard.press('Escape')
