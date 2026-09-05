@@ -12,6 +12,7 @@
 | [scope.md](scope.zh.md) | 作用域注册标识、dispatch 载体，以及拥有的 `Scope` 上下文 |
 | [typert.md](typert.zh.md) | 远程调用描述符、lookup/Context 声明、Typert 注册表，以及 Host Gateway/Client API 边界 |
 | [goal.md](goal.zh.md) | 持久 goal 标识、生命周期快照、激活、变更记录与 Round 归属 |
+| [delivery.md](delivery.zh.md) | 每个会话一份持久任务：branded 任务标识与比较并设置式引用、等级决定的阶段顺序、`delivery` 投影与 `delivery/changed` |
 | [schedule.md](schedule.zh.md) | 仅限 Session 内的提醒记录、持久转换、活动视图与普通对话交付 |
 | [todo.md](todo.zh.md) | todo 包的整列表条目类型、持久事件所有权、投影和开放轮次不变量 |
 | [commands.md](commands.zh.md) | 人类命令注册表服务：定义、适配器发现、直接调用、结果与解析视图 |
@@ -25,6 +26,7 @@
 | [session-reference.md](session-reference.zh.md) | 结构化跨会话引用：`SessionReferenceInput`/`Candidate`、prepared 消息上下文、稳定错误分类 |
 | [system-prompt.md](system-prompt.zh.md) | 逐次组装的上下文、工具提供方结果、提示词段落与协作式组装 |
 | [tools.md](tools.zh.md) | `ToolDefinition` 完整字段、schema DSL、`ToolExecution`/`ToolResult`、工具展示 UI 类型，以及受保护的执行流水线 |
+| [mcp.md](mcp.zh.md) | 用户管理的 MCP 服务器列表：`mcp` settings 命名空间、挂载/丢弃协调、状态 sink、`McpServerStatusView` 与 `mcp/status` |
 | [user-questions.md](user-questions.zh.md) | UI 支持的人工问答 seam：`AskUserQuestionRequest`、answer/options 词汇、提供方 API、错误分类体系 |
 | [approval.md](approval.zh.md) | 一次性用户审批 seam：`ApprovalRequest`、`ApprovalOutcome`、逐会话策略、审计事件和 answerer 约定 |
 | [attachment.md](attachment.zh.md) | 持久图片标识与元数据、校验输入、经校验读取，以及 `AttachmentStore` seam |

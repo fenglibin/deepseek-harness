@@ -866,6 +866,37 @@ async prepare(request: DeepSeekLlmApiExtensionRequest): Promise<PreparedDeepSeek
 
 Source: [`packages/llm/deepseek-llm-api-extensions/src/index.ts`](../../packages/llm/deepseek-llm-api-extensions/src/index.ts)
 
+<a id="ctxlightweightmodel--lightweightmodelconfig"></a>
+
+### `ctx.lightweightModel` — `LightweightModelConfig`
+
+Owns the lightweight route independently of any Host or transport. The composition entry remains usable without a settings provider; when one is mounted, its user layer is read live.
+
+```ts cordis-catalog
+/**
+ * Read the current lightweight route.
+ * @returns a detached provider and model, or `undefined` when the user set none.
+ */
+currentSelection(): LightweightModelSelection | undefined
+
+/**
+ * Save the lightweight route. A deployment without a settings provider keeps
+ * its composition entry.
+ * @param next - exact route accepted by an entry point.
+ * @returns fulfillment after the optional settings write settles.
+ */
+async saveSelection(next: LightweightModelSelection): Promise<void>
+
+/**
+ * Drop the lightweight route so auxiliary calls follow the conversation's
+ * own model again.
+ * @returns fulfillment after the optional settings write settles.
+ */
+async clearSelection(): Promise<void>
+```
+
+Source: [`packages/core/lightweight-model/src/index.ts`](../../packages/core/lightweight-model/src/index.ts)
+
 <a id="ctxllm--llmruntime"></a>
 
 ### `ctx.llm` — `LlmRuntime`

@@ -776,6 +776,56 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'delivery',
+    summary: 'Delivery task service (`ctx.delivery`) backed exclusively by the owning session log.',
+    description: 'Delivery task service (`ctx.delivery`) backed exclusively by the owning session log.',
+    methods: [
+      {
+        signature: 'get(agent: Agent): DeliveryView | undefined',
+        description: 'Read the current task for one exact live agent.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }],
+        returns: 'a fresh view or `undefined` when no task is current.',
+        throws: ['{@link DeliveryError} when the agent is not the registry\'s live instance.'],
+      },
+      {
+        signature: 'create(agent: Agent, request: CreateDeliveryRequest): DeliveryView',
+        description: 'Create a task in the `created` phase. An accepted task may be replaced; every other current phase must be cleared or advanced first.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'request', description: 'objective and optional level.' }],
+        returns: 'the created live view.',
+      },
+      {
+        signature: 'advance(agent: Agent, ref: DeliveryTaskRef, phase: DeliveryPhase): DeliveryView',
+        description: 'Advance the current task to the given phase. The phase must be the single legal next phase for the task\'s level; skipping a required phase is rejected before anything is committed.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'ref', description: 'expected current revision.' }, { name: 'phase', description: 'target phase.' }],
+        returns: 'the advanced view.',
+      },
+      {
+        signature: 'recordChange(agent: Agent, ref: DeliveryTaskRef, text: string): DeliveryView',
+        description: 'Record one change against the current task without changing its phase.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'ref', description: 'expected current revision.' }, { name: 'text', description: 'non-empty change description.' }],
+        returns: 'the view with the incremented change count.',
+      },
+      {
+        signature: 'recordDesign(agent: Agent, ref: DeliveryTaskRef, text: string): DeliveryView',
+        description: 'Record one design against the current task without changing its phase.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'ref', description: 'expected current revision.' }, { name: 'text', description: 'non-empty design description.' }],
+        returns: 'the view with the incremented design count.',
+      },
+      {
+        signature: 'recordSpec(agent: Agent, ref: DeliveryTaskRef, text: string): DeliveryView',
+        description: 'Record one spec against the current task without changing its phase.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'ref', description: 'expected current revision.' }, { name: 'text', description: 'non-empty spec description.' }],
+        returns: 'the view with the incremented spec count.',
+      },
+      {
+        signature: 'clear(agent: Agent, ref: DeliveryTaskRef): DeliveryTaskRef',
+        description: 'Clear the current task while retaining a durable tombstone and history.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'ref', description: 'expected current revision.' }],
+        returns: 'the tombstone ref whose revision is one past the cleared snapshot.',
+      },
+    ],
+  },
+  {
     key: 'directoryPicker',
     summary: 'Abstract directory-picking service.',
     description: 'Abstract directory-picking service. Subclass, implement `capability()`, and load the subclass as a plugin — it registers as `ctx.directoryPicker` (one implementation per context; loading a second throws, cordis\' standard duplicate-service behavior). The capability object must be stable for the service lifetime: consumers may capture it across calls.',
@@ -1091,6 +1141,31 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Attach an effect-scoped controller that can read and stop jobs. It serves the owners its registering context\'s scope covers, and start refuses an owner no attached controller serves.',
         parameters: [{ name: 'name', description: 'diagnostic label; duplicate names remain independent.' }],
         returns: 'disposer that detaches this controller.',
+      },
+    ],
+  },
+  {
+    key: 'lightweightModel',
+    summary: 'Owns the lightweight route independently of any Host or transport.',
+    description: 'Owns the lightweight route independently of any Host or transport. The composition entry remains usable without a settings provider; when one is mounted, its user layer is read live.',
+    methods: [
+      {
+        signature: 'currentSelection(): LightweightModelSelection | undefined',
+        description: 'Read the current lightweight route.',
+        parameters: [],
+        returns: 'a detached provider and model, or `undefined` when the user set none.',
+      },
+      {
+        signature: 'async saveSelection(next: LightweightModelSelection): Promise<void>',
+        description: 'Save the lightweight route. A deployment without a settings provider keeps its composition entry.',
+        parameters: [{ name: 'next', description: 'exact route accepted by an entry point.' }],
+        returns: 'fulfillment after the optional settings write settles.',
+      },
+      {
+        signature: 'async clearSelection(): Promise<void>',
+        description: 'Drop the lightweight route so auxiliary calls follow the conversation\'s own model again.',
+        parameters: [],
+        returns: 'fulfillment after the optional settings write settles.',
       },
     ],
   },
@@ -3164,6 +3239,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'ref', description: 'the reference whose stored value changed.' }],
   },
   {
+    name: 'delivery/changed',
+    mode: 'emit',
+    signature: '\'delivery/changed\'(this: import(\'@deepseek-ai/dsh-scope\').Scoped<Agent>, payload: { agent: Agent; change: DeliveryChanged }): void',
+    summary: 'Delivery mutation accepted by one live agent.',
+    description: 'Delivery mutation accepted by one live agent. The matching `delivery/change` session event has already committed. Listener failures are contained. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.',
+    parameters: [{ name: 'payload', description: '.change - fresh current projection or clear tombstone.' }],
+  },
+  {
     name: 'domain/changed',
     mode: 'emit',
     signature: '\'domain/changed\'(change: DomainChanged): void',
@@ -3218,6 +3301,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'Waterfall around every streaming model call (retry, replay, routing).',
     description: 'Waterfall around every streaming model call (retry, replay, routing). Bound to the LlmRuntime; call `next()` to reach the resolved adapter\'s stream, or yield your own chunks to short-circuit.',
     parameters: [{ name: 'options', description: 'the full request. A LOOP-built request carries the process-local {@link markAgentLoopRequest} identity and arrives deep-frozen (mutation throws): its content is a pure function of the session log (the reconstructability Agent Note), so listeners read it, never rewrite it. Hand-built calls do not carry that marker; their messages already obey the immutable creation contract.' }],
+  },
+  {
+    name: 'mcp/status',
+    mode: 'emit',
+    signature: '\'mcp/status\'(): void',
+    summary: 'One server\'s live connection status changed.',
+    description: 'One server\'s live connection status changed. Payload-free: a configuration surface re-reads the manager\'s `list` Remote method for the new state.',
+    parameters: [],
   },
   {
     name: 'session-telemetry/record',
@@ -3705,15 +3796,19 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CommandDefinition',
-    declaration: 'export interface CommandDefinition {\n    readonly name: string;\n    readonly description: string;\n    readonly input?: CommandInputDescriptor;\n    readonly recordInput?: boolean;\n    readonly handler: (invocation: CommandInvocation) => CommandResult | Promise<CommandResult>;\n}',
+    declaration: 'export interface CommandDefinition {\n    readonly name: string;\n    readonly title?: string;\n    readonly description: string;\n    readonly input?: CommandInputDescriptor;\n    readonly recordInput?: boolean;\n    readonly kind?: \'code\' | \'prompt\';\n    readonly prompt?: string;\n    readonly handler?: CommandHandler;\n}',
   },
   {
     name: 'CommandDescriptor',
-    declaration: 'export interface CommandDescriptor {\n    readonly name: string;\n    readonly description: string;\n    readonly input?: CommandInputDescriptor;\n}',
+    declaration: 'export interface CommandDescriptor {\n    readonly name: string;\n    readonly title?: string;\n    readonly description: string;\n    readonly input?: CommandInputDescriptor;\n}',
   },
   {
     name: 'CommandExecution',
     declaration: 'export interface CommandExecution {\n    readonly commandId: CommandId;\n    readonly result: CommandResult;\n}',
+  },
+  {
+    name: 'CommandHandler',
+    declaration: 'export type CommandHandler = (invocation: CommandInvocation) => CommandResult | Promise<CommandResult>;',
   },
   {
     name: 'CommandId',
@@ -3872,6 +3967,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface CreateAgentOptions {\n    readonly sessionId: SessionId;\n    readonly meta?: {\n        readonly cwd?: string;\n        readonly parentSession?: SessionId;\n        readonly seedLength?: number;\n        readonly origin?: \'subagent\';\n        readonly delegationDepth?: number;\n        readonly agentPreset?: string;\n    };\n    readonly seed?: readonly SessionEvent[];\n    readonly agentOptions?: AgentOptions;\n    readonly signal?: AbortSignal;\n    readonly setup?: AgentSetup;\n}',
   },
   {
+    name: 'CreateDeliveryRequest',
+    declaration: 'export interface CreateDeliveryRequest {\n    readonly objective: string;\n    readonly level?: DeliveryLevel;\n}',
+  },
+  {
     name: 'CreateGoalRequest',
     declaration: 'export interface CreateGoalRequest {\n    readonly objective: string;\n    readonly maxGoalRounds?: number;\n}',
   },
@@ -3926,6 +4025,38 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'DeepSeekLlmApiJson',
     declaration: 'export type DeepSeekLlmApiJson = null | boolean | number | string | DeepSeekLlmApiJson[] | {\n    [key: string]: DeepSeekLlmApiJson;\n};',
+  },
+  {
+    name: 'DeliveryChanged',
+    declaration: 'export interface DeliveryChanged {\n    readonly operation: DeliveryOperation;\n    readonly ref: DeliveryTaskRef;\n    readonly task?: DeliveryView;\n}',
+  },
+  {
+    name: 'DeliveryLevel',
+    declaration: 'export type DeliveryLevel = \'l0\' | \'l1\' | \'l2\';',
+  },
+  {
+    name: 'DeliveryOperation',
+    declaration: 'export type DeliveryOperation = \'create\' | \'advance\' | \'record-change\' | \'record-design\' | \'record-spec\' | \'clear\';',
+  },
+  {
+    name: 'DeliveryPhase',
+    declaration: 'export type DeliveryPhase = \'created\' | \'designed\' | \'specified\' | \'implemented\' | \'verified\' | \'accepted\';',
+  },
+  {
+    name: 'DeliverySnapshot',
+    declaration: 'export interface DeliverySnapshot extends DeliveryTaskRef {\n    readonly objective: string;\n    readonly phase: DeliveryPhase;\n    readonly level: DeliveryLevel;\n    readonly changeCount: number;\n    readonly designCount: number;\n    readonly specCount: number;\n}',
+  },
+  {
+    name: 'DeliveryTaskId',
+    declaration: 'export type DeliveryTaskId = Branded<\'DeliveryTaskId\'>;',
+  },
+  {
+    name: 'DeliveryTaskRef',
+    declaration: 'export interface DeliveryTaskRef {\n    readonly id: DeliveryTaskId;\n    readonly revision: number;\n}',
+  },
+  {
+    name: 'DeliveryView',
+    declaration: 'export interface DeliveryView extends DeliverySnapshot {\n    readonly createdAt: number;\n    readonly updatedAt: number;\n}',
   },
   {
     name: 'DiffCallView',
@@ -4318,6 +4449,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'KvUnitDescriptor',
     declaration: 'export interface KvUnitDescriptor {\n    readonly name: string;\n    readonly version: number;\n    readonly tables: readonly string[];\n    readonly hasGlobal: boolean;\n    readonly layout?: \'single\' | \'per-record\';\n}',
+  },
+  {
+    name: 'LightweightModelSelection',
+    declaration: 'export interface LightweightModelSelection {\n    provider: string;\n    model: string;\n}',
   },
   {
     name: 'LlmAdapter',
