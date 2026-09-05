@@ -544,7 +544,6 @@ jobs:
           packages/shell/tool-pwsh/tests/loader.spec.ts
           packages/workflow/workflow-worker-thread/tests/workflow-worker-thread.spec.ts
           packages/workflow/tool-ralph/tests/integration.spec.ts
-          packages/subprocess/subprocess-local/tests/process-exit.spec.ts
           packages/session/session-persistence-sqlite/tests/differential.spec.ts
 
   windows-observational:

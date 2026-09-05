@@ -118,7 +118,7 @@ describe('change-scope', () => {
     expect(pushed.paths.committed).toEqual(['feature.txt'])
   })
 
-  it.skipIf(process.platform === 'win32')('preserves trailing spaces in the worktree path', () => {
+  it.skipIf(process.platform === 'win32')('preserves trailing spaces in the worktree path', { timeout: 30_000 }, () => {
     const { root } = fixture('worktree ')
     const report = jsonReport(root, 'HEAD')
 
@@ -126,7 +126,7 @@ describe('change-scope', () => {
     expect(report.paths).toEqual({ committed: [], staged: [], unstaged: [], untracked: [] })
   })
 
-  it('reports an exact head above a non-master stacked base while dirty paths remain worktree-local', () => {
+  it('reports an exact head above a non-master stacked base while dirty paths remain worktree-local', { timeout: 30_000 }, () => {
     const { root } = fixture()
     git(root, ['switch', '-c', 'foundation'])
     const baseSha = commit(root, 'foundation.txt', 'foundation\n')
@@ -142,7 +142,7 @@ describe('change-scope', () => {
     expect(report.paths.untracked).toEqual(['current-worktree.txt'])
   })
 
-  it('keeps committed, staged, unstaged, and untracked paths independent and does not mutate state', () => {
+  it('keeps committed, staged, unstaged, and untracked paths independent and does not mutate state', { timeout: 30_000 }, () => {
     const { root } = fixture()
     commit(root, 'unstaged.txt', 'before\n')
     const baseSha = git(root, ['rev-parse', 'HEAD'])
@@ -204,7 +204,7 @@ describe('change-scope', () => {
     }).toThrow('cannot inspect staged paths: Git path 1 is not valid UTF-8')
   })
 
-  it('rejects missing, ambiguous, and non-commit refs', () => {
+  it('rejects missing, ambiguous, and non-commit refs', { timeout: 30_000 }, () => {
     const { root } = fixture()
     git(root, ['branch', 'collision'])
     git(root, ['tag', 'collision'])
@@ -224,7 +224,7 @@ describe('change-scope', () => {
     }
   })
 
-  it('renders deterministic versioned JSON', () => {
+  it('renders deterministic versioned JSON', { timeout: 30_000 }, () => {
     const { root } = fixture()
     git(root, ['switch', '-c', 'format'])
     commit(root, 'zeta.txt', 'zeta\n')

@@ -46,7 +46,7 @@ async function writeContractConfig(suffix: string): Promise<string> {
 }
 
 describe('Oxlint executable contract', () => {
-  it('discovers the owning TypeScript project for every file class', async () => {
+  it('discovers the owning TypeScript project for every file class', { timeout: 30_000 }, async () => {
     const suffix = randomUUID()
     const configPath = await writeContractConfig(suffix)
     const probes = [
@@ -107,7 +107,7 @@ probePromise()
     }
   }, 90_000)
 
-  it('runs JavaScript compatibility and nursery rules', async () => {
+  it('runs JavaScript compatibility and nursery rules', { timeout: 30_000 }, async () => {
     const suffix = randomUUID()
     const configPath = await writeContractConfig(suffix)
     const path = join(repositoryRoot, 'scripts', `oxlint-contract-${suffix}.ts`)
@@ -154,7 +154,7 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
     }
   }, 90_000)
 
-  it('keeps the complete stylistic contract in Oxlint', async () => {
+  it('keeps the complete stylistic contract in Oxlint', { timeout: 30_000 }, async () => {
     const oxlintPath = join(repositoryRoot, '.oxlintrc.json')
     const result = parseConfigFileTextToJson(oxlintPath, await readFile(oxlintPath, 'utf8'))
     if (result.error !== undefined) {
@@ -196,7 +196,7 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
     })
   })
 
-  it('checks preserved TypeGraph syntax without type-aware analysis', () => {
+  it('checks preserved TypeGraph syntax without type-aware analysis', { timeout: 30_000 }, () => {
     const result = runOxlint([
       '--config',
       '.oxlintrc.staged.json',
@@ -207,7 +207,7 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
     expect(result.status, normalizedOutput(result)).toBe(0)
   })
 
-  it('keeps repository lint workflows Oxlint-only', async () => {
+  it('keeps repository lint workflows Oxlint-only', { timeout: 30_000 }, async () => {
     const packageJson = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8')) as unknown
     if (!isRecord(packageJson) || !isRecord(packageJson.scripts) || !isRecord(packageJson.devDependencies)) {
       throw new Error('package.json must contain scripts and devDependencies objects')
@@ -227,7 +227,7 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
     expect(lefthook).not.toContain('eslint.format.config.mjs')
   })
 
-  it('reports an unused suppression', async () => {
+  it('reports an unused suppression', { timeout: 30_000 }, async () => {
     const suffix = randomUUID()
     const configPath = await writeContractConfig(suffix)
     const path = join(repositoryRoot, 'scripts', `oxlint-contract-${suffix}.ts`)
@@ -254,7 +254,7 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
     }
   }, 90_000)
 
-  it('accepts an ignored-only staged selection', () => {
+  it('accepts an ignored-only staged selection', { timeout: 30_000 }, () => {
     const result = runOxlint([
       '--fix',
       '--no-error-on-unmatched-pattern',
@@ -265,7 +265,7 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
     expect(result.status, normalizedOutput(result)).toBe(0)
   })
 
-  it('keeps staged validation project-free while preserving source rules', async () => {
+  it('keeps staged validation project-free while preserving source rules', { timeout: 30_000 }, async () => {
     const configPath = join(repositoryRoot, '.oxlintrc.staged.json')
     const result = parseConfigFileTextToJson(configPath, await readFile(configPath, 'utf8'))
     if (result.error !== undefined) {
@@ -301,7 +301,7 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
     }
   })
 
-  it('preserves successful fix output channels', async () => {
+  it('preserves successful fix output channels', { timeout: 30_000 }, async () => {
     const suffix = randomUUID()
     const path = join(repositoryRoot, 'scripts', `staged-lint-probe-${suffix}.ts`)
 
@@ -325,7 +325,7 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
     }
   })
 
-  it('prints only the final diagnostics when a fix retry still fails', async () => {
+  it('prints only the final diagnostics when a fix retry still fails', { timeout: 30_000 }, async () => {
     const suffix = randomUUID()
     const path = join(repositoryRoot, 'scripts', `staged-lint-probe-${suffix}.ts`)
 

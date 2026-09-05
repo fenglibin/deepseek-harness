@@ -8,7 +8,7 @@
  * design-platform.css, so adding, renaming, or dropping a scrollbar token
  * moves these assertions with it.
  */
-import { readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync, type Dirent } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -104,7 +104,16 @@ function varReferences(value: string): string[] {
 function packageStylesheets(): string[] {
   const found: string[] = []
   const walk = (dir: string): void => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    let entries: Dirent[]
+    try {
+      entries = readdirSync(dir, { withFileTypes: true })
+    } catch (error: unknown) {
+      // A sibling spec may be tearing down its temp tree mid-walk; a vanished
+      // directory carries no stylesheets, so skip it rather than fail the run.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+      throw error
+    }
+    for (const entry of entries) {
       const path = join(dir, entry.name)
       if (entry.isDirectory()) {
         if (entry.name !== 'node_modules' && entry.name !== 'lib' && entry.name !== 'dist') walk(path)

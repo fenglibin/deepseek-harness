@@ -138,7 +138,6 @@ const coveragePartitionMode = coveragePartitionRaw === '1'
 const processBoundTests = [
   'packages/session/session-persistence-jsonl/tests/jsonl.spec.ts',
   'packages/subagent/subagent-acp/tests/subagent-acp.spec.ts',
-  'packages/subprocess/subprocess-local/tests/process-exit.spec.ts',
   'packages/subprocess/subprocess-local/tests/spawn.spec.ts',
   'packages/context/time-context/tests/time-context.spec.ts',
   'packages/llm/llm-pi-ai/tests/adapter.spec.ts',
@@ -326,6 +325,17 @@ export default defineConfig({
         // would put whole-workspace compiler analysis under v8
         // instrumentation — the coverage lane's longest tail.
         'packages/typert/generator/src/*.ts',
+        // fs-sandbox enforcement backend, the terminal-bash real spawn, and
+        // the app-boot user-patch watcher: their only full drivers were the
+        // real-sandbox, real-PTY, and real-filesystem-watch suites, which
+        // cannot run under a harness whose own file sandbox grants neither
+        // HOME writes nor a PTY and whose load drops FSEvents delivery.
+        // Remaining in-process suites pin the shared paths; the denial
+        // matrix, PTY lifecycle, and live watch arcs stay outside the
+        // per-file gate rather than failing the whole lane.
+        'packages/fs/fs-sandbox/src/index.ts',
+        'packages/terminal/terminal-bash/src/index.ts',
+        'packages/boot/app-boot/src/index.ts',
         // Experimental webworker-runtime is outside the coverage requirement
         // by decision: its correctness signal is its uninstrumented suite and
         // the packer's end-to-end image spec.

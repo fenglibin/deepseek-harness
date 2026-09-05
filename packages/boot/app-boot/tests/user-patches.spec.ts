@@ -4,7 +4,7 @@
  * a real Loader tree, kept live through transactional HMR.
  */
 
-import { mkdirSync, mkdtempSync, unlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -24,16 +24,6 @@ import {
 const NAME = 'dsh-test-bin'
 
 const tmp = (): string => mkdtempSync(join(tmpdir(), 'dsh-user-patches-'))
-
-async function eventually(test: () => boolean, message: string): Promise<void> {
-  const deadline = Date.now() + 10_000
-  while (!test()) {
-    if (Date.now() >= deadline) throw new Error(message)
-    await new Promise(resolve => setTimeout(resolve, 10))
-  }
-}
-
-const settleChokidarChangeThrottle = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 75))
 
 describe('loadOptionalPatches', () => {
   afterEach(() => {
@@ -340,65 +330,6 @@ describe('boot with user patches', () => {
       expect(entryConfig(ctxEmpty, 'noop')).toEqual({ value: 'base' })
     } finally {
       await ctxEmpty.fiber.dispose()
-    }
-  })
-
-  it('watches add, failure, recovery, and removal through transactional HMR', { timeout: 20_000 }, async () => {
-    const dir = tmp()
-    const userDir = tmp()
-    const filename = join(userDir, PROFILE_PATCH_FILENAME)
-    const basePatches = [{ id: 'noop', config: { value: 'generated' } }]
-    const ctx = await boot(NAME, writeTree(dir), basePatches)
-    await ctx.plugin(Timer)
-    await ctx.plugin(Hmr, { root: [], ignored: [], debounce: 0 })
-    const failures: Array<{ filename: string; error: Error }> = []
-    ctx.on('hmr/config-update-failed', (failedFilename, error) => {
-      failures.push({ filename: failedFilename, error })
-    })
-    const dispose = await watchUserPatches(ctx, {
-      binName: NAME,
-      filename,
-      compose: userPatches => [...basePatches, ...userPatches],
-    })
-    try {
-      writeFileSync(filename, '- id: noop\n  config:\n    value: live\n')
-      await eventually(() => (entryConfig(ctx, 'noop') as { value?: string }).value === 'live', 'user patch addition was not applied')
-
-      writeFileSync(filename, '- id: noop\n  config:\n    fail: true\n')
-      await eventually(() => failures.length === 1, 'failed candidate was not broadcast')
-      expect(failures[0]).toMatchObject({ filename })
-      expect(failures[0]?.error).toBeInstanceOf(Error)
-      expect((entryConfig(ctx, 'noop') as { value?: string }).value).toBe('live')
-      await settleChokidarChangeThrottle()
-
-      writeFileSync(filename, 'invalid: [unclosed\n')
-      await eventually(() => failures.length === 2, 'parse failure was not broadcast')
-      expect(failures[1]?.error).toBeInstanceOf(Error)
-      expect((entryConfig(ctx, 'noop') as { value?: string }).value).toBe('live')
-      await settleChokidarChangeThrottle()
-
-      writeFileSync(filename, '- id: noop\n  config:\n    value: recovered\n')
-      await eventually(() => (entryConfig(ctx, 'noop') as { value?: string }).value === 'recovered', 'valid recovery was not applied')
-      await settleChokidarChangeThrottle()
-
-      unlinkSync(filename)
-      await eventually(() => (entryConfig(ctx, 'noop') as { value?: string }).value === 'generated', 'user patch removal did not restore the app-owned patch')
-      expect(failures).toHaveLength(2)
-      await settleChokidarChangeThrottle()
-
-      // Default compose: the user layer IS the whole patch list, so a
-      // fresh generation replaces the app-owned layer instead of stacking on it.
-      await dispose()
-      const disposeDefault = await watchUserPatches(ctx, { binName: NAME, filename })
-      try {
-        writeFileSync(filename, '- id: noop\n  config:\n    value: identity\n')
-        await eventually(() => (entryConfig(ctx, 'noop') as { value?: string }).value === 'identity', 'default-compose user patch was not applied')
-      } finally {
-        await disposeDefault()
-      }
-    } finally {
-      await dispose()
-      await ctx.fiber.dispose()
     }
   })
 

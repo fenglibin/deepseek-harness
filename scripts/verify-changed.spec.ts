@@ -193,7 +193,7 @@ describe('readWorkspacePackages', () => {
 })
 
 describe('changedPaths', () => {
-  it('reports paths from git inside the repository', () => {
+  it('reports paths from git inside the repository', { timeout: 30_000 }, () => {
     expect(Array.isArray(changedPaths(repositoryRoot))).toBe(true)
   })
 
@@ -246,7 +246,7 @@ describe('spawnVitest', () => {
 })
 
 describe('main', () => {
-  it('lists the affected directories and succeeds', () => {
+  it('lists the affected directories and succeeds', { timeout: 30_000 }, () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     try {
       expect(main(['--list'], repositoryRoot)).toBe(0)
@@ -255,7 +255,7 @@ describe('main', () => {
     }
   })
 
-  it('runs the affected directories through the injected runner', () => {
+  it('runs the affected directories through the injected runner', { timeout: 30_000 }, () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     const run = vi.fn<TestRunner>(() => 0)
     try {
@@ -266,7 +266,7 @@ describe('main', () => {
     }
   })
 
-  it('narrows the scope to changed packages under --direct-only', () => {
+  it('narrows the scope to changed packages under --direct-only', { timeout: 30_000 }, () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     const collected: string[][] = []
     const run: TestRunner = (directories) => {

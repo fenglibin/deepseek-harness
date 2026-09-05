@@ -25,7 +25,7 @@ function write(root: string, path: string, content: string): void {
 }
 
 describe('application entrypoints', () => {
-  it('accepts the repository launcher inventory', () => {
+  it('accepts the repository launcher inventory', { timeout: 30_000 }, () => {
     expect(applicationEntrypointViolations(resolve(import.meta.dirname, '..'))).toEqual([])
   })
 

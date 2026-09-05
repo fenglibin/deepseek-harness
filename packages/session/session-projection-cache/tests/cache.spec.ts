@@ -188,8 +188,15 @@ describe('SessionProjectionCache write policy', () => {
     if (session === undefined) throw new Error('session was not created')
     mark(session, ['live'])
     await owner.dispose()
-    await settle()
-    expect((await storedRows(root, session.id))?.['cache-test/marks']?.val).toEqual({ marks: ['live'] })
+    // The disposal write is fire-and-forget over real fs I/O; poll until it is
+    // durable instead of trusting a fixed settle, so an aggregate under load
+    // cannot starve the drain and turn the assertion into a false negative.
+    const rows = await vi.waitFor(async () => {
+      const rows = await storedRows(root, session.id)
+      if (rows?.['cache-test/marks']?.val === undefined) throw new Error('disposal checkpoint is not durable yet')
+      return rows
+    }, { timeout: 5_000, interval: 25 })
+    expect(rows['cache-test/marks']?.val).toEqual({ marks: ['live'] })
   })
 
   it('discards a session\'s cached rows on remove, and resolves false when there is none', async () => {
@@ -286,14 +293,23 @@ describe('SessionProjectionCache write policy', () => {
     const session = ctx.sessions.create(SessionId('fail-soft'))
     mark(session, ['x'])
     endTurn(session)
-    await settle()
-    expect(await storedRows(root, session.id)).toBeUndefined()
+    // The write failure is reported through the same fire-and-forget drain;
+    // poll instead of trusting a fixed settle so a loaded aggregate cannot
+    // starve the drain and turn the assertion into a false negative.
+    await vi.waitFor(() => {
+      if (warn.mock.calls.length === 0) throw new Error('failed turn/end write was not logged')
+    }, { timeout: 5_000, interval: 25 })
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('turn/end write for "fail-soft" failed'))
+    expect(await storedRows(root, session.id)).toBeUndefined()
     // Self-heal: once the blocker clears, the next mandatory point writes.
     await rm(recordPath(root, session.id), { recursive: true })
     mark(session, ['y'])
     endTurn(session)
-    await settle()
+    await vi.waitFor(async () => {
+      const rows = await storedRows(root, session.id)
+      if (rows?.['cache-test/marks']?.val === undefined) throw new Error('self-healing checkpoint is not durable yet')
+      return rows
+    }, { timeout: 5_000, interval: 25 })
     expect((await storedRows(root, session.id))?.['cache-test/marks']?.val).toEqual({ marks: ['y'] })
   })
 })
