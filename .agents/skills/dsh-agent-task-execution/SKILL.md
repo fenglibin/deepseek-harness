@@ -79,7 +79,7 @@ npx tsx scripts/verify-changed.ts --direct-only  # changed packages only, when t
 
 The script derives its scope from `git diff` and each manifest's `dependencies`. It deliberately ignores `devDependencies`: a large share of this workspace lists `dsh-*` packages there, and treating a test-time relationship as a runtime edge spread a 24-package change across 163 packages.
 
-See [Local verification scope](../../../docs/testing.md#local-verification-scope) for the tiering rule.
+See [Local verification scope](../../../docs/testing.zh.md#local-verification-scope) for the tiering rule.
 
 ## Do not trade these away
 

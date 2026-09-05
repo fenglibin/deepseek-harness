@@ -9,7 +9,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import AttachmentStore from '@deepseek-ai/dsh-attachment'
+import AttachmentStore, { AttachmentId } from '@deepseek-ai/dsh-attachment'
+import LlmImageUnderstanding, { DEFAULT_INSTRUCTION } from '@deepseek-ai/dsh-image-understanding'
 import LlmRuntime, { LlmAdapter, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type {
   GenerateOptions, LlmCallConfig, LlmCallConfigAdapterDefaults, LlmModelInfo,
@@ -139,6 +140,28 @@ async function harness(logged?: {
 function expectValue<T>(result: { ok: true; value: T } | { ok: false }): T {
   if (!result.ok) throw new Error('expected successful response')
   return result.value
+}
+
+/** Adapter that answers every understanding request with one fixed description. */
+class DescribingAdapter extends LlmAdapter {
+  readonly requests: GenerateOptions[] = []
+
+  override listModels(): Promise<readonly LlmModelInfo[]> {
+    return Promise.resolve([
+      { provider: 'vision', id: 'vision-model', name: 'Vision', inputModalities: ['text', 'image'] },
+    ])
+  }
+
+  override resolveModel(provider: string, model: string): Promise<LlmResolvedModelInfo> {
+    return Promise.resolve({ provider, id: model, name: model, inputModalities: ['text', 'image'] })
+  }
+
+  override async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    this.requests.push(options)
+    yield { type: 'block-start', index: 0, blockType: 'text' }
+    yield { type: 'text-delta', index: 0, text: 'A red traffic light.' }
+    yield { type: 'finish', reason: { kind: 'stop' } }
+  }
 }
 
 function registerTextOnly(ctx: Context): void {
@@ -346,7 +369,6 @@ describe('Web session model selection', () => {
     }))
     ctx.llm.registerAdapter(['string-failure'], new class extends CatalogAdapter {
       override listModels(): Promise<readonly LlmModelInfo[]> {
-        // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- non-Error provider normalization is the scenario.
         return Promise.reject('string catalog failure')
       }
     }('String Failure', []))
@@ -605,7 +627,6 @@ describe('Web session model selection', () => {
     }('Image Capable', []))
     ctx.llm.registerAdapter(['string-error'], new class extends CatalogAdapter {
       override resolveModel(): Promise<LlmResolvedModelInfo> {
-        // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- non-Error provider normalization is the scenario.
         return Promise.reject('string selection failure')
       }
     }('String Error', []))
@@ -683,6 +704,48 @@ describe('Web session model selection', () => {
       ok: false,
       error: { code: 'session/model-unavailable', message: 'string selection failure' },
     })
+    await ctx.fiber.dispose()
+  })
+
+  it('admits an image prompt for a text-only route once a describer is mounted', async () => {
+    const { ctx, agent, sessionId } = await harness()
+    registerTextOnly(ctx)
+    const savedRef = {
+      attachmentId: AttachmentId('saved-image'),
+      mediaType: 'image/png' as const,
+      bytes: 1,
+      width: 1,
+      height: 1,
+    }
+    ctx.provide('attachments', Object.setPrototypeOf({
+      saveImages: () => Promise.resolve([savedRef]),
+    }, AttachmentStore.prototype) as never)
+    const vision = new DescribingAdapter()
+    ctx.llm.registerAdapter(['vision'], vision)
+    await ctx.plugin(LlmImageUnderstanding, { provider: 'vision', model: 'vision-model' })
+    const followup = vi.fn()
+    Object.assign(agent, { followup })
+    const remote = createSessionTestRemote(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      cwd: '/tmp',
+    })
+    expectValue(await remote.selectModel(request({ sessionId, provider: 'text-only', model: 'plain' })))
+
+    expectValue(await remote.prompt(promptRequest({
+      sessionId, mode: 'queue', content: [{ type: 'image', mediaType: 'image/png', data: 'AQ==' }],
+    })))
+
+    expect(followup).toHaveBeenCalledOnce()
+    expect((followup.mock.calls[0]?.[0] as UserMessage).content).toEqual([{
+      type: 'image',
+      attachment: savedRef,
+      description: {
+        text: 'A red traffic light.',
+        source: { provider: 'vision', model: 'vision-model', instruction: DEFAULT_INSTRUCTION },
+      },
+    }])
+    expect(vision.requests).toHaveLength(1)
+    expect(vision.requests[0]?.purpose).toBe('image-understanding')
     await ctx.fiber.dispose()
   })
 })

@@ -35,6 +35,7 @@ Choose this backend when the child must run with its own runtime, model, and too
 
 | Field | Default | Meaning |
 |---|---|---|
+| `enabled` | `true` | Master switch; `false` registers no provider and performs no validation, so a deployment whose command is absent loads unchanged |
 | `providerName` | `acp` | Registry name on `ctx.subagents` |
 | `command` | required | Executable spawned for each run (the child ACP agent) |
 | `args` | `[]` | Command arguments |

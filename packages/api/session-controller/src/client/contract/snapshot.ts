@@ -30,6 +30,11 @@ export interface PendingSubmissionImage {
   readonly height?: number
 }
 
+/** One ordered part of a local submission echo: typed text or an inline image preview. */
+export type PendingSubmissionPart =
+  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'image'; readonly preview: PendingSubmissionImage }
+
 /**
  * One local prompt-submission echo: inserted synchronously when a submission
  * begins, so the conversation can show the message before serialization,
@@ -45,6 +50,8 @@ export interface PendingSubmission {
   readonly text: string
   /** Ordered image previews matching the prompt's image parts. */
   readonly images: readonly PendingSubmissionImage[]
+  /** Ordered text/image parts in the document order the composer produced. */
+  readonly parts: readonly PendingSubmissionPart[]
 }
 
 /** History-open lifecycle of a Session event window. */

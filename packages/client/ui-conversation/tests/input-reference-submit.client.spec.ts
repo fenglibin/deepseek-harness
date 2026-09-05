@@ -5,9 +5,10 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import type { Context } from '@deepseek-ai/cordis'
-import type { InputTriggerController, SubmitOutcome } from '../src/client/contract/input.ts'
+import type {
+  DraftAttachmentId, DraftPart, InputTriggerController, SubmitOutcome,
+} from '../src/client/contract/input.ts'
 import { SessionInputShell } from '../src/client/input/facade.ts'
-import type { DraftAttachmentId } from '../src/client/contract/input.ts'
 
 const mention = '@[Research](dsh-session:InNvdXJjZSI)'
 const spacedMention = '@[Research notes](dsh-session:InNvdXJjZSI)'
@@ -16,6 +17,13 @@ const commandImages = {
   release: () => {},
   unsupportedNotice: (token: string) => `${token.trim()} images-unsupported`,
 }
+const imageLabels = {
+  remove: (name: string) => `remove ${name}`,
+  pending: () => 'pending image',
+  lightboxDialog: () => 'image preview',
+  lightboxClose: () => 'close preview',
+}
+const releaseImage = (): void => {}
 
 function chip(shell: SessionInputShell): void {
   shell.setDraft('@res')
@@ -39,6 +47,8 @@ describe('reference submission', () => {
       actx: {} as Context,
       defaultSink: vi.fn(),
       commandImages,
+      imageLabels,
+      releaseImage,
     })
     first.bindMirror(mirror)
     first.setDraft('@res')
@@ -63,19 +73,20 @@ describe('reference submission', () => {
       actx: {} as Context,
       defaultSink: sink,
       commandImages,
+      imageLabels,
+      releaseImage,
     })
     restored.setDraft(mirror.mock.calls.at(-1)?.[0] as string)
     restored.submit()
     await vi.waitFor(() => {
-      expect(sink).toHaveBeenCalledWith(spacedMention, [], 'queue', expect.any(AbortSignal))
+      expect(sink).toHaveBeenCalledWith([{ type: 'text', text: spacedMention }], 'queue', expect.any(AbortSignal))
     })
   })
 
   it('retains the chip on Host failure and clears it only after a later accepted retry', async () => {
     const serializeReference = vi.fn(() => Promise.resolve(mention))
     const sink = vi.fn<(
-      _text: string,
-      _imageIds: readonly DraftAttachmentId[],
+      _parts: readonly DraftPart[],
       _mode: 'queue' | 'steer',
       _signal: AbortSignal,
     ) => Promise<SubmitOutcome>>()
@@ -91,6 +102,8 @@ describe('reference submission', () => {
       inputTriggers: () => inputTriggers,
       defaultSink: sink,
       commandImages,
+      imageLabels,
+      releaseImage,
     })
     chip(shell)
     expect(shell.snapshot).toMatchObject({
@@ -106,7 +119,7 @@ describe('reference submission', () => {
     await vi.waitFor(() => {
       expect(shell.snapshot.draft).toBe(`${mention} `)
     })
-    expect(sink).toHaveBeenNthCalledWith(1, mention, [], 'queue', expect.any(AbortSignal))
+    expect(sink).toHaveBeenNthCalledWith(1, [{ type: 'text', text: mention }], 'queue', expect.any(AbortSignal))
     expect(shell.snapshot).toMatchObject({
       draft: `${mention} `,
       occurrences: [{ source: 'reference', ref: mention, label: 'Research', offset: 0, length: mention.length }],
@@ -119,7 +132,7 @@ describe('reference submission', () => {
     shell.submit('queue')
     expect(shell.snapshot.draft).toBe('')
     await vi.waitFor(() => {
-      expect(sink).toHaveBeenNthCalledWith(2, mention, [], 'queue', expect.any(AbortSignal))
+      expect(sink).toHaveBeenNthCalledWith(2, [{ type: 'text', text: mention }], 'queue', expect.any(AbortSignal))
     })
     expect(shell.snapshot.occurrences).toEqual([])
     expect(serializeReference).toHaveBeenCalledTimes(2)
@@ -137,6 +150,8 @@ describe('reference submission', () => {
       inputTriggers: () => inputTriggers,
       defaultSink: sink,
       commandImages,
+      imageLabels,
+      releaseImage,
     })
     chip(shell)
     shell.submit()
@@ -156,11 +171,13 @@ describe('reference submission', () => {
     let signal: AbortSignal | undefined
     const shell = new SessionInputShell({
       actx: {} as Context,
-      defaultSink: (_text, _imageIds, _mode, received) => {
+      defaultSink: (_parts, _mode, received) => {
         signal = received
         return new Promise<SubmitOutcome>(() => {})
       },
       commandImages,
+      imageLabels,
+      releaseImage,
     })
     shell.setDraft('send this')
     shell.submit()
@@ -178,6 +195,8 @@ describe('reference submission', () => {
       actx: {} as Context,
       defaultSink: () => Promise.resolve({ kind: 'error' }),
       commandImages,
+      imageLabels,
+      releaseImage,
     })
     shell.setDraft('retry this')
     shell.submit()
@@ -194,6 +213,8 @@ describe('reference submission', () => {
       actx: {} as Context,
       defaultSink: () => new Promise<SubmitOutcome>((resolve) => { settlements.push(resolve) }),
       commandImages,
+      imageLabels,
+      releaseImage,
     })
     shell.setDraft('first')
     shell.submit()
@@ -216,17 +237,19 @@ describe('submit transaction hardening', () => {
       actx: {} as Context,
       defaultSink: sink,
       commandImages,
+      imageLabels,
+      releaseImage,
     })
-    expect(shell.addImages(['img-1' as DraftAttachmentId])).toBe(true)
+    expect(shell.addImages([{ attachmentId: 'img-1' as DraftAttachmentId, previewUrl: 'blob:img-1' }])).toBe(true)
     shell.submit('queue')
     shell.submit('queue')
     expect(sink).toHaveBeenCalledTimes(1)
     settle({ kind: 'success' })
     await vi.waitFor(() => {
-      expect(shell.snapshot.imageIds).toEqual([])
+      expect(shell.snapshot.parts).toEqual([])
     })
 
-    expect(shell.addImages(['img-2' as DraftAttachmentId])).toBe(true)
+    expect(shell.addImages([{ attachmentId: 'img-2' as DraftAttachmentId, previewUrl: 'blob:img-2' }])).toBe(true)
     shell.submit('queue')
     expect(sink).toHaveBeenCalledTimes(2)
   })
@@ -237,13 +260,15 @@ describe('submit transaction hardening', () => {
       actx: {} as Context,
       defaultSink: sink,
       commandImages,
+      imageLabels,
+      releaseImage,
     })
     const imageId = 'img-1' as DraftAttachmentId
-    shell.addImages([imageId])
+    shell.addImages([{ attachmentId: imageId, previewUrl: 'blob:img-1' }])
     shell.submit()
     await Promise.resolve()
     await Promise.resolve()
-    expect(shell.snapshot.imageIds).toEqual([imageId])
+    expect(shell.snapshot.parts).toEqual([{ type: 'image', attachmentId: imageId }])
     expect(shell.notices.getSnapshot()).toBeNull()
   })
 
@@ -252,13 +277,15 @@ describe('submit transaction hardening', () => {
     const imageId = 'img-flight' as DraftAttachmentId
     const shell = new SessionInputShell({
       actx: {} as Context,
-      defaultSink: (_text, _ids, _mode, received) => {
+      defaultSink: (_parts, _mode, received) => {
         signal = received
         return new Promise<SubmitOutcome>(() => {})
       },
       commandImages,
+      imageLabels,
+      releaseImage,
     })
-    shell.addImages([imageId])
+    shell.addImages([{ attachmentId: imageId, previewUrl: 'blob:img-flight' }])
     shell.submit()
     expect(signal?.aborted).toBe(false)
     expect(shell.dispose()).toEqual([imageId])
@@ -273,6 +300,8 @@ describe('submit transaction hardening', () => {
       inputTriggers: () => ({ track, lexicon } as unknown as InputTriggerController),
       defaultSink: vi.fn(),
       commandImages,
+      imageLabels,
+      releaseImage,
     })
     shell.setDraft('@sr')
     const applied = shell.insertText('@src/', { start: 0, end: 3, draftRev: shell.snapshot.draftRev }, true)

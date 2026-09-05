@@ -12,7 +12,11 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { createToolResultMessage, type ToolCallBlock } from '@deepseek-ai/dsh-llm'
+import { describeForRoute } from '@deepseek-ai/dsh-image-understanding'
+import {
+  attachImageDescriptions, collectImageRefs, createToolResultMessage,
+  type ModelModality, type ToolCallBlock,
+} from '@deepseek-ai/dsh-llm'
 import type { Session, UserMessage } from '@deepseek-ai/dsh-session'
 import { TOOL_ABORTED_BEFORE_DISPATCH, TOOL_RUNTIME_SCHEDULER, type ToolExecutionInput, type ToolExecutionMode, type ToolExecutionResult, type ToolRunContext } from '@deepseek-ai/dsh-tools'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
@@ -64,6 +68,7 @@ export async function executeToolCalls(
   toolCalls: ToolCallBlock[],
   signal: AbortSignal,
   acceptContext: (context: UserMessage) => void,
+  inputModalities: readonly ModelModality[] | undefined,
 ): Promise<{ concluded: boolean }> {
   const agent = ctx.agents.requireInitiator()
   const { session } = agent
@@ -89,12 +94,14 @@ export async function executeToolCalls(
     const mode = ctx.tools.executionMode(first.exec).kind
     const group = mode === 'parallel' ? planned.slice(next) : [first]
     const outcome = await runGroup(
-      ctx, turn, step, group, mode, signal, acceptContext,
+      ctx, turn, step, group, mode, signal, acceptContext, inputModalities,
     )
     next += outcome.consumed
     concluded ||= outcome.concluded
     if (outcome.aborted) {
-      for (const call of planned.slice(next)) appendSkippedToolCall(session, turn, step, call.block)
+      for (const call of planned.slice(next)) {
+        await appendSkippedToolCall(ctx, session, turn, step, call.block, inputModalities, signal)
+      }
       return { concluded }
     }
   }
@@ -127,6 +134,7 @@ async function runGroup(
   mode: ToolExecutionMode['kind'],
   signal: AbortSignal,
   acceptContext: (context: UserMessage) => void,
+  inputModalities: readonly ModelModality[] | undefined,
 ): Promise<GroupOutcome> {
   const { session } = ctx.agents.requireInitiator()
   const { maxParallelToolCalls } = ctx.agentLoop.config
@@ -153,7 +161,7 @@ async function runGroup(
         ? await ctx.tools[TOOL_RUNTIME_SCHEDULER].finalize(slot.exec, slot.result)
         : ctx.tools[TOOL_RUNTIME_SCHEDULER].finish(slot.exec, slot.result)
       // oxlint-disable-next-line typescript/no-non-null-assertion -- bounded index
-      appendToolResult(session, turn, step, call!.block, result, callSeqs[committed]!)
+      await appendToolResult(ctx, session, turn, step, call!.block, result, callSeqs[committed]!, inputModalities, signal)
       for (const context of result.additionalContexts ?? []) acceptContext(context)
       concluded ||= result.concludesTurn === true
       committed++
@@ -238,7 +246,9 @@ async function runGroup(
   if (aborted) {
     // Started calls and accepted context settle first; every remaining model
     // call then receives an ordered synthetic result before the turn aborts.
-    for (const call of group.slice(started)) appendSkippedToolCall(session, turn, step, call.block)
+    for (const call of group.slice(started)) {
+      await appendSkippedToolCall(ctx, session, turn, step, call.block, inputModalities, signal)
+    }
     return { consumed: group.length, aborted: true, concluded }
   }
   /* v8 ignore next -- unreachable: a non-aborted group commits every started call */
@@ -247,16 +257,24 @@ async function runGroup(
 }
 
 /** Append the durable call/result pair for a model call skipped after cancellation. */
-function appendSkippedToolCall(session: Session, turn: number, step: number, block: ToolCallBlock): void {
+async function appendSkippedToolCall(
+  ctx: Context,
+  session: Session,
+  turn: number,
+  step: number,
+  block: ToolCallBlock,
+  inputModalities: readonly ModelModality[] | undefined,
+  signal: AbortSignal,
+): Promise<void> {
   const callSeq = appendToolCall(session, turn, step, block)
-  appendToolResult(session, turn, step, block, {
+  await appendToolResult(ctx, session, turn, step, block, {
     content: [{ type: 'text', text: 'Error: tool call aborted before dispatch' }],
     isError: true,
     error: {
       message: 'tool call aborted before dispatch',
       info: { name: 'AbortError', code: TOOL_ABORTED_BEFORE_DISPATCH },
     },
-  }, callSeq)
+  }, callSeq, inputModalities, signal)
 }
 
 /** Append a started call and return the event seq that its result must cite. */
@@ -265,18 +283,30 @@ function appendToolCall(session: Session, turn: number, step: number, block: Too
   return event.seq
 }
 
-/** Append a model-ordered result linked to its call event. */
-function appendToolResult(
+/**
+ * Append a model-ordered result linked to its call event. When the target
+ * route cannot read images, describe any image blocks in the result content
+ * first so a text-only projection carries the generated text instead of the
+ * omission placeholder; a missing describer or a failed call leaves the block
+ * undescribed.
+ */
+async function appendToolResult(
+  ctx: Context,
   session: Session,
   turn: number,
   step: number,
   block: ToolCallBlock,
   result: ToolExecutionResult,
   callSeq: number,
-): void {
+  inputModalities: readonly ModelModality[] | undefined,
+  signal: AbortSignal,
+): Promise<void> {
+  const refs = collectImageRefs(result.content)
+  const descriptions = await describeForRoute(ctx, refs, inputModalities, signal, session.id)
+  const content = attachImageDescriptions(result.content, descriptions)
   const message = createToolResultMessage({
     callId: block.id,
-    content: result.content,
+    content,
     isError: result.isError,
   })
   session.append('tool/result', {

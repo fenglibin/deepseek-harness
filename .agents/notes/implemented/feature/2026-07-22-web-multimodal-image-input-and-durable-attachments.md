@@ -22,10 +22,9 @@ Version one supports PNG, JPEG, WebP, and GIF paste and drag-and-drop, image-onl
 
 ### Product behavior
 
-- Pasting or dropping one or more supported images adds ordered thumbnails above the textarea without inserting placeholder text. Dragging files over the composer highlights the drop target.
-- The same resident `InputBar` renders the rail in both blank-session Hero and active-session layouts. The rail is hidden when empty and scrolls horizontally instead of widening the composer.
-- Each 64-by-64-pixel thumbnail carries a hover-revealed remove control inside the card and opens its original draft image on a single click; overflow pages with edge arrows instead of a visible scrollbar.
-- A prompt may contain text and images or images only. Pure text paste remains native browser behavior; mixed clipboard content inserts its text normally while adding its files to the rail, and file-only paste prevents default browser handling. File drops on the composer always prevent browser navigation and report unsupported files locally.
+- Pasting or dropping one or more supported images adds ordered inline chips at the caret without inserting placeholder text. Dragging files over the composer highlights the drop target.
+- Draft images render as inline editor chips (one decorator node per image), not a separate rail. The former `InputBar` rail — thumbnails above the textarea with a hover-revealed remove control, single-click preview, and edge-arrow paging — was retired by the [inline-image composer note](2026-09-05-inline-image-composer.md); its interim visual details lived in the [attachment display alignment note](2026-08-11-web-attachment-display-alignment.md).
+- A prompt may contain text and images or images only. Pure text paste remains native browser behavior; mixed clipboard content inserts its text normally while adding its files as inline chips, and file-only paste prevents default browser handling. File drops on the composer always prevent browser navigation and report unsupported files locally.
 - A failed send restores the complete text and image draft without clobbering text or images added while the request was in flight. Removal, successful send, session-scope disposal, rendered-history disposal, and application disposal revoke the object URLs they own.
 - Historical user and assistant images use one `MessageImage` control. Inline images preserve intrinsic aspect ratio, do not upscale, and stay within a 240-by-240-pixel box.
 - Clicking a message image opens the stored original in a viewport-bounded modal. Escape, the close control, and backdrop activation close it and restore focus.
@@ -156,7 +155,7 @@ Malformed base64, unsupported or mismatched media, truncated image payloads, exc
 | `packages/compaction/compaction-basic` | Preserve images in summary input and reject non-text checkpoint output explicitly. |
 | `packages/host/apiproxy` and `packages/bundle/base` | Narrow upload wire, shared batch admission, limits and routed-model preflight, persist-before-event ordering, session-authorized reads, and default profile composition. |
 | `packages/client/connection` and `packages/client/runtime` | Bounded request buffering, wire types, fixture images, prompt uploads, attachment reads, and durable-reference folding. |
-| `packages/client/ui-conversation` | Per-session draft images, attachment rail, user and assistant image controls, and original preview. |
+| `packages/client/ui-conversation` | Per-session draft images as inline editor chips, user and assistant image controls, and original preview. |
 | `packages/acp/acp` | Conditional native image capability, atomic inline-image admission, and verified assistant-image delivery. |
 | `packages/mcp/mcp-client` | Lossless canonical MCP results plus capability-gated durable image projection and explicit diagnostics for unsupported rich blocks. |
 | `packages/core/tools` | Generic PTC mode forwarding of settled image-bearing sub-results after the outer result. |

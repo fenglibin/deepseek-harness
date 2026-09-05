@@ -12,10 +12,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { UiConversation } from './conversation/assembly.ts'
 import type { ViewTab } from './contract/views.ts'
 import type {
-  ComposerBarInjected, ConversationInjected, ConversationSessionHeaderInjected,
+  ComposerAttachment, ComposerBarInjected, ConversationInjected, ConversationSessionHeaderInjected,
   ConversationSessionInjected,
 } from './contract/slots.ts'
-import type { InputNotice } from './contract/input.ts'
+import type { DraftImageInsert, InputNotice } from './contract/input.ts'
 import { createConversationStore } from './stores.ts'
 import { ConversationController, UnsupportedImageMediaTypeError } from './service.ts'
 import type { IConversation } from './service.ts'
@@ -44,6 +44,17 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export const inject = [
   'slots', 'sessions', 'uiSession', 'uiWorkspace', 'locale', 'settingsScope',
 ]
+
+/** Map browser attachment descriptors to insert-time display caches for the composer. */
+function toDraftImageInserts(attachments: readonly ComposerAttachment[]): DraftImageInsert[] {
+  return attachments.map(attachment => ({
+    attachmentId: attachment.id,
+    previewUrl: attachment.previewUrl,
+    ...(attachment.file.name === '' ? {} : { name: attachment.file.name }),
+    ...(attachment.width === undefined ? {} : { width: attachment.width }),
+    ...(attachment.height === undefined ? {} : { height: attachment.height }),
+  }))
+}
 
 // Stable no-session sources keep the renderer's observable-hook cache and
 // hook order unchanged across current-Session transitions.
@@ -203,9 +214,14 @@ export function apply(ctx: Context): void {
         if (sessionId !== undefined && nextId !== sessionId) {
           const from = inputHub.shell(sessionId)
           const draft = from.snapshot.draft
-          const imageIds = from.snapshot.imageIds
+          const imageIds = from.snapshot.parts
+            .filter(part => part.type === 'image')
+            .map(part => part.attachmentId)
           const next = inputHub.shell(nextId)
-          if (imageIds.length === 0 || next.addImages(imageIds)) {
+          const inserts = imageIds.length === 0
+            ? []
+            : toDraftImageInserts(concreteConversation(ctx).draftImages(imageIds))
+          if (imageIds.length === 0 || next.addImages(inserts)) {
             if (draft !== '') {
               next.setDraft(draft)
               from.setDraft('')
@@ -264,8 +280,6 @@ export function apply(ctx: Context): void {
   const absentComposerFace = (): ComposerBarInjected => ({
     keyboard: undefined,
     addImages: undefined,
-    removeImage: undefined,
-    draftImages: undefined,
     resolveSubmitMode: (running, gesture, steeringAvailable) =>
       submissionPolicy.resolve(running, gesture, steeringAvailable),
     toggleCommandMenu: undefined,
@@ -282,7 +296,6 @@ export function apply(ctx: Context): void {
     name: 'conversation.composer.bar',
     locale: NS,
     children: {
-      'conversation.input.attachments': { kind: 'single', scope: 'session-maybe' },
       'conversation.input.plan': { kind: 'single', scope: 'session' },
       'conversation.input.model': { kind: 'single', scope: 'session' },
     },
@@ -300,7 +313,7 @@ export function apply(ctx: Context): void {
         addImages: (files) => {
           try {
             const images = conversation.createDraftImages(files)
-            if (!shell.addImages(images.map(image => image.id))) {
+            if (!shell.addImages(toDraftImageInserts(images))) {
               conversation.releaseDraftImages(images)
             }
             return null
@@ -309,11 +322,6 @@ export function apply(ctx: Context): void {
             return error instanceof Error ? error.message : String(error)
           }
         },
-        removeImage: (id) => {
-          conversation.releaseDraftImage(id)
-          shell.removeImage(id)
-        },
-        draftImages: ids => conversation.draftImages(ids),
         resolveSubmitMode: (running, gesture, steeringAvailable) =>
           submissionPolicy.resolve(running, gesture, steeringAvailable),
         toggleCommandMenu: inputTriggers === undefined

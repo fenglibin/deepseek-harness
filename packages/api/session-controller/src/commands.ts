@@ -9,7 +9,8 @@ import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import {
   ReasoningEffortId, createUserMessage, freezeMessage,
 } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, MessageSource, ModelModality } from '@deepseek-ai/dsh-llm'
+import { describeForRoute, routeExcludesImages } from '@deepseek-ai/dsh-image-understanding'
 import type { SessionEvent, SessionHeader, SessionId, UserMessage } from '@deepseek-ai/dsh-session'
 import { SessionPersistenceNotFoundError } from '@deepseek-ai/dsh-session-persistence'
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
@@ -399,18 +400,20 @@ export class SessionCommandController {
     const hasImage = request.content.some(part => part.type === 'image')
     const admit = async (): Promise<SessionPromptValue> => {
       try {
-        if (hasImage) {
-          const current = this.agents.selectionFor(agent).current
-          const model = await this.ctx.llm.resolveModelInfo(current.provider, current.model)
-          if (model.inputModalities !== undefined && !model.inputModalities.includes('image')) {
-            throw new RemoteError(
-              'session/attachment-invalid',
-              `Model "${current.model}" does not support image input.`,
-              { reason: 'MODEL_DOES_NOT_SUPPORT_IMAGES' },
-            )
-          }
+        const selection = hasImage ? this.agents.selectionFor(agent).current : undefined
+        const modalities = selection === undefined
+          ? undefined
+          : (await this.ctx.llm.resolveModelInfo(selection.provider, selection.model)).inputModalities
+        // A text-only route is only a dead end when nothing can describe the
+        // images for it; with a describer mounted the images ride along as text.
+        if (selection !== undefined && routeExcludesImages(modalities) && !(await this.canDescribeImages())) {
+          throw new RemoteError(
+            'session/attachment-invalid',
+            `Model "${selection.model}" does not support image input.`,
+            { reason: 'MODEL_DOES_NOT_SUPPORT_IMAGES' },
+          )
         }
-        const content = await durablePromptContent(this.ctx, request.content)
+        const content = await durablePromptContent(this.ctx, request.content, modalities, request.sessionId)
         const message: UserMessage = createUserMessage({ content, source })
         if (request.mode === 'steer') agent.steer(message)
         else agent.followup(message)
@@ -424,6 +427,16 @@ export class SessionCommandController {
       return { accepted: true }
     }
     return hasImage ? this.agents.serializeImageAdmission(agent, admit) : admit()
+  }
+
+  /**
+   * Whether a mounted describer can supply text for images this route cannot read.
+   * @returns true when a describer resolved a usable vision route.
+   * @throws when a mounted describer is misconfigured.
+   */
+  private async canDescribeImages(): Promise<boolean> {
+    const service = this.ctx.get('imageUnderstanding')
+    return service === undefined ? false : await service.resolveRoute() !== undefined
   }
 
   /**
@@ -583,19 +596,40 @@ export class SessionCommandController {
   }
 }
 
+/**
+ * Project wire prompt parts into durable content blocks, attaching a generated
+ * description to every image the target route cannot accept.
+ * @param ctx - Host context carrying attachment and optional describer services.
+ * @param content - ordered wire prompt parts.
+ * @param modalities - declared input modalities of the exact target route.
+ * @param sessionId - owning session, stamped on the understanding call.
+ * @returns content blocks in the same order as `content`.
+ */
 async function durablePromptContent(
   ctx: Context,
   content: readonly SessionPromptRequest['content'][number][],
+  modalities: readonly ModelModality[] | undefined,
+  sessionId: SessionId,
 ): Promise<ContentBlock[]> {
   if (content.every(part => part.type === 'text')) {
     return content.map(part => ({ type: 'text', text: part.text }))
   }
   const refs = await admitEncodedImages(ctx.attachments, content.filter(part => part.type === 'image'))
+  // admitEncodedImages returns one reference per image part in order, so the
+  // descriptions it yields are index-aligned with both.
+  const descriptions = await describeForRoute(ctx, refs, modalities, undefined, sessionId)
   let next = 0
-  return content.map(part => part.type === 'text'
-    ? { type: 'text', text: part.text }
-    // admitEncodedImages returns one reference per image part in order.
-    : { type: 'image', attachment: refs[next++] as ImageAttachmentRef })
+  return content.map((part) => {
+    if (part.type === 'text') return { type: 'text', text: part.text }
+    const attachment = refs[next] as ImageAttachmentRef
+    const description = descriptions[next]
+    next += 1
+    return {
+      type: 'image',
+      attachment,
+      ...(description === undefined ? {} : { description }),
+    }
+  })
 }
 
 function imageBlockIn(

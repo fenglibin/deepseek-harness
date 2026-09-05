@@ -1,6 +1,40 @@
 {
   "initial": [
     {
+      "name": "advance_delivery_task",
+      "description": "Advance the current delivery task to the next phase in its level's order (created | designed | specified | implemented | verified | accepted). The phase must be the single legal next phase; skipping a required phase is rejected.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Exact id returned by get_delivery_task."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Exact positive revision returned by get_delivery_task."
+          },
+          "phase": {
+            "type": "string",
+            "description": "The target next phase.",
+            "enum": [
+              "created",
+              "designed",
+              "specified",
+              "implemented",
+              "verified",
+              "accepted"
+            ]
+          }
+        },
+        "required": [
+          "task_id",
+          "revision",
+          "phase"
+        ]
+      }
+    },
+    {
       "name": "bash",
       "description": "Execute a bash command (`bash -c`) and return its stdout/stderr. Each call runs in a fresh shell: no state (cwd, variables, functions) persists between calls — pass `workdir` instead of using `cd`. Non-zero exits are reported as `[exit code: N]`. Current harness environment facts are exposed through managed `$DSH_*` variables; inspect them when needed. Commands may run under a file sandbox; a blocked file operation is reported as `[sandbox: file access denied under <mode> mode]` — a policy denial, not a bug in the command; do not retry another way. Long output is truncated to its tail; the full output is saved to a file whose path is reported when available. Set `run_in_background: true` for long-running commands: the call returns a job id immediately; read its output with `job_output` and stop it with `job_kill`. Attempting a command the sandbox may deny is safe and expected: run it and read the marker rather than assuming the denial. When a command is denied and a wider mode would let it succeed, escalate immediately in the same turn — the one sanctioned exception to a denial: retry the exact same command once with `sandbox_permissions` (the narrowest wider mode that suffices) plus a one-sentence `justification`. Do not detour through chat to ask permission first — the approval prompt raised by that retry is how the user consents. If the session states approval prompts are disabled, there is no exception: a denial is final — do not set `sandbox_permissions`. Never escalate speculatively: ground the request in a real denial — normally the one this command just hit; escalating up front is fine only when this session already denied the same access. A rejected escalation is final for that command — stop and explain, never work around it — but it does not forbid attempting or escalating other commands later.",
       "parameters": {
@@ -42,6 +76,43 @@
         "required": [
           "command",
           "description"
+        ]
+      }
+    },
+    {
+      "name": "create_delivery_task",
+      "description": "Create one delivery task in the created phase. Use it for a concrete piece of work that should produce a change record; level selects the discipline path (l0 small fix, l1 adds a design, l2 adds an openspec split). When level is omitted it is inferred from the objective length plus optional todo_count and touched_files estimates. An accepted task may be replaced.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "objective": {
+            "type": "string",
+            "description": "The concrete task objective."
+          },
+          "level": {
+            "type": "string",
+            "description": "Task-size class; inferred when omitted.",
+            "enum": [
+              "l0",
+              "l1",
+              "l2"
+            ]
+          },
+          "todo_count": {
+            "type": "number",
+            "description": "Estimated todo-item count used for size tiering."
+          },
+          "touched_files": {
+            "type": "number",
+            "description": "Estimated changed-file count used for size tiering."
+          },
+          "is_bug": {
+            "type": "boolean",
+            "description": "Whether this is a bug fix; may force l2 under requireOpenspecForBugs."
+          }
+        },
+        "required": [
+          "objective"
         ]
       }
     },
@@ -121,6 +192,14 @@
         "required": [
           "plan"
         ]
+      }
+    },
+    {
+      "name": "get_delivery_task",
+      "description": "Read the current delivery task, including its exact id/revision, objective, phase, level, recorded change count, and timestamps. Call this before advancing or recording a change.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
       }
     },
     {
@@ -317,6 +396,84 @@
         },
         "required": [
           "file_path"
+        ]
+      }
+    },
+    {
+      "name": "record_change",
+      "description": "Record one change against the current delivery task without changing its phase, and append it to .dsh/changes/<task-id>.md. Every task must record at least one change before it can reach implemented.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Exact id returned by get_delivery_task."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Exact positive revision returned by get_delivery_task."
+          },
+          "text": {
+            "type": "string",
+            "description": "Non-empty description of the change."
+          }
+        },
+        "required": [
+          "task_id",
+          "revision",
+          "text"
+        ]
+      }
+    },
+    {
+      "name": "record_design",
+      "description": "Record one design against the current delivery task without changing its phase, and append it to .dsh/design/<task-id>.md. A task must record at least one design before it can reach designed.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Exact id returned by get_delivery_task."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Exact positive revision returned by get_delivery_task."
+          },
+          "text": {
+            "type": "string",
+            "description": "Non-empty description of the design."
+          }
+        },
+        "required": [
+          "task_id",
+          "revision",
+          "text"
+        ]
+      }
+    },
+    {
+      "name": "record_spec",
+      "description": "Record one spec against the current delivery task without changing its phase, and append it to openspec/changes/<task-id>/spec.md. A task must record at least one spec before it can reach specified.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Exact id returned by get_delivery_task."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Exact positive revision returned by get_delivery_task."
+          },
+          "text": {
+            "type": "string",
+            "description": "Non-empty description of the spec."
+          }
+        },
+        "required": [
+          "task_id",
+          "revision",
+          "text"
         ]
       }
     },

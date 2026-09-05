@@ -212,6 +212,18 @@
         backgroundMode: one-shot
         maxDepth: provider-managed
 
+    # CodeBuddy speaks standard ACP, so it reuses `subagent-acp` on the host
+    # plane instead of a dedicated backend. Mount that provider with
+    # `command: codebuddy` and remove `disabled` to expose this tool.
+    - id: tool-subagent-codebuddy
+      name: '@deepseek-ai/dsh-tool-subagent'
+      disabled: true
+      config:
+        provider: codebuddy
+        toolName: subagent_codebuddy
+        backgroundMode: one-shot
+        maxDepth: provider-managed
+
     - id: workflow-worker-thread
       name: '@deepseek-ai/dsh-workflow-worker-thread'
       config:

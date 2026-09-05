@@ -5,7 +5,7 @@
 // user message and an assistant message, and pins the product surfaces: the
 // history ImageGallery loading real fixture bytes through the authorized
 // sessions.attachment route, the single-click ImageLightbox, and the composer
-// intake chain (paste → ordered thumbnail rail → image-only send enablement → remove).
+// intake chain (paste → ordered inline chips → image-only send enablement → remove).
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect, it } from 'vitest'
 import { installAssembledBootEnv, mountAssembledApp } from './assembled-boot.ts'
@@ -78,7 +78,7 @@ it('renders the history image pair through the authorized attachment route and o
   })
 })
 
-it('accepts pasted images into the composer rail in order and removes them', async () => {
+it('accepts pasted images into the composer as inline chips in order and removes them', async () => {
   mountAssembledApp()
 
   const tree = await screen.findByRole('tree', { name: 'Sessions' }, { timeout: 10_000 })
@@ -103,14 +103,12 @@ it('accepts pasted images into the composer rail in order and removes them', asy
     },
   })
 
-  // The rail is an accessible group holding the draft thumbnail (queried via
-  // DOM: jsdom's a11y-visibility computation hides the composer subtree).
-  const rail = await waitFor(() => {
-    const el = document.querySelector('[role="group"][aria-label="Pending images"]')
-    if (el === null) throw new Error('attachment rail missing')
-    return el
+  // The inline chip renders the draft thumbnail inside the composer (queried
+  // via DOM: jsdom's a11y-visibility computation hides the composer subtree).
+  await waitFor(() => {
+    if (textarea.querySelector('img') === null) throw new Error('inline image chip missing')
   }, { timeout: 5_000 })
-  expect([...rail.querySelectorAll('img')].map(img => ({
+  expect([...textarea.querySelectorAll('img')].map(img => ({
     alt: img.getAttribute('alt'), scheme: img.getAttribute('src')?.split(':')[0],
   }))).toMatchInlineSnapshot(`
     [
@@ -129,15 +127,15 @@ it('accepts pasted images into the composer rail in order and removes them', asy
     },
   })
   await waitFor(() => {
-    expect([...rail.querySelectorAll('img')].map(img => img.getAttribute('alt')))
+    expect([...textarea.querySelectorAll('img')].map(img => img.getAttribute('alt')))
       .toEqual(['pasted.png', 'second.png'])
   })
 
-  const remove = [...rail.querySelectorAll('button[aria-label^="Remove image"]')]
+  const remove = [...textarea.querySelectorAll('button[aria-label^="Remove image"]')]
   if (remove.length !== 2) throw new Error('remove buttons missing')
   for (const button of remove) fireEvent.click(button)
   await waitFor(() => {
-    expect(document.querySelector('[role="group"][aria-label="Pending images"]')).toBeNull()
+    expect(textarea.querySelector('img')).toBeNull()
   })
 
   // An unsupported file announces a transient toast (the inline strip is
@@ -183,18 +181,17 @@ it('accepts a whole-page drop under the limits-labeled overlay and refuses an ov
     expect(overlay.textContent).toContain('Up to 20 images, 5MB each')
   })
 
-  // Dropping on the transcript area (not the composer card) lands in the rail.
+  // Dropping on the transcript area (not the composer card) lands in the
+  // composer as an inline chip.
   fireEvent.drop(document.body, { dataTransfer })
   await waitFor(() => {
-    const rail = document.querySelector('[role="group"][aria-label="Pending images"]')
-    if (rail === null) throw new Error('attachment rail missing after page drop')
-    expect([...rail.querySelectorAll('img')].map(img => img.getAttribute('alt'))).toEqual(['dropped.png'])
+    expect([...textarea.querySelectorAll('img')].map(img => img.getAttribute('alt'))).toEqual(['dropped.png'])
   }, { timeout: 5_000 })
   expect(screen.queryByRole('status')).toBeNull()
 
   // An intake that would exceed the projected per-message count is refused as
-  // a whole batch at add time: the banner names the limit and the rail keeps
-  // only the previously accepted thumbnail — no submit-time rollback.
+  // a whole batch at add time: the banner names the limit and the composer
+  // keeps only the previously accepted thumbnail — no submit-time rollback.
   const batch = Array.from({ length: 20 }, (_, i) =>
     new File([new Uint8Array([137, 80, 78, 71])], `bulk-${String(i)}.png`, { type: 'image/png' }))
   fireEvent.paste(textarea, {
@@ -206,8 +203,7 @@ it('accepts a whole-page drop under the limits-labeled overlay and refuses an ov
   const limitMessage = 'A message can include up to 20 images'
   const banner = await screen.findByText(limitMessage)
   expect(banner.closest('[role="alert"]')).not.toBeNull()
-  const rail = document.querySelector('[role="group"][aria-label="Pending images"]')
-  expect([...(rail?.querySelectorAll('img') ?? [])]).toHaveLength(1)
+  expect([...textarea.querySelectorAll('img')]).toHaveLength(1)
 })
 
 it('renders a host dimension rejection with the projected 2000px limit', async () => {
@@ -233,7 +229,7 @@ it('renders a host dimension rejection with the projected 2000px limit', async (
     },
   })
   await waitFor(() => {
-    expect(document.querySelector('[role="group"][aria-label="Pending images"]')).not.toBeNull()
+    expect(textarea.querySelector('img')).not.toBeNull()
   })
   fireEvent.keyDown(textarea, { key: 'Enter' })
 
@@ -245,5 +241,5 @@ it('renders a host dimension rejection with the projected 2000px limit', async (
       "text": "Image sides must be at most 2000px; downscale it and try again",
     }
   `)
-  expect(document.querySelector('[role="group"][aria-label="Pending images"]')).not.toBeNull()
+  expect(textarea.querySelector('img')).not.toBeNull()
 })

@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/design/codebuddy-acp-provider.md
+codebuddy-acp-provider.md: fc2403d47ca9d25d6e8e05aaa854457f2b13e31e
+codebuddy-acp-provider.zh.md: 5759d8343884657ecf40f0354f473bd50cc03863

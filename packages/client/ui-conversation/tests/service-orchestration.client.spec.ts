@@ -91,7 +91,9 @@ describe('ConversationController', () => {
         new File([new Uint8Array(4)], 'a.png', { type: 'image/png' }),
       ])
       if (attachment === undefined) throw new Error('draft attachment missing')
-      b.root.input.for(b.runtime.sessions.scope('s1')!).addImages([attachment.id])
+      b.root.input.for(b.runtime.sessions.scope('s1')!).addImages([
+        { attachmentId: attachment.id, previewUrl: attachment.previewUrl },
+      ])
       await b.runtime.sessions.remove('s1')
       expect(b.root.draftImages([attachment.id])).toEqual([])
       expect(revoked).toHaveBeenCalledWith('blob:draft-1')
@@ -111,9 +113,9 @@ describe('ConversationController', () => {
         new File([Uint8Array.of(1)], 'detached.png', { type: 'image/png' }),
       ])
       if (attachment === undefined) throw new Error('draft attachment missing')
-      b.shell.addImages([attachment.id])
+      b.shell.addImages([{ attachmentId: attachment.id, previewUrl: attachment.previewUrl }])
       b.shell.submit()
-      expect(b.shell.snapshot.imageIds).toEqual([])
+      expect(b.shell.snapshot.parts).toEqual([])
       await b.runtime.sessions.remove('s1')
       expect(b.root.draftImages([attachment.id])).toEqual([])
       expect(revoked).toHaveBeenCalledWith('blob:detached')
@@ -182,7 +184,10 @@ describe('sendSession submission echo', () => {
         new File([Uint8Array.of(1, 2, 3)], 'a.png', { type: 'image/png' }),
       ])
       const session = b.runtime.sessions.binding('s1')!.session
-      const sending = b.root.sendSession(session, '带图', [attachment!.id], 'queue')
+      const sending = b.root.sendSession(session, [
+        { type: 'image', attachmentId: attachment!.id },
+        { type: 'text', text: '带图' },
+      ], 'queue')
       // Synchronous: the echo is registered before any encoding starts.
       expect(b.beginSubmission).toHaveBeenCalledWith(expect.objectContaining({
         text: '带图',
@@ -221,7 +226,7 @@ describe('sendSession submission echo', () => {
         new File([Uint8Array.of(9)], 'seeded.png', { type: 'image/png' }),
       ])
       const session = b.runtime.sessions.binding('s1')!.session
-      const sending = b.root.sendSession(session, '', [attachment!.id], 'queue')
+      const sending = b.root.sendSession(session, [{ type: 'image', attachmentId: attachment!.id }], 'queue')
       await vi.waitFor(() => { expect(b.prompt).toHaveBeenCalledOnce() })
       const ref = { attachmentId: 'att-1' }
       b.retire.onRetire?.({ reason: 'observed', attachments: [ref] })
@@ -247,7 +252,10 @@ describe('sendSession submission echo', () => {
         new File([Uint8Array.of(7)], 'kept.png', { type: 'image/png' }),
       ])
       const session = b.runtime.sessions.binding('s1')!.session
-      await expect(b.root.sendSession(session, '失败', [attachment!.id], 'queue'))
+      await expect(b.root.sendSession(session, [
+        { type: 'image', attachmentId: attachment!.id },
+        { type: 'text', text: '失败' },
+      ], 'queue'))
         .resolves.toEqual({ kind: 'error' })
       b.retire.onRetire?.({ reason: 'failed' })
       expect(b.root.draftImages([attachment!.id])).toHaveLength(1)
@@ -274,7 +282,10 @@ describe('sendSession submission echo', () => {
         new File([Uint8Array.of(1)], 'broken.png', { type: 'image/png' }),
       ])
       const session = b.runtime.sessions.binding('s1')!.session
-      await expect(b.root.sendSession(session, 'x', [attachment!.id], 'queue'))
+      await expect(b.root.sendSession(session, [
+        { type: 'image', attachmentId: attachment!.id },
+        { type: 'text', text: 'x' },
+      ], 'queue'))
         .rejects.toThrow('read failed')
       expect(b.abandon).toHaveBeenCalledOnce()
       expect(b.prompt).not.toHaveBeenCalled()
@@ -290,7 +301,7 @@ describe('sendSession submission echo', () => {
     vi.stubGlobal('requestAnimationFrame', undefined)
     try {
       const session = b.runtime.sessions.binding('s1')!.session
-      await expect(b.root.sendSession(session, '纯文本', [], 'queue')).resolves.toEqual({ kind: 'success' })
+      await expect(b.root.sendSession(session, [{ type: 'text', text: '纯文本' }], 'queue')).resolves.toEqual({ kind: 'success' })
       expect(b.prompt).toHaveBeenCalledWith([{ type: 'text', text: '纯文本' }], 'queue', undefined, 'req-echo')
     } finally {
       vi.unstubAllGlobals()
@@ -304,7 +315,7 @@ describe('sendSession submission echo', () => {
     vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1))
     try {
       const session = b.runtime.sessions.binding('s1')!.session
-      const sending = b.root.sendSession(session, '后台标签', [], 'queue')
+      const sending = b.root.sendSession(session, [{ type: 'text', text: '后台标签' }], 'queue')
       expect(b.prompt).not.toHaveBeenCalled()
       await expect(sending).resolves.toEqual({ kind: 'success' })
       expect(b.prompt).toHaveBeenCalledWith([{ type: 'text', text: '后台标签' }], 'queue', undefined, 'req-echo')
@@ -327,7 +338,7 @@ describe('sendSession submission echo', () => {
       },
     })
     const prompt = vi.spyOn(session, 'prompt').mockResolvedValue({ ok: true, value: { accepted: true } })
-    await expect(b.root.sendSession(session, '继续', [], 'queue')).resolves.toEqual({ kind: 'success' })
+    await expect(b.root.sendSession(session, [{ type: 'text', text: '继续' }], 'queue')).resolves.toEqual({ kind: 'success' })
     expect(beginSubmission).not.toHaveBeenCalled()
     expect(prompt).toHaveBeenCalledWith([{ type: 'text', text: '继续' }], 'queue', undefined)
     await b.runtime.dispose()

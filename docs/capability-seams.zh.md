@@ -216,6 +216,14 @@ flowchart LR
   pkg_lsp["lsp"]
   svc_lsp["ctx.lsp<br/>Language-server navigation seam"]
   pkg_tool_lsp["tool-lsp"]
+  pkg_image_understanding["image-understanding"]
+  svc_imageUnderstanding["ctx.imageUnderstanding<br/>Generated text for images a route cannot read"]
+  pkg_lightweight_model["lightweight-model"]
+  svc_lightweightModel["ctx.lightweightModel<br/>Auxiliary route for session titles and compaction"]
+  pkg_session_title_llm["session-title-llm"]
+  pkg_delivery["delivery"]
+  svc_delivery["ctx.delivery<br/>Delivery task state and change log"]
+  pkg_tool_delivery["tool-delivery"]
   pkg_cordis_host_runner["cordis-host-runner"]
   svc_dynamicCordisRunner["ctx.dynamicCordisRunner<br/>Dynamic Cordis package host runner"]
   svc_cordisInspect["ctx.cordisInspect<br/>Dynamic Cordis inspect registry"]
@@ -248,6 +256,7 @@ flowchart LR
   pkg_credentials --> svc_credentials
   pkg_credentials_local --> svc_credentials
   pkg_deepseek_llm_api_extensions --> svc_deepseekLlmApiExtensions
+  pkg_delivery --> svc_delivery
   pkg_e2b --> svc_e2b
   pkg_experimental_agent_team --> svc_agentTeams
   pkg_file_reference --> svc_fileReferences
@@ -261,10 +270,12 @@ flowchart LR
   pkg_host_directory_picker_browse --> svc_directoryPicker
   pkg_host_directory_picker_native --> svc_directoryPicker
   pkg_host_webserver --> svc_webServer
+  pkg_image_understanding --> svc_imageUnderstanding
   pkg_inspector --> svc_inspector
   pkg_invariants --> svc_invariants
   pkg_jobs --> svc_jobs
   pkg_jobs_local --> svc_jobs
+  pkg_lightweight_model --> svc_lightweightModel
   pkg_llm --> svc_llm
   pkg_llm_deepseek --> svc_llm
   pkg_llm_pi_ai --> svc_llm
@@ -359,12 +370,15 @@ flowchart LR
   svc_credentials --> pkg_llm_deepseek
   svc_credentials --> pkg_llm_pi_ai
   svc_deepseekLlmApiExtensions --> pkg_llm_deepseek
+  svc_delivery --> pkg_tool_cordis
+  svc_delivery --> pkg_tool_delivery
   svc_directoryPicker --> pkg_api_workspace_controller
   svc_dynamicCordisRunner --> pkg_tool_cordis
   svc_e2b --> pkg_fs_e2b
   svc_e2b --> pkg_subprocess_e2b
   svc_fileReferences --> pkg_api_session_controller
   svc_fs --> pkg_tool_fs
+  svc_imageUnderstanding --> pkg_api_session_controller
   svc_invariants --> pkg_agent
   svc_invariants --> pkg_agent_loop
   svc_invariants --> pkg_scope
@@ -373,6 +387,9 @@ flowchart LR
   svc_jobs --> pkg_tool_jobs
   svc_jobs --> pkg_tool_subagent
   svc_jobs --> pkg_tool_terminal
+  svc_lightweightModel --> pkg_compaction_basic
+  svc_lightweightModel --> pkg_session_title_llm
+  svc_lightweightModel --> pkg_tool_cordis
   svc_llm --> pkg_agent_loop
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
@@ -532,6 +549,9 @@ flowchart LR
 | `ctx.workflowEngine` | `seam` | [`workflow`](../packages/workflow/workflow) | [`workflow-worker-thread`](../packages/workflow/workflow-worker-thread) | [`tool-workflow`](../packages/workflow/tool-workflow), [`tool-ralph`](../packages/workflow/tool-ralph) | - | 每个上下文使用一个引擎，与 bash 相同，且没有具名提供方注册表；通用工作流与固定 Ralph 消费方启动运行，其中的 agent() 调用通过 ctx.subagents 扇出。 |
 | `ctx.webhookRuntime` | `core` | [`webhook`](../packages/webhook/webhook) | - | [`webhook-github`](../packages/webhook/webhook-github) | - | 提供方适配器分派已认证交付；可信插件注册独立的进程本地规则，runtime 把非 null 结果转换为普通的 Workspace-backed Session，不保留交付或完成状态。 |
 | `ctx.lsp` | `seam` | [`lsp`](../packages/lsp/lsp) | [`lsp-stdio`](../packages/lsp/lsp-stdio) | [`tool-lsp`](../packages/lsp/tool-lsp) | - | 提供方注册与选择，加上恰好四种操作的标准化查询执行；该 seam 不提供协议逃生口，后端必须转换为标准化请求和结果。 |
+| `ctx.imageUnderstanding` | `seam` | [`image-understanding`](../packages/llm/image-understanding) | - | [`api-session-controller`](../packages/api/session-controller) | - | 一条视觉路由为声明纯文本输入的目标路由描述一张持久化图片；准入路径把结果挂到图片块上，使目标模型读到有边界的文字而非省略提示。 |
+| `ctx.lightweightModel` | `core` | [`lightweight-model`](../packages/core/lightweight-model) | - | [`compaction-basic`](../packages/compaction/compaction-basic), [`session-title-llm`](../packages/session/session-title-llm), [`tool-cordis`](../packages/extensions/tool-cordis) | - | 持有一对可选的 provider/model，供辅助模型调用共享，使部署能把每一次辅助调用都指向一条路由而无需逐个调用方配置。 |
+| `ctx.delivery` | `core` | [`delivery`](../packages/delivery/delivery) | - | [`tool-delivery`](../packages/delivery/tool-delivery), [`tool-cordis`](../packages/extensions/tool-cordis) | - | 拥有当前交付任务、其阶段顺序，以及交付界面重放的持久变更流；调用方读取状态并记录变更，绝不改写它们。 | 提供方注册与选择，加上恰好四种操作的标准化查询执行；该 seam 不提供协议逃生口，后端必须转换为标准化请求和结果。 |
 | `ctx.dynamicCordisRunner` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | 拥有内存定义注册表、Host 半的 vm 沙箱和 request-run 往返流程；浏览器页面通过其 Remote 命名空间在线访问同一服务。 |
 | `ctx.cordisInspect` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | 注册 Host inspect 提供方、镜像 Client 提供方 manifest，并通过动态 Cordis 传输路由 Client 查询。 |
 

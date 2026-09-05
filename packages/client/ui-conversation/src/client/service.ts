@@ -14,7 +14,7 @@ import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 // error, so scope resolution goes through the sessions service (scopeOf
 // method) instead of the standalone helper.
 import type {
-  ISessions, PendingSubmissionRetirement, SessionFace,
+  ISessions, PendingSubmissionPart, PendingSubmissionRetirement, SessionFace,
 } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
@@ -22,7 +22,7 @@ import type { ComposerAttachment } from './contract/slots.ts'
 import type { QueueAction, QueueItemId } from './contract/queue.ts'
 import type { ComposerBlocks } from './contract/composer-blocks.ts'
 import type {
-  DraftAttachmentId, SessionInputResolver, SubmitImageAttachment, SubmitOutcome,
+  DraftAttachmentId, DraftPart, SessionInputResolver, SubmitImageAttachment, SubmitOutcome,
 } from './contract/input.ts'
 import type { InputSubmitMode } from './contract/composer-submission.ts'
 
@@ -183,33 +183,32 @@ export class ConversationController extends Service implements IConversation {
   }
 
   /**
-   * Submit ordered draft images with text through one host admission. A local
+   * Submit ordered text/image parts through one host admission. A local
    * submission echo enters the session snapshot synchronously; serialization
    * and the prompt round-trip start after the browser can paint it. On the
    * echo's observed retirement the draft images hand their preview URLs to
    * the durable image cache and leave the registry; on failure they stay
    * registered so the composer can restore them.
    * @param session - target session.
-   * @param text - serialized prompt text.
-   * @param imageIds - ordered draft-local attachment ids.
+   * @param parts - ordered text/image parts (images already trimmed to edges).
    * @param mode - queue or steer delivery selected by composer policy.
    * @param signal - optional cancellation for the complete Host admission.
    * @returns the Host admission outcome; local attachment preparation failures reject.
    */
   async sendSession(
     session: SessionFace,
-    text: string,
-    imageIds: readonly DraftAttachmentId[],
+    parts: readonly DraftPart[],
     mode: InputSubmitMode,
     signal?: AbortSignal,
   ): Promise<SubmitOutcome> {
+    const imageIds = this.imageIdsOf(parts)
     const attachments = this.draftImages(imageIds)
     if (attachments.length !== imageIds.length) {
       throw new Error('conversation.sendSession: one or more draft images are no longer available')
     }
+    const text = parts.filter(part => part.type === 'text').map(part => part.text).join('')
     if (session.getSnapshot().subagent !== null) {
-      const uploaded = await this.serializeImages(attachments.map(attachment => attachment.file))
-      const content = [...uploaded, ...(text === '' ? [] : [{ type: 'text' as const, text }])]
+      const content = await this.contentFor(parts, imageIds, attachments)
       const result = await session.prompt(content, mode, signal)
       return result.ok ? { kind: 'success' } : { kind: 'error' }
     }
@@ -225,6 +224,7 @@ export class ConversationController extends Service implements IConversation {
         ...(attachment.width === undefined ? {} : { width: attachment.width }),
         ...(attachment.height === undefined ? {} : { height: attachment.height }),
       })),
+      parts: this.submissionPartsOf(parts, attachments),
       onRetire: (settlement) => {
         this.settleSubmittedImages(session.sessionId, attachments, settlement)
         finishRetirement?.(settlement)
@@ -233,8 +233,7 @@ export class ConversationController extends Service implements IConversation {
     let content: Parameters<SessionFace['prompt']>[0]
     try {
       await nextPaint()
-      const uploaded = await this.serializeImages(attachments.map(attachment => attachment.file))
-      content = [...uploaded, ...(text === '' ? [] : [{ type: 'text' as const, text }])]
+      content = await this.contentFor(parts, imageIds, attachments)
     } catch (error) {
       submission.abandon()
       throw error
@@ -243,6 +242,54 @@ export class ConversationController extends Service implements IConversation {
     if (!result.ok) return { kind: 'error' }
     if (retirement !== undefined && (await retirement).reason !== 'observed') return { kind: 'error' }
     return { kind: 'success' }
+  }
+
+  /**
+   * Serialize each image once, then map parts to wire content in document
+   * order — text parts to text blocks, image parts to their serialized blocks.
+   */
+  private async contentFor(
+    parts: readonly DraftPart[],
+    imageIds: readonly DraftAttachmentId[],
+    attachments: readonly ComposerAttachment[],
+  ): Promise<Parameters<SessionFace['prompt']>[0]> {
+    const uploaded = await this.serializeImages(attachments.map(attachment => attachment.file))
+    const uploadedById = new Map(imageIds.map((id, index) => [id, uploaded[index]]))
+    return parts.flatMap((part) => {
+      if (part.type === 'text') {
+        return part.text === '' ? [] : [{ type: 'text' as const, text: part.text }]
+      }
+      const image = uploadedById.get(part.attachmentId)
+      return image === undefined ? [] : [image]
+    })
+  }
+
+  /**
+   * Map the composer's ordered parts to the echo parts the submission bubble
+   * renders: text runs verbatim, image parts to their object-URL previews.
+   * @param parts - ordered text/image parts already trimmed to edges.
+   * @param attachments - draft images resolved for `parts`, in image order.
+   * @returns echo parts in the composer's document order.
+   */
+  private submissionPartsOf(
+    parts: readonly DraftPart[],
+    attachments: readonly ComposerAttachment[],
+  ): readonly PendingSubmissionPart[] {
+    const byId = new Map(attachments.map(attachment => [attachment.id, attachment]))
+    return parts.flatMap((part): PendingSubmissionPart[] => {
+      if (part.type === 'text') return [{ type: 'text', text: part.text }]
+      const attachment = byId.get(part.attachmentId)
+      if (attachment === undefined) return []
+      return [{
+        type: 'image',
+        preview: {
+          previewUrl: attachment.previewUrl,
+          ...(attachment.file.name === '' ? {} : { name: attachment.file.name }),
+          ...(attachment.width === undefined ? {} : { width: attachment.width }),
+          ...(attachment.height === undefined ? {} : { height: attachment.height }),
+        },
+      }]
+    })
   }
 
   /**
@@ -386,6 +433,11 @@ export class ConversationController extends Service implements IConversation {
   /** Convert browser files to canonical base64 prompt parts. */
   private serializeImages(images: readonly File[]): Promise<Parameters<SessionFace['prompt']>[0]> {
     return Promise.all(images.map(async file => ({ type: 'image' as const, ...await this.encodeImage(file) })))
+  }
+
+  /** Ordered draft attachment ids of one part list's image segments. */
+  private imageIdsOf(parts: readonly DraftPart[]): readonly DraftAttachmentId[] {
+    return parts.filter(part => part.type === 'image').map(part => part.attachmentId)
   }
 
   /** Canonical base64 wire form of one browser image file. */

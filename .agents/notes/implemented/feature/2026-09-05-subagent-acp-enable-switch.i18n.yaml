@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-05-subagent-acp-enable-switch.md
+2026-09-05-subagent-acp-enable-switch.md: 508be63b100a7b12455e8ca393dc00909de65ff4
+2026-09-05-subagent-acp-enable-switch.zh.md: 5ceef3e3b7a88ec7f9f3ec96c40279d765d4ac88

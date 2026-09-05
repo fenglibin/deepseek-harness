@@ -204,13 +204,12 @@ function standaloneProps(
 ): StandaloneBaseProps {
   const trajectory = historySnapshot(nodes)
   const input = createSnapshotStore<InputState>({
-    draft: '', imageIds: [], draftRev: 0, phase: 'plain', occurrences: [], queue: [],
+    draft: '', parts: [], draftRev: 0, phase: 'plain', occurrences: [], queue: [],
   })
   const inputActions: InputActions = {
     setDraft: () => {},
-    addImages: () => false,
+    addImages: _inserts => false,
     removeImage: () => {},
-    pruneImages: () => {},
     submit: () => {},
   }
   return {
@@ -325,13 +324,12 @@ function mount(fixture: Awaited<ReturnType<typeof bench>>) {
     createSnapshotStore<readonly ViewTab[]>(tabsOf(slots)),
   )
   const useInput = bindSnapshotSelector(createSnapshotStore<InputState>({
-    draft: '', imageIds: [], draftRev: 0, phase: 'plain', occurrences: [], queue: [],
+    draft: '', parts: [], draftRev: 0, phase: 'plain', occurrences: [], queue: [],
   }))
   const inputActions: InputActions = {
     setDraft: vi.fn(),
     addImages: vi.fn(() => false),
     removeImage: vi.fn(),
-    pruneImages: vi.fn(),
     submit: vi.fn(),
   }
   const standardProps = {

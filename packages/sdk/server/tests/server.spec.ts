@@ -12,6 +12,7 @@ import AgentRegistry, { type Agent, type AgentHandle } from '@deepseek-ai/dsh-ag
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import * as agentCore from '@deepseek-ai/dsh-agent-spine-demo'
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import JsonlSessionPersistence from '@deepseek-ai/dsh-session-persistence-jsonl'
 import * as LlmDeepSeek from '@deepseek-ai/dsh-llm-deepseek'
 import SubagentRuntime, { type SubagentResult, type SubagentRunEndInfo } from '@deepseek-ai/dsh-subagent'
@@ -28,6 +29,11 @@ class FakeTransport implements JsonRpcTransportPeer {
   notify(method: string, params?: object): void {
     this.notifications.push(params === undefined ? { method } : { method, params: params as Record<string, unknown> })
   }
+}
+
+/** Minimal session view: the server only reads the owning session id. */
+function mockSession(id: string): Agent['session'] {
+  return { id: SessionId(id) } as Agent['session']
 }
 
 const servers: Server[] = []
@@ -185,13 +191,15 @@ describe('HarnessSdkJsonRpcServer', () => {
     const mainFollowup = vi.fn<Agent['followup']>()
     const mainAgent = ({
       id: SessionId('main'),
+      session: mockSession('main'),
       followup: mainFollowup,
-    } satisfies Pick<Agent, 'id' | 'followup'>) as unknown as Agent
+    } satisfies Pick<Agent, 'id' | 'session' | 'followup'>) as unknown as Agent
     const otherFollowup = vi.fn<Agent['followup']>()
     const otherAgent = ({
       id: SessionId('other'),
+      session: mockSession('other'),
       followup: otherFollowup,
-    } satisfies Pick<Agent, 'id' | 'followup'>) as unknown as Agent
+    } satisfies Pick<Agent, 'id' | 'session' | 'followup'>) as unknown as Agent
     const mainHandle = { agent: mainAgent, dispose: vi.fn(() => Promise.resolve()) }
     const otherHandle = { agent: otherAgent, dispose: vi.fn(() => Promise.resolve()) }
     const create = vi.fn(async (options: { sessionId: SessionId }) =>
@@ -223,7 +231,7 @@ describe('HarnessSdkJsonRpcServer', () => {
 
   it('admits inline SDK images before the user message enters the session', async () => {
     const followup = vi.fn<Agent['followup']>()
-    const agent = ({ id: SessionId('image'), followup } satisfies Pick<Agent, 'id' | 'followup'>) as unknown as Agent
+    const agent = ({ id: SessionId('image'), session: mockSession('image'), followup } satisfies Pick<Agent, 'id' | 'session' | 'followup'>) as unknown as Agent
     const handle = { agent, dispose: vi.fn(() => Promise.resolve()) }
     const ref = {
       attachmentId: 'sha256:image',
@@ -236,7 +244,9 @@ describe('HarnessSdkJsonRpcServer', () => {
     const ctx = {
       on: vi.fn(() => () => undefined),
       agents: { create: vi.fn(async () => handle), get: () => agent },
-      get: (name: string) => name === 'attachments' ? { saveImages } : undefined,
+      get: (name: string) => name === 'attachments' ? { saveImages }
+        : name === 'llm' ? { resolveModelInfo: vi.fn(async () => ({ inputModalities: ['text', 'image'] })) }
+          : undefined,
     } as unknown as Context
     const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport())
     // This isolated prompt test begins after the handshake boundary.
@@ -258,14 +268,114 @@ describe('HarnessSdkJsonRpcServer', () => {
     await server.shutdown()
   })
 
-  it('rejects inline SDK images when the composition has no attachment store', async () => {
+  it('attaches a generated description to images for a text-only route', async () => {
     const followup = vi.fn<Agent['followup']>()
-    const agent = ({ id: SessionId('image'), followup } satisfies Pick<Agent, 'id' | 'followup'>) as unknown as Agent
+    const agent = ({ id: SessionId('image'), session: mockSession('image'), followup } satisfies Pick<Agent, 'id' | 'session' | 'followup'>) as unknown as Agent
+    const handle = { agent, dispose: vi.fn(() => Promise.resolve()) }
+    const ref = {
+      attachmentId: 'sha256:image',
+      mediaType: 'image/png',
+      bytes: 1,
+      width: 1,
+      height: 1,
+    }
+    const description = {
+      text: 'A single red pixel.',
+      source: { provider: 'deepseek-official', model: 'vision-model', instruction: 'describe' },
+    }
+    const describe = vi.fn(async () => [description])
+    const ctx = {
+      on: vi.fn(() => () => undefined),
+      agents: { create: vi.fn(async () => handle), get: () => agent },
+      get: (name: string) => name === 'attachments' ? { saveImages: vi.fn(async () => [ref]) }
+        : name === 'llm' ? { resolveModelInfo: vi.fn(async () => ({ inputModalities: ['text'] })) }
+          : name === 'imageUnderstanding' ? { resolveRoute: vi.fn(async () => ({ provider: 'deepseek-official', model: 'vision-model', instruction: 'describe' })), describe }
+            : undefined,
+    } as unknown as Context
+    const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport())
+    // This isolated prompt test begins after the handshake boundary.
+    ;(server as unknown as { initialized: boolean }).initialized = true
+
+    await server.prompt({
+      sessionId: 'image',
+      contentBlocks: [{ type: 'image', data: 'AQ==', mimeType: 'image/png' }],
+    })
+
+    expect(describe).toHaveBeenCalledWith([ref], undefined, SessionId('image'))
+    expect(followup.mock.calls[0]?.[0].content).toEqual([
+      { type: 'image', attachment: ref, description },
+    ])
+    await server.shutdown()
+  })
+
+  it('describes an already-durable attachment ref for a text-only route', async () => {
+    const followup = vi.fn<Agent['followup']>()
+    const agent = ({ id: SessionId('image'), session: mockSession('image'), followup } satisfies Pick<Agent, 'id' | 'session' | 'followup'>) as unknown as Agent
+    const handle = { agent, dispose: vi.fn(() => Promise.resolve()) }
+    const ref: ImageAttachmentRef = {
+      attachmentId: 'sha256:image' as ImageAttachmentRef['attachmentId'],
+      mediaType: 'image/png',
+      bytes: 1,
+      width: 1,
+      height: 1,
+    }
+    const description = {
+      text: 'A single red pixel.',
+      source: { provider: 'deepseek-official', model: 'vision-model', instruction: 'describe' },
+    }
+    const describe = vi.fn(async () => [description])
+    const ctx = {
+      on: vi.fn(() => () => undefined),
+      agents: { create: vi.fn(async () => handle), get: () => agent },
+      get: (name: string) => name === 'llm' ? { resolveModelInfo: vi.fn(async () => ({ inputModalities: ['text'] })) }
+        : name === 'imageUnderstanding' ? { resolveRoute: vi.fn(async () => ({ provider: 'deepseek-official', model: 'vision-model', instruction: 'describe' })), describe }
+          : undefined,
+    } as unknown as Context
+    const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport())
+    // This isolated prompt test begins after the handshake boundary.
+    ;(server as unknown as { initialized: boolean }).initialized = true
+
+    await server.prompt({
+      sessionId: 'image',
+      contentBlocks: [{ type: 'image', attachment: ref }],
+    })
+
+    expect(describe).toHaveBeenCalledWith([ref], undefined, SessionId('image'))
+    expect(followup.mock.calls[0]?.[0].content).toEqual([
+      { type: 'image', attachment: ref, description },
+    ])
+    await server.shutdown()
+  })
+
+  it('rejects inline SDK images for a text-only route with no describer', async () => {
+    const followup = vi.fn<Agent['followup']>()
+    const agent = ({ id: SessionId('image'), session: mockSession('image'), followup } satisfies Pick<Agent, 'id' | 'session' | 'followup'>) as unknown as Agent
     const handle = { agent, dispose: vi.fn(() => Promise.resolve()) }
     const ctx = {
       on: vi.fn(() => () => undefined),
       agents: { create: vi.fn(async () => handle), get: () => agent },
-      get: () => undefined,
+      get: (name: string) => name === 'llm' ? { resolveModelInfo: vi.fn(async () => ({ inputModalities: ['text'] })) } : undefined,
+    } as unknown as Context
+    const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport())
+    // This isolated prompt test begins after the handshake boundary.
+    ;(server as unknown as { initialized: boolean }).initialized = true
+
+    await expect(server.prompt({
+      sessionId: 'image',
+      contentBlocks: [{ type: 'image', data: 'AQ==', mimeType: 'image/png' }],
+    })).rejects.toThrow('Model "deepseek-official" does not support image input.')
+    expect(followup).not.toHaveBeenCalled()
+    await server.shutdown()
+  })
+
+  it('rejects inline SDK images when the composition has no attachment store', async () => {
+    const followup = vi.fn<Agent['followup']>()
+    const agent = ({ id: SessionId('image'), session: mockSession('image'), followup } satisfies Pick<Agent, 'id' | 'session' | 'followup'>) as unknown as Agent
+    const handle = { agent, dispose: vi.fn(() => Promise.resolve()) }
+    const ctx = {
+      on: vi.fn(() => () => undefined),
+      agents: { create: vi.fn(async () => handle), get: () => agent },
+      get: (name: string) => name === 'llm' ? { resolveModelInfo: vi.fn(async () => ({ inputModalities: ['text', 'image'] })) } : undefined,
     } as unknown as Context
     const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport())
     // This isolated prompt test begins after the handshake boundary.
@@ -281,7 +391,7 @@ describe('HarnessSdkJsonRpcServer', () => {
 
   it('rechecks agent liveness after asynchronous image admission', async () => {
     const followup = vi.fn<Agent['followup']>()
-    const agent = ({ id: SessionId('image-race'), followup } satisfies Pick<Agent, 'id' | 'followup'>) as unknown as Agent
+    const agent = ({ id: SessionId('image-race'), session: mockSession('image-race'), followup } satisfies Pick<Agent, 'id' | 'session' | 'followup'>) as unknown as Agent
     const handle = { agent, dispose: vi.fn(() => Promise.resolve()) }
     const admitted = Promise.withResolvers<Array<{
       attachmentId: string
@@ -296,7 +406,9 @@ describe('HarnessSdkJsonRpcServer', () => {
         create: vi.fn(async () => handle),
         get: () => live ? agent : undefined,
       },
-      get: (name: string) => name === 'attachments' ? { saveImages } : undefined,
+      get: (name: string) => name === 'attachments' ? { saveImages }
+        : name === 'llm' ? { resolveModelInfo: vi.fn(async () => ({ inputModalities: ['text', 'image'] })) }
+          : undefined,
     } as unknown as Context
     const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport())
     // This isolated prompt test begins after the handshake boundary.
@@ -319,9 +431,10 @@ describe('HarnessSdkJsonRpcServer', () => {
     const followup = vi.fn<Agent['followup']>()
     const agent = ({
       id: SessionId('zombie'),
+      session: mockSession('zombie'),
       followup,
       whenIdle: vi.fn(() => Promise.resolve()),
-    } satisfies Pick<Agent, 'id' | 'followup' | 'whenIdle'>) as unknown as Agent
+    } satisfies Pick<Agent, 'id' | 'session' | 'followup' | 'whenIdle'>) as unknown as Agent
     const handle = { agent, dispose: vi.fn(() => Promise.resolve()) }
     // The registry drops the agent after creation, modelling an agent-loop-only
     // reload that leaves the server's SessionRecord pointing at a detached agent.

@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { PendingSubmission, PendingSubmissionPart } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { MessageImageSource } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { JsonBlock, projectUserText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
@@ -12,23 +12,99 @@ import css from './MessageItem.module.css'
 
 type UserImage = Extract<UserMessageNode['content'][number], { type: 'image' }>
 
-function contentParts(content: readonly unknown[]): {
+/** One interleaved run of a user bubble: consecutive text or consecutive images. */
+type BubbleRun =
+  | { readonly kind: 'text'; readonly text: string }
+  | { readonly kind: 'images'; readonly images: readonly MessageImageSource[] }
+
+/**
+ * Commit a pending text run into `runs` and clear `textRun`; an empty run is
+ * dropped. Shared by both run-folders so the text-commit step stays one
+ * implementation.
+ */
+function commitTextRun(runs: BubbleRun[], textRun: string): string {
+  if (textRun === '') return textRun
+  runs.push({ kind: 'text', text: textRun })
+  return ''
+}
+
+/**
+ * Fold one ordered user-message content into interleaved text/image runs and
+ * the non-text/image tail, preserving the composer's document order so images
+ * render between their surrounding text instead of all before it.
+ */
+function contentRuns(content: readonly unknown[]): {
+  runs: readonly BubbleRun[]
   text: string
-  images: { attachment: UserImage['attachment'] }[]
   rest: unknown[]
 } {
-  const texts: string[] = []
-  const images: { attachment: UserImage['attachment'] }[] = []
+  const runs: BubbleRun[] = []
   const rest: unknown[] = []
+  const textParts: string[] = []
+  let textRun = ''
+  let imageRun: { attachment: UserImage['attachment'] }[] = []
+  const flushImages = (): void => {
+    if (imageRun.length === 0) return
+    runs.push({ kind: 'images', images: imageRun.map(({ attachment }) => ({ attachment })) })
+    imageRun = []
+  }
   for (const block of content) {
     const b = block as { type?: string; text?: string; attachment?: unknown }
-    if (b.type === 'text' && typeof b.text === 'string') texts.push(b.text)
-    else if (b.type === 'image' && b.attachment !== undefined) {
-      images.push({ attachment: (b as UserImage).attachment })
+    if (b.type === 'text' && typeof b.text === 'string') {
+      flushImages()
+      textRun += b.text
+      textParts.push(b.text)
+    } else if (b.type === 'image' && b.attachment !== undefined) {
+      textRun = commitTextRun(runs, textRun)
+      imageRun.push({ attachment: (b as UserImage).attachment })
+    } else {
+      textRun = commitTextRun(runs, textRun)
+      flushImages()
+      rest.push(block)
     }
-    else rest.push(block)
   }
-  return { text: texts.join(''), images, rest }
+  textRun = commitTextRun(runs, textRun)
+  flushImages()
+  return { runs, text: textParts.join(''), rest }
+}
+
+/**
+ * Fold a local submission echo's ordered parts into the same interleaved runs
+ * the durable user message renders, so the echo and its replacement agree.
+ */
+function partsRuns(parts: readonly PendingSubmissionPart[]): {
+  runs: readonly BubbleRun[]
+  text: string
+} {
+  const runs: BubbleRun[] = []
+  const textParts: string[] = []
+  let textRun = ''
+  let imageRun: MessageImageSource[] = []
+  const flushImages = (): void => {
+    if (imageRun.length === 0) return
+    runs.push({ kind: 'images', images: imageRun })
+    imageRun = []
+  }
+  for (const part of parts) {
+    if (part.type === 'text') {
+      flushImages()
+      textRun += part.text
+      textParts.push(part.text)
+    } else {
+      textRun = commitTextRun(runs, textRun)
+      imageRun.push({
+        preview: {
+          url: part.preview.previewUrl,
+          ...(part.preview.name === undefined ? {} : { name: part.preview.name }),
+          ...(part.preview.width === undefined ? {} : { width: part.preview.width }),
+          ...(part.preview.height === undefined ? {} : { height: part.preview.height }),
+        },
+      })
+    }
+  }
+  textRun = commitTextRun(runs, textRun)
+  flushImages()
+  return { runs, text: textParts.join('') }
 }
 
 function retrySeconds(milliseconds: number): number {
@@ -148,9 +224,13 @@ function TurnMaxTokensItem({ t }: {
 
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
-  content, renderMessageImages, actions, pending = false, echo = false, referenceLabels = [], previewImages, reveal = 'always', t,
+  runs, text, rest, renderMessageImages, actions, pending = false, echo = false, referenceLabels = [], reveal = 'always', t,
 }: {
-  content: readonly unknown[]
+  runs: readonly BubbleRun[]
+  /** Joined text across all text runs; the actions row receives it. */
+  text: string
+  /** Non-text/image blocks rendered after the interleaved runs. */
+  rest: readonly unknown[]
   renderMessageImages: ChatNodeOwnerProps['renderMessageImages']
   /** Optional IconActions (or similar) below the bubble; receives the joined text. */
   actions?: (text: string) => ReactNode
@@ -160,16 +240,12 @@ function UserStyleBubble({
   echo?: boolean
   /** Exact session mention labels associated by the adjacent recall node. */
   referenceLabels?: readonly string[]
-  /** Local submission-echo previews replacing the content-derived image group. */
-  previewImages?: readonly MessageImageSource[]
   /** Whole actions-row visibility: earlier rows reveal on hover, the latest stays shown (turn tails' gate). */
   reveal?: 'always' | 'hover'
   t: ChatViewSlotProps['t']
 }): ReactNode {
-  const { text, images: contentImages, rest } = contentParts(content)
-  const images = previewImages ?? contentImages
   const truncated = (total: number): string => t('json.truncated', { total })
-  const showBubble = text !== '' || rest.length > 0
+  const showTail = rest.length > 0
   return (
     <div
       className={css.userRow}
@@ -178,9 +254,10 @@ function UserStyleBubble({
       data-actions-reveal={reveal}
     >
       <div className={css.userStack}>
-        {renderMessageImages({ images, align: 'end' })}
-        {showBubble && <div className={css.bubble}>
-          {projectUserText(text, referenceLabels)}
+        {runs.map((run, index) => run.kind === 'text'
+          ? <div key={`text${index}`} className={css.bubble}>{projectUserText(run.text, referenceLabels)}</div>
+          : renderMessageImages({ images: run.images, align: 'end' }))}
+        {showTail && <div className={css.bubble}>
           {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
         </div>}
         {referenceLabels.length > 0 && (
@@ -205,9 +282,12 @@ export function PendingSteeringBubble({ content, renderMessageImages, t }: {
   renderMessageImages: ChatNodeOwnerProps['renderMessageImages']
   t: ChatViewSlotProps['t']
 }): ReactNode {
+  const { runs, text, rest } = contentRuns(content)
   return (
     <UserStyleBubble
-      content={content}
+      runs={runs}
+      text={text}
+      rest={rest}
       renderMessageImages={renderMessageImages}
       pending
       t={t}
@@ -236,25 +316,12 @@ export function PendingSubmissionBubble({ submission, renderMessageImages, t }: 
   renderMessageImages: ChatNodeOwnerProps['renderMessageImages']
   t: ChatViewSlotProps['t']
 }): ReactNode {
-  const content = useMemo(
-    () => (submission.text === '' ? [] : [{ type: 'text', text: submission.text }]),
-    [submission.text],
-  )
-  const previewImages = useMemo<readonly MessageImageSource[]>(
-    () => submission.images.map(image => ({
-      preview: {
-        url: image.previewUrl,
-        ...(image.name === undefined ? {} : { name: image.name }),
-        ...(image.width === undefined ? {} : { width: image.width }),
-        ...(image.height === undefined ? {} : { height: image.height }),
-      },
-    })),
-    [submission.images],
-  )
+  const { runs, text } = useMemo(() => partsRuns(submission.parts), [submission.parts])
   return (
     <UserStyleBubble
-      content={content}
-      previewImages={previewImages}
+      runs={runs}
+      text={text}
+      rest={[]}
       renderMessageImages={renderMessageImages}
       echo
       t={t}
@@ -285,9 +352,12 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
     }
     return true
   })
+  const { runs, text, rest } = contentRuns(data.content)
   return (
     <UserStyleBubble
-      content={data.content}
+      runs={runs}
+      text={text}
+      rest={rest}
       renderMessageImages={renderMessageImages}
       {...data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }}
       reveal={isLatestUserRow ? 'always' : 'hover'}

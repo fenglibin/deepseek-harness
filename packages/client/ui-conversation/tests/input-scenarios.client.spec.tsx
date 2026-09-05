@@ -125,7 +125,14 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
   const sink = vi.fn(() => Promise.resolve<SubmitOutcome>({ kind: 'success' }))
   const serialize = vi.fn((ids: readonly DraftAttachmentId[]) => Promise.resolve(ids.map(() => PNG)))
   const release = vi.fn()
-  const shell = new SessionInputShell({ actx, inputTriggers: () => controller, defaultSink: sink, commandImages: { serialize, release, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` } })
+  const shell = new SessionInputShell({
+    actx,
+    inputTriggers: () => controller,
+    defaultSink: sink,
+    commandImages: { serialize, release, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` },
+    imageLabels: { remove: () => '', pending: () => '', lightboxDialog: () => '', lightboxClose: () => '' },
+    releaseImage: () => {},
+  })
   // The hub's listener wiring, verbatim.
   actx.on('slash/input-begin-command', req => shell.beginCommand(req.claim, req.span) ? true : undefined)
   actx.on('slash/input-insert-reference', req => shell.insertReference(req.reference, req.span) ? true : undefined)
@@ -153,13 +160,6 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
     inputActions: shell.actions,
     keyboard: shell,
     addImages: () => null,
-    removeImage: () => {},
-    // Every id resolves so the bar's registry prune never drops a test image.
-    draftImages: ids => ids.map(id => ({
-      kind: 'image' as const, id,
-      file: new File([Uint8Array.of(1)], `${id}.png`, { type: 'image/png' }),
-      previewUrl: `blob:${id}`,
-    })),
     resolveSubmitMode: () => 'queue',
     toggleCommandMenu: (selection) => {
       const snapshot = shell.snapshot
@@ -264,7 +264,7 @@ describe('scenario D: execute-kind /compact', () => {
     act(() => { b2.shell.setDraft('/compact 现在') })
     fireEvent.keyDown(b2.textarea, { key: 'Enter' })
     // execute with trailing → matchEnter answers undefined → default sink.
-    await vi.waitFor(() => { expect(b2.sink).toHaveBeenCalledWith('/compact 现在', [], 'queue', expect.any(AbortSignal)) })
+    await vi.waitFor(() => { expect(b2.sink).toHaveBeenCalledWith([{ type: 'text', text: '/compact 现在' }], 'queue', expect.any(AbortSignal)) })
     expect(b2.executed).toHaveLength(0)
   })
 })
@@ -272,8 +272,8 @@ describe('scenario D: execute-kind /compact', () => {
 describe('scenario: images ride an accepting command through the real pipeline', () => {
   it('adjudication reports the image count; the claim chain serializes, submits, and consumes', async () => {
     const b = await bench()
-    act(() => { b.shell.addImages(['img-1' as DraftAttachmentId]) })
     act(() => { b.shell.setDraft('/vision 这张图是什么') })
+    act(() => { b.shell.addImages([{ attachmentId: 'img-1' as DraftAttachmentId, previewUrl: 'blob:img-1' }]) })
     fireEvent.keyDown(b.textarea, { key: 'Enter' })
     await vi.waitFor(() => { expect(b.execute).toHaveBeenCalledWith('/vision 这张图是什么', [PNG]) })
     // The envelope the controller forwarded to matchEnter carried the count.
@@ -281,7 +281,7 @@ describe('scenario: images ride an accepting command through the real pipeline',
     expect(b.serialize).toHaveBeenCalledWith(['img-1'])
     await vi.waitFor(() => { expect(b.shell.snapshot.draft).toBe('') })
     expect(b.release).toHaveBeenCalledWith(['img-1'])
-    expect(b.shell.snapshot.imageIds).toEqual([])
+    expect(b.shell.snapshot.parts).toEqual([])
     expect(b.sink).not.toHaveBeenCalled()
   })
 
@@ -346,7 +346,7 @@ describe('scenario I: unknown /xyz + enter', () => {
     const b = await bench()
     act(() => { b.shell.setDraft('/xyz 干点啥') })
     fireEvent.keyDown(b.textarea, { key: 'Enter' })
-    await vi.waitFor(() => { expect(b.sink).toHaveBeenCalledWith('/xyz 干点啥', [], 'queue', expect.any(AbortSignal)) })
+    await vi.waitFor(() => { expect(b.sink).toHaveBeenCalledWith([{ type: 'text', text: '/xyz 干点啥' }], 'queue', expect.any(AbortSignal)) })
     await vi.waitFor(() => { expect(b.shell.snapshot.phase).toBe('plain') })
     expect(b.execute).not.toHaveBeenCalled()
   })

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/design/image-understanding-and-inline-images.md
-image-understanding-and-inline-images.md: 1c4bd710196370fae3e887268bac0f71398713d9
-image-understanding-and-inline-images.zh.md: 3a23e79031f1b1d6b60de11aeec566d6481bd01e
+image-understanding-and-inline-images.md: 022a1a26d0dddf657b2745346df7093e2e79b218
+image-understanding-and-inline-images.zh.md: dc05c8beecb98dcc94da01fbc6d6a9e19ae4a622

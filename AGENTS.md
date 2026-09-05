@@ -1,158 +1,158 @@
 # AGENTS.md
 
-DeepSeek Harness is an all-plugin Cordis agent harness. Read [docs/architecture.md](docs/architecture.md) before changing `packages/`; follow [docs/AGENTS.md](docs/AGENTS.md) for documentation.
+DeepSeek Harness 是一个一切皆插件的 Cordis agent harness（智能体框架）。修改 `packages/` 之前先阅读 [docs/architecture.md](docs/architecture.zh.md)；文档规范见 [docs/AGENTS.md](docs/AGENTS.md)。
 
-## Pre-release stance: foundation over blast radius
+## 预发布立场：地基优先于影响半径
 
-**Remove at the first tagged release.** Until then, prefer correct foundations to compatibility shims: rename or repackage freely and update every reference. Backends reject old on-disk formats. SQLite uses monotonic `SCHEMA_VERSION`; `dsh-session` keeps `SESSION_FORMAT_VERSION` at `0` with no compatibility promise.
+**首个 tagged release 发布时删除本节。** 在此之前，优先保证地基正确，而非做兼容垫片：可自由重命名或重新打包，并更新所有引用。后端会拒绝旧的磁盘格式。SQLite 使用单调递增的 `SCHEMA_VERSION`；`dsh-session` 将 `SESSION_FORMAT_VERSION` 保持在 `0`，不提供任何兼容性承诺。
 
-**Application launch.** Only `dsh` profiles launch supported Node apps; package bins, demos, and public SDK argv escapes are forbidden ([rule](docs/architecture.md#application-launch)).
+**应用启动。** 只有 `dsh` profile 可以启动受支持的 Node 应用；package bin、demo 以及公开 SDK 的 argv 逃逸均在禁止之列（[规则](docs/architecture.zh.md#application-launch)）。
 
-## Repository layout
+## 仓库布局
 
 ```
-vendor/      Vendored Cordis source — manifest + sync procedure in vendor/README.md
-packages/    @deepseek-ai/dsh-<pkg> workspaces at packages/<group>/<pkg>/
-  core/        product API spine: session, system-prompt, tools, agent, agent-loop
-  api/         Remote BFF assembly and Typert RPC gateway
-  typert/      type graph generator, loader, and runtime registry
-  llm/         LLM capability: Service Definition/Consumer + DeepSeek providers
-  e2b/         E2B POC: sandbox + FS/subprocess adapters
-  shell/        bash capability: Service Definition + local/pwsh providers + shell Consumers
-  subprocess/  subprocess capability + local process-tree provider + shared Win32 library
-  terminal/         persistent sessions
-  fs/          filesystem capability + policy
-  lsp/         language-server capability
-  skill/       skill provider registry + local impl + catalog/loader tool
-  web/         web capability: Service Definition + search/fetch providers + tool Consumer
-  compaction/     compaction capability + basic provider
-  context/     request-context plugins
-  subagent/    subagent capability: Service Definition + providers + delegation Consumers
-  bundle/      installable dsh --profile patch-layer bundles
-  workflow/    workflow capability + worker-thread provider + tool Consumer
-  webhook/     webhook ingress
-  todo/        todo_write tool
-  plan/        plan mode as logged state
-  preset/      per-session agent composition from preset cordis.yml files
-  guard/       loop-hygiene + tool-timeout plugins
-  self-modification/  the agent inspects/mounts its own plugins
-  hooks/       Claude Code/Codex hook bridges + wire-protocol library
-  session/     durable session data: persistence, projection, titles, telemetry
-  identity/    anonymous identity
-  settings/    user-settings capability + file provider
-  credentials/ credential/authorization capabilities + env/.env provider
-  acp/         automation-only Agent Client Protocol server
-  interaction/ approval/interaction capabilities, permission, commands, ask-user
-  boot/        shared profile/application boot glue
-  sdk/         JSON-RPC protocol + TypeScript client/server
-  examples/    reusable composition bundles (agent-spine)
-  experimental/ private prototypes excluded from official releases
-  support/     dev/test infrastructure
-  util/        zero-dependency utilities
-python/      Python SDK and bundled runtime (see python/README.md)
-native/      @deepseek-ai/node-addon-landlock-run source of record (see native/README.md)
-.agents/     Agent workflows and Agent Notes (`notes/`)
-docs/        architecture, generated catalogs, postmortems, cookbook (see docs/AGENTS.md)
-scripts/     repo gates and generators
-website/     VitePress projection of selected bilingual docs/ sources
+vendor/  内置的 Cordis 源码 — manifest 与同步流程见 vendor/README.md
+packages/  @deepseek-ai/dsh-<pkg> workspace，位于 packages/<group>/<pkg>/
+  core/   产品 API 主干：session、system-prompt、tools、agent、agent-loop
+  api/    Remote BFF 组装与 Typert RPC 网关
+  typert/  类型图生成器、加载器与运行时注册表
+  llm/    LLM 能力：Service Definition/Consumer + DeepSeek 提供方
+  e2b/    E2B 概念验证（POC）：沙箱 + FS/subprocess 适配器
+  shell/  bash 能力：Service Definition + local/pwsh 提供方 + shell Consumer
+  subprocess/  subprocess 能力 + 本地进程树提供方 + 共享 Win32 库
+  terminal/  持久会话
+  fs/     文件系统能力 + 策略
+  lsp/    language-server 能力
+  skill/  skill provider 注册表 + 本地实现 + catalog/loader 工具
+  web/    web 能力：Service Definition + search/fetch 提供方 + tool Consumer
+  compaction/  compaction 能力 + 基础提供方
+  context/  request-context 插件
+  subagent/  subagent 能力：Service Definition + 提供方 + delegation Consumer
+  bundle/  可安装的 dsh --profile patch-layer bundle
+  workflow/  workflow 能力 + worker-thread 提供方 + tool Consumer
+  webhook/  webhook 入口
+  todo/    todo_write 工具
+  plan/    以记录状态（logged state）呈现的 plan 模式
+  preset/  从 preset cordis.yml 文件进行按会话的 agent 组合
+  guard/   loop-hygiene + tool-timeout 插件
+  self-modification/  agent 检查并挂载自己的插件
+  hooks/   Claude Code/Codex hook 桥 + wire-protocol 库
+  session/  持久会话数据：持久化、投影、标题、遥测
+  identity/  匿名身份
+  settings/  用户设置能力 + 文件提供方
+  credentials/  credential/authorization 能力 + env/.env 提供方
+  acp/     仅自动化使用的 Agent Client Protocol 服务器
+  interaction/  approval/interaction 能力、权限、命令、ask-user
+  boot/    共享 profile/应用启动胶水
+  sdk/     JSON-RPC 协议 + TypeScript 客户端/服务器
+  examples/  可复用的组合 bundle（agent-spine）
+  experimental/  排除在正式发布之外的私有原型
+  support/  开发/测试基础设施
+  util/    零依赖工具库
+python/  Python SDK 与内置运行时（见 python/README.md）
+native/  @deepseek-ai/node-addon-landlock-run 的源记录（见 native/README.md）
+.agents/  Agent 工作流与 Agent Notes（`notes/`）
+docs/    架构、生成目录、事后复盘、cookbook（见 docs/AGENTS.md）
+scripts/  仓库 gate 与生成器
+website/  选定双语 docs/ 源的 VitePress 投影
 ```
 
-Package groups: [packages/README.md](packages/README.md).
+Package 分组：[packages/README.md](packages/README.zh.md)。
 
-## Commands
+## 命令
 
 ```sh
-pnpm install            # pnpm workspaces, node ^22.19 || >=24
-pnpm run clean           # remove build outputs and safe residue from deleted packages
-pnpm run test           # unit tests
-pnpm run test:coverage  # CI coverage gate: per-file 100% on packages/*/*/src
-pnpm run test:e2e       # real-API tests; self-skip without DEEPSEEK_API_KEY
-pnpm run test:expected  # owner-local process expectations
-pnpm run test:snapshot  # keyless recorded-session replay through shipped profiles; filter: -t <name>
-pnpm run test:snapshot:record  # re-record expected outputs (needs key)
+pnpm install            # pnpm workspaces，node ^22.19 || >=24
+pnpm run clean           # 移除构建产物与已删除 package 的安全残留
+pnpm run test           # 单元测试
+pnpm run test:coverage  # CI 覆盖率门禁：packages/*/*/src 上每个文件 100%
+pnpm run test:e2e       # 真实 API 测试；无 DEEPSEEK_API_KEY 时自行跳过
+pnpm run test:expected  # 各 owner 本地的进程期望输出
+pnpm run test:snapshot  # 通过随附 profile 回放无密钥录制的会话；过滤：-t <name>
+pnpm run test:snapshot:record  # 重新录制期望输出（需要 key）
 pnpm run typecheck
 pnpm run lint
-pnpm run duplication    # cross-file TypeScript clone detection
-pnpm run build          # tsc emits lib/types, tsdown bundles runtime
-pnpm run hygiene        # publint + workspace/package/dependency checks + NodeNext consumer check
-pnpm run check:windows-wine  # ONLY when diagnosing a known Windows failure (needs wine); CI owns this signal
-pnpm run doc-sync       # all documentation gates; leaf list in scripts/run-gates.ts
-pnpm run test:docs      # quick documentation checks (no build; doc-quick aggregate)
-pnpm run website:build  # VitePress build (doubles as dead-link check)
-pnpm dsh --profile headless "task"  # run one task from source (needs DEEPSEEK_API_KEY)
-pnpm run demo:ptc -- "task"  # headless PTC mode run (needs key)
+pnpm run duplication    # 跨文件 TypeScript 克隆检测
+pnpm run build          # tsc 产出 lib/types，tsdown 打包 runtime
+pnpm run hygiene        # publint + workspace/package/依赖检查 + NodeNext consumer 检查
+pnpm run check:windows-wine  # 仅在诊断已知 Windows 故障时使用（需要 wine）；该信号由 CI 负责
+pnpm run doc-sync       # 所有文档门禁；叶子清单见 scripts/run-gates.ts
+pnpm run test:docs      # 快速文档检查（不构建；doc-quick 聚合）
+pnpm run website:build  # VitePress 构建（兼作死链检查）
+pnpm dsh --profile headless "task"  # 从源码运行一个任务（需要 DEEPSEEK_API_KEY）
+pnpm run demo:ptc -- "task"  # headless PTC 模式运行（需要 key）
 ```
 
-### Host sandbox failures
+### 宿主机沙箱失败
 
-If a required `gh`, `pnpm`, build, test, or generator command fails because the sandbox blocks credentials, network, IPC, watching, or nested `sandbox-exec`, retry unchanged with the narrowest host escalation. Require sandbox evidence; never bypass test failures or the product sandbox.
+若必需的 `gh`、`pnpm`、build、test 或 generator 命令因沙箱拦截凭据、网络、IPC、文件监听或嵌套 `sandbox-exec` 而失败，请以最窄的宿主机提权方式原样重试。必须要有沙箱证据；绝不绕过测试失败或产品沙箱。
 
-### Run relevant checks locally
+### 在本地运行相关检查
 
-Run checks before pushes via [dsh-pre-push-checks](.agents/skills/dsh-pre-push-checks/SKILL.md); report only commands run. After `gh stack sync`, validate immediately; do not merge before checks pass.
+推送前通过 [dsh-pre-push-checks](.agents/skills/dsh-pre-push-checks/SKILL.md) 运行检查；只汇报实际运行过的命令。`gh stack sync` 之后立即验证；检查未通过前不要合并。
 
-- Match evidence to the surface: focused behavior tests, model/user-output snapshots, `doc-sync` for docs, built smokes for published paths, and real-API e2e for providers.
-- Never default to the full suite or repeat a passing check for commit or push. CI owns exhaustive coverage and the platform matrix; rehearse all locally only by explicit request, for CI diagnosis, or for an irreducibly repository-wide change.
-- `test:coverage`, not `test`, is the CI coverage gate ([why](docs/testing.md)).
+- 让证据与改动面匹配：聚焦的行为测试、模型/用户输出快照、文档走 `doc-sync`、已发布路径走构建冒烟、提供方走真实 API e2e。
+- 提交或推送时永远不要默认跑全套，也不要重复跑已经通过的检查。穷尽式覆盖与平台矩阵由 CI 负责；只有被显式要求、排查 CI、或确实是无法拆分的全仓库变更时，才在本地完整预演。
+- CI 的覆盖率门禁是 `test:coverage` 而不是 `test`（[为什么](docs/testing.zh.md)）。
 
-## Secrets / .env
+## 密钥 / .env
 
-Real-API tests and demos read `DEEPSEEK_API_KEY`, optional `DEEPSEEK_BASE_URL`, and root `.env`. cordis.yml allows `!!js` (never `!js`) under plugin `config` and entry `disabled`; other metadata stays literal, so conditional composition also uses overlays ([primer](docs/cordis-primer.md#loader-configuration)). Never commit credentials. CI e2e skips without a key; [testing.md](docs/testing.md) owns key policy.
+真实 API 测试与 demo 读取 `DEEPSEEK_API_KEY`、可选的 `DEEPSEEK_BASE_URL` 以及根目录 `.env`。cordis.yml 在 plugin `config` 与条目 `disabled` 下允许 `!!js`（绝不使用 `!js`）；其余元数据保持字面量，因此条件组合也使用 overlay（[入门](docs/cordis-primer.zh.md#loader-configuration)）。绝不提交凭据。无 key 时 CI e2e 会跳过；key 策略由 [testing.md](docs/testing.zh.md) 负责。
 
-## Conventions
+## 约定
 
-- Every npm package is `@deepseek-ai/dsh-<name>`; vendored packages are rescoped ([mapping](docs/rescope.md)) and `private: true`. `@deepseek-ai/cordis` is a peerDependency (+ dev) of every harness package.
-- ESM everywhere (`"type": "module"`). Use package names across packages and `.ts` in local relative imports. Config subprocesses run built `lib/` under plain Node; source regressions use their declared launcher ([testing policy](docs/testing.md#test-subprocess-launch-modes)). The `dsh` CLI source launch runs through tsx's ESM-only hook (`node --import tsx/esm`); modules it reaches must stay ESM (no CJS-only exports) — Node's native TypeScript modes are unavailable across the engines range ([source-launch contract](.agents/notes/implemented/architecture/2026-07-29-dsh-source-launch-tsx-esm.md)). Raw/Web `cordis.yml` bare plugins must appear in their resolver manifest's `dependencies`; `verify-cordis-config` enforces it.
-- **Registrations are effects**: every contribution goes through `ctx.effect()` / `ctx.on()`; a registry's `register()` returns the disposer.
-- **Runtime invariants assert owned relationships.** Check authoritative event streams or mutable data, not service or method presence, plugin metadata or effects, or fixed pure examples. Without a plausible relationship, an explained empty companion is correct ([package invariant rules](packages/AGENTS.md)).
-- **Typed events use declaration merging** and merge-extensible maps. Event JSDoc needs `@mode` and payload `@param`; scoped keys absent from payloads need `@dshScopeScan unsupported`. Public service methods document parameters and non-void returns. `SessionEventMap` members are required-on-read by default — builds that do not know a type refuse the log unless the event carries the envelope's `ignorable: true`; only structural format changes bump `SESSION_FORMAT_VERSION` ([mechanism](.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.md)).
-- **Switch on discriminant tags.** Closed unions end in `assertNever`; merge-extensible unions fall through a documented default.
-- **Waterfall listeners MUST call `next()`** to delegate; returning without it short-circuits the chain ([semantics](docs/cordis-primer.md#cordis-waterfall-semantics)).
-- **Model-visible ⟺ logged**: anything that reaches a model request must be reconstructable from the session log; a new model-visible input requires a session event.
-- **Plugins, not loop changes**: new behavior goes on documented extension points; changing `agent-loop` requires updating docs/architecture.md.
-- **A capability seam comprises Service Definition / Service Provider / Consumer roles.** It is complete, never one role; split only when roles evolve independently ([glossary](docs/glossary.md#capability-seam)).
-- **Prefer maintained dependencies over hand-rolling** when they genuinely delete owned code and tests ([policy](.agents/notes/implemented/process/2026-07-26-dependencies-over-hand-rolling.md)).
-- **Explicit > implicit at package boundaries**: defaulting is an explicit `resolve(request): Spec` step in the owning implementation, never a hidden `?? default` inside `run()` (the `dsh-shell` request/spec split is the template).
-- **No hardcoded tunables in plugins**: deployment-varying choices are validated `Config` fields changeable from cordis.yml; a `DEFAULT_*` constant or test hook is not configurability. Protocol constants, external specs, and security invariants stay fixed.
-- **Misconfiguration fails loud** at load when self-contained, otherwise at the earliest resolvable point; never silently skip a missing referent.
-- **Opaque cross-boundary ids are branded** (`Branded<B>` from `dsh-brand`), never bare `string`.
-- **Trust TypeScript at typed same-process boundaries.** Do not add runtime validation, fallback behavior, or hostile-input tests solely for values the static interface requires; validate at parser/config, queued, model/tool JSON, durable/file, worker, process, and wire boundaries.
-- **Source plane vs artifact plane, never mixed.** Static gates and tests resolve workspace imports through tsconfig `paths` to `src` and pass on a clean tree; gates consuming built `lib/` declare that dependency ([layout](docs/development.md#typescript-project-layout)).
-- **Keep compiler faces explicit.** A package with both Host and Client programs exposes face-specific leaf configs and a solution-only root; repo-wide programs seed a face config, never the root solution ([layout](docs/development.md#typescript-project-layout)).
-- **An empty `catch` names what it swallows** and why nothing else can reach it; keep the `try` to one statement.
-- **Keep comments local.** Do not restate code, explain distant behavior unless locally required, or expand unrelated comments ([rationale](.agents/notes/implemented/process/2026-08-09-concrete-prose-names-actors-and-recorded-facts.md)).
-- **Prefer symmetry for parallel values**; unexplained asymmetry usually signals a missed extraction.
-- **Tests describe behavior, not correctness.** Change obsolete behavior with its tests; explain why in the PR.
-- **Non-trivial changes MUST include an Agent Note in the same PR;** only mechanical/local edits are exempt ([scope](.agents/notes/README.md#when-to-write-one)). Archived notes are frozen: never edit or treat them as current authority ([archive policy](.agents/notes/README.md#archiving-and-deletion)).
-- **Client UI copy is locale-owned.** Route product text through typed dictionaries and `t` or localized primitive props; `verify-client-ui-i18n` rejects hardcoded copy ([decision](.agents/notes/implemented/architecture/2026-08-23-locale-owned-client-ui-copy.md)).
-- **Testing policy** — [docs/testing.md](docs/testing.md). Every non-trivial model- or product-user-visible change updates a keyless recorded-session snapshot; [snapshot ownership](snapshots/AGENTS.md) reserves the top-level tree for session-driven cases and keeps other expected output owner-local. Fixtures replay on macOS/Linux; fix fixtures, not normalizers.
-- **Design each tool's UI presentation up front.** Host presenters stay pure; Web cards derive from raw events and persisted result metadata ([cookbook](docs/cookbook/adding-a-tool.md)).
-- **Plan unit, e2e, and snapshot coverage** for capability seams, lifecycle paths, and transcript output; include missing snapshot-harness support in the same change.
-- **Both SDKs project the loop.** Agent-loop, session-lifecycle, and `SessionEventMap` changes update the TypeScript and Python SDK expected outputs in the same PR; `pnpm run test` covers neither ([surfaces](docs/testing.md#when-a-snapshot-test-is-required)).
-- **Choose PR history deliberately.** Split independent changes and fix the introducing PR before propagation. Standalone/stack branches may merge-forward or rebase. Rewrites use `--force-with-lease`, abort on remote movement, never raw `--force`; preserve an in-progress merge-forward checkpoint before taking a newer base ([rationale](.agents/notes/implemented/process/2026-08-02-native-github-stacks-and-optional-rebases.md)).
-- **Labels:** one PR `kind/*`, all material `area/*`, and native Issue Type ([taxonomy](.agents/notes/implemented/process/2026-08-08-unified-github-label-taxonomy.md)).
-- TODO markers: `FIXME`/`TODO`/`XXX` by urgency ([semantics](docs/development.md)).
-- Files end with exactly one trailing newline; `git diff --cached --check` (pre-commit) gates it.
+- 每个 npm package 都是 `@deepseek-ai/dsh-<name>`；vendor 包会重新设定 scope（[映射](docs/rescope.zh.md)）且为 `private: true`。`@deepseek-ai/cordis` 是每个 harness package 的 peerDependency（+ dev）。
+- 处处使用 ESM（`"type": "module"`）。跨 package 使用包名，本地相对导入使用 `.ts`。配置子进程在纯 Node 下运行构建后的 `lib/`；源码回归测试使用其声明的启动器（[测试策略](docs/testing.zh.md#test-subprocess-launch-modes)）。`dsh` CLI 源码启动经由 tsx 的 ESM-only hook（`node --import tsx/esm`）运行；它触达的模块必须保持 ESM（不能只有 CJS 导出）——在 engines 覆盖范围内 Node 的原生 TypeScript 模式不可用（[源码启动契约](.agents/notes/implemented/architecture/2026-07-29-dsh-source-launch-tsx-esm.zh.md)）。Raw/Web 的 `cordis.yml` 裸插件必须出现在其 resolver manifest 的 `dependencies` 中；`verify-cordis-config` 强制此项。
+- **注册即副作用（effects）**：所有贡献都经由 `ctx.effect()` / `ctx.on()`；registry 的 `register()` 返回 disposer。
+- **运行时不变式断言的是归属关系。** 检查权威事件流或可变数据，而不是 service/方法是否存在、plugin 元数据或 effects，也不是固定的纯示例。没有合理关系时，一个有解释的空伴生（companion）才是正确的（[package 不变式规则](packages/AGENTS.md)）。
+- **类型化事件使用声明合并（declaration merging）**与可合并扩展的 map。事件 JSDoc 需要 `@mode` 与 payload 的 `@param`；payload 中不出现的 scoped key 需要 `@dshScopeScan unsupported`。公共 service 方法要记录参数与非 void 返回值。`SessionEventMap` 成员默认 required-on-read——不识别某类型的构建会拒绝写入日志，除非该事件带信封的 `ignorable: true`；只有结构性格式变更才提升 `SESSION_FORMAT_VERSION`（[机制](.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.zh.md)）。
+- **基于判别标签（discriminant tags）进行 switch。** 封闭联合以 `assertNever` 收尾；可合并扩展的联合落到有文档说明的默认分支。
+- **Waterfall 监听器必须调用 `next()`** 来转交；不调用即返回会短路整条链（[语义](docs/cordis-primer.zh.md#cordis-waterfall-semantics)）。
+- **模型可见 ⟺ 已记录（logged）**：任何进入模型请求的内容都必须能从 session 日志重建；新增的模型可见输入需要一个 session 事件。
+- **加插件，不改 loop**：新行为放在有文档说明的扩展点上；改动 `agent-loop` 需要同步更新 docs/architecture.md。
+- **一个能力接缝（capability seam）由 Service Definition / Service Provider / Consumer 三种角色构成。** 它是完整的整体，绝不只是一个角色；只有当各角色独立演进时才拆分（[术语表](docs/glossary.zh.md#capability-seam)）。
+- **优先使用有维护的依赖而不是自己手写**，前提是它们确实能删掉自有代码与测试（[策略](.agents/notes/implemented/process/2026-07-26-dependencies-over-hand-rolling.zh.md)）。
+- **package 边界处显式优于隐式**：默认值在属主实现中是一个显式的 `resolve(request): Spec` 步骤，绝不是在 `run()` 里藏一个 `?? default`（`dsh-shell` 的 request/spec 拆分是范本）。
+- **plugin 中不允许硬编码可调项**：随部署变化的选项必须是可从 cordis.yml 修改的、经校验的 `Config` 字段；`DEFAULT_*` 常量或测试 hook 不构成可配置性。协议常量、外部规格与安全不变式保持固定。
+- **错误配置要大声失败（fails loud）**：能自包含判断时在加载期失败，否则在最早可判定的点失败；绝不静默跳过缺失的引用对象。
+- **跨边界的非透明 id 必须打标（branded）**（用 `dsh-brand` 的 `Branded<B>`），绝不用裸 `string`。
+- **在类型化的同进程边界信任 TypeScript。** 不要仅为静态接口已要求的取值添加运行时校验、回退行为或对抗性输入测试；要在 parser/config、queued、model/tool JSON、durable/file、worker、process 与 wire 边界做校验。
+- **源码面（source plane）与产物面（artifact plane）绝不混用。** 静态 gate 与测试通过 tsconfig `paths` 将 workspace 导入解析到 `src`，并在干净树上通过；消费构建产物 `lib/` 的 gate 必须声明该依赖（[布局](docs/development.zh.md#typescript-project-layout)）。
+- **保持编译面（compiler faces）显式。** 同时含 Host 与 Client 程序的 package 要暴露面级 leaf 配置与仅含 solution 的根配置；仓库级程序从某个面配置播种，绝不用根 solution（[布局](docs/development.zh.md#typescript-project-layout)）。
+- **空的 `catch` 要说明吞掉了什么**以及为什么不会有别的东西到达这里；`try` 只包一条语句。
+- **让注释保持局部。** 不复述代码；除非本地确有必要，否则不解释远处行为，也不扩充无关注释（[依据](.agents/notes/implemented/process/2026-08-09-concrete-prose-names-actors-and-recorded-facts.zh.md)）。
+- **并行取值优先对称**；无法解释的不对称通常意味着漏做了抽取。
+- **测试描述行为，而不是正确性。** 行为过时了就连同测试一起改；在 PR 里解释原因。
+- **非平凡变更必须在同一 PR 中包含一条 Agent Note；** 只有机械式/局部编辑可豁免（[范围](.agents/notes/README.zh.md#when-to-write-one)）。已归档的 notes 是冻结的：绝不修改，也不把它们当作当前权威（[归档策略](.agents/notes/README.zh.md#archiving-and-deletion)）。
+- **Client UI 文案归 locale 所有。** 产品文本要经类型化字典与 `t` 或本地化 primitive props 路由；`verify-client-ui-i18n` 拒绝硬编码文案（[决策](.agents/notes/implemented/architecture/2026-08-23-locale-owned-client-ui-copy.zh.md)）。
+- **测试策略** — [docs/testing.md](docs/testing.zh.md)。每个非平凡的、模型或产品用户可见的变更都要更新无密钥的录制会话快照；[快照归属](snapshots/AGENTS.md)将顶层目录树保留给会话驱动用例，其余期望输出保持 owner-local。Fixture 在 macOS/Linux 上回放；修 fixture，不要修 normalizer。
+- **提前设计每个工具的 UI 呈现。** Host presenter 保持纯函数；Web 卡片从原始事件与持久化的结果元数据派生（[cookbook](docs/cookbook/adding-a-tool.zh.md)）。
+- **为能力接缝、生命周期路径与 transcript 输出规划 unit、e2e 和 snapshot 覆盖**；缺失的 snapshot-harness 支持要并入同一变更。
+- **两个 SDK 都投影 loop。** Agent-loop、session-lifecycle 与 `SessionEventMap` 的变更要在同一 PR 中更新 TypeScript 与 Python SDK 的期望输出；`pnpm run test` 两者都不覆盖（[面](docs/testing.zh.md#when-a-snapshot-test-is-required)）。
+- **审慎选择 PR 历史。** 拆分相互独立的变更；传播前先修好引入问题的 PR。独立/stack 分支可以 merge-forward 或 rebase。重写使用 `--force-with-lease`，远端有移动就中止，绝不使用裸 `--force`；在改取更新的 base 之前，先保存进行中的 merge-forward 检查点（[依据](.agents/notes/implemented/process/2026-08-02-native-github-stacks-and-optional-rebases.zh.md)）。
+- **标签：** 每个 PR 一个 `kind/*`，所有实质内容打 `area/*`，并填原生 Issue Type（[分类法](.agents/notes/implemented/process/2026-08-08-unified-github-label-taxonomy.zh.md)）。
+- TODO 标记：按紧急程度使用 `FIXME`/`TODO`/`XXX`（[语义](docs/development.zh.md)）。
+- 文件以恰好一个尾部换行结束；`git diff --cached --check`（pre-commit）把关。
 
-## Defensive patterns
+## 防御性模式（Defensive patterns）
 
-Read [docs/defensive-patterns.md](docs/defensive-patterns.md) before lifecycle, concurrency, subprocess, or teardown work.
+做生命周期、并发、子进程或 teardown 相关工作前，先阅读 [docs/defensive-patterns.md](docs/defensive-patterns.zh.md)。
 
-## Type safety and documentation
+## 类型安全与文档
 
-Everything compiles under `strict: true` with `noImplicitAny`; every remaining `any` explains why narrowing is infeasible. Every module and export has concise JSDoc for its non-obvious contract; function-like exports include `@param`/`@returns`, as enforced by `verify-export-jsdoc`. Heritage-declared members, plugin-protocol slots, and constructors keep their docs at the declaring Service Definition, protocol, or class.
+所有代码在 `strict: true` 与 `noImplicitAny` 下编译；任何剩余的 `any` 都要解释为何无法收窄。每个模块与导出对其非显而易见的契约都有简洁 JSDoc；函数式导出包含 `@param`/`@returns`，由 `verify-export-jsdoc` 强制执行。继承声明的成员、plugin 协议槽位与构造函数，其文档保留在声明处的 Service Definition、协议或类中。
 
-Comments and docs state complete contracts and context, not reasoning transcripts. Use direct, concrete terms. Do not use metaphors. Before writing `contract`, `boundary`, or `shape`, ask whether a more exact term names the subject: write `response fields`, `JSON validation`, or `ESM exports` instead of `response shape`, `validation boundary`, or `module shape`. Keep `contract` for preconditions, postconditions, invariants, compatibility promises, and other obligations that callers, callees, implementers, providers, producers, or consumers rely on. Keep a literal process, wire, security, transaction, or lifecycle boundary. Do not narrate control flow or tests, preserve review history, or restate code. Keep behavior, failure, timing, ownership, and safe-use facts; link the rationale. Use [dsh-prose-standard](.agents/skills/dsh-prose-standard/SKILL.md) for decisions. Wire mechanically checkable invariants into an executed top-level gate and prove each changed acceptance path rejects an invalid case. Use narrow, justified exceptions instead of disabling a rule globally.
+注释与文档陈述的是完整契约与上下文，而不是推理过程记录。使用直接、具体的措辞，不使用隐喻。在写 `contract`、`boundary` 或 `shape` 之前，先问是否有更精确的词能命名该主题：写 `response fields`、`JSON validation` 或 `ESM exports`，而不是 `response shape`、`validation boundary` 或 `module shape`。`contract` 只用于前置条件、后置条件、不变式、兼容性承诺，以及其他调用方、被调方、实现者、提供方、生产者或消费者所依赖的义务。`boundary` 只用于字面意义上的进程、wire、安全、事务或生命周期边界。不要叙述控制流或测试过程、保留评审历史，或复述代码。保留关于行为、失败、时序、归属与安全使用的实事，并链接到其依据。决策时使用 [dsh-prose-standard](.agents/skills/dsh-prose-standard/SKILL.md)。把可机械检查的不变式接入一个被执行的最顶层 gate，并证明每条被改动的验收路径都会拒绝非法用例。使用狭窄且有依据的例外，而不是全局禁用某条规则。
 
-Docs accompany every code change: update affected README and JSDoc contracts together. Routine bilingual work follows [docs/AGENTS.md](docs/AGENTS.md); only explicit user invocation may run `dsh-translate-docs`. Current-state prose, one physical line per paragraph, one home per fact, and word budgets live there.
+每个代码变更都伴随文档：同步更新受影响的 README 与 JSDoc 契约。常规双语工作遵循 [docs/AGENTS.md](docs/AGENTS.md)；只有用户显式调用才能运行 `dsh-translate-docs`。当前态行文、每段一个物理行、每项实事只有一个归属、以及词数预算，都在该文件中定义。
 
-## Editing these instructions
+## 编辑这些指令
 
-`CLAUDE.md` symlinks `AGENTS.md` at root and `packages/`; edit the real file. Keep each rule self-contained while linking high-level docs. Condense when clarity survives; raise a `verify-doc-budgets` ceiling when the required content genuinely needs more space.
+根目录与 `packages/` 下的 `CLAUDE.md` 是指向 `AGENTS.md` 的符号链接；要编辑真实文件。保持每条规则自包含，同时链接高层文档。在清晰度不受损时压缩内容；当必需内容确实需要更多空间时，调高 `verify-doc-budgets` 上限。
 
-## Vendoring policy
+## 内置依赖（Vendoring）策略
 
-`vendor/` packages are pinned source copies (manifest with upstream SHAs in [vendor/README.md](vendor/README.md)). Update via the sync procedure there; re-apply or retire the logged local modifications; rerun `pnpm run test && pnpm run build`.
+`vendor/` 下的 packages 是锁定版本的源码拷贝（manifest 连同上游 SHA 见 [vendor/README.md](vendor/README.md)）。按其中的同步流程更新；重新应用或撤除已记录在案的本地修改；重跑 `pnpm run test && pnpm run build`。
 
 <!-- CODEGRAPH_START -->
 ## CodeGraph

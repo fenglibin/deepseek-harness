@@ -187,6 +187,10 @@ export class Session implements SessionFace {
       time: Date.now(),
       text: input.text,
       images: input.images,
+      parts: input.parts ?? [
+        ...(input.text === '' ? [] : [{ type: 'text', text: input.text } as const]),
+        ...input.images.map(image => ({ type: 'image', preview: image } as const)),
+      ],
     }]
     this.submissionSettlements.set(requestId, { onRetire: input.onRetire, retiring: false })
     // The blank → engaging edge flips here, ahead of prompt(): the composer

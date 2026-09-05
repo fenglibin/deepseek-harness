@@ -354,6 +354,8 @@
       "@deepseek-ai/dsh-hooks-claude-code/invariant": ["./packages/hooks/hooks-claude-code/src/invariant.ts"],
       "@deepseek-ai/dsh-hooks-codex": ["./packages/hooks/hooks-codex/src"],
       "@deepseek-ai/dsh-hooks-codex/invariant": ["./packages/hooks/hooks-codex/src/invariant.ts"],
+      "@deepseek-ai/dsh-image-understanding": ["./packages/llm/image-understanding/src"],
+      "@deepseek-ai/dsh-image-understanding/invariant": ["./packages/llm/image-understanding/src/invariant.ts"],
       "@deepseek-ai/dsh-invariants/invariant": ["./packages/runtime-diagnostics/invariants/src/invariant.ts"],
       "@deepseek-ai/dsh-jobs": ["./packages/jobs/jobs/src"],
       "@deepseek-ai/dsh-jobs/invariant": ["./packages/jobs/jobs/src/invariant.ts"],

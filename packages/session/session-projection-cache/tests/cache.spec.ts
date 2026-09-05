@@ -186,13 +186,14 @@ describe('SessionProjectionCache write policy', () => {
       session = inner.sessions.create(SessionId('detach'))
     }, { inject: ['sessions'] }))
     if (session === undefined) throw new Error('session was not created')
-    mark(session, ['live'])
+    const created = session
+    mark(created, ['live'])
     await owner.dispose()
     // The disposal write is fire-and-forget over real fs I/O; poll until it is
     // durable instead of trusting a fixed settle, so an aggregate under load
     // cannot starve the drain and turn the assertion into a false negative.
     const rows = await vi.waitFor(async () => {
-      const rows = await storedRows(root, session.id)
+      const rows = await storedRows(root, created.id)
       if (rows?.['cache-test/marks']?.val === undefined) throw new Error('disposal checkpoint is not durable yet')
       return rows
     }, { timeout: 5_000, interval: 25 })

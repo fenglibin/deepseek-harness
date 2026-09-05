@@ -20,13 +20,12 @@ import type { SessionListState, SessionSnapshot } from '@deepseek-ai/dsh-api-ses
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { SubmitOutcome } from '../src/client/contract/input.ts'
+import type {
+  DraftAttachmentId, DraftImageInsert, DraftPart, SubmitOutcome,
+} from '../src/client/contract/input.ts'
 import { SessionInputShell } from '../src/client/input/facade.ts'
 import { $replaceDetectSpanWithText, $selectDetectSpan } from '../src/client/input/editor/span-map.ts'
-import type {
-  ComposerAttachment, ComposerAttachmentsOwnerProps,
-} from '../src/client/contract/slots.ts'
-import type { DraftAttachmentId } from '../src/client/contract/input.ts'
+import type { ComposerAttachment } from '../src/client/contract/slots.ts'
 import { InputBar } from '../src/client/skeleton/InputBar.tsx'
 import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
 import { zh } from '../src/client/locales.ts'
@@ -103,8 +102,7 @@ function row(id: string): SessionSnapshot['queue'][number] {
 /** Real machine behind the bar entry: sink spy, no slash pipeline (plain text goes straight to the sink). */
 function bench(over?: BenchOptions) {
   const sink = vi.fn<(
-    text: string,
-    imageIds: readonly DraftAttachmentId[],
+    parts: readonly DraftPart[],
     mode: 'queue' | 'steer',
     signal: AbortSignal,
   ) => Promise<SubmitOutcome>>(() => Promise.resolve({ kind: 'success' }))
@@ -121,6 +119,13 @@ function bench(over?: BenchOptions) {
     actx: SCTX,
     defaultSink: sink,
     commandImages: { serialize: () => Promise.resolve([]), release: () => {}, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` },
+    imageLabels: {
+      remove: (name: string) => `删除图片 ${name}`,
+      pending: () => '待处理图片',
+      lightboxDialog: () => '查看图片',
+      lightboxClose: () => '关闭预览',
+    },
+    releaseImage: () => {},
     queue: {
       getSnapshot: () => session.getSnapshot().queue,
       subscribe: fn => session.subscribe(fn),
@@ -138,9 +143,17 @@ function bench(over?: BenchOptions) {
       : {}),
   })
   if (over?.draft !== undefined && over.draft !== '') shell.setDraft(over.draft)
-  if (over?.attachments !== undefined) shell.addImages(over.attachments.map(attachment => attachment.id))
+  if (over?.attachments !== undefined) {
+    const inserts: readonly DraftImageInsert[] = over.attachments.map(attachment => ({
+      attachmentId: attachment.id,
+      previewUrl: attachment.previewUrl,
+      name: attachment.file.name,
+      ...(attachment.width === undefined ? {} : { width: attachment.width }),
+      ...(attachment.height === undefined ? {} : { height: attachment.height }),
+    }))
+    shell.addImages(inserts)
+  }
   const stop = vi.fn()
-  const removeImage = vi.fn((id: DraftAttachmentId) => { shell.removeImage(id) })
   const menuLauncher = createSnapshotStore<string | null>(over?.commandMenuOpen === true ? 'command' : null)
   const slotCalls: { key: string; owner: unknown }[] = []
   const renderSlot = ((key: string, owner: object) => {
@@ -170,11 +183,6 @@ function bench(over?: BenchOptions) {
     inputActions: shell.actions,
     keyboard: shell,
     addImages: over?.addImages ?? (() => null),
-    removeImage,
-    draftImages: ids => ids.flatMap((id) => {
-      const attachment = over?.attachments?.find(candidate => candidate.id === id)
-      return attachment === undefined ? [] : [attachment]
-    }),
     resolveSubmitMode: (running, gesture, steeringAvailable) => {
       if (!running || !steeringAvailable) return 'queue'
       const preferred = over?.busyEnter ?? 'queue'
@@ -210,20 +218,12 @@ function bench(over?: BenchOptions) {
   )!
   const interruptButton = view.container.querySelector<HTMLButtonElement>('button[aria-label="停止生成"]')
   return {
-    view, textarea, button, interruptButton, props, sink, shell, wiring: shell, session, stop, removeImage, slotCalls,
+    view, textarea, button, interruptButton, props, sink, shell, wiring: shell, session, stop, slotCalls,
     menuLauncher,
     steerQueue: over?.steerQueue,
     get placeholder() { return placeholderOf(view.container) },
     get inputDisabled() { return textarea.getAttribute('aria-disabled') === 'true' },
   }
-}
-
-function attachmentOwner(slotCalls: readonly { key: string; owner: unknown }[]): ComposerAttachmentsOwnerProps {
-  for (let i = slotCalls.length - 1; i >= 0; i -= 1) {
-    const call = slotCalls[i]
-    if (call?.key === 'conversation.input.attachments') return call.owner as ComposerAttachmentsOwnerProps
-  }
-  throw new Error('attachment slot was not rendered')
 }
 
 /** The state's placeholder copy (the textarea.placeholder equivalent; the visible layer renders it only while empty). */
@@ -241,7 +241,17 @@ function writeDraft(shell: SessionInputShell, text: string): void {
   act(() => { shell.setDraft(text) })
 }
 
-describe('image draft rail', () => {
+describe('inline image intake and send', () => {
+  /** Trigger image intake through the paste path (the composer has no attachment slot anymore). */
+  function pasteFiles(textarea: HTMLElement, files: readonly File[]): void {
+    fireEvent.paste(textarea, {
+      clipboardData: {
+        items: files.map(file => ({ kind: 'file' as const, type: file.type, getAsFile: () => file })),
+        getData: () => '',
+      },
+    })
+  }
+
   it('collects clipboard files while preserving text from a mixed paste', async () => {
     const addImages = vi.fn(() => null)
     const { textarea, shell } = bench({ addImages })
@@ -270,33 +280,22 @@ describe('image draft rail', () => {
       mediaTypes: ['image/png'] as const,
     }
     const png = (bytes: number, name: string) => new File([new ArrayBuffer(bytes)], name, { type: 'image/png' })
-    const intake = (result: ReturnType<typeof bench>, files: File[]) => {
-      act(() => { attachmentOwner(result.slotCalls).onAddImages(files) })
-    }
     // Count: three at once over a two-image limit → the whole batch refused.
     const overCount = bench({ addImages: vi.fn(() => null), imageLimits: limits })
-    intake(overCount, [png(8, 'a.png'), png(8, 'b.png'), png(8, 'c.png')])
+    pasteFiles(overCount.textarea, [png(8, 'a.png'), png(8, 'b.png'), png(8, 'c.png')])
     expect(overCount.view.getByRole('alert').textContent).toContain('一条消息最多添加 2 张图片')
     expect(overCount.props.addImages).not.toHaveBeenCalled()
     cleanup()
     // Per-file bytes.
     const overFile = bench({ addImages: vi.fn(() => null), imageLimits: limits })
-    intake(overFile, [png(1024 * 1024 + 1, 'big.png')])
+    pasteFiles(overFile.textarea, [png(1024 * 1024 + 1, 'big.png')])
     expect(overFile.view.getByRole('alert').textContent).toContain('单张图片不能超过 1MB')
     expect(overFile.props.addImages).not.toHaveBeenCalled()
-    cleanup()
-    // Aggregate bytes across the existing rail plus the new batch.
-    const held = new File([new ArrayBuffer(1024 * 1024 * 1.5)], 'held.png', { type: 'image/png' })
-    const attachment = { kind: 'image' as const, id: 'draft-1' as DraftAttachmentId, file: held, previewUrl: 'blob:held' }
-    const overTotal = bench({ addImages: vi.fn(() => null), imageLimits: limits, attachments: [attachment] })
-    intake(overTotal, [png(1024 * 1024, 'more.png')])
-    expect(overTotal.view.getByRole('alert').textContent).toContain('图片总大小超过 2MB')
-    expect(overTotal.props.addImages).not.toHaveBeenCalled()
     cleanup()
     // Within every limit: the batch passes through to addImages.
     const within = bench({ addImages: vi.fn(() => null), imageLimits: limits })
     const fits = png(16, 'fits.png')
-    intake(within, [fits])
+    pasteFiles(within.textarea, [fits])
     expect(within.props.addImages).toHaveBeenCalledWith([fits])
     expect(within.view.queryByRole('alert')).toBeNull()
   })
@@ -319,24 +318,9 @@ describe('image draft rail', () => {
       new File([new ArrayBuffer(64)], 'a.pdf', { type: 'application/pdf' }),
       new File([new ArrayBuffer(64)], 'b.pdf', { type: 'application/pdf' }),
     ]
-    act(() => { attachmentOwner(result.slotCalls).onAddImages(files) })
+    pasteFiles(result.textarea, files)
     expect(addImages).toHaveBeenCalledWith(files)
     expect(result.view.getByRole('alert').textContent).toContain('仅支持 PNG、JPG、WebP、GIF 格式的图片')
-  })
-
-  it('projects display-ready limits into the attachment slot', () => {
-    const result = bench({
-      addImages: vi.fn(() => null),
-      imageLimits: {
-        maxImageBytes: 5 * 1024 * 1024,
-        maxImagesPerMessage: 20,
-        maxMessageImageBytes: 100 * 1024 * 1024,
-        maxImagePixels: 40_000_000,
-        maxImageDimension: 2000,
-        mediaTypes: ['image/png'] as const,
-      },
-    })
-    expect(attachmentOwner(result.slotCalls).dropLimits).toEqual({ count: 20, size: '5MB' })
   })
 
   it('announces server attachment rejections as product copy, other codes as developer text', () => {
@@ -368,35 +352,25 @@ describe('image draft rail', () => {
     expect(other.view.getByRole('alert').textContent).toContain('boom (gateway/internal)')
   })
 
-  it('marks the attachment slot unavailable while the composer is locked', () => {
-    const result = bench({ addImages: vi.fn(() => null), inert: true })
-    expect(attachmentOwner(result.slotCalls).canAcceptDrop).toBe(false)
-  })
-
-  it('sends an image-only draft and exposes removal through the attachment slot', async () => {
+  it('sends an image-only draft as image parts', async () => {
     const file = new File([Uint8Array.of(1)], 'pixel.png', { type: 'image/png' })
-    const extra = new File([Uint8Array.of(2)], 'extra.png', { type: 'image/png' })
     const attachments = [
       { kind: 'image' as const, id: 'draft-1' as DraftAttachmentId, file, previewUrl: 'blob:draft-1' },
-      { kind: 'image' as const, id: 'draft-2' as DraftAttachmentId, file: extra, previewUrl: 'blob:draft-2' },
     ]
     const result = bench({ attachments })
-    const { view, textarea, sink, removeImage } = result
+    const { view, textarea, sink } = result
     expect((view.getByRole('button', { name: '发送消息' }) as HTMLButtonElement).disabled).toBe(false)
-    const owner = attachmentOwner(result.slotCalls)
-    act(() => { owner.onRemoveImage('draft-2' as DraftAttachmentId) })
-    expect(removeImage).toHaveBeenCalledWith('draft-2')
     let settle!: (outcome: SubmitOutcome) => void
     sink.mockImplementationOnce(() => new Promise<SubmitOutcome>((resolve) => { settle = resolve }))
     fireEvent.keyDown(textarea, { key: 'Enter' })
-    expect(sink).toHaveBeenCalledWith('', ['draft-1'], 'queue', expect.any(AbortSignal))
-    // Optimistic commit: the rail clears at submit, before the admission settles.
-    expect(attachmentOwner(result.slotCalls).attachments).toEqual([])
+    expect(sink).toHaveBeenCalledWith([{ type: 'image', attachmentId: 'draft-1' }], 'queue', expect.any(AbortSignal))
+    // Optimistic commit: the chip clears at submit, before the admission settles.
+    expect(result.shell.snapshot.parts.filter(part => part.type === 'image').length).toBe(0)
     await act(async () => { settle({ kind: 'success' }) })
-    expect(attachmentOwner(result.slotCalls).attachments).toEqual([])
+    expect(result.shell.snapshot.parts.filter(part => part.type === 'image').length).toBe(0)
   })
 
-  it('returns an image-only draft to the rail when its admission fails', async () => {
+  it('restores the image chip when an image-only send fails', async () => {
     const file = new File([Uint8Array.of(1)], 'pixel.png', { type: 'image/png' })
     const attachments = [
       { kind: 'image' as const, id: 'draft-1' as DraftAttachmentId, file, previewUrl: 'blob:draft-1' },
@@ -406,10 +380,11 @@ describe('image draft rail', () => {
     let fail!: (outcome: SubmitOutcome) => void
     sink.mockImplementationOnce(() => new Promise<SubmitOutcome>((resolve) => { fail = resolve }))
     fireEvent.keyDown(textarea, { key: 'Enter' })
-    expect(attachmentOwner(result.slotCalls).attachments).toEqual([])
+    expect(sink).toHaveBeenCalledWith([{ type: 'image', attachmentId: 'draft-1' }], 'queue', expect.any(AbortSignal))
+    expect(result.shell.snapshot.parts.filter(part => part.type === 'image').length).toBe(0)
     await act(async () => { fail({ kind: 'error', text: '图片发送失败' }) })
     await vi.waitFor(() => {
-      expect(attachmentOwner(result.slotCalls).attachments).toEqual([attachments[0]])
+      expect(result.shell.snapshot.parts.filter(part => part.type === 'image').length).toBe(1)
     })
     expect(result.view.getByRole('alert').textContent).toContain('图片发送失败')
   })
@@ -437,17 +412,6 @@ describe('image draft rail', () => {
     } finally {
       vi.useRealTimers()
     }
-  })
-
-  it('announces a rejected attachment-slot intake through the same toast', () => {
-    const addImages = vi.fn(() => '图片读取服务不可用')
-    const result = bench({ addImages })
-    act(() => {
-      attachmentOwner(result.slotCalls).onAddImages([
-        new File([Uint8Array.of(1)], 'x.png', { type: 'image/png' }),
-      ])
-    })
-    expect(result.view.getByRole('alert').textContent).toContain('图片读取服务不可用')
   })
 })
 
@@ -506,7 +470,7 @@ describe('Enter semantics', () => {
   it('plain Enter submits queue mode through the machine; repeat and empty are suppressed', () => {
     const { textarea, sink } = bench({ draft: 'hello' })
     fireEvent.keyDown(textarea, { key: 'Enter' })
-    expect(sink).toHaveBeenCalledWith('hello', [], 'queue', expect.any(AbortSignal))
+    expect(sink).toHaveBeenCalledWith([{ type: 'text', text: 'hello' }], 'queue', expect.any(AbortSignal))
     // The submitting-phase lock, not draft emptiness, suppresses the repeat:
     // the draft is still uncleared while the sink round-trip is in flight.
     fireEvent.keyDown(textarea, { key: 'Enter', repeat: true })
@@ -534,15 +498,15 @@ describe('Enter semantics', () => {
   it('Ctrl/Meta+Enter sends normally while idle and steers while running', () => {
     const idle = bench({ draft: 'hello' })
     fireEvent.keyDown(idle.textarea, { key: 'Enter', metaKey: true })
-    expect(idle.sink).toHaveBeenCalledWith('hello', [], 'queue', expect.any(AbortSignal))
+    expect(idle.sink).toHaveBeenCalledWith([{ type: 'text', text: 'hello' }], 'queue', expect.any(AbortSignal))
 
     const busyCtrl = bench({ running: true, draft: 'steer with ctrl' })
     fireEvent.keyDown(busyCtrl.textarea, { key: 'Enter', ctrlKey: true })
-    expect(busyCtrl.sink).toHaveBeenCalledWith('steer with ctrl', [], 'steer', expect.any(AbortSignal))
+    expect(busyCtrl.sink).toHaveBeenCalledWith([{ type: 'text', text: 'steer with ctrl' }], 'steer', expect.any(AbortSignal))
 
     const busyMeta = bench({ running: true, draft: 'steer with cmd' })
     fireEvent.keyDown(busyMeta.textarea, { key: 'Enter', metaKey: true })
-    expect(busyMeta.sink).toHaveBeenCalledWith('steer with cmd', [], 'steer', expect.any(AbortSignal))
+    expect(busyMeta.sink).toHaveBeenCalledWith([{ type: 'text', text: 'steer with cmd' }], 'steer', expect.any(AbortSignal))
   })
 
   it('empty-draft Cmd/Ctrl+Enter steers the whole queue instead of submitting', () => {
@@ -607,7 +571,7 @@ describe('Enter semantics', () => {
     const steerQueue = vi.fn()
     const { textarea, sink } = bench({ running: true, queue: [row('q-1')], draft: '插话', steerQueue })
     fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true })
-    expect(sink).toHaveBeenCalledWith('插话', [], 'steer', expect.any(AbortSignal))
+    expect(sink).toHaveBeenCalledWith([{ type: 'text', text: '插话' }], 'steer', expect.any(AbortSignal))
     expect(steerQueue).not.toHaveBeenCalled()
   })
 
@@ -724,7 +688,7 @@ describe('running and lock semantics', () => {
     writeDraft(shell, '排队消息2')
     expect(button.getAttribute('aria-label')).toBe('发送消息')
     fireEvent.click(button)
-    expect(sink).toHaveBeenCalledWith('排队消息2', [], 'queue', expect.any(AbortSignal))
+    expect(sink).toHaveBeenCalledWith([{ type: 'text', text: '排队消息2' }], 'queue', expect.any(AbortSignal))
     await vi.waitFor(() => { expect(button.getAttribute('aria-label')).toBe('停止生成') })
     expect(stop).toHaveBeenCalledTimes(1)
   })
@@ -739,7 +703,7 @@ describe('running and lock semantics', () => {
     const { button, sink } = bench({ running: true, attachments: [attachment] })
     expect(button.getAttribute('aria-label')).toBe('发送消息')
     fireEvent.click(button)
-    expect(sink).toHaveBeenCalledWith('', ['draft-1'], 'queue', expect.any(AbortSignal))
+    expect(sink).toHaveBeenCalledWith([{ type: 'image', attachmentId: 'draft-1' }], 'queue', expect.any(AbortSignal))
     await vi.waitFor(() => { expect(button.getAttribute('aria-label')).toBe('停止生成') })
   })
 
@@ -762,17 +726,17 @@ describe('running and lock semantics', () => {
   it('running plain Enter follows the busy-state Steer preference', () => {
     const { textarea, sink } = bench({ running: true, busyEnter: 'steer', draft: '直接插话' })
     fireEvent.keyDown(textarea, { key: 'Enter' })
-    expect(sink).toHaveBeenCalledWith('直接插话', [], 'steer', expect.any(AbortSignal))
+    expect(sink).toHaveBeenCalledWith([{ type: 'text', text: '直接插话' }], 'steer', expect.any(AbortSignal))
   })
 
   it('running Cmd/Ctrl+Enter uses the opposite of the busy-state Enter preference', () => {
     const meta = bench({ running: true, busyEnter: 'steer', draft: '排到下一轮' })
     fireEvent.keyDown(meta.textarea, { key: 'Enter', metaKey: true })
-    expect(meta.sink).toHaveBeenCalledWith('排到下一轮', [], 'queue', expect.any(AbortSignal))
+    expect(meta.sink).toHaveBeenCalledWith([{ type: 'text', text: '排到下一轮' }], 'queue', expect.any(AbortSignal))
 
     const ctrl = bench({ running: true, busyEnter: 'steer', draft: 'also queue' })
     fireEvent.keyDown(ctrl.textarea, { key: 'Enter', ctrlKey: true })
-    expect(ctrl.sink).toHaveBeenCalledWith('also queue', [], 'queue', expect.any(AbortSignal))
+    expect(ctrl.sink).toHaveBeenCalledWith([{ type: 'text', text: 'also queue' }], 'queue', expect.any(AbortSignal))
   })
 
   it('running continuable subagent keeps Send beside an independent Stop', () => {
@@ -792,7 +756,7 @@ describe('running and lock semantics', () => {
     expect(interruptButton).not.toBeNull()
     expect(textarea.getAttribute('aria-disabled')).not.toBe('true')
     fireEvent.click(button)
-    expect(sink).toHaveBeenCalledWith('后续消息', [], 'queue', expect.any(AbortSignal))
+    expect(sink).toHaveBeenCalledWith([{ type: 'text', text: '后续消息' }], 'queue', expect.any(AbortSignal))
     fireEvent.click(interruptButton!)
     expect(stop).toHaveBeenCalledTimes(1)
   })
@@ -849,11 +813,11 @@ describe('running and lock semantics', () => {
     }
     const plain = bench({ running: true, busyEnter: 'steer', draft: 'plain', subagent })
     fireEvent.keyDown(plain.textarea, { key: 'Enter' })
-    expect(plain.sink).toHaveBeenCalledWith('plain', [], 'queue', expect.any(AbortSignal))
+    expect(plain.sink).toHaveBeenCalledWith([{ type: 'text', text: 'plain' }], 'queue', expect.any(AbortSignal))
 
     const accelerated = bench({ running: true, draft: 'accelerated', subagent })
     fireEvent.keyDown(accelerated.textarea, { key: 'Enter', metaKey: true })
-    expect(accelerated.sink).toHaveBeenCalledWith('accelerated', [], 'queue', expect.any(AbortSignal))
+    expect(accelerated.sink).toHaveBeenCalledWith([{ type: 'text', text: 'accelerated' }], 'queue', expect.any(AbortSignal))
   })
 
   it('disabled (session removed) locks the textarea and chrome', () => {
@@ -866,7 +830,7 @@ describe('running and lock semantics', () => {
   it('idle primary sends and disables on empty draft', () => {
     const { button, sink } = bench({ draft: 'go' })
     fireEvent.click(button)
-    expect(sink).toHaveBeenCalledWith('go', [], 'queue', expect.any(AbortSignal))
+    expect(sink).toHaveBeenCalledWith([{ type: 'text', text: 'go' }], 'queue', expect.any(AbortSignal))
     const empty = bench()
     expect(empty.button.disabled).toBe(true)
   })
@@ -1300,7 +1264,7 @@ describe('command launcher chrome and control seats', () => {
     // Every seat dispatched, nothing rendered (render passes may repeat; the
     // seat set is the contract).
     expect([...new Set(slotCalls.map(c => c.key))]).toEqual([
-      'conversation.input.attachments', 'conversation.input.plan', 'conversation.input.model',
+      'conversation.input.plan', 'conversation.input.model',
     ])
     expect(view.queryByLabelText('Plan mode')).toBeNull()
     expect(view.queryByLabelText('Model')).toBeNull()
@@ -1465,15 +1429,11 @@ describe('command launcher chrome and control seats', () => {
     })
     expect(view.getByTestId('plan-entry')).toBeTruthy()
     expect(view.getByTestId('model-entry')).toBeTruthy()
-    // The bar hands its chrome disable state to the filling entry.
-    const controls = slotCalls.filter(call => call.key !== 'conversation.input.attachments')
-    expect(controls.every(c => (c.owner as { locked: boolean }).locked)).toBe(true)
-    expect(attachmentOwner(slotCalls).canAcceptDrop).toBe(false)
+    // The bar hands its chrome disable state to the filling entries.
+    expect(slotCalls.every(c => (c.owner as { locked: boolean }).locked)).toBe(true)
     cleanup()
     const live = bench({ running: true })
-    const liveControls = live.slotCalls.filter(call => call.key !== 'conversation.input.attachments')
-    expect(liveControls.every(c => !(c.owner as { locked: boolean }).locked)).toBe(true)
-    expect(attachmentOwner(live.slotCalls).canAcceptDrop).toBe(true)
+    expect(live.slotCalls.every(c => !(c.owner as { locked: boolean }).locked)).toBe(true)
   })
 
   it('disabled locks the Access chip and command launcher (running does not)', () => {

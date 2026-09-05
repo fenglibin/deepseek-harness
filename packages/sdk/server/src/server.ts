@@ -10,7 +10,8 @@ import { resolve } from 'node:path'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
 import { admitEncodedImages, type EncodedImageAttachment, type ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
-import { createUserMessage, ReasoningEffortId, type ContentBlock, type LlmRuntime } from '@deepseek-ai/dsh-llm'
+import { describeForRoute, routeExcludesImages } from '@deepseek-ai/dsh-image-understanding'
+import { createUserMessage, ReasoningEffortId, type ContentBlock, type ImageBlock, type LlmRuntime, type ModelModality } from '@deepseek-ai/dsh-llm'
 import { carrierKeyOf, type Scoped } from '@deepseek-ai/dsh-scope'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type SubagentRuntime from '@deepseek-ai/dsh-subagent'
@@ -36,19 +37,64 @@ function encodedImage(block: SessionPromptParams['contentBlocks'][number]): bloc
   return block.type === 'image' && 'data' in block
 }
 
-async function durablePromptContent(ctx: Context, blocks: SessionPromptParams['contentBlocks']): Promise<ContentBlock[]> {
-  const images = blocks.filter(encodedImage)
+/** Any image block: inline raster awaiting admission or an already-durable ref. */
+function imageBlock(block: SessionPromptParams['contentBlocks'][number]): block is SdkEncodedImageBlock | ImageBlock {
+  return block.type === 'image'
+}
+
+async function durablePromptContent(
+  ctx: Context,
+  blocks: SessionPromptParams['contentBlocks'],
+  modalities: readonly ModelModality[] | undefined,
+  sessionId: SessionId,
+): Promise<ContentBlock[]> {
+  const images = blocks.filter(imageBlock)
   if (images.length === 0) return blocks as ContentBlock[]
-  const attachments = ctx.get('attachments')
-  if (attachments === undefined) throw new Error('SDK image prompt requires an attachment store')
-  const refs = await admitEncodedImages(attachments, images.map((image): EncodedImageAttachment => ({
-    data: image.data,
-    mediaType: image.mimeType,
-  })))
+  const encoded = images.filter(encodedImage)
+  // Admit inline raster; already-durable attachment refs pass through so both
+  // kinds read the same description pass in their document order.
+  let admitted: readonly ImageAttachmentRef[] = []
+  if (encoded.length > 0) {
+    const attachments = ctx.get('attachments')
+    if (attachments === undefined) throw new Error('SDK image prompt requires an attachment store')
+    admitted = await admitEncodedImages(attachments, encoded.map((image): EncodedImageAttachment => ({
+      data: image.data,
+      mediaType: image.mimeType,
+    })))
+  }
+  const refs: ImageAttachmentRef[] = []
+  let encodedNext = 0
+  for (const block of images) {
+    if (encodedImage(block)) {
+      // The admit pass above returns one ref per encoded block, in order.
+      const ref = admitted[encodedNext]
+      /* v8 ignore next -- the admit pass above returns one ref per encoded block */
+      if (ref === undefined) throw new Error('admitted image ref underflow')
+      refs.push(ref)
+      encodedNext += 1
+    } else {
+      refs.push(block.attachment)
+    }
+  }
+  // A text-only route reads images as generated text when a describer is
+  // mounted; a missing or failing describer degrades to no description while
+  // the image still enters the session.
+  const descriptions = await describeForRoute(ctx, refs, modalities, undefined, sessionId)
   let next = 0
-  return blocks.map(block => encodedImage(block)
-    ? { type: 'image', attachment: refs[next++] as ImageAttachmentRef }
-    : block)
+  return blocks.map((block) => {
+    if (!imageBlock(block)) return block
+    // `refs` is built one entry per image block above, in the same order.
+    const attachment = refs[next]
+    /* v8 ignore next -- `refs` holds one entry per image block, in order */
+    if (attachment === undefined) throw new Error('image ref underflow')
+    const description = descriptions[next]
+    next += 1
+    return {
+      type: 'image',
+      attachment,
+      ...(description === undefined ? {} : { description }),
+    }
+  })
 }
 
 /** Recover the delegating parent from the service-owned scoped carrier. */
@@ -180,7 +226,7 @@ export class HarnessSdkJsonRpcServer {
     // survives; a retained agent accepts followup() silently, so validate the
     // record against the live registry before delivery.
     this.assertLiveAgent(rec, params.sessionId)
-    const content = await durablePromptContent(this.ctx, params.contentBlocks)
+    const content = await this.admitPromptContent(params, rec.handle.agent.session.id)
     // Attachment admission crosses an async boundary where shutdown or an
     // agent-loop reload may detach the retained handle.
     this.assertLiveAgent(rec, params.sessionId)
@@ -190,6 +236,34 @@ export class HarnessSdkJsonRpcServer {
     })
     rec.handle.agent.followup(message)
     return { messageId: message.id }
+  }
+
+  /**
+   * Admit the prompt content for the configured route, describing inline
+   * images as text when the route cannot read them and a describer is mounted.
+   * @param params - target session and user content.
+   * @param sessionId - owning session, stamped on the understanding call.
+   * @returns durable content blocks in the caller's order.
+   * @throws when the route excludes images and nothing can describe them.
+   */
+  private async admitPromptContent(params: SessionPromptParams, sessionId: SessionId): Promise<ContentBlock[]> {
+    const hasImage = params.contentBlocks.some(block => block.type === 'image')
+    const modalities = hasImage
+      ? (await (this.ctx.get('llm') as LlmRuntime).resolveModelInfo(this.provider, this.model)).inputModalities
+      : undefined
+    if (hasImage && routeExcludesImages(modalities) && !(await this.canDescribeImages())) {
+      throw new Error(`Model "${this.model}" does not support image input.`)
+    }
+    return durablePromptContent(this.ctx, params.contentBlocks, modalities, sessionId)
+  }
+
+  /**
+   * Whether a mounted describer can supply text for images this route cannot read.
+   * @returns true when a describer resolved a usable vision route.
+   */
+  private async canDescribeImages(): Promise<boolean> {
+    const service = this.ctx.get('imageUnderstanding')
+    return service === undefined ? false : await service.resolveRoute() !== undefined
   }
 
   private assertLiveAgent(rec: SessionRecord, sessionId: string): void {

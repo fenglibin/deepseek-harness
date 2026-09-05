@@ -14,8 +14,9 @@
  */
 import type { LexicalEditor } from 'lexical'
 import {
-  COMMAND_PRIORITY_CRITICAL, KEY_ARROW_DOWN_COMMAND, KEY_ARROW_UP_COMMAND, KEY_ENTER_COMMAND,
-  KEY_ESCAPE_COMMAND, KEY_SPACE_COMMAND, KEY_TAB_COMMAND, PASTE_COMMAND,
+  COMMAND_PRIORITY_CRITICAL, DRAGOVER_COMMAND, DROP_COMMAND, KEY_ARROW_DOWN_COMMAND,
+  KEY_ARROW_UP_COMMAND, KEY_ENTER_COMMAND, KEY_ESCAPE_COMMAND, KEY_SPACE_COMMAND, KEY_TAB_COMMAND,
+  PASTE_COMMAND,
 } from 'lexical'
 import { mergeRegister } from '@lexical/utils'
 import type { ArbitrateKey, ArbitrateOutcome } from '../../contract/input.ts'
@@ -41,7 +42,6 @@ export interface ComposerKeymapHandlers {
 /** Composition state a keydown can trust (see the module doc's Safari note). */
 function isComposingEvent(event: KeyboardEvent, recentlyComposing: () => boolean): boolean {
   // keyCode 229 is the legacy IME-composition signal engines emit without isComposing.
-  // oxlint-disable-next-line typescript/no-deprecated
   return event.isComposing || event.keyCode === 229 || recentlyComposing()
 }
 
@@ -145,6 +145,20 @@ export function registerComposerKeymap(editor: LexicalEditor, handlers: Composer
       }
       event.preventDefault()
       handlers.pasteText(text)
+      return true
+    }, COMMAND_PRIORITY_CRITICAL),
+    // Document-level file drag onto the editor: accept Files so the drop
+    // below can fire; the intake path re-validates each batch.
+    editor.registerCommand(DRAGOVER_COMMAND, (event) => {
+      if (event.dataTransfer?.types.includes('Files') !== true) return false
+      event.preventDefault()
+      return true
+    }, COMMAND_PRIORITY_CRITICAL),
+    editor.registerCommand(DROP_COMMAND, (event) => {
+      const files = Array.from(event.dataTransfer?.files ?? [])
+      if (files.length === 0) return false
+      event.preventDefault()
+      handlers.intakeFiles(files)
       return true
     }, COMMAND_PRIORITY_CRITICAL),
   )

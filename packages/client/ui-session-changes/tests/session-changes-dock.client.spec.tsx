@@ -2,9 +2,10 @@
 
 /**
  * ui-session-changes browser half: the session-wide change folding over
- * per-turn deliverables, and the dock's collapse/expand + accept behavior.
+ * per-turn deliverables, the dock's collapse/expand + accept behavior, and
+ * the adapter-owned accept set's survival across a new request.
  */
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type {
   ConversationLocationDataStore, ConversationSnapshot, ConversationTurnDataMap, TurnLocation,
@@ -13,7 +14,7 @@ import type { DeliverablesTurnData } from '@deepseek-ai/dsh-client-ui-deliverabl
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import {
-  SessionChangesPanel, sessionChanges, type ProducedChange,
+  SessionChangesDock, SessionChangesPanel, sessionChanges, type ProducedChange,
 } from '../src/client/SessionChangesDock.tsx'
 import { zh } from '../src/client/locales.ts'
 // Type-only: registers the `session-changes` LocaleNamespaceMap merge so the
@@ -112,9 +113,22 @@ describe('SessionChangesPanel', () => {
 
   const headerName = new RegExp(t('title'))
 
-  function renderPanel() {
+  function renderPanel(overrides?: {
+    accepted?: ReadonlySet<string>
+    onAccept?: (path: string) => void
+    onAcceptAll?: (paths: readonly string[]) => void
+  }) {
+    const accepted = overrides?.accepted ?? new Set<string>()
+    const onAccept = overrides?.onAccept ?? vi.fn()
+    const onAcceptAll = overrides?.onAcceptAll ?? vi.fn()
     return render(
-      <SessionChangesPanel changes={changes} t={t} />,
+      <SessionChangesPanel
+        changes={changes}
+        accepted={accepted}
+        onAccept={onAccept}
+        onAcceptAll={onAcceptAll}
+        t={t}
+      />,
     )
   }
 
@@ -130,22 +144,90 @@ describe('SessionChangesPanel', () => {
   })
 
   it('accepts one file without touching the others', () => {
-    renderPanel()
+    const onAccept = vi.fn()
+    renderPanel({ onAccept })
     fireEvent.click(screen.getByRole('button', { name: headerName }))
 
     const acceptButtons = screen.getAllByRole('button', { name: t('accept') })
     expect(acceptButtons).toHaveLength(2)
     fireEvent.click(acceptButtons[0]!)
 
+    expect(onAccept).toHaveBeenCalledTimes(1)
+    expect(onAccept).toHaveBeenCalledWith('a.txt')
+  })
+
+  it('drops accepted files from the visible list using the adapter-owned set', () => {
+    const accepted = new Set(['a.txt'])
+    const onAccept = vi.fn()
+    renderPanel({ accepted, onAccept })
+    fireEvent.click(screen.getByRole('button', { name: headerName }))
+
     expect(screen.getByText(t('summary', { count: 1 }))).toBeDefined()
     expect(screen.queryByText('a.txt')).toBeNull()
     expect(screen.getByText('b.txt')).toBeDefined()
   })
 
-  it('accepts all files from the collapsed header and hides the dock once empty', () => {
-    renderPanel()
-    fireEvent.click(screen.getByRole('button', { name: t('acceptAll') }))
-
+  it('renders nothing when every change is in the accept set', () => {
+    const accepted = new Set(['a.txt', 'b.txt'])
+    renderPanel({ accepted })
     expect(screen.queryByTestId('session-changes')).toBeNull()
+  })
+
+  it('routes the bulk-accept button through the adapter-owned handler with pending paths', () => {
+    const onAcceptAll = vi.fn()
+    renderPanel({ onAcceptAll })
+    fireEvent.click(screen.getByRole('button', { name: t('acceptAll') }))
+    expect(onAcceptAll).toHaveBeenCalledTimes(1)
+    expect(onAcceptAll).toHaveBeenCalledWith(['a.txt', 'b.txt'])
+  })
+})
+
+describe('SessionChangesDock', () => {
+  afterEach(cleanup)
+
+  function dockProps(snapshot: ConversationSnapshot) {
+    const useConversation = <T,>(selector: (s: ConversationSnapshot) => T) => selector(snapshot)
+    return { useConversation, t } as unknown as Parameters<typeof SessionChangesDock>[0]
+  }
+
+  it('keeps accepted files dismissed when the conversation adds a new turn', () => {
+    // First turn: agent writes a.txt and b.txt.
+    const before = conversationOf([
+      turnLocation(1, [
+        { path: 'a.txt', operation: 'write' },
+        { path: 'b.txt', operation: 'write' },
+      ]),
+    ])
+    const { rerender } = render(<SessionChangesDock {...dockProps(before)} />)
+    expect(screen.getByText(t('summary', { count: 2 }))).toBeDefined()
+
+    // Reader accepts a.txt (the bug scenario: a new request arrives before
+    // the reader has had a chance to accept every prior file).
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(t('title')) }))
+    const perFileAccepts = screen.getAllByRole('button', { name: t('accept') })
+    fireEvent.click(perFileAccepts[0]!)
+    expect(screen.getByText(t('summary', { count: 1 }))).toBeDefined()
+    expect(screen.queryByText('a.txt')).toBeNull()
+    expect(screen.getByText('b.txt')).toBeDefined()
+
+    // New turn lands: the agent adds c.txt and re-edits b.txt. The dock must
+    // still hide a.txt (it was accepted) and now show b.txt + c.txt; a
+    // previous incarnation of the component would reset the accept set and
+    // resurrect a.txt as if the reader had never accepted it.
+    const after = conversationOf([
+      turnLocation(1, [
+        { path: 'a.txt', operation: 'write' },
+        { path: 'b.txt', operation: 'write' },
+      ]),
+      turnLocation(2, [
+        { path: 'b.txt', operation: 'edit' },
+        { path: 'c.txt', operation: 'write' },
+      ]),
+    ])
+    rerender(<SessionChangesDock {...dockProps(after)} />)
+    expect(screen.getByText(t('summary', { count: 2 }))).toBeDefined()
+    expect(screen.queryByText('a.txt')).toBeNull()
+    expect(screen.getByText('b.txt')).toBeDefined()
+    expect(screen.getByText('c.txt')).toBeDefined()
   })
 })

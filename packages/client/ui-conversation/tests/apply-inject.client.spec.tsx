@@ -153,7 +153,6 @@ describe('Conversation inject API', () => {
     // inject on its new binding.
     const ghost = injectBar('ghost' as SessionId)
     expect(ghost.keyboard).toBeUndefined()
-    expect(ghost.draftImages).toBeUndefined()
     expect(ghost.stop).toBeUndefined()
     expect(ghost.hooks.notices.getSnapshot()).toBeNull()
 

@@ -15,7 +15,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { queueReadFaceOf } from './queue-store.ts'
 import type {
-  ComposerKeyboard, DraftAttachmentId, InputTriggerController, SessionInputResolver, SessionInput,
+  ComposerKeyboard, DraftAttachmentId, DraftPart, InputTriggerController, SessionInputResolver, SessionInput,
   SubmitImageAttachment, SubmitOutcome,
 } from '../contract/input.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
@@ -37,8 +37,7 @@ interface InputTriggerServiceFace {
 interface ConversationAttachmentFace {
   sendSession(
     session: SessionFace,
-    text: string,
-    imageIds: readonly DraftAttachmentId[],
+    parts: readonly DraftPart[],
     mode: InputSubmitMode,
     signal?: AbortSignal,
   ): Promise<SubmitOutcome>
@@ -88,7 +87,7 @@ export class InputHub implements SessionInputResolver {
       inputTriggers: () => this.controller(actx),
       popup: () => this.popup(actx),
       queue: queueReadFaceOf(session),
-      defaultSink: (text, imageIds, mode, signal) => this.sink(session, text, imageIds, mode, signal),
+      defaultSink: (parts, mode, signal) => this.sink(session, parts, mode, signal),
       steerQueue: () => { void this.steerQueue(session, shell) },
       commandImages: {
         serialize: ids => this.conversation().serializeDraftImages(ids),
@@ -103,6 +102,16 @@ export class InputHub implements SessionInputResolver {
         unsupportedNotice: token => this.t('command.imagesUnsupported', {
           command: token.trim().replace(/^\//u, ''),
         }),
+      },
+      imageLabels: {
+        remove: name => this.t('image.remove', { name }),
+        pending: () => this.t('image.pending'),
+        lightboxDialog: () => this.t('image.preview'),
+        lightboxClose: () => this.t('image.closePreview'),
+      },
+      releaseImage: (id) => {
+        const conversation = this.rootCtx.get('conversation') as ConversationAttachmentFace | undefined
+        conversation?.releaseDraftImage(id)
       },
     })
     this.shells.set(id, shell)
@@ -192,13 +201,12 @@ export class InputHub implements SessionInputResolver {
    */
   private sink(
     session: SessionFace,
-    text: string,
-    imageIds: readonly DraftAttachmentId[],
+    parts: readonly DraftPart[],
     mode: InputSubmitMode,
     signal: AbortSignal,
   ): Promise<SubmitOutcome> {
-    if (text === '' && imageIds.length === 0) return Promise.resolve({ kind: 'success' })
-    return this.conversation().sendSession(session, text, imageIds, mode, signal)
+    if (parts.length === 0) return Promise.resolve({ kind: 'success' })
+    return this.conversation().sendSession(session, parts, mode, signal)
   }
 
   /**

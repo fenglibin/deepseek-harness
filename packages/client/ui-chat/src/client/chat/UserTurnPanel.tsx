@@ -3,24 +3,27 @@
  *
  * The collapsed mode is a circular toggle pinned on the right gutter (a
  * visual sibling of {@link TurnNavigator}); the open mode swaps the toggle
- * for a vertical panel listing every loaded user turn with its first-line
- * preview. The panel reuses the live Chat-snapshot navigation data, so the
- * list grows naturally when the user loads older history, and the active
- * row tracks the same `activeTurn` {@link TurnNavigator} already publishes.
+ * for a vertical panel listing every user turn in the durable log with its
+ * first-line preview. The panel reads the whole-log `turnOutline` projection
+ * (one entry per turn that opened with a direct user prompt), so the list is
+ * complete on re-entry regardless of how much history the client has paged
+ * in, and the only way it changes is a new user message landing. Picking a
+ * row pages older history on demand when the target turn is not yet loaded.
  */
 import {
   useEffect, useId, useRef, useState, type CSSProperties,
 } from 'react'
 import { useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { TurnOutlineEntry } from '@deepseek-ai/dsh-session-stats/client'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
-import type { TurnNavigationItem } from '../contract/snapshot.ts'
 import css from './UserTurnPanel.module.css'
 
 interface UserTurnPanelProps {
-  /** Loaded Turn navigation items; entries without a direct user prompt are filtered out. */
-  readonly items: readonly TurnNavigationItem[]
+  /** Whole-log user-turn outline (turn + prompt), independent of paging. */
+  readonly items: readonly TurnOutlineEntry[]
   readonly activeTurn: number | null
-  readonly onNavigate: (item: TurnNavigationItem) => void
+  /** Turn-number handler: the host pages older history when the turn is unloaded. */
+  readonly onNavigate: (turn: number) => void
   readonly t: ChatViewSlotProps['t']
 }
 
@@ -48,10 +51,10 @@ function trimPrompt(text: string): string {
 }
 
 /**
- * User-message drawer. {@link items} may include turns whose `prompt` is
- * empty (mid-Turn loaded windows, compaction entries); filtering keeps the
- * drawer strictly user-facing and is also what renders the empty state
- * honest. Each row's `aria-current` mirrors {@link activeTurn} so the
+ * User-message drawer. `items` is the whole-log outline, so every entry
+ * already represents a turn with a direct user prompt — no client-side
+ * filtering is needed, and the empty state honestly reports "no user
+ * messages yet". Each row's `aria-current` mirrors `activeTurn` so the
  * highlighted row and {@link TurnNavigator}'s active mark stay in lockstep.
  */
 export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPanelProps) {
@@ -60,11 +63,7 @@ export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPane
   const headingId = useId()
   const labelId = useId()
 
-  // The rail carries every loaded Turn, including windows that start mid-Turn
-  // (empty prompt); filtering keeps the drawer strictly user-facing and also
-  // makes the empty state honest.
-  const userTurns = items.filter(item => item.prompt !== '')
-  const count = userTurns.length
+  const count = items.length
 
   useDismissOnOutsidePointer(root, open, setOpen)
 
@@ -81,8 +80,8 @@ export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPane
 
   if (count === 0) return null
 
-  const onPick = (item: TurnNavigationItem): void => {
-    onNavigate(item)
+  const onPick = (turn: number): void => {
+    onNavigate(turn)
     setOpen(false)
   }
 
@@ -104,7 +103,7 @@ export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPane
             </span>
           </header>
           <ol className={css.list} aria-describedby={labelId}>
-            {userTurns.map((item) => {
+            {items.map((item) => {
               const active = item.turn === activeTurn
               return (
                 <li key={item.turn}>
@@ -112,7 +111,7 @@ export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPane
                     type="button"
                     className={active ? `${css.item} ${css.itemActive}` : css.item}
                     aria-current={active ? 'true' : undefined}
-                    onClick={() => { onPick(item) }}
+                    onClick={() => { onPick(item.turn) }}
                   >
                     <span className={css.tag} aria-hidden>#{ZERO_PAD(item.turn)}</span>
                     <span className={css.preview}>{trimPrompt(item.prompt)}</span>

@@ -86,7 +86,10 @@ function progressLabel(todos: readonly TodoItem[], t: TodoPanelProps['t']): stri
 }
 
 export function TodoPanel({ todos, t }: TodoPanelProps) {
-  const [collapsed, setCollapsed] = useState(true)
+  // Plan strips are operational state the reader refers to constantly while
+  // an agent is running, so the panel defaults expanded; the collapse toggle
+  // is the reader's escape hatch, not the default.
+  const [collapsed, setCollapsed] = useState(false)
   if (todos.length === 0) return null
 
   return (

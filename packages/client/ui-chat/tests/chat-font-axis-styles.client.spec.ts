@@ -148,11 +148,12 @@ describe('chat flow font-size axis', () => {
     expect(narrow).toMatch(/\.root \+ \.root \{[^}]*margin-left: 0/)
   })
 
-  it('non-latest turn tails hide the whole actions row until hover or focus', () => {
-    // TurnTailNodeView tags its root data-actions-reveal='hover' for every
-    // turn but the latest; the gate lives under @media (hover: hover) so
-    // no-hover devices keep the row visible. 'always' has no rule at all —
-    // absence, not an override, keeps the latest turn's row shown.
+  it('non-latest user rows hide their actions row until hover or focus', () => {
+    // User rows gate their actions by recency through data-actions-reveal='hover':
+    // every row but the latest stays hidden until hover or focus-within, while
+    // the latest ('always') is shown by default. Turn-tail rows opt out of the
+    // recency gate and always show their actions; 'always' has no rule at all —
+    // absence, not an override, keeps the latest user row's actions visible.
     const css = read('MessageIconActions.module.css')
     expect(declarationsFrom(css, "[data-actions-reveal='hover'] .actions"))
       .toEqual(expect.arrayContaining(['opacity: 0']))

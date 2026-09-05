@@ -7,6 +7,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import { CompactionId } from '@deepseek-ai/dsh-compaction'
 import DeepSeekLlmApiExtensionRegistry from '@deepseek-ai/dsh-deepseek-llm-api-extensions'
 import LlmRuntime, { ToolCallId, createUserMessage, GenerateOptions, LlmAdapter, StreamChunk } from '@deepseek-ai/dsh-llm'
+import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import {
   type Config,
   type ReplayEntry,
@@ -125,6 +126,12 @@ describe('parseSessionLog', () => {
       .toThrow('session snapshot line 2: sourceEventSeqs ranges require start <= end')
   })
 
+  it('reports a body row that is not valid JSON with its source line', () => {
+    const header = JSON.stringify({ type: 'session', version: 0, id: 's1', createdAt: 0 })
+    expect(() => parseSessionLog(`${header}\n{not json}\n`))
+      .toThrow('session snapshot line 2 contains invalid JSON')
+  })
+
   it('rejects non-object body rows with their source line', () => {
     const header = JSON.stringify({ type: 'session', version: 0, id: 's1', createdAt: 0 })
     expect(() => parseSessionLog(`${header}\nnull\n`))
@@ -220,6 +227,83 @@ describe('deriveReplayScript', () => {
 
   it('returns an empty script for a log with no assistant/chunk events', () => {
     expect(deriveReplayScript([])).toEqual([])
+  })
+
+  it('derives one image-understanding call from a described image before its turn request', () => {
+    const descriptionChunks: StreamChunk[] = [
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'block-end', index: 0, block: { type: 'text', text: 'A red dot.' } },
+      { type: 'finish', reason: { kind: 'stop' } },
+    ]
+    let seq = 1
+    const events: SessionEvent[] = [
+      {
+        type: 'user/message', seq: seq++, time: 0,
+        data: createUserMessage({
+          source: { kind: 'user' },
+          content: [
+            { type: 'text', text: 'Inspect this:' },
+            {
+              type: 'image',
+              attachment: { attachmentId: AttachmentId('sha256:aaa'), mediaType: 'image/png', width: 1, height: 1, bytes: 69 },
+              description: {
+                text: 'A red dot.',
+                source: { provider: 'deepseek-official', model: 'deepseek-v4-flash-vision-exp', instruction: 'Describe it.' },
+              },
+            },
+          ],
+        }),
+      },
+      ...TEXT_CHUNKS.map(chunk => chunkEvent(seq++, 1, 1, chunk)),
+    ]
+    expect(deriveReplayScript(events)).toEqual([
+      { kind: 'chunks', chunks: descriptionChunks },
+      { kind: 'chunks', chunks: TEXT_CHUNKS },
+    ])
+  })
+
+  it('emits one understanding call per source-route/attachment pair across turns', () => {
+    const description = {
+      text: 'A red dot.',
+      source: { provider: 'deepseek-official', model: 'deepseek-v4-flash-vision-exp', instruction: 'Describe it.' },
+    }
+    const describedImage = () => ({
+      type: 'image' as const,
+      attachment: { attachmentId: AttachmentId('sha256:aaa'), mediaType: 'image/png' as const, width: 1, height: 1, bytes: 69 },
+      description,
+    })
+    let seq = 1
+    const events: SessionEvent[] = [
+      {
+        type: 'user/message', seq: seq++, time: 0,
+        data: createUserMessage({ source: { kind: 'user' }, content: [describedImage()] }),
+      },
+      ...TEXT_CHUNKS.map(chunk => chunkEvent(seq++, 1, 1, chunk)),
+      {
+        type: 'user/message', seq: seq++, time: 0,
+        data: createUserMessage({ source: { kind: 'user' }, content: [describedImage()] }),
+      },
+      ...TEXT_CHUNKS.map(chunk => chunkEvent(seq++, 2, 1, chunk)),
+    ]
+    expect(deriveReplayScript(events)).toHaveLength(3) // 1 understanding call + 2 turn requests
+  })
+
+  it('derives no understanding call for an image without a description', () => {
+    let seq = 1
+    const events: SessionEvent[] = [
+      {
+        type: 'user/message', seq: seq++, time: 0,
+        data: createUserMessage({
+          source: { kind: 'user' },
+          content: [{
+            type: 'image',
+            attachment: { attachmentId: AttachmentId('sha256:aaa'), mediaType: 'image/png', width: 1, height: 1, bytes: 69 },
+          }],
+        }),
+      },
+      ...TEXT_CHUNKS.map(chunk => chunkEvent(seq++, 1, 1, chunk)),
+    ]
+    expect(deriveReplayScript(events)).toEqual([{ kind: 'chunks', chunks: TEXT_CHUNKS }])
   })
 
   it('keeps a finish-error chunk in the derived entry (replays naturally)', () => {

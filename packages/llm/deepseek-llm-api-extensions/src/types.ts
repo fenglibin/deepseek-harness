@@ -21,8 +21,13 @@ export interface DeepSeekLlmApiExtensionRequest {
   readonly body: Readonly<Record<string, DeepSeekLlmApiJson>>
   /** Session identity carried by the model request, when present. */
   readonly sessionId?: string
-  /** Auxiliary request classification, when present. */
-  readonly purpose?: 'compaction' | 'session-title'
+  /**
+   * Auxiliary request classification, when present. This union mirrors
+   * `GenerateOptions.purpose` in `@deepseek-ai/dsh-llm`, which the adapter maps
+   * onto this field; the two stay apart because this package carries no LLM
+   * dependency, so adding a purpose needs both sides.
+   */
+  readonly purpose?: 'compaction' | 'session-title' | 'image-understanding'
   /** Cancellation for request preparation; providers must stop promptly after abort. */
   readonly signal: AbortSignal
 }

@@ -5,6 +5,8 @@
 
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
+import { AttachmentId } from '@deepseek-ai/dsh-attachment'
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { createUserMessage, ToolCallId, StreamChunk  } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
@@ -13,7 +15,7 @@ import ToolRuntime, { defineContentToolFixture, TOOL_ABORTED_BEFORE_DISPATCH, TO
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import AgentLoop, { DEFAULT_MAX_PARALLEL_TOOL_CALLS } from '@deepseek-ai/dsh-agent-loop'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
-import { MockAdapter, textResponse } from './mock-adapter.ts'
+import { MockAdapter, textResponse, toolCallResponse } from './mock-adapter.ts'
 import { CodeRuntime } from '@deepseek-ai/dsh-code-runtime'
 import type { CodeRunRequest, CodeRunResult } from '@deepseek-ai/dsh-code-runtime'
 
@@ -765,5 +767,86 @@ describe('PTC mode native-tool denial through the agent loop', () => {
       name: 'ToolNotFoundError',
       code: 'UNKNOWN_TOOL',
     })
+  })
+})
+
+describe('tool-result image description', () => {
+  const shotRef: ImageAttachmentRef = {
+    attachmentId: AttachmentId(`sha256:${'f'.repeat(64)}`),
+    mediaType: 'image/png',
+    bytes: 9,
+    width: 3,
+    height: 3,
+  }
+  const description = {
+    text: 'A red dot.',
+    source: { provider: 'vision', model: 'vision-model', instruction: 'Describe it.' },
+  }
+
+  function screenshotTool() {
+    return defineContentToolFixture({
+      name: 'shot',
+      description: 'captures the screen',
+      parameters: {},
+      async execute() {
+        return [{ type: 'image', attachment: shotRef }]
+      },
+    })
+  }
+
+  function resultImageBlock(agent: Agent) {
+    const resultEvent = [...agent.session.events].find(e => e.type === 'tool/result')
+    if (resultEvent?.type !== 'tool/result') throw new Error('expected a tool/result event')
+    const block = resultEvent.data.message.content[0]
+    if (block?.type !== 'tool-result') throw new Error('expected a tool-result block')
+    return block.content[0]
+  }
+
+  it('attaches a generated description to a tool-result image for a text-only route', async () => {
+    const adapter = new MockAdapter([
+      toolCallResponse('c1', 'shot', {}),
+      textResponse('done'),
+    ], undefined, undefined, ['text'])
+    const ctx = await harness(adapter)
+    ctx.provide('imageUnderstanding', {
+      describe: () => Promise.resolve([description]),
+    } as never)
+    ctx.tools.register(screenshotTool())
+    const agent = ctx.agentLoop.create(SessionId('a-desc'), { provider: 'mock', model: 'mock' })
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+    await waitForIdle(ctx, agent)
+
+    expect(resultImageBlock(agent)).toEqual({ type: 'image', attachment: shotRef, description })
+  })
+
+  it('leaves a tool-result image undescribed for an image-capable route', async () => {
+    const adapter = new MockAdapter([
+      toolCallResponse('c1', 'shot', {}),
+      textResponse('done'),
+    ], undefined, undefined, ['text', 'image'])
+    const ctx = await harness(adapter)
+    ctx.provide('imageUnderstanding', {
+      describe: () => { throw new Error('must not be called for an image-capable route') },
+    } as never)
+    ctx.tools.register(screenshotTool())
+    const agent = ctx.agentLoop.create(SessionId('a-vision'), { provider: 'mock', model: 'mock' })
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+    await waitForIdle(ctx, agent)
+
+    expect(resultImageBlock(agent)).toEqual({ type: 'image', attachment: shotRef })
+  })
+
+  it('leaves a tool-result image undescribed when no describer is mounted', async () => {
+    const adapter = new MockAdapter([
+      toolCallResponse('c1', 'shot', {}),
+      textResponse('done'),
+    ], undefined, undefined, ['text'])
+    const ctx = await harness(adapter)
+    ctx.tools.register(screenshotTool())
+    const agent = ctx.agentLoop.create(SessionId('a-none'), { provider: 'mock', model: 'mock' })
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+    await waitForIdle(ctx, agent)
+
+    expect(resultImageBlock(agent)).toEqual({ type: 'image', attachment: shotRef })
   })
 })

@@ -37,7 +37,7 @@ async function pasteText(surface: HTMLElement, text: string): Promise<void> {
   await waitFor(() => { expect(surface.textContent).toContain(text) })
 }
 
-/** Paste one tiny PNG into the composer and wait for its rail thumbnail. */
+/** Paste one tiny PNG into the composer and wait for its inline chip thumbnail. */
 async function pasteImage(textarea: HTMLElement, name: string): Promise<void> {
   const image = new File([new Uint8Array([137, 80, 78, 71])], name, { type: 'image/png' })
   fireEvent.paste(textarea, {
@@ -47,9 +47,7 @@ async function pasteImage(textarea: HTMLElement, name: string): Promise<void> {
     },
   })
   await waitFor(() => {
-    const rail = document.querySelector('[role="group"][aria-label="Pending images"]')
-    if (rail === null) throw new Error('attachment rail missing')
-    expect([...rail.querySelectorAll('img')].map(img => img.getAttribute('alt'))).toContain(name)
+    expect([...textarea.querySelectorAll('img')].map(img => img.getAttribute('alt'))).toContain(name)
   }, { timeout: 5_000 })
 }
 
@@ -73,10 +71,9 @@ it('refuses an image-carrying submit to a non-declaring command and keeps draft 
   expect(notice.textContent).toBe('/echo does not accept image attachments; remove them first')
   expect([...document.querySelectorAll('[role="status"]')]
     .some(candidate => candidate.textContent?.includes('image attachments') ?? false)).toBe(false)
-  // The whole envelope is retained: draft text and the rail thumbnail.
+  // The whole envelope is retained: draft text and the inline thumbnail.
   await waitFor(() => { expect(textarea.textContent).toBe('/echo hello') })
-  const rail = document.querySelector('[role="group"][aria-label="Pending images"]')
-  expect([...(rail?.querySelectorAll('img') ?? [])].map(img => img.getAttribute('alt'))).toEqual(['ref.png'])
+  expect([...textarea.querySelectorAll('img')].map(img => img.getAttribute('alt'))).toEqual(['ref.png'])
 })
 
 it('consumes images through a declaring command and clears the composer on success', async () => {
@@ -91,7 +88,7 @@ it('consumes images through a declaring command and clears the composer on succe
 
   await waitFor(() => {
     expect(textarea.textContent).toBe('')
-    expect(document.querySelector('[role="group"][aria-label="Pending images"]')).toBeNull()
+    expect(textarea.querySelector('img')).toBeNull()
   }, { timeout: 5_000 })
 })
 
@@ -107,7 +104,7 @@ it('submits a bare /plan with an image as an image-only plan request', async () 
 
   await waitFor(() => {
     expect(textarea.textContent).toBe('')
-    expect(document.querySelector('[role="group"][aria-label="Pending images"]')).toBeNull()
+    expect(textarea.querySelector('img')).toBeNull()
   }, { timeout: 5_000 })
   expect([...document.querySelectorAll('[role="alert"]')]
     .some(candidate => candidate.textContent?.includes('/plan') ?? false)).toBe(false)

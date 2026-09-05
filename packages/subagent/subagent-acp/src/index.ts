@@ -25,6 +25,12 @@ export const inject = ['subagents', 'subprocess']
 
 /** Config: how to spawn and drive the child ACP agent process. */
 export interface Config {
+  /**
+   * Master switch: when `false`, the plugin registers no provider and performs
+   * no validation, so a deployment whose command is absent (e.g. a machine
+   * without CodeBuddy) loads unchanged. Default `true`.
+   */
+  enabled?: boolean
   /** Provider name on `ctx.subagents` (default `acp`). */
   providerName: string
   /** The executable to spawn for each run (the child ACP agent). */
@@ -64,6 +70,7 @@ export interface Config {
 }
 
 export const Config: z<Config> = z.object({
+  enabled: z.boolean().default(true),
   providerName: z.string().default('acp'),
   command: z.string().required(),
   args: z.array(z.string()).default([]),
@@ -190,6 +197,10 @@ class AcpProvider implements SubagentProvider {
 export function apply(ctx: Context, config: Config): void {
   // schemastery (Config) has already filled every defaulted field.
   const resolved = config as ResolvedConfig
+  // An explicit `enabled: false` keeps the row dormant: no provider is
+  // registered and no field is validated, so a deployment whose command is
+  // absent (a machine without CodeBuddy) loads unchanged.
+  if (!resolved.enabled) return
   assertPositiveFinite('disposeEofGraceMs', resolved.disposeEofGraceMs)
   assertPositiveFinite('disposeGraceMs', resolved.disposeGraceMs)
   // `path.resolve('')` is the process cwd — an empty string would silently

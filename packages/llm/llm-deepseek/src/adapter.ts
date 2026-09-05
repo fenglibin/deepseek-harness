@@ -218,7 +218,7 @@ async function prepareRequestImages(
 ): Promise<Map<AttachmentId, RequestImageAttachment>> {
   const refs = new Map<AttachmentId, ImageAttachmentRef>()
   for (const message of options.messages) collectImageRefs(message.content, refs)
-  const policy = resolveRequestImagePolicy(model)
+  const policy = options.requestImagePolicy ?? resolveRequestImagePolicy(model)
   const orderedRefs = [...refs.values()]
   const projected = await Promise.all(orderedRefs.map(
     ref => attachments.readImageRequest(ref, policy, signal),
@@ -544,7 +544,7 @@ export class DeepSeekAdapter extends LlmAdapter {
 
     const fileConnection = { baseURL: connection.baseURL, apiKey }
     const model = connection.models.find(entry => entry.id === options.model)
-    const policy = model === undefined ? undefined : resolveRequestImagePolicy(model)
+    const policy = model === undefined ? undefined : options.requestImagePolicy ?? resolveRequestImagePolicy(model)
     const resolveImageAccess = attachments === undefined
       ? undefined
       : (ref: ImageAttachmentRef): ImageAttachmentAccess | undefined => this.config.resolveImageAccess?.(attachments, ref)

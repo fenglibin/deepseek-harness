@@ -1054,6 +1054,26 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'imageUnderstanding',
+    summary: 'Generated descriptions for durable images.',
+    description: 'Generated descriptions for durable images. Implementations answer one route question and one batch question; a batch answer is always index-aligned with its input, so a caller can attach each result to the block it came from.',
+    methods: [
+      {
+        signature: 'abstract resolveRoute(signal?: AbortSignal): Promise<ImageDescriberRoute | undefined>',
+        description: 'Resolve the route this deployment uses, validating it on first use.',
+        parameters: [{ name: 'signal', description: 'cancellation for the provider-directory reads this may perform.' }],
+        returns: 'the route in force, or `undefined` when no model can describe images.',
+        throws: ['when a configured route exists but cannot serve the call.'],
+      },
+      {
+        signature: 'abstract describe( refs: readonly ImageAttachmentRef[], signal?: AbortSignal, ): Promise<readonly ImageDescriptionResult[]>',
+        description: 'Describe every reference that has no description yet.',
+        parameters: [{ name: 'refs', description: 'durable normalized attachments in owning-message order.' }, { name: 'signal', description: 'cancellation shared by every call this batch makes.' }],
+        returns: 'one description or `undefined` per input, aligned by index.',
+      },
+    ],
+  },
+  {
     key: 'inspector',
     summary: 'Shared Host/Client service façade over the realm\'s source publisher.',
     description: 'Shared Host/Client service façade over the realm\'s source publisher.',
@@ -4020,7 +4040,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DeepSeekLlmApiExtensionRequest',
-    declaration: 'export interface DeepSeekLlmApiExtensionRequest {\n    readonly body: Readonly<Record<string, DeepSeekLlmApiJson>>;\n    readonly sessionId?: string;\n    readonly purpose?: \'compaction\' | \'session-title\';\n    readonly signal: AbortSignal;\n}',
+    declaration: 'export interface DeepSeekLlmApiExtensionRequest {\n    readonly body: Readonly<Record<string, DeepSeekLlmApiJson>>;\n    readonly sessionId?: string;\n    readonly purpose?: \'compaction\' | \'session-title\' | \'image-understanding\';\n    readonly signal: AbortSignal;\n}',
   },
   {
     name: 'DeepSeekLlmApiJson',
@@ -4248,7 +4268,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GenerateOptions',
-    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\';\n}',
+    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\' | \'image-understanding\';\n}',
   },
   {
     name: 'GenericCallView',
@@ -4308,7 +4328,23 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ImageBlock',
-    declaration: 'export interface ImageBlock {\n    type: \'image\';\n    attachment: ImageAttachmentRef;\n}',
+    declaration: 'export interface ImageBlock {\n    type: \'image\';\n    attachment: ImageAttachmentRef;\n    description?: ImageDescription;\n}',
+  },
+  {
+    name: 'ImageDescriberRoute',
+    declaration: 'export interface ImageDescriberRoute {\n    provider: string;\n    model: string;\n    instruction: string;\n}',
+  },
+  {
+    name: 'ImageDescription',
+    declaration: 'export interface ImageDescription {\n    text: string;\n    source: ImageDescriptionSource;\n}',
+  },
+  {
+    name: 'ImageDescriptionResult',
+    declaration: 'export type ImageDescriptionResult = ImageDescription | undefined;',
+  },
+  {
+    name: 'ImageDescriptionSource',
+    declaration: 'export interface ImageDescriptionSource {\n    provider: string;\n    model: string;\n    instruction: string;\n}',
   },
   {
     name: 'ImageMediaType',

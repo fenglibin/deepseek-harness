@@ -1438,3 +1438,47 @@ describe('dsh-subagent-acp', () => {
     expect(typeof unwrapped.apply).toBe('function')
   })
 })
+
+describe('enabled switch', () => {
+  it('registers the provider by default when enabled is omitted', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    await ctx.plugin(acp, { providerName: 'acp', command: 'x', args: [], permission: 'reject', env: {} })
+    expect(ctx.subagents.list()).toEqual(['acp'])
+    await ctx.fiber.dispose()
+  })
+
+  it('registers no provider when enabled is false', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    await ctx.plugin(acp, { enabled: false, providerName: 'acp', command: 'x', args: [], permission: 'reject', env: {} })
+    expect(ctx.subagents.list()).toEqual([])
+    await ctx.fiber.dispose()
+  })
+
+  it('skips all validation when disabled, so a dormant row never fails load', async () => {
+    // A disabled row may hold an absent command, an unusable cwd, and invalid
+    // graces: none of it is validated because the provider is not registered.
+    const ctx = new Context()
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(LocalSubprocessRuntime)
+    await expect(ctx.plugin(acp, {
+      enabled: false,
+      providerName: 'acp',
+      command: '/nonexistent/codebuddy-binary',
+      args: [],
+      cwd: '/nonexistent/codebuddy-workspace',
+      permission: 'reject',
+      env: {},
+      disposeEofGraceMs: -1,
+      disposeGraceMs: Number.NaN,
+    })).resolves.toBeTruthy()
+    expect(ctx.subagents.list()).toEqual([])
+    await ctx.fiber.dispose()
+  })
+})

@@ -82,6 +82,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   webServer: 'web-server.md',
   invariants: 'invariants.md',
   llm: 'llm-streaming.md',
+  imageUnderstanding: 'llm-streaming.md',
   lsp: 'lsp.md',
   messageFeedback: 'feedback.md',
   permissionPresets: 'permission-presets.md',
@@ -741,6 +742,9 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   WorkflowAgentEndInfo: 'event-local snapshot is owned by packages/workflow/workflow/src/index.ts',
   WorkflowAgentInfo: 'event-local snapshot is owned by packages/workflow/workflow/src/index.ts',
   WorkflowResultInfo: 'event-local snapshot is owned by packages/workflow/workflow/src/index.ts',
+  ImageDescriberRoute: 'vision route contract is owned by packages/llm/image-understanding/README.md',
+  ImageDescriptionResult:
+    'generated description result is owned by packages/llm/image-understanding/README.md',
 }
 
 /** Repository data policy consumed by the Cordis catalog projector. */

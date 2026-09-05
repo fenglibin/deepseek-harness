@@ -46,7 +46,7 @@ async function writeContractConfig(suffix: string): Promise<string> {
 }
 
 describe('Oxlint executable contract', () => {
-  it('discovers the owning TypeScript project for every file class', { timeout: 30_000 }, async () => {
+  it('discovers the owning TypeScript project for every file class', { timeout: 90_000 }, async () => {
     const suffix = randomUUID()
     const configPath = await writeContractConfig(suffix)
     const probes = [
@@ -105,9 +105,9 @@ probePromise()
         rm(configPath, { force: true }),
       ])
     }
-  }, 90_000)
+  })
 
-  it('runs JavaScript compatibility and nursery rules', { timeout: 30_000 }, async () => {
+  it('runs JavaScript compatibility and nursery rules', { timeout: 90_000 }, async () => {
     const suffix = randomUUID()
     const configPath = await writeContractConfig(suffix)
     const path = join(repositoryRoot, 'scripts', `oxlint-contract-${suffix}.ts`)
@@ -152,9 +152,9 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
         rm(configPath, { force: true }),
       ])
     }
-  }, 90_000)
+  })
 
-  it('keeps the complete stylistic contract in Oxlint', { timeout: 30_000 }, async () => {
+  it('keeps the complete stylistic contract in Oxlint', { timeout: 90_000 }, async () => {
     const oxlintPath = join(repositoryRoot, '.oxlintrc.json')
     const result = parseConfigFileTextToJson(oxlintPath, await readFile(oxlintPath, 'utf8'))
     if (result.error !== undefined) {
@@ -252,7 +252,7 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
         rm(configPath, { force: true }),
       ])
     }
-  }, 90_000)
+  })
 
   it('accepts an ignored-only staged selection', { timeout: 30_000 }, () => {
     const result = runOxlint([

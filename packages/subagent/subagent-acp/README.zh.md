@@ -35,6 +35,7 @@ kind: "package-reference"
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
+| `enabled` | `true` | 总开关；`false` 时不注册 provider 也不做任何校验，因此命令缺失的部署也能照常加载 |
 | `providerName` | `acp` | `ctx.subagents` 上的注册表名称 |
 | `command` | 必填 | 每次运行时 spawn 的可执行文件（子 ACP agent） |
 | `args` | `[]` | 命令参数 |

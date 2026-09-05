@@ -245,10 +245,13 @@ export function parseSessionHeader(text: string): { id: string; createdAt: numbe
  * Splits `assistant/chunk` events at every `finish`, using turn and step changes
  * to detect an unterminated prior call. A `compaction/summary` explicitly marked
  * as one local LLM-stream call becomes a canonical successful stream from its
- * complete `rawOutput` at the summary's log position. A
- * missing assistant terminator means the live stream threw, so derivation
- * rejects and the scenario must provide an explicit override. Multiple calls
- * may share one turn and step when the loop retries.
+ * complete `rawOutput` at the summary's log position. A described image in a
+ * `user/message` becomes a canonical one-text-block stream from its recorded
+ * description, placed before the turn's first derived request because the
+ * admission-time understanding call precedes it. A missing assistant terminator
+ * means the live stream threw, so derivation rejects and the scenario must
+ * provide an explicit override. Multiple calls may share one turn and step when
+ * the loop retries.
  * @param events - the recorded session's events.
  * @returns one `chunks` entry per recorded model call, in call order.
  */
@@ -256,6 +259,9 @@ export function deriveReplayScript(events: SessionEvent[]): ReplayEntry[] {
   const script: ReplayEntry[] = []
   let currentKey: string | undefined
   let current: StreamChunk[] = []
+  // Described attachment/source pairs already emitted; a cache hit replays no
+  // call, so each pair contributes one entry across the whole session.
+  const described = new Set<string>()
   const close = (key: string | undefined, chunks: StreamChunk[]): void => {
     if (chunks.length === 0) return
     if (chunks[chunks.length - 1]?.type !== 'finish') {
@@ -290,6 +296,35 @@ export function deriveReplayScript(events: SessionEvent[]): ReplayEntry[] {
         if (persisted.usage !== undefined) chunks.push({ type: 'usage', usage: persisted.usage })
         chunks.push({ type: 'finish', reason: { kind: 'stop' } })
         script.push({ kind: 'chunks', chunks })
+      }
+      continue
+    }
+    if (event.type === 'user/message') {
+      // A described image reached this message through one admission-time
+      // vision call (purpose: image-understanding). That call produces no
+      // assistant/chunk, so derive its canonical text stream from the
+      // description the log already carries; the admission path replays it in
+      // the same order, before the turn's first request. A cache hit replays
+      // no call, so one entry is emitted per source-route/attachment pair.
+      close(currentKey, current)
+      currentKey = undefined
+      current = []
+      for (const block of event.data.content) {
+        if (block.type !== 'image') continue
+        const description = block.description
+        if (description === undefined) continue
+        const key = `${description.source.provider}\u0000${description.source.model}\u0000`
+          + `${description.source.instruction}\u0000${String(block.attachment.attachmentId)}`
+        if (described.has(key)) continue
+        described.add(key)
+        script.push({
+          kind: 'chunks',
+          chunks: [
+            { type: 'block-start', index: 0, blockType: 'text' },
+            { type: 'block-end', index: 0, block: { type: 'text', text: description.text } },
+            { type: 'finish', reason: { kind: 'stop' } },
+          ],
+        })
       }
       continue
     }

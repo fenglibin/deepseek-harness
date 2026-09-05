@@ -5,7 +5,7 @@
  */
 
 import type { Branded } from '@deepseek-ai/dsh-brand'
-import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type { ImageAttachmentRef, ImageRequestPolicy } from '@deepseek-ai/dsh-attachment'
 import type { ToolCallId, ProviderRequestId, ReasoningEffortId } from './brand.ts'
 import type { Message } from './message.ts'
 
@@ -62,6 +62,28 @@ export interface ReasoningBlock {
   text: string
 }
 
+/** Route and instruction that produced one generated image description. */
+export interface ImageDescriptionSource {
+  /** Provider route that produced the text. */
+  provider: string
+  /** Provider-owned model id that produced the text. */
+  model: string
+  /** Versioned instruction the describer used; it identifies the text's form. */
+  instruction: string
+}
+
+/**
+ * Text generated from one image so a route without image input can still read
+ * what the image shows. Prompt admission produces it and carries it on the
+ * image block into the session log.
+ */
+export interface ImageDescription {
+  /** Generated text; never blank. */
+  text: string
+  /** Route and instruction that produced the text. */
+  source: ImageDescriptionSource
+}
+
 /**
  * A durable raster image reference, valid in user or assistant content. The
  * block is deliberately role-neutral; assistant-side rendering is forward
@@ -72,6 +94,12 @@ export interface ImageBlock {
   type: 'image'
   /** Immutable bytes and intrinsic display metadata owned by the attachment service. */
   attachment: ImageAttachmentRef
+  /**
+   * Text generated for routes that cannot accept the image itself; absent
+   * while no describer produced one. Adapters serialize `attachment` alone and
+   * ignore this field, so it never reaches a provider.
+   */
+  description?: ImageDescription
 }
 
 /** A tool invocation requested by the model. */
@@ -425,5 +453,12 @@ export interface GenerateOptions {
    * map the purpose to model-hidden transport metadata or purpose-specific
    * generation policy. Ordinary conversation requests leave it unset.
    */
-  purpose?: 'compaction' | 'session-title'
+  purpose?: 'compaction' | 'session-title' | 'image-understanding'
+  /**
+   * Request-image compression policy for this call. Adapters prefer it over
+   * the route's model or profile default when compressing durable images, so
+   * an auxiliary caller can size its own images independently of the main
+   * route. Omission keeps the route's default in force.
+   */
+  requestImagePolicy?: ImageRequestPolicy
 }

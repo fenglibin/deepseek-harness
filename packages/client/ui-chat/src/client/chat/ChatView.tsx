@@ -6,6 +6,8 @@ import type {
   ConversationTimelineSnapshot, RenderMessageImages,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { Button, IconChevronDownOutline14, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+// Type-only: the `turnOutline` projection-key merge (whole-log user-turn list).
+import type {} from '@deepseek-ai/dsh-session-stats/client'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import type { ChatSnapshot, TurnNavigationItem } from '../contract/snapshot.ts'
 import { PendingSteeringBubble, PendingSubmissionBubble } from './MessageItem.tsx'
@@ -20,6 +22,8 @@ const FOLLOW_THRESHOLD = 24
 const TURN_SCROLL_MARGIN = 24
 /** Distance from the list top that arms automatic older-history loading. */
 const OLDER_LOAD_THRESHOLD_PX = 48
+/** Empty whole-log turn outline while the projection has not delivered a value. */
+const EMPTY_TURN_ITEMS: readonly never[] = []
 
 /** Active column host when present; otherwise the view-local scroller. */
 function scrollerOf(from: HTMLElement): HTMLElement {
@@ -208,11 +212,16 @@ function TurnStatus({ startTime, t }: {
  * ordered business Node crosses the keyed renderer seat.
  */
 export function ChatView({
-  useSession, useChat, useSessions, useStore, actions, renderSlot, sessionId, openFile, loadOlder, loadImage, openView, chatScroll, forkAt,
+  useSession, useChat, useSessions, useStore, useProjection, actions, renderSlot,
+  sessionId, openFile, loadOlder, loadImage, openView, chatScroll, forkAt,
   fileMentions, useTranscriptView, t,
 }: ChatViewSlotProps) {
   const order = useChat(s => s.order)
   const nodeStore = useChat(s => s.nodes)
+  // Whole-log user-turn outline (turn + prompt): the drawer lists every user
+  // message regardless of paging, and navigation pages back on demand.
+  const turnOutline = useProjection('turnOutline')
+  const userTurnItems = turnOutline?.turns ?? EMPTY_TURN_ITEMS
   // The rail's items are accumulated in the Chat snapshot, so this selector is
   // both the data and its change signal: the array identity moves only when a
   // Turn enters, leaves, or changes its preview.
@@ -611,15 +620,34 @@ export function ChatView({
   const loadOlderAnchoredRef = useRef<() => void>(() => {})
   loadOlderAnchoredRef.current = loadOlderAnchored
 
-  // Identity feeds the memoized rail; a fresh closure per render would defeat it.
-  const navigateToTurn = useCallback((item: TurnNavigationItem): void => {
+  // Latest loaded navigation items, read through a ref so `navigateToTurn`
+  // keeps a stable identity for the memoized rail while still finding a turn
+  // by number (a loaded item is optional — the drawer may target an unloaded
+  // turn and page back to it).
+  const turnNavigationItemsRef = useRef(turnNavigationItems)
+  turnNavigationItemsRef.current = turnNavigationItems
+
+  // The drawer hands a turn number; the rail hands the loaded item. Both paths
+  // converge on the same settle / page flow, and a stable closure identity
+  // keeps the memoized rail from re-rendering on every parent update.
+  const navigateToTurn = useCallback((turn: number): void => {
+    const item = turnNavigationItemsRef.current.find(entry => entry.turn === turn)
     const local = listRef.current
     if (local === null) return
+    if (item === undefined) {
+      // The turn is not loaded yet: keep paging until it lands (see the
+      // pending effect at the bottom of the hook block).
+      if (!hasMore) return
+      pendingTurnRef.current = turn
+      autoPagedSeqRef.current = firstSeq
+      loadOlderAnchoredRef.current()
+      return
+    }
     const row = anchorElement(local, item.anchorKey)
     if (row === null) {
       // The turn is loaded but its row has not rendered: page until it lands.
       if (!hasMore) return
-      pendingTurnRef.current = item.turn
+      pendingTurnRef.current = turn
       autoPagedSeqRef.current = firstSeq
       loadOlderAnchoredRef.current()
       return
@@ -628,18 +656,11 @@ export function ChatView({
     settleAt(local, row, item)
   }, [firstSeq, hasMore, settleAt])
 
-  // The drawer lists loaded user turns, so it renders nothing until a loaded
-  // window carries a prompt. The rail's hover previews read the same loaded
-  // window, so page until a loaded turn carries a prompt; an empty rail means
-  // the first page is still in flight and nothing more can correct it yet.
-  const awaitingUserPrompt = turnNavigationItems.length > 0
-    && !turnNavigationItems.some(item => item.prompt !== '')
-  useEffect(() => {
-    if (!awaitingUserPrompt || !hasMore || loadingOlder) return
-    if (autoPagedSeqRef.current === firstSeq) return
-    autoPagedSeqRef.current = firstSeq
-    loadOlderAnchoredRef.current()
-  }, [awaitingUserPrompt, hasMore, loadingOlder, firstSeq])
+  // The drawer now lists the whole-log outline, so its entries no longer depend
+  // on the loaded window: no automatic older-history loading on the drawer's
+  // behalf. A reader who picks an unloaded entry still pages back through the
+  // pending-turn effect below; a reader who only scrolls the chat column
+  // pages through the scroll-top hook above.
 
   // A navigation target a landed page did not bring in keeps the older history
   // coming; each hop re-arms the paging anchor so the reader's position holds
@@ -673,11 +694,11 @@ export function ChatView({
           t={t}
         />
         {/* User-message drawer sits beside the rail on the same right gutter.
-            Both read the loaded navigation items; the drawer filters to turns
-            with a direct user prompt, and the active highlight tracks
-            `activeTurn` for both. */}
+            It reads the whole-log turn outline (every user message, paged or
+            not), while the rail reads the loaded navigation items; the active
+            highlight tracks `activeTurn` for both. */}
         <UserTurnPanel
-          items={turnNavigationItems}
+          items={userTurnItems}
           activeTurn={activeTurn}
           onNavigate={navigateToTurn}
           t={t}

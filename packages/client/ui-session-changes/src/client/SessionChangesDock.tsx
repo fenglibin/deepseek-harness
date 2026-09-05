@@ -8,7 +8,7 @@
  * per-call prior-content snapshot exists to roll a file back).
  */
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: the `deliverables` ConversationTurnDataMap key merge and its
@@ -58,30 +58,20 @@ export function sessionChanges(conversation: ConversationSnapshot): readonly Pro
 /** Props of the pure list panel: the folded changes plus the locale seat. */
 export type SessionChangesPanelProps = {
   changes: readonly ProducedChange[]
+  /** Per-file accept set, owned by the dock adapter so it survives a new request. */
+  accepted: ReadonlySet<string>
+  /** Record one file's accept; the adapter keeps the canonical set. */
+  onAccept: (path: string) => void
+  /** Mark every pending file accepted. */
+  onAcceptAll: (paths: readonly string[]) => void
 } & PropsLocale<'session-changes'>
 
-/** The folded list plus its per-file accept, owned by the dock adapter. */
-export function SessionChangesPanel({ changes, t }: SessionChangesPanelProps) {
-  const [accepted, setAccepted] = useState<ReadonlySet<string>>(() => new Set())
+/** The folded list rendered from the adapter-owned accept set. */
+export function SessionChangesPanel({ changes, accepted, onAccept, onAcceptAll, t }: SessionChangesPanelProps) {
   const [expanded, setExpanded] = useState(false)
 
   const pending = changes.filter(change => !accepted.has(change.path))
   if (pending.length === 0) return null
-
-  const accept = (path: string): void => {
-    setAccepted((previous) => {
-      const next = new Set(previous)
-      next.add(path)
-      return next
-    })
-  }
-  const acceptAll = (): void => {
-    setAccepted((previous) => {
-      const next = new Set(previous)
-      for (const change of pending) next.add(change.path)
-      return next
-    })
-  }
 
   return (
     <section className={css.root} data-testid="session-changes" aria-label={t('title')}>
@@ -99,7 +89,11 @@ export function SessionChangesPanel({ changes, t }: SessionChangesPanelProps) {
             {expanded ? <IconChevronDownOutline14 /> : <IconChevronUpOutline14 />}
           </span>
         </button>
-        <button type="button" className={css.bulkAccept} onClick={acceptAll}>
+        <button
+          type="button"
+          className={css.bulkAccept}
+          onClick={() => { onAcceptAll(pending.map(change => change.path)) }}
+        >
           <IconCheckOutline16 size={14} />
           {t('acceptAll')}
         </button>
@@ -115,7 +109,7 @@ export function SessionChangesPanel({ changes, t }: SessionChangesPanelProps) {
               <button
                 type="button"
                 className={css.accept}
-                onClick={() => { accept(change.path) }}
+                onClick={() => { onAccept(change.path) }}
                 aria-label={t('accept')}
               >
                 <IconCheckOutline16 size={14} />
@@ -129,9 +123,42 @@ export function SessionChangesPanel({ changes, t }: SessionChangesPanelProps) {
   )
 }
 
-/** Dock adapter: folds the conversation and renders the list panel. */
+/** Dock adapter: owns the accept set so a new request keeps prior accepts. */
 export function SessionChangesDock({ useConversation, t }: SessionChangesDockProps) {
   const conversation = useConversation(snapshot => snapshot)
   const changes = useMemo(() => sessionChanges(conversation), [conversation])
-  return <SessionChangesPanel changes={changes} t={t} />
+  // The accept set lives on the adapter, not the panel: a new user request
+  // adds new turns to the timeline without unmounting the dock, but a
+  // panel that returns null while pending is empty would otherwise drop the
+  // accepted set on the next mount. Keeping it here means the user's prior
+  // accepts persist across every render of the same dock registration.
+  const [accepted, setAccepted] = useState<ReadonlySet<string>>(() => new Set())
+  const accept = useCallback((path: string): void => {
+    setAccepted((previous) => {
+      if (previous.has(path)) return previous
+      const next = new Set(previous)
+      next.add(path)
+      return next
+    })
+  }, [])
+  const acceptAll = useCallback((paths: readonly string[]): void => {
+    setAccepted((previous) => {
+      let next: Set<string> | null = null
+      for (const path of paths) {
+        if (previous.has(path)) continue
+        if (next === null) next = new Set(previous)
+        next.add(path)
+      }
+      return next ?? previous
+    })
+  }, [])
+  return (
+    <SessionChangesPanel
+      changes={changes}
+      accepted={accepted}
+      onAccept={accept}
+      onAcceptAll={acceptAll}
+      t={t}
+    />
+  )
 }

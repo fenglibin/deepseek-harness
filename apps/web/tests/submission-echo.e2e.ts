@@ -33,8 +33,8 @@ it('paints the submission echo on the send keystroke and swaps it for the durabl
     },
   })
   await waitFor(() => {
-    if (document.querySelector('[role="group"][aria-label="Pending images"] img') === null) {
-      throw new Error('attachment rail missing')
+    if (composer.querySelector('img') === null) {
+      throw new Error('inline image chip missing')
     }
   }, { timeout: 5_000 })
   fireEvent.paste(composer, {
@@ -46,14 +46,14 @@ it('paints the submission echo on the send keystroke and swaps it for the durabl
   // Synchronously after the keystroke: the echo bubble is in the flow with
   // the draft text and the object-URL preview, while the prompt has not even
   // been serialized yet (it starts after a paint yield). The composer is
-  // already cleared, editable, and free of the rail.
+  // already cleared, editable, and free of the inline chip.
   const echo = document.querySelector<HTMLElement>('[data-submission-echo]')
   if (echo === null) throw new Error('submission echo missing on the send keystroke')
   expect(echo.textContent).toContain('回显这条消息')
   expect(echo.querySelector('img')?.getAttribute('src')?.split(':')[0]).toBe('blob')
   expect(composer.textContent).toBe('')
   expect(composer.getAttribute('contenteditable')).toBe('true')
-  expect(document.querySelector('[role="group"][aria-label="Pending images"]')).toBeNull()
+  expect(composer.querySelector('img')).toBeNull()
 
   // The fixture's durable user/message (source.rpcId echoes the prompt
   // requestId) replaces the echo: one bubble, no marker left, and the image

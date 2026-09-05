@@ -27,6 +27,9 @@
       "path": "../../attachment/attachment"
     },
     {
+      "path": "../../llm/image-understanding"
+    },
+    {
       "path": "../../core/session"
     },
     {

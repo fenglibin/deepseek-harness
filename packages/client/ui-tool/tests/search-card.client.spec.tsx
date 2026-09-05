@@ -397,7 +397,6 @@ describe('DetailsPanel Output section (search)', () => {
           setDraft: () => {},
           addImages: () => true,
           removeImage: () => {},
-          pruneImages: () => {},
           submit: () => {},
         }}
         useProjection={(() => undefined)}

@@ -70,6 +70,12 @@
     - id: lightweight-model
       name: '@deepseek-ai/dsh-lightweight-model'
 
+    # Vision route that turns images into text for model routes that cannot
+    # accept images. Empty provider/model selects the first registered model
+    # advertising image input; with none, images stay omitted as before.
+    - id: image-understanding
+      name: '@deepseek-ai/dsh-image-understanding'
+
     - id: user-questions
       name: '@deepseek-ai/dsh-user-questions'
 

@@ -35,9 +35,9 @@ Two repo invariants bind the design. Everything model-visible must be reconstruc
 
 A new package owns all three roles of a capability seam. The Service Definition declares what a description is and when one is unavailable; the Service Provider calls one configured vision route through `ctx.llm`; the Consumer decides, per step, which images must be described. The package sits under `packages/llm/`, next to the capability it consumes, and is mounted as an ordinary Cordis config entry.
 
-### 3.2 Decision B: describe at `agent/pre-step`, not in the gateway and not at the request boundary
+### 3.2 Decision B: describe at prompt admission, not at `agent/pre-step` and not at the request boundary
 
-The gateway is the wrong place because it only admits the message; the join from description to request still has to happen later. The request boundary is the wrong place because the content there is deep-frozen and unlogged. `agent/pre-step` is a documented extension point whose decision messages the loop then appends to the session log, so a listener can both produce a description and have it recorded by the same mechanism that already carries the message. `compaction-basic` rewrites messages through this event and `plan-mode` appends durable state through it, so the pattern is established.
+`agent/pre-step` is the wrong place because it runs before the `agent/request` waterfall resolves the actually-dispatched route, so a listener there cannot know the target route's input modalities and would have to describe every image for every route. The request boundary is the wrong place because the content there is deep-frozen and unlogged. `durablePromptContent()` in the session controller and its SDK twin in `../../packages/sdk/server/src/server.ts` are the authoritative points: each already resolves the target route's `inputModalities` to admit encoded images, so each calls the describer with those modalities and the owning `sessionId`, attaching each result to the image block the loop then appends to the log. The `sessionId` binds each understanding call to the same recorded session as the owning message, so keyless replay routes it there.
 
 ### 3.3 Decision C: the description rides on the image block
 
@@ -63,11 +63,11 @@ Once images live in the draft, the rail above it keeps only a second, unordered 
 
 ### 4.2 LLM-backed Service Provider
 
-Configuration carries `provider`, `model`, the instruction text, an output bound, a timeout, and the request-image policy used for the understanding call. Empty `provider` and `model` mean auto-selection: pick the first registered model whose `inputModalities` includes `image` and log the choice. A configured route is validated on first use and must advertise image input, so a text-only route configured here fails loudly. The call itself reuses the request-image ladder to describe a compressed image, then streams one request through `ctx.llm` with a new `image-understanding` purpose and takes the first text block, exactly as the compaction summarizer drives an auxiliary call.
+Configuration carries `provider`, `model`, the instruction text, an output bound, a timeout, and the request-image policy used for the understanding call. Empty `provider` and `model` mean auto-selection: pick the first registered model whose `inputModalities` includes `image` and log the choice. A configured route is validated on first use and must advertise image input, so a text-only route configured here fails loudly. The call itself reuses the request-image ladder to describe a compressed image, then streams one request through `ctx.llm` with a new `image-understanding` purpose and the owning `sessionId`, and takes the first text block, exactly as the compaction summarizer drives an auxiliary call.
 
-### 4.3 Consumer on `agent/pre-step`
+### 4.3 Consumer at prompt admission
 
-The consumer runs only when the agent's declared route lacks image input. It walks the claimed messages for image blocks, resolves each undescribed attachment through the service with a per-session cache so one attachment costs one vision call, and returns an enter decision carrying copies of the messages with descriptions attached. Failure, timeout, and cancellation leave the messages untouched and log a warning; they never block a step. The loop appends those messages, so the description reaches the log with the message.
+`describeForRoute` runs only when the resolved target route lacks image input. `durablePromptContent()` in the session controller and its SDK twin call it with the admitted encoded images, the route's `inputModalities`, and the owning `sessionId`; it resolves each undescribed attachment through the service with a per-route cache so one attachment costs one vision call, and returns one description or `undefined` per reference, index-aligned with its input. Failure, timeout, and cancellation degrade to no description and log a warning; they never block admission. The controller attaches each result to its image block, so the description reaches the log with the message.
 
 ### 4.4 Request projection
 
@@ -93,7 +93,7 @@ Paste, drop, and the toolbar button all take one path that inserts at the curren
 
 ## 6. Deferred scope
 
-Tool results can contain images, for example a screenshot tool, and those never pass through the inbox, so `agent/pre-step` does not see them. Covering them needs a projection point for tool-result content and is deliberately out of this design.
+Tool results can contain images, for example a screenshot tool, and those never pass through the gateway inbox. The loop describes them at the `tool/result` commit through the same seam ([Agent Note](../../.agents/notes/implemented/architecture/2026-09-05-tool-result-image-description.md)).
 
 ## 7. Verification
 
@@ -101,4 +101,4 @@ Host behavior is covered by unit tests over the service, the projection branch, 
 
 ## 8. Open questions
 
-The route `agent/pre-step` sees is the agent's declared route, while `agent/request` resolves the one actually dispatched; a listener that rewrites the route can therefore disagree with the decision to describe, in which case an unused description is produced or a needed one is missing and the placeholder stands. Whether the few seconds of extra latency before the first step warrants a non-blocking composer notice is a product call; the design assumes a short localized notice while understanding runs.
+Admission resolves the route authoritatively, so a listener that later rewrites the route can at worst waste one describing call; the image block keeps its attachment, so an image-capable route still receives the image and a text-only one still receives the description. Whether the few seconds of extra latency before the first step warrants a non-blocking composer notice is a product call; the design assumes a short localized notice while understanding runs.

@@ -432,6 +432,7 @@ export class ReactLoopAgent implements Agent {
       const { concluded } = await executeToolCalls(
         this.loopCtx, turn, step, toolCalls, signal,
         context => this.inbox.splice('next-step', this.inbox.nextStep.length, 0, [context]),
+        preparedCall?.inputModalities,
       )
       return concluded ? { kind: 'completed' } : null
     }

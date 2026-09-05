@@ -214,6 +214,14 @@ flowchart LR
   pkg_lsp["lsp"]
   svc_lsp["ctx.lsp<br/>Language-server navigation seam"]
   pkg_tool_lsp["tool-lsp"]
+  pkg_image_understanding["image-understanding"]
+  svc_imageUnderstanding["ctx.imageUnderstanding<br/>Generated text for images a route cannot read"]
+  pkg_lightweight_model["lightweight-model"]
+  svc_lightweightModel["ctx.lightweightModel<br/>Auxiliary route for session titles and compaction"]
+  pkg_session_title_llm["session-title-llm"]
+  pkg_delivery["delivery"]
+  svc_delivery["ctx.delivery<br/>Delivery task state and change log"]
+  pkg_tool_delivery["tool-delivery"]
   pkg_cordis_host_runner["cordis-host-runner"]
   svc_dynamicCordisRunner["ctx.dynamicCordisRunner<br/>Dynamic Cordis package host runner"]
   svc_cordisInspect["ctx.cordisInspect<br/>Dynamic Cordis inspect registry"]
@@ -246,6 +254,7 @@ flowchart LR
   pkg_credentials --> svc_credentials
   pkg_credentials_local --> svc_credentials
   pkg_deepseek_llm_api_extensions --> svc_deepseekLlmApiExtensions
+  pkg_delivery --> svc_delivery
   pkg_e2b --> svc_e2b
   pkg_experimental_agent_team --> svc_agentTeams
   pkg_file_reference --> svc_fileReferences
@@ -259,10 +268,12 @@ flowchart LR
   pkg_host_directory_picker_browse --> svc_directoryPicker
   pkg_host_directory_picker_native --> svc_directoryPicker
   pkg_host_webserver --> svc_webServer
+  pkg_image_understanding --> svc_imageUnderstanding
   pkg_inspector --> svc_inspector
   pkg_invariants --> svc_invariants
   pkg_jobs --> svc_jobs
   pkg_jobs_local --> svc_jobs
+  pkg_lightweight_model --> svc_lightweightModel
   pkg_llm --> svc_llm
   pkg_llm_deepseek --> svc_llm
   pkg_llm_pi_ai --> svc_llm
@@ -357,12 +368,15 @@ flowchart LR
   svc_credentials --> pkg_llm_deepseek
   svc_credentials --> pkg_llm_pi_ai
   svc_deepseekLlmApiExtensions --> pkg_llm_deepseek
+  svc_delivery --> pkg_tool_cordis
+  svc_delivery --> pkg_tool_delivery
   svc_directoryPicker --> pkg_api_workspace_controller
   svc_dynamicCordisRunner --> pkg_tool_cordis
   svc_e2b --> pkg_fs_e2b
   svc_e2b --> pkg_subprocess_e2b
   svc_fileReferences --> pkg_api_session_controller
   svc_fs --> pkg_tool_fs
+  svc_imageUnderstanding --> pkg_api_session_controller
   svc_invariants --> pkg_agent
   svc_invariants --> pkg_agent_loop
   svc_invariants --> pkg_scope
@@ -371,6 +385,9 @@ flowchart LR
   svc_jobs --> pkg_tool_jobs
   svc_jobs --> pkg_tool_subagent
   svc_jobs --> pkg_tool_terminal
+  svc_lightweightModel --> pkg_compaction_basic
+  svc_lightweightModel --> pkg_session_title_llm
+  svc_lightweightModel --> pkg_tool_cordis
   svc_llm --> pkg_agent_loop
   svc_llm --> pkg_compaction_basic
   svc_lsp --> pkg_tool_lsp
@@ -530,6 +547,9 @@ flowchart LR
 | `ctx.workflowEngine` | `seam` | [`workflow`](../packages/workflow/workflow) | [`workflow-worker-thread`](../packages/workflow/workflow-worker-thread) | [`tool-workflow`](../packages/workflow/tool-workflow), [`tool-ralph`](../packages/workflow/tool-ralph) | - | One engine per context, as in bash, with no named-provider registry; the general workflow and fixed Ralph consumers start runs whose agent() calls fan out through ctx.subagents. |
 | `ctx.webhookRuntime` | `core` | [`webhook`](../packages/webhook/webhook) | - | [`webhook-github`](../packages/webhook/webhook-github) | - | Provider adapters dispatch authenticated deliveries; trusted plugins register independent process-local rules, and the runtime turns non-null results into ordinary Workspace-backed Sessions without delivery or completion state. |
 | `ctx.lsp` | `seam` | [`lsp`](../packages/lsp/lsp) | [`lsp-stdio`](../packages/lsp/lsp-stdio) | [`tool-lsp`](../packages/lsp/tool-lsp) | - | Provider registration and selection plus normalized query execution over exactly four operations; the seam offers no protocol escape hatch, so a backend translates into the normalized request and result. |
+| `ctx.imageUnderstanding` | `seam` | [`image-understanding`](../packages/llm/image-understanding) | - | [`api-session-controller`](../packages/api/session-controller) | - | One vision route describes a durable image for a target route that declares text-only input; the admission path attaches the result to the image block, so the target model reads bounded prose instead of an omission notice. |
+| `ctx.lightweightModel` | `core` | [`lightweight-model`](../packages/core/lightweight-model) | - | [`compaction-basic`](../packages/compaction/compaction-basic), [`session-title-llm`](../packages/session/session-title-llm), [`tool-cordis`](../packages/extensions/tool-cordis) | - | Holds one optional provider/model pair that auxiliary model calls share, so a deployment points every helper call at one route without configuring each caller. |
+| `ctx.delivery` | `core` | [`delivery`](../packages/delivery/delivery) | - | [`tool-delivery`](../packages/delivery/tool-delivery), [`tool-cordis`](../packages/extensions/tool-cordis) | - | Owns the current delivery task, its phase order, and the durable change feed the delivery surface replays; callers read state and record changes, never rewrite them. |
 | `ctx.dynamicCordisRunner` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | Owns the in-memory definition registry, the vm sandbox for host halves, and the request-run round trip; browser pages reach the same service over the wire through its remote namespace. |
 | `ctx.cordisInspect` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | Registers host inspect providers, mirrors the client provider manifest, and routes client queries through the dynamic Cordis transport. |
 

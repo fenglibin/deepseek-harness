@@ -34,20 +34,6 @@ export interface ComposerAttachment {
   height?: number
 }
 
-/** Input state handed to the optional attachment presentation plugin. */
-export interface ComposerAttachmentsOwnerProps {
-  /** Browser-owned draft images in input order. */
-  attachments: readonly ComposerAttachment[]
-  /** Whether a document-level file drop may add images now. */
-  canAcceptDrop: boolean
-  /** Add one dropped batch through the composer's validation path. */
-  onAddImages: (files: readonly File[]) => void
-  /** Remove one draft image through the Conversation service. */
-  onRemoveImage: (id: DraftAttachmentId) => void
-  /** Display-ready limits for the drop invitation. */
-  dropLimits?: { readonly count: number; readonly size: string } | undefined
-}
-
 /**
  * One image inside a message record: a durable admitted reference, or the
  * local preview of a submission echo whose admission is still in flight.
@@ -137,12 +123,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation.input.right': { kind: 'list'; scope: 'session'; owner: InputZone }
     /** Resident composer body, including the no-Session inert state. */
     'conversation.composer.bar': { kind: 'single'; scope: 'session-maybe'; owner: ComposerBarOwnerProps }
-    /** Optional draft-image rail and drop target. */
-    'conversation.input.attachments': {
-      kind: 'single'
-      scope: 'session-maybe'
-      owner: ComposerAttachmentsOwnerProps
-    }
     /** Plan control inside the composer tool row. */
     'conversation.input.plan': { kind: 'single'; scope: 'session'; owner: InputControlOwnerProps }
     /** Model selector inside the composer tool row. */
@@ -267,8 +247,6 @@ export interface ComposerBarOwnerProps {
 export interface ComposerBarInjected {
   keyboard: ComposerKeyboard | undefined
   addImages: ((files: readonly File[]) => string | null) | undefined
-  removeImage: ((id: DraftAttachmentId) => void) | undefined
-  draftImages: ((ids: readonly DraftAttachmentId[]) => readonly ComposerAttachment[]) | undefined
   resolveSubmitMode: (
     running: boolean,
     gesture: ComposerSubmitGesture,
@@ -293,9 +271,7 @@ export interface InputControlOwnerProps {
 /** Full props of the resident composer bar. */
 export type ComposerBarProps =
   PropsRuntime<'conversation.composer.bar'>
-  & PropsRenderSlots<
-    'conversation.input.attachments' | 'conversation.input.plan' | 'conversation.input.model'
-  >
+  & PropsRenderSlots<'conversation.input.plan' | 'conversation.input.model'>
   & InjectFace<ComposerBarInjected>
   & PropsLocale<'conversation'>
 
@@ -355,10 +331,6 @@ export type ConversationSessionHeaderSlotProps =
   & PropsStore<ConversationStore>
   & InjectFace<ConversationSessionHeaderInjected>
   & PropsLocale<'conversation'>
-
-/** Full props of the draft-image attachment renderer. */
-export type ComposerAttachmentsProps =
-  PropsRuntime<'conversation.input.attachments'> & PropsLocale<'conversation'>
 
 /** Owner share common to blank-session Workspace pickers. */
 export interface EmptyWorkspaceOwnerProps {

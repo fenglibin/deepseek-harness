@@ -165,6 +165,33 @@ declare module '@deepseek-ai/cordis' {
 /** Browser-runtime identity of one unsent image draft. */
 export type DraftAttachmentId = Branded<'DraftAttachmentId'>
 
+/** Insert-time display cache of one inline image chip (the bytes stay browser-owned). */
+export interface DraftImageInsert {
+  /** Browser-owned draft attachment id. */
+  readonly attachmentId: DraftAttachmentId
+  /** Object URL the chip thumbnail renders. */
+  readonly previewUrl: string
+  /** Original file name for the remove/alt labels. */
+  readonly name?: string
+  /** Intrinsic pixel width, when the intake probe has resolved it. */
+  readonly width?: number
+  /** Intrinsic pixel height, when the intake probe has resolved it. */
+  readonly height?: number
+}
+
+/** One image chip's projection coordinates in clipboard-text space. */
+export interface DraftImage {
+  /** Browser-owned draft attachment id. */
+  readonly attachmentId: DraftAttachmentId
+  /** Clipboard-projection offset of the chip; images carry no text, so it occupies zero length. */
+  readonly offset: number
+}
+
+/** One ordered composer part: typed text or an inline image. */
+export type DraftPart =
+  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'image'; readonly attachmentId: DraftAttachmentId }
+
 /**
  * The scoped-event application verbs: the hub's bail listeners call these,
  * and the boolean answer IS the event's bail value (true ⟺ the editor
@@ -181,12 +208,10 @@ export interface InputTarget {
 export interface SessionInput extends InputTarget {
   /** Replace the whole draft (persisted-draft seed and programmatic writes). */
   setDraft(text: string): void
-  /** Append ordered browser-owned image ids; busy admission phases refuse. */
-  addImages(ids: readonly DraftAttachmentId[]): boolean
-  /** Remove one browser-owned image id; busy admission phases refuse. */
+  /** Insert inline image chips at the caret; busy admission phases refuse. */
+  addImages(inserts: readonly DraftImageInsert[]): boolean
+  /** Remove one inline image chip; busy admission phases refuse. */
   removeImage(id: DraftAttachmentId): void
-  /** Drop ids whose browser-owned objects no longer exist. */
-  pruneImages(ids: readonly DraftAttachmentId[]): void
   /**
    * THE complexity sink: enter adjudication, submit transaction, and the default sink live inside.
    * @param mode - delivery intent retained through asynchronous adjudication and serialization.
@@ -221,12 +246,10 @@ export interface SessionInputResolver {
 export interface InputActions {
   /** Replace the whole draft (persisted-draft seed and programmatic writes). */
   setDraft(text: string): void
-  /** Append ordered browser-owned image ids; busy admission phases refuse. */
-  addImages(ids: readonly DraftAttachmentId[]): boolean
-  /** Remove one browser-owned image id; busy admission phases refuse. */
+  /** Insert inline image chips at the caret; busy admission phases refuse. */
+  addImages(inserts: readonly DraftImageInsert[]): boolean
+  /** Remove one inline image chip; busy admission phases refuse. */
   removeImage(id: DraftAttachmentId): void
-  /** Drop ids whose browser-owned objects no longer exist. */
-  pruneImages(ids: readonly DraftAttachmentId[]): void
   /** Enter submission (adjudication / claim transaction / default sink inside). */
   submit(): void
 }
@@ -328,8 +351,8 @@ export interface Occurrence {
 export interface InputState {
   /** Clipboard-text projection of the editor document (chips expanded to their clipboard form). */
   readonly draft: string
-  /** Ordered runtime-only image ids; bytes and URLs stay in ConversationController. */
-  readonly imageIds: readonly DraftAttachmentId[]
+  /** Ordered text/image parts derived from the document (images inline, not a separate rail). */
+  readonly parts: readonly DraftPart[]
   /** Monotonic editor revision (span CAS compares against this). */
   readonly draftRev: number
   readonly phase: 'plain' | 'adjudicating' | 'claimed' | 'submitting'

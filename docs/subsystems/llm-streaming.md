@@ -591,7 +591,7 @@ interface GenerateOptions {
    * map the purpose to model-hidden transport metadata or purpose-specific
    * generation policy. Ordinary conversation requests leave it unset.
    */
-  purpose?: 'compaction' | 'session-title'
+  purpose?: 'compaction' | 'session-title' | 'image-understanding'
 }
 ```
 
@@ -859,6 +859,34 @@ async prepare(request: DeepSeekLlmApiExtensionRequest): Promise<PreparedDeepSeek
 ```
 
 Source: [`packages/llm/deepseek-llm-api-extensions/src/index.ts`](../../packages/llm/deepseek-llm-api-extensions/src/index.ts)
+
+<a id="ctximageunderstanding--imageunderstanding-abstract-seam"></a>
+
+### `ctx.imageUnderstanding` — `ImageUnderstanding` (abstract seam)
+
+Generated descriptions for durable images. Implementations answer one route question and one batch question; a batch answer is always index-aligned with its input, so a caller can attach each result to the block it came from.
+
+```ts cordis-catalog
+/**
+ * Resolve the route this deployment uses, validating it on first use.
+ * @param signal - cancellation for the provider-directory reads this may perform.
+ * @returns the route in force, or `undefined` when no model can describe images.
+ * @throws when a configured route exists but cannot serve the call.
+ */
+abstract resolveRoute(signal?: AbortSignal): Promise<ImageDescriberRoute | undefined>
+
+/**
+ * Describe every reference that has no description yet.
+ * @param refs - durable normalized attachments in owning-message order.
+ * @param signal - cancellation shared by every call this batch makes.
+ * @returns one description or `undefined` per input, aligned by index.
+ */
+abstract describe( refs: readonly ImageAttachmentRef[], signal?: AbortSignal, ): Promise<readonly ImageDescriptionResult[]>
+```
+
+Types: [ImageAttachmentRef](attachment.md)
+
+Source: [`packages/llm/image-understanding/src/index.ts`](../../packages/llm/image-understanding/src/index.ts)
 
 <a id="ctxlightweightmodel--lightweightmodelconfig"></a>
 

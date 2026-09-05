@@ -11,16 +11,17 @@ import type { ElementNode, LexicalNode, NodeKey, Point } from 'lexical'
 import {
   $getRoot, $getSelection, $isElementNode, $isLineBreakNode, $isRangeSelection, $isTextNode,
 } from 'lexical'
-import type { Occurrence } from '../../contract/input.ts'
+import type { DraftImage, Occurrence } from '../../contract/input.ts'
 import { $isReferenceChipNode } from './chip-node.tsx'
+import { $isImageChipNode } from './image-node.tsx'
 
 /** The detect-projection stand-in for one chip (object replacement character). */
 export const ATOMIC_CHAR = '￼'
 
 /** One leaf (or gap) of the composer document in projection coordinates. */
 export interface ComposerSegment {
-  /** text/linebreak carry a node; chip is atomic; gap is the newline between block elements. */
-  readonly kind: 'text' | 'chip' | 'linebreak' | 'gap'
+  /** text/linebreak carry a node; chip/image are atomic; gap is the newline between block elements. */
+  readonly kind: 'text' | 'chip' | 'image' | 'linebreak' | 'gap'
   /** The backing node; null only for gap. */
   readonly node: LexicalNode | null
   readonly detectStart: number
@@ -59,7 +60,7 @@ export function $composerLayout(): ComposerLayout {
   let detect = ''
   let clipboard = ''
 
-  const pushLeaf = (kind: 'text' | 'chip' | 'linebreak', node: LexicalNode, detectPiece: string, clipboardPiece: string): void => {
+  const pushLeaf = (kind: 'text' | 'chip' | 'image' | 'linebreak', node: LexicalNode, detectPiece: string, clipboardPiece: string): void => {
     const segment: ComposerSegment = {
       kind,
       node,
@@ -81,6 +82,8 @@ export function $composerLayout(): ComposerLayout {
     for (const kid of kids) {
       if ($isReferenceChipNode(kid)) {
         pushLeaf('chip', kid, ATOMIC_CHAR, kid.getTextContent())
+      } else if ($isImageChipNode(kid)) {
+        pushLeaf('image', kid, ATOMIC_CHAR, '')
       } else if ($isTextNode(kid)) {
         const text = kid.getTextContent()
         pushLeaf('text', kid, text, text)
@@ -158,6 +161,8 @@ export interface EditorProjection {
   readonly clipboardText: string
   /** InputState-compatible occurrence view (clipboardText coordinates). */
   readonly occurrences: readonly Occurrence[]
+  /** Ordered inline-image view (clipboardText coordinates, zero-length each). */
+  readonly images: readonly DraftImage[]
   /** Range selection in detect coordinates (ordered); null while absent or non-range. */
   readonly selection: { readonly start: number; readonly end: number } | null
   /** Collapsed caret in detect coordinates; null while the selection is absent or ranged. */
@@ -196,20 +201,27 @@ export function $detectOffsetOfPoint(layout: ComposerLayout, point: Point): numb
 export function $projectComposer(idOf: (key: NodeKey) => number): EditorProjection {
   const layout = $composerLayout()
   const occurrences: Occurrence[] = []
+  const images: DraftImage[] = []
   for (const segment of layout.segments) {
-    if (segment.kind !== 'chip' || !$isReferenceChipNode(segment.node)) continue
-    const chip = segment.node
-    occurrences.push({
-      occurrenceId: idOf(chip.getKey()),
-      source: chip.getSource(),
-      ref: chip.getReference(),
-      offset: segment.clipboardStart,
-      length: segment.clipboardLength,
-      label: chip.getLabel(),
-      ...(chip.getAppearance() === undefined ? {} : { appearance: chip.getAppearance() }),
-      clipboardText: chip.getTextContent(),
-      ...(chip.isInvalid() ? { invalid: true } : {}),
-    })
+    if (segment.kind === 'chip' && $isReferenceChipNode(segment.node)) {
+      const chip = segment.node
+      occurrences.push({
+        occurrenceId: idOf(chip.getKey()),
+        source: chip.getSource(),
+        ref: chip.getReference(),
+        offset: segment.clipboardStart,
+        length: segment.clipboardLength,
+        label: chip.getLabel(),
+        ...(chip.getAppearance() === undefined ? {} : { appearance: chip.getAppearance() }),
+        clipboardText: chip.getTextContent(),
+        ...(chip.isInvalid() ? { invalid: true } : {}),
+      })
+    } else if (segment.kind === 'image' && $isImageChipNode(segment.node)) {
+      images.push({
+        attachmentId: segment.node.getAttachmentId(),
+        offset: segment.clipboardStart,
+      })
+    }
   }
   const selection = $getSelection()
   let range: { start: number; end: number } | null = null
@@ -224,6 +236,7 @@ export function $projectComposer(idOf: (key: NodeKey) => number): EditorProjecti
     detectText: layout.detectText,
     clipboardText: layout.clipboardText,
     occurrences,
+    images,
     selection: range,
     caret: range !== null && range.start === range.end ? range.start : null,
   }

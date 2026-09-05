@@ -65,7 +65,7 @@ function liveSession(initial: SessionSnapshot) {
   }
 }
 
-const INPUT_STATE: InputState = { draft: '', imageIds: [], draftRev: 0, phase: 'plain', occurrences: [], queue: [] }
+const INPUT_STATE: InputState = { draft: '', parts: [], draftRev: 0, phase: 'plain', occurrences: [], queue: [] }
 
 const t: QueueDockProps['t'] = makeTranslate(zh, commonZh)
 

@@ -12,9 +12,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import {
   createSnapshotStore, type ObservableSnapshot, type SnapshotStore,
 } from '@deepseek-ai/dsh-client-store'
-import type { LexicalEditor, NodeKey } from 'lexical'
+import type { LexicalEditor, LexicalNode, NodeKey } from 'lexical'
 import {
-  $addUpdateTag, $createParagraphNode, $createTextNode, $getRoot, $getSelection, $isRangeSelection,
+  $addUpdateTag, $createParagraphNode, $createTextNode, $getRoot, $getSelection, $isElementNode,
+  $isRangeSelection,
   CLEAR_HISTORY_COMMAND, createEditor, HISTORY_MERGE_TAG, PASTE_TAG,
 } from 'lexical'
 import { registerPlainText } from '@lexical/plain-text'
@@ -22,13 +23,15 @@ import { createEmptyHistoryState, registerHistory } from '@lexical/history'
 import { mergeRegister } from '@lexical/utils'
 import type {
   ArbitrateKey, ArbitrateOutcome, CommandClaim, ConsumeTokenRequest, DraftAttachmentId,
-  InputActions, InputEffect, InputNotice, InputState, InputTriggerController, PickOutcome,
-  Occurrence, QueuedMessage, ReferenceInsert, SessionInput, SubmitAttempt, SubmitImageAttachment,
-  SubmitOutcome, TokenSpan,
+  DraftImage, DraftImageInsert, DraftPart, InputActions, InputEffect, InputNotice, InputState,
+  InputTriggerController, PickOutcome, Occurrence, QueuedMessage, ReferenceInsert, SessionInput,
+  SubmitAttempt, SubmitImageAttachment, SubmitOutcome, TokenSpan,
 } from '../contract/input.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 import { SubmitMachine } from './machine.ts'
 import { ReferenceChipNode, $createReferenceChipNode } from './editor/chip-node.tsx'
+import { ImageChipNode, $createImageChipNode, $isImageChipNode } from './editor/image-node.tsx'
+import type { ImageChipLabels } from './editor/image-node.tsx'
 import { refreshClaimDecoration, registerClaimDecoration } from './editor/claim-decor.ts'
 import { registerTextRefDecoration, rescanTextRefs, TextRefNode } from './editor/text-ref.ts'
 import type { EditorProjection } from './editor/projection.ts'
@@ -62,8 +65,7 @@ export interface SessionInputDeps {
   steerQueue?: (() => void) | undefined
   /** The plain-message sink (send choreography / materialize fork — the hub owns it). */
   defaultSink(
-    text: string,
-    imageIds: readonly DraftAttachmentId[],
+    parts: readonly DraftPart[],
     mode: InputSubmitMode,
     signal: AbortSignal,
   ): Promise<SubmitOutcome>
@@ -76,6 +78,19 @@ export interface SessionInputDeps {
     /** Localized composer notice for a claimed command that does not accept images. */
     unsupportedNotice(token: string): string
   }
+  /** Insert-time locale labels for inline image chips (the decorator has no locale seat). */
+  imageLabels: {
+    /** Remove-button accessible name for one image. */
+    remove(name: string): string
+    /** Fallback alt for a nameless image. */
+    pending(): string
+    /** Preview dialog accessible name. */
+    lightboxDialog(): string
+    /** Preview close-button accessible name. */
+    lightboxClose(): string
+  }
+  /** Free one draft image's object URL once its chip leaves the document. */
+  releaseImage(id: DraftAttachmentId): void
 }
 
 /** Guard tier from the machine phase. */
@@ -91,13 +106,46 @@ function guardOf(phase: InputState['phase']): 'plain' | 'claimed' | 'frozen' {
 function projectionContentChanged(prev: EditorProjection, next: EditorProjection): boolean {
   if (prev.clipboardText !== next.clipboardText || prev.detectText !== next.detectText) return true
   if (prev.occurrences.length !== next.occurrences.length) return true
-  return next.occurrences.some((occ, i) => {
+  if (prev.images.length !== next.images.length) return true
+  if (next.occurrences.some((occ, i) => {
     const old = prev.occurrences[i]
     return old === undefined || old.occurrenceId !== occ.occurrenceId || old.invalid !== occ.invalid
+  })) return true
+  return next.images.some((img, i) => {
+    const old = prev.images[i]
+    return old === undefined || old.attachmentId !== img.attachmentId || old.offset !== img.offset
   })
 }
 
 const EMPTY_QUEUE: readonly QueuedMessage[] = []
+
+/** Trim the message's leading/trailing whitespace and drop empty text parts. */
+function trimParts(parts: readonly DraftPart[]): readonly DraftPart[] {
+  const result = [...parts]
+  const firstText = result.findIndex(part => part.type === 'text')
+  if (firstText >= 0) {
+    const first = result[firstText]
+    if (first?.type === 'text') {
+      result[firstText] = { type: 'text', text: first.text.replace(/^\s+/u, '') }
+    }
+  }
+  for (let i = result.length - 1; i >= 0; i -= 1) {
+    const part = result[i]
+    if (part?.type === 'text') {
+      result[i] = { type: 'text', text: part.text.replace(/\s+$/u, '') }
+      break
+    }
+  }
+  return result.filter(part => part.type !== 'text' || part.text !== '')
+}
+
+/** Depth-first visit of a Lexical subtree inside an active editor update. */
+function $forEachDescendant(node: LexicalNode, fn: (node: LexicalNode) => void): void {
+  fn(node)
+  if ($isElementNode(node)) {
+    for (const child of node.getChildren()) $forEachDescendant(child, fn)
+  }
+}
 
 /** No-pipeline lexicon: zero text-ref decorations. */
 const EMPTY_LEXICON: ReadonlyMap<'/' | '@', readonly string[]> = new Map()
@@ -117,7 +165,8 @@ const HISTORY_MERGE_DELAY_MS = 1000
 interface DetachedDraft {
   readonly draft: string
   readonly occurrences: readonly Occurrence[]
-  readonly imageIds: readonly DraftAttachmentId[]
+  /** Inline images with their clipboard offsets, for position-preserving restoration. */
+  readonly images: readonly DraftImage[]
 }
 
 /**
@@ -137,12 +186,11 @@ export class SessionInputShell implements SessionInput {
     setDraft: (text) => { this.setDraft(text) },
     addImages: ids => this.addImages(ids),
     removeImage: (id) => { this.removeImage(id) },
-    pruneImages: (ids) => { this.pruneImages(ids) },
     submit: () => { this.submit('queue') },
   }
 
   private readonly core = new SubmitMachine()
-  private projection: EditorProjection = { detectText: '', clipboardText: '', occurrences: [], selection: null, caret: null }
+  private projection: EditorProjection = { detectText: '', clipboardText: '', occurrences: [], images: [], selection: null, caret: null }
   private rev = 0
   /** Stable occurrence ids per chip NodeKey (undo restores keys, so ids survive it too). */
   private readonly occurrenceIds = new Map<NodeKey, number>()
@@ -150,7 +198,8 @@ export class SessionInputShell implements SessionInput {
   private readonly unregister: () => void
   private noticeSeq = 0
   private lastMirroredDraft = ''
-  private imageIds: readonly DraftAttachmentId[] = []
+  /** Insert-time display cache per draft attachment id (restoration rebuilds chips from it). */
+  private readonly imageCache = new Map<DraftAttachmentId, DraftImageInsert>()
   private disposed = false
   /** Draft persistence mirror (Conversation store write; receives the clipboard projection). */
   private mirrorFn: ((text: string) => void) | undefined
@@ -167,13 +216,13 @@ export class SessionInputShell implements SessionInput {
   /** Image-only sends retained until admission settles or scope disposal releases their images. */
   private readonly imageFlights = new Map<number, {
     readonly controller: AbortController
-    readonly imageIds: readonly DraftAttachmentId[]
+    readonly images: readonly DraftImageInsert[]
   }>()
 
   constructor(private readonly deps: SessionInputDeps) {
     this.editor = createEditor({
       namespace: 'dsh-composer',
-      nodes: [ReferenceChipNode, TextRefNode],
+      nodes: [ReferenceChipNode, ImageChipNode, TextRefNode],
       onError: (error) => { throw error },
     })
     this.unregister = mergeRegister(
@@ -281,38 +330,115 @@ export class SessionInputShell implements SessionInput {
     }, { discrete: true, tag: HISTORY_MERGE_TAG })
   }
 
-  /** Append ordered image ids unless an admission transaction is locked. */
-  addImages(ids: readonly DraftAttachmentId[]): boolean {
+  /** Insert inline image chips at the caret unless an admission transaction is locked. */
+  addImages(inserts: readonly DraftImageInsert[]): boolean {
     if (this.snapshot.phase === 'adjudicating' || this.snapshot.phase === 'submitting') return false
-    if (ids.length === 0) return true
-    this.imageIds = [...this.imageIds, ...ids]
-    this.publish()
+    if (inserts.length === 0) return true
+    for (const insert of inserts) this.imageCache.set(insert.attachmentId, insert)
+    this.applyEdit(() => {
+      const nodes = inserts.map(insert =>
+        $createImageChipNode(insert, this.imageLabelsOf(insert), (id) => { this.removeImage(id) }))
+      const selection = $getSelection()
+      if ($isRangeSelection(selection)) {
+        selection.insertNodes(nodes)
+        return
+      }
+      // No selection yet (never-focused surface): land at the document end.
+      const root = $getRoot()
+      if (root.getChildrenSize() === 0) root.append($createParagraphNode())
+      root.selectEnd().insertNodes(nodes)
+    })
     return true
   }
 
   /**
-   * Remove one image id from this draft. Busy admission phases refuse, like
+   * Remove one inline image chip. Busy admission phases refuse, like
    * {@link addImages}: a removal landing while a command submit serializes
-   * would otherwise vanish from the rail yet still ride the in-flight send.
+   * would otherwise vanish from the draft yet still ride the in-flight send.
    */
   removeImage(id: DraftAttachmentId): void {
     if (this.snapshot.phase === 'adjudicating' || this.snapshot.phase === 'submitting') return
-    const next = this.imageIds.filter(candidate => candidate !== id)
-    if (next.length === this.imageIds.length) return
-    this.imageIds = next
-    this.publish()
+    this.imageCache.delete(id)
+    this.deps.releaseImage(id)
+    this.applyEdit(() => {
+      this.forEachImageChip((node) => {
+        if (node.getAttachmentId() === id) node.remove()
+      })
+    })
+  }
+
+  /** Run fn against every image chip node in the document, inside one edit. */
+  private forEachImageChip(fn: (node: ImageChipNode) => void): void {
+    $forEachDescendant($getRoot(), (node) => {
+      if ($isImageChipNode(node)) fn(node)
+    })
+  }
+
+  /** Insert-time locale labels for one image chip. */
+  private imageLabelsOf(insert: DraftImageInsert): ImageChipLabels {
+    return {
+      removeLabel: this.deps.imageLabels.remove(insert.name ?? ''),
+      pendingAlt: this.deps.imageLabels.pending(),
+      lightboxDialog: this.deps.imageLabels.lightboxDialog(),
+      lightboxClose: this.deps.imageLabels.lightboxClose(),
+    }
+  }
+
+  /** Resolve ordered image projections to their insert-time display caches. */
+  private insertsOf(images: readonly DraftImage[]): readonly DraftImageInsert[] {
+    const inserts: DraftImageInsert[] = []
+    for (const image of images) {
+      const insert = this.imageCache.get(image.attachmentId)
+      if (insert !== undefined) inserts.push(insert)
+    }
+    return inserts
   }
 
   /**
-   * Keep only image ids that still resolve in the browser attachment registry.
-   * @param available - live registry ids.
+   * Build the ordered submission parts: text segments between inline chips
+   * and images, with reference chips replaced by their model forms.
+   * @param draft - clipboard-text projection.
+   * @param occurrences - reference chips (offset-sorted).
+   * @param images - inline images (offset-sorted).
+   * @param modelTextOf - occurrence → model-form text.
+   * @returns text/image parts in document order, edges trimmed.
    */
-  pruneImages(available: readonly DraftAttachmentId[]): void {
-    const keep = new Set(available)
-    const next = this.imageIds.filter(id => keep.has(id))
-    if (next.length === this.imageIds.length) return
-    this.imageIds = next
-    this.publish()
+  private deriveParts(
+    draft: string,
+    occurrences: readonly Occurrence[],
+    images: readonly DraftImage[],
+    modelTextOf: (occurrence: Occurrence) => string,
+  ): readonly DraftPart[] {
+    const items: Array<{ readonly offset: number } & (
+      | { readonly kind: 'chip'; readonly occurrence: Occurrence }
+      | { readonly kind: 'image'; readonly attachmentId: DraftAttachmentId }
+    )> = [
+      ...occurrences.map(occurrence => ({ kind: 'chip' as const, occurrence, offset: occurrence.offset })),
+      ...images.map(image => ({ kind: 'image' as const, attachmentId: image.attachmentId, offset: image.offset })),
+    ].sort((a, b) => {
+      const byOffset = a.offset - b.offset
+      if (byOffset !== 0) return byOffset
+      // A zero-length image projection shares its offset with a following
+      // chip; the image precedes it in document order.
+      return (a.kind === 'image' ? 0 : 1) - (b.kind === 'image' ? 0 : 1)
+    })
+    const parts: DraftPart[] = []
+    let cursor = 0
+    for (const item of items) {
+      const text = draft.slice(cursor, item.offset)
+      if (text !== '') parts.push({ type: 'text', text })
+      if (item.kind === 'chip') {
+        const model = modelTextOf(item.occurrence)
+        if (model !== '') parts.push({ type: 'text', text: model })
+        cursor = item.offset + item.occurrence.length
+      } else {
+        parts.push({ type: 'image', attachmentId: item.attachmentId })
+        cursor = item.offset
+      }
+    }
+    const tail = draft.slice(cursor)
+    if (tail !== '') parts.push({ type: 'text', text: tail })
+    return trimParts(parts)
   }
 
   /**
@@ -323,7 +449,15 @@ export class SessionInputShell implements SessionInput {
    */
   commitSend(imageIds: readonly DraftAttachmentId[]): void {
     const submitted = new Set(imageIds)
-    this.imageIds = this.imageIds.filter(id => !submitted.has(id))
+    this.applyEdit(() => {
+      this.forEachImageChip((node) => {
+        const id = node.getAttachmentId()
+        if (submitted.has(id)) {
+          this.imageCache.delete(id)
+          node.remove()
+        }
+      })
+    })
     this.dispatchRun(({ type: 'send-committed' }))
   }
 
@@ -358,22 +492,24 @@ export class SessionInputShell implements SessionInput {
    * dismisses and the menu tracks frozen.
    */
   submit(mode: InputSubmitMode = 'queue'): void {
-    if (this.snapshot.draft.trim() === '' && this.imageIds.length > 0) {
+    const images = this.projection.images
+    if (this.snapshot.draft.trim() === '' && images.length > 0) {
       if (this.snapshot.phase === 'plain') {
-        const imageIds = [...this.imageIds]
+        const inserts = this.insertsOf(images)
         const controller = new AbortController()
         this.imageFlightSeq += 1
         const flight = this.imageFlightSeq
-        this.imageFlights.set(flight, { controller, imageIds })
-        this.commitSend(imageIds)
-        void this.deps.defaultSink('', imageIds, mode, controller.signal).then((outcome) => {
+        this.imageFlights.set(flight, { controller, images: inserts })
+        this.commitSend(inserts.map(insert => insert.attachmentId))
+        const parts: DraftPart[] = inserts.map(insert => ({ type: 'image', attachmentId: insert.attachmentId }))
+        void this.deps.defaultSink(parts, mode, controller.signal).then((outcome) => {
           if (this.disposed || !this.imageFlights.delete(flight)) return
           if (outcome.kind === 'success') return
-          this.restoreImages(imageIds)
+          this.restoreImages(inserts)
           if (outcome.text !== undefined) this.notify('error', outcome.text)
         }, (error: unknown) => {
           if (this.disposed || !this.imageFlights.delete(flight)) return
-          this.restoreImages(imageIds)
+          this.restoreImages(inserts)
           this.notify('error', error instanceof Error ? error.message : String(error))
         })
       }
@@ -384,7 +520,7 @@ export class SessionInputShell implements SessionInput {
     // Enter-time adjudication applies the same policy for unclaimed lines
     // inside the command source itself.
     const before = this.snapshot
-    if (before.phase === 'claimed' && this.imageIds.length > 0 && before.claim?.images !== true) {
+    if (before.phase === 'claimed' && images.length > 0 && before.claim?.images !== true) {
       this.notify('error', this.deps.commandImages.unsupportedNotice(before.claim?.token ?? before.draft))
       return
     }
@@ -568,12 +704,12 @@ export class SessionInputShell implements SessionInput {
    */
   dispose(): readonly DraftAttachmentId[] {
     if (this.disposed) return []
-    const retained = new Set(this.imageIds)
+    const retained = new Set(this.imageCache.keys())
     for (const record of this.detachedDrafts.values()) {
-      for (const imageId of record.imageIds) retained.add(imageId)
+      for (const image of record.images) retained.add(image.attachmentId)
     }
     for (const flight of this.imageFlights.values()) {
-      for (const imageId of flight.imageIds) retained.add(imageId)
+      for (const image of flight.images) retained.add(image.attachmentId)
       flight.controller.abort()
     }
     this.disposed = true
@@ -583,6 +719,7 @@ export class SessionInputShell implements SessionInput {
     this.detachedDrafts.clear()
     this.failedDetached.clear()
     this.imageFlights.clear()
+    this.imageCache.clear()
     return [...retained]
   }
 
@@ -684,7 +821,21 @@ export class SessionInputShell implements SessionInput {
       root.clear()
       root.selectEnd()
     }, { discrete: true, tag: HISTORY_MERGE_TAG })
+    this.pruneImageCache()
     this.editor.dispatchCommand(CLEAR_HISTORY_COMMAND, undefined)
+  }
+
+  /** Drop display caches for image chips no longer in the document (committed or removed). */
+  private pruneImageCache(): void {
+    const keep = new Set<DraftAttachmentId>()
+    this.editor.getEditorState().read(() => {
+      $forEachDescendant($getRoot(), (node) => {
+        if ($isImageChipNode(node)) keep.add(node.getAttachmentId())
+      })
+    })
+    for (const id of this.imageCache.keys()) {
+      if (!keep.has(id)) this.imageCache.delete(id)
+    }
   }
 
   /**
@@ -698,41 +849,33 @@ export class SessionInputShell implements SessionInput {
     draft: string,
     mode: InputSubmitMode,
   ): void {
-    const imageIds = [...this.imageIds]
-    this.imageIds = []
+    const images = this.projection.images
     const occurrences = this.projection.occurrences
-    const record = { draft, occurrences, imageIds }
+    const record = { draft, occurrences, images }
     this.detachedDrafts.set(attempt.seq, record)
     if (this.failedRestoreRev === this.rev) {
       this.failedDetached.clear()
       this.failedRestoreRev = undefined
     }
     if (occurrences.length === 0) {
-      this.settleSink(attempt, this.deps.defaultSink(draft.trim(), imageIds, mode, attempt.signal))
+      this.settleSink(attempt, this.deps.defaultSink(
+        this.deriveParts(draft, [], this.projection.images, () => ''), mode, attempt.signal))
       return
     }
     const inputTriggers = this.deps.inputTriggers?.()
     void Promise.all(occurrences.map(async (o) => {
       if (inputTriggers === undefined) throw new Error(`no serializer for reference source "${o.source}"`)
       return {
-        offset: o.offset,
-        length: o.length,
+        occurrenceId: o.occurrenceId,
         text: await inputTriggers.serializeReference(o.source, o.ref, attempt.signal),
       }
     })).then(
-      (parts) => {
+      (serialized) => {
         if (this.disposed) return
-        // Splice model forms over their clipboard ranges (offsets are
-        // clipboard-projection; parts arrive offset-sorted since chips walk in
-        // document order).
-        let out = ''
-        let cursor = 0
-        for (const part of parts) {
-          out += draft.slice(cursor, part.offset) + part.text
-          cursor = part.offset + part.length
-        }
-        out += draft.slice(cursor)
-        this.settleSink(attempt, this.deps.defaultSink(out.trim(), imageIds, mode, attempt.signal))
+        const modelTexts = new Map(serialized.map(({ occurrenceId, text }) => [occurrenceId, text]))
+        const parts = this.deriveParts(draft, occurrences, this.projection.images,
+          occurrence => modelTexts.get(occurrence.occurrenceId) ?? '')
+        this.settleSink(attempt, this.deps.defaultSink(parts, mode, attempt.signal))
       },
       (error: unknown) => {
         if (this.dead(attempt)) return
@@ -769,7 +912,6 @@ export class SessionInputShell implements SessionInput {
     const record = this.detachedDrafts.get(attempt.seq)
     if (record === undefined) return
     this.detachedDrafts.delete(attempt.seq)
-    this.restoreImages(record.imageIds)
     this.failedDetached.set(attempt.seq, record)
     if (this.projection.clipboardText === '' || this.failedRestoreRev === this.rev) {
       this.restoreFailedDrafts()
@@ -784,12 +926,16 @@ export class SessionInputShell implements SessionInput {
     const separator = '\n\n'
     let draft = ''
     const occurrences: Occurrence[] = []
+    const images: DraftImage[] = []
     for (const record of records) {
       const base = draft.length + (draft === '' ? 0 : separator.length)
       if (draft !== '') draft += separator
       draft += record.draft
       for (const occurrence of record.occurrences) {
         occurrences.push({ ...occurrence, offset: base + occurrence.offset })
+      }
+      for (const image of record.images) {
+        images.push({ ...image, offset: base + image.offset })
       }
     }
     this.restoringFailures = true
@@ -810,17 +956,38 @@ export class SessionInputShell implements SessionInput {
             }
           }
         }
+        const items: Array<{ readonly offset: number } & (
+          | { readonly kind: 'chip'; readonly occurrence: Occurrence }
+          | { readonly kind: 'image'; readonly image: DraftImage }
+        )> = [
+          ...occurrences.map(occurrence => ({ kind: 'chip' as const, occurrence, offset: occurrence.offset })),
+          ...images.map(image => ({ kind: 'image' as const, image, offset: image.offset })),
+        ].sort((a, b) => {
+          const byOffset = a.offset - b.offset
+          if (byOffset !== 0) return byOffset
+          // Zero-length image projection precedes a following chip at the same offset.
+          return (a.kind === 'image' ? 0 : 1) - (b.kind === 'image' ? 0 : 1)
+        })
         let cursor = 0
-        for (const occurrence of occurrences) {
-          appendText(draft.slice(cursor, occurrence.offset))
-          paragraph.append(new ReferenceChipNode({
-            source: occurrence.source,
-            ref: occurrence.ref,
-            label: occurrence.label,
-            ...(occurrence.appearance === undefined ? {} : { appearance: occurrence.appearance }),
-            clipboardText: occurrence.clipboardText,
-          }, occurrence.invalid === true))
-          cursor = occurrence.offset + occurrence.length
+        for (const item of items) {
+          appendText(draft.slice(cursor, item.offset))
+          if (item.kind === 'chip') {
+            const occurrence = item.occurrence
+            paragraph.append(new ReferenceChipNode({
+              source: occurrence.source,
+              ref: occurrence.ref,
+              label: occurrence.label,
+              ...(occurrence.appearance === undefined ? {} : { appearance: occurrence.appearance }),
+              clipboardText: occurrence.clipboardText,
+            }, occurrence.invalid === true))
+            cursor = item.offset + occurrence.length
+          } else {
+            const insert = this.imageCache.get(item.image.attachmentId)
+            if (insert !== undefined) {
+              paragraph.append($createImageChipNode(insert, this.imageLabelsOf(insert), (id) => { this.removeImage(id) }))
+            }
+            cursor = item.offset
+          }
         }
         appendText(draft.slice(cursor))
         root.selectEnd()
@@ -832,14 +999,22 @@ export class SessionInputShell implements SessionInput {
     }
   }
 
-  /** Return failed-send images to the head of the rail (ids still resolve — release happens only after success). */
-  private restoreImages(imageIds: readonly DraftAttachmentId[]): void {
-    if (imageIds.length === 0) return
-    const current = new Set(this.imageIds)
-    const restored = imageIds.filter(id => !current.has(id))
+  /** Return failed image-only sends to the document start (ids still resolve — release happens only after success). */
+  private restoreImages(inserts: readonly DraftImageInsert[]): void {
+    if (inserts.length === 0) return
+    const existing = new Set(this.projection.images.map(image => image.attachmentId))
+    const restored = inserts.filter(insert => !existing.has(insert.attachmentId))
     if (restored.length === 0) return
-    this.imageIds = [...restored, ...this.imageIds]
-    this.publish()
+    for (const insert of restored) this.imageCache.set(insert.attachmentId, insert)
+    this.applyEdit(() => {
+      const nodes = restored.map(insert =>
+        $createImageChipNode(insert, this.imageLabelsOf(insert), (id) => { this.removeImage(id) }))
+      const root = $getRoot()
+      if (root.getChildrenSize() === 0) root.append($createParagraphNode())
+      root.getFirstChild()?.selectStart()
+      const selection = $getSelection()
+      if ($isRangeSelection(selection)) selection.insertNodes(nodes)
+    })
   }
 
   /** Enter adjudication: poll the session controller; failure = notice + draft retained (never a silent downgrade). */
@@ -850,7 +1025,7 @@ export class SessionInputShell implements SessionInput {
       this.dispatchRun(({ type: 'adjudicated', attempt, outcome: undefined }))
       return
     }
-    inputTriggers.adjudicate(draft.trim(), attempt.signal, { images: this.imageIds.length }).then(
+    inputTriggers.adjudicate(draft.trim(), attempt.signal, { images: this.projection.images.length }).then(
       (outcome: PickOutcome) => {
         if (this.dead(attempt)) return
         this.dispatchRun(({ type: 'adjudicated', attempt, outcome }))
@@ -871,7 +1046,9 @@ export class SessionInputShell implements SessionInput {
    * for correction.
    */
   private beginSubmit(attempt: SubmitAttempt, claim: CommandClaim, args: string): void {
-    const imageIds = claim.images === true ? [...this.imageIds] : []
+    const imageIds = claim.images === true
+      ? this.projection.images.map(image => image.attachmentId)
+      : []
     Promise.resolve()
       .then(async () => {
         const images = imageIds.length > 0 ? await this.deps.commandImages.serialize(imageIds) : []
@@ -884,8 +1061,7 @@ export class SessionInputShell implements SessionInput {
         (outcome) => {
           if (outcome === undefined || this.dead(attempt)) return
           if (outcome.kind === 'success' && imageIds.length > 0) {
-            const submitted = new Set(imageIds)
-            this.imageIds = this.imageIds.filter(id => !submitted.has(id))
+            this.commitSend(imageIds)
             this.deps.commandImages.release(imageIds)
           }
           this.dispatchRun(({
@@ -914,7 +1090,12 @@ export class SessionInputShell implements SessionInput {
     const core = this.core.state
     return {
       draft: this.projection.clipboardText,
-      imageIds: this.imageIds,
+      parts: this.deriveParts(
+        this.projection.clipboardText,
+        this.projection.occurrences,
+        this.projection.images,
+        occurrence => occurrence.clipboardText,
+      ),
       draftRev: this.rev,
       phase: core.phase,
       ...(core.claim !== undefined ? { claim: core.claim } : {}),

@@ -30,6 +30,10 @@ flowchart LR
   cfg --> plugin_dsh_base_session_title
   plugin_dsh_base_session_title_llm["session-title-llm<br/>@deepseek-ai/dsh-session-title-first-prompt-llm"]
   cfg --> plugin_dsh_base_session_title_llm
+  plugin_dsh_base_lightweight_model["lightweight-model<br/>@deepseek-ai/dsh-lightweight-model"]
+  cfg --> plugin_dsh_base_lightweight_model
+  plugin_dsh_base_image_understanding["image-understanding<br/>@deepseek-ai/dsh-image-understanding"]
+  cfg --> plugin_dsh_base_image_understanding
   plugin_dsh_base_user_questions["user-questions<br/>@deepseek-ai/dsh-user-questions"]
   cfg --> plugin_dsh_base_user_questions
   plugin_dsh_base_agent["agent<br/>@deepseek-ai/dsh-agent"]
@@ -44,6 +48,8 @@ flowchart LR
   cfg --> plugin_dsh_base_llm_retry
   plugin_dsh_base_settings["settings<br/>@deepseek-ai/dsh-settings-file"]
   cfg --> plugin_dsh_base_settings
+  plugin_dsh_base_mcp_manager["mcp-manager<br/>@deepseek-ai/dsh-mcp-manager"]
+  cfg --> plugin_dsh_base_mcp_manager
   plugin_dsh_base_credentials["credentials<br/>@deepseek-ai/dsh-credentials-local"]
   cfg --> plugin_dsh_base_credentials
   plugin_dsh_base_llm_pi_ai["llm-pi-ai<br/>@deepseek-ai/dsh-llm-pi-ai"]
@@ -108,6 +114,12 @@ flowchart LR
   cfg --> plugin_dsh_base_commands
   plugin_dsh_base_command_feedback["command-feedback<br/>@deepseek-ai/dsh-command-feedback"]
   cfg --> plugin_dsh_base_command_feedback
+  plugin_dsh_base_command_prompt_config["command-prompt-config<br/>@deepseek-ai/dsh-command-prompt-config"]
+  cfg --> plugin_dsh_base_command_prompt_config
+  plugin_dsh_base_delivery["delivery<br/>@deepseek-ai/dsh-delivery"]
+  cfg --> plugin_dsh_base_delivery
+  plugin_dsh_base_tool_delivery["tool-delivery<br/>@deepseek-ai/dsh-tool-delivery"]
+  cfg --> plugin_dsh_base_tool_delivery
   plugin_dsh_base_goal["goal<br/>@deepseek-ai/dsh-goal"]
   cfg --> plugin_dsh_base_goal
   plugin_dsh_base_goal_round_driver["goal-round-driver<br/>@deepseek-ai/dsh-goal-round-driver"]
@@ -197,6 +209,8 @@ flowchart LR
 | `typert-gateway` | `@deepseek-ai/dsh-api-gateway` |
 | `session-title` | `@deepseek-ai/dsh-session-title` |
 | `session-title-llm` | `@deepseek-ai/dsh-session-title-first-prompt-llm` |
+| `lightweight-model` | `@deepseek-ai/dsh-lightweight-model` |
+| `image-understanding` | `@deepseek-ai/dsh-image-understanding` |
 | `user-questions` | `@deepseek-ai/dsh-user-questions` |
 | `agent` | `@deepseek-ai/dsh-agent` |
 | `plugin-package-inventory-deepseek` | `@deepseek-ai/dsh-plugin-package-inventory-deepseek` |
@@ -204,6 +218,7 @@ flowchart LR
 | `jobs` | `@deepseek-ai/dsh-jobs-local` |
 | `llm-retry` | `@deepseek-ai/dsh-llm-retry` |
 | `settings` | `@deepseek-ai/dsh-settings-file` |
+| `mcp-manager` | `@deepseek-ai/dsh-mcp-manager` |
 | `credentials` | `@deepseek-ai/dsh-credentials-local` |
 | `llm-pi-ai` | `@deepseek-ai/dsh-llm-pi-ai` |
 | `session-persistence-jsonl` | `@deepseek-ai/dsh-session-persistence-jsonl` |
@@ -236,6 +251,9 @@ flowchart LR
 | `tool-skill` | `@deepseek-ai/dsh-tool-skill` |
 | `commands` | `@deepseek-ai/dsh-commands` |
 | `command-feedback` | `@deepseek-ai/dsh-command-feedback` |
+| `command-prompt-config` | `@deepseek-ai/dsh-command-prompt-config` |
+| `delivery` | `@deepseek-ai/dsh-delivery` |
+| `tool-delivery` | `@deepseek-ai/dsh-tool-delivery` |
 | `goal` | `@deepseek-ai/dsh-goal` |
 | `goal-round-driver` | `@deepseek-ai/dsh-goal-round-driver` |
 | `command-goal` | `@deepseek-ai/dsh-command-goal` |

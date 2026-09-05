@@ -954,6 +954,38 @@ export interface Config {
 
 Source: [`packages/host/webserver/src/index.ts:59`](../packages/host/webserver/src/index.ts)
 
+<a id="deepseek-aidsh-image-understanding"></a>
+
+## `@deepseek-ai/dsh-image-understanding`
+
+Requires: `llm`
+
+```ts config-catalog
+/** Vision route and bounds for one understanding deployment. */
+export interface Config {
+  /** Provider route; empty selects the first registered model that accepts images. */
+  provider?: string
+  /** Model id interpreted by `provider`; set together with `provider`. */
+  model?: string
+  /** Instruction sent with each image. */
+  instruction?: string
+  /** Maximum output tokens for one description. */
+  maxOutputTokens?: number
+  /** End-to-end deadline in milliseconds for one understanding call. */
+  timeoutMs?: number
+  /** Maximum characters retained from one description. */
+  maxDescriptionChars?: number
+  /** Total-pixel budget for one deterministic request image in an understanding call. */
+  requestImagePixelBudget?: number
+  /** Encoded-byte target for one request image; the smallest quality-ladder output is used when no quality fits. */
+  requestImageMaxBytes?: number
+  /** Number of attachment descriptions retained per route. */
+  maxCacheEntries?: number
+}
+```
+
+Source: [`packages/llm/image-understanding/src/index.ts:75`](../packages/llm/image-understanding/src/index.ts)
+
 <a id="deepseek-aidsh-invariants"></a>
 
 ## `@deepseek-ai/dsh-invariants`
@@ -1427,7 +1459,7 @@ export interface ReplayModelConfig {
 
 Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
 
-Source: [`packages/test-support/llm-replay/src/index.ts:919`](../packages/test-support/llm-replay/src/index.ts)
+Source: [`packages/test-support/llm-replay/src/index.ts:954`](../packages/test-support/llm-replay/src/index.ts)
 
 <a id="deepseek-aidsh-llm-retry"></a>
 
@@ -2397,6 +2429,12 @@ Requires: `subagents` · `subprocess`
 ```ts config-catalog
 /** Config: how to spawn and drive the child ACP agent process. */
 export interface Config {
+  /**
+   * Master switch: when `false`, the plugin registers no provider and performs
+   * no validation, so a deployment whose command is absent (e.g. a machine
+   * without CodeBuddy) loads unchanged. Default `true`.
+   */
+  enabled?: boolean
   /** Provider name on `ctx.subagents` (default `acp`). */
   providerName: string
   /** The executable to spawn for each run (the child ACP agent). */

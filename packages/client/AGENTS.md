@@ -1,12 +1,12 @@
 # AGENTS.md — Web client stack
 
-Rules for `packages/client/*` (the browser side of the dsh web GUI) plus its build entry `apps/web`. They supplement the repo-wide [conventions](../../AGENTS.md#conventions) and the [package rules](../README.md). Read the current [Web Client architecture](../../docs/subsystems/web-client.md), [Slots reference](../../docs/subsystems/slots.md), and [Conversation reference](../../docs/subsystems/conversation.md) before changing the corresponding layer.
+Rules for `packages/client/*` (the browser side of the dsh web GUI) plus its build entry `apps/web`. They supplement the repo-wide [conventions](../../AGENTS.md#conventions) and the [package rules](../README.zh.md). Read the current [Web Client architecture](../../docs/subsystems/web-client.zh.md), [Slots reference](../../docs/subsystems/slots.zh.md), and [Conversation reference](../../docs/subsystems/conversation.zh.md) before changing the corresponding layer.
 
 Packages here are named with the directory prefix: `@deepseek-ai/dsh-client-<name>`.
 
 ## Slot and props discipline
 
-The [Slots reference](../../docs/subsystems/slots.md) owns the current design; these are the rules you must not violate when writing or reviewing client code:
+The [Slots reference](../../docs/subsystems/slots.zh.md) owns the current design; these are the rules you must not violate when writing or reviewing client code:
 
 1. **One API**: a plugin composes UI only through `ctx.slots.register({ name, children?, store?, inject? }, Component)`. There is no separate slot-definition call, no whitelist face object, no face-minting helper. The shell alone renders `'root'`.
 2. **children = declaration + authorization**: the slots your component renders are exactly the keys of your register call's `children` object (spec values: `kind`/`scope`). Rendering a slot you didn't declare, or declaring one someone else declared, fails at load — do not work around it; the conflict is the design speaking. Slot names mirror the composition path: `<domain>.<entry>.<hole>` (e.g. `'tool.call.toolview'`).
@@ -41,7 +41,7 @@ The `/client` entrypoint of a UI plugin package is its public browser API, not a
 
 ## Layering red lines
 
-The stack has one-way knowledge, documented in the [Web Client architecture](../../docs/subsystems/web-client.md):
+The stack has one-way knowledge, documented in the [Web Client architecture](../../docs/subsystems/web-client.zh.md):
 
 1. **Data object layer** (React-free): `client/connection` owns transport generations, `api/session-controller/client` owns `ClientSessions` → `SessionManager` → `Session`, `api/workspace-controller/client` owns Workspace state, and `client/store` owns the snapshot-store engine (`defineStore`, `createSnapshotStore`, `shallowEqual`). Store products are bare observable sources with no hook members.
 2. **Render machinery** (`ui-renderer`, dynamic plugin): all ctx-to-React integration — slot renderer/outlets, `SessionProvider`, and the uSES adapter. Every hook is composed here at the binding site from bare sources; production business code carries no ui-renderer value dependency.
@@ -50,7 +50,7 @@ The stack has one-way knowledge, documented in the [Web Client architecture](../
 Non-negotiables across the layers:
 
 - **Business data lives in the object layer, never a store.** Entry-declared stores carry shared viewing/interaction state (selection, drafts, panel widths); sessions, frames, and connections stay in the object layer.
-- **rpcId is strictly bidirectional**: the initiator mints, the responder echoes, and minting stays in Connection ([unary Remote migration](../../.agents/notes/implemented/architecture/2026-08-10-unary-apiproxy-remote-migration.md)).
+- **rpcId is strictly bidirectional**: the initiator mints, the responder echoes, and minting stays in Connection ([unary Remote migration](../../.agents/notes/implemented/architecture/2026-08-10-unary-apiproxy-remote-migration.zh.md)).
 - **Notifier publication discipline**: `notifyNow` is only the direct echo of a user gesture; structural updates use microtask-batched `markDirty`, while visible streaming chunks use cumulative `markFrameDirty`. See `../api/session-controller/src/client/sessions/notifier.ts`.
 - **The web layer is pure presentation.** Nothing that is only "how to draw" enters the session log. Tool cards derive in the Client from raw call/result events and persisted result metadata; process-local control state uses its own snapshots and frames. Unknown or malformed tool data falls back to the generic form. A new *model-visible* input still requires a session event (repo-wide rule).
 
@@ -98,7 +98,7 @@ The seam is `loader.internal = modules`: cordis reaches plugin code through `Ent
 
 ## Conversation Node discipline
 
-- A Chat business feature registers one `ConversationNodeDefinition` and its keyed `conversation.chat.node` renderer; do not add its event switch or fold to `Session`, `SessionManager`, or a central built-in dispatcher. Follow the [Conversation reference](../../docs/subsystems/conversation.md).
+- A Chat business feature registers one `ConversationNodeDefinition` and its keyed `conversation.chat.node` renderer; do not add its event switch or fold to `Session`, `SessionManager`, or a central built-in dispatcher. Follow the [Conversation reference](../../docs/subsystems/conversation.zh.md).
 - `match(event)` reads only the current `SessionEventLike`. Every scalar event or packed Assistant run in a multi-input Context carries or independently derives the same stable business id; `update` folds one Match into State and remains deterministically replayable by logical log `seq`. Packed rows are update-only, and a Definition that consumes Assistant deltas implements both scalar and `chunkrow/*` branches without expanding members.
 - The append hot path and renderers never scan the full event window, Contexts, or Chat Nodes. Accumulate in State, publish same-Turn/Step facts through `buildLocationData()`, and consume final Node data or constrained Location hooks.
 
@@ -108,13 +108,13 @@ One UI feature = one plugin package (`src/client/` browser half). A multi-domain
 
 ## Styling and localization
 
-[docs/web-styling.md](../../docs/web-styling.md) is authoritative. Shared `--dsw-*` tokens and global sheets live in `ui-theme/src/styles/`; feature components consume semantic aliases through CSS Modules and `clsx`, with no literal colors, component library, or Tailwind. Code comments are English.
+[docs/web-styling.md](../../docs/web-styling.zh.md) is authoritative. Shared `--dsw-*` tokens and global sheets live in `ui-theme/src/styles/`; feature components consume semantic aliases through CSS Modules and `clsx`, with no literal colors, component library, or Tailwind. Code comments are English.
 
-Every product-visible string—including text, accessibility names, tooltips, placeholders, status/unit formatters, and primitive chrome—lives in a typed locale dictionary and reaches components through the standard `t` seat or an already-localized prop. Cordis-free primitives require complete label props and own no fallback copy. Keep user/model/wire data and code tokens verbatim; internal matching uses discriminants or stable ids, never localized text. `pnpm run verify-client-ui-i18n` enforces source ownership ([decision](../../.agents/notes/implemented/architecture/2026-08-23-locale-owned-client-ui-copy.md)).
+Every product-visible string—including text, accessibility names, tooltips, placeholders, status/unit formatters, and primitive chrome—lives in a typed locale dictionary and reaches components through the standard `t` seat or an already-localized prop. Cordis-free primitives require complete label props and own no fallback copy. Keep user/model/wire data and code tokens verbatim; internal matching uses discriminants or stable ids, never localized text. `pnpm run verify-client-ui-i18n` enforces source ownership ([decision](../../.agents/notes/implemented/architecture/2026-08-23-locale-owned-client-ui-copy.zh.md)).
 
 ## Testing and coverage
 
-The GUI test structure (three tiers, lane map) is settled in the [GUI testing system note](../../.agents/notes/implemented/process/2026-07-20-gui-testing-system.md); repo-wide policy in [docs/testing.md](../../docs/testing.md).
+The GUI test structure (three tiers, lane map) is settled in the [GUI testing system note](../../.agents/notes/implemented/process/2026-07-20-gui-testing-system.zh.md); repo-wide policy in [docs/testing.md](../../docs/testing.zh.md).
 
 - Client source packages are inside the per-file 100% coverage gate (`pnpm run test:coverage`). Genuinely unreachable defensive arms take a `/* v8 ignore -- <reason> */` comment with a real reason, never a bare ignore.
 - Component specs render with realistic props or a driven fixture runtime and assert user-visible behavior, not class names, hook internals, or render counts.
@@ -144,7 +144,7 @@ Bringing up a new `packages/client/<name>` plugin package (ui-workspace is a com
 
 ## New component checklist
 
-1. Compose through register: add the slot to `SlotMap`, declare it in its parent entry's `children`, and register your component — see the [Slots reference](../../docs/subsystems/slots.md). No other composition route exists.
+1. Compose through register: add the slot to `SlotMap`, declare it in its parent entry's `children`, and register your component — see the [Slots reference](../../docs/subsystems/slots.zh.md). No other composition route exists.
 2. Type the props as the four shares (`PropsRuntime` & `PropsRenderSlots` & `PropsStore` & inject face) — derive, don't hand-write. Shared/surviving state goes in a `createXXXStore()` factory declared at register; component-private state stays local.
 3. Component tests feed props directly (`createXXXStore().create()` for the store data; plain stubs for framework hooks) and assert behavior without render machinery.
 4. Tokens only in CSS; product copy follows the localization rule above; English comments.

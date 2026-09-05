@@ -6,11 +6,11 @@
 
 ## 问题
 
-issue #2248 的第二步对齐，接在[附件展示 note](2026-08-11-web-attachment-display-alignment.zh.md) 之后（其附件栏、toast 与原子组件包的决策继续有效；本 note 取代其中历史画廊几何与灯箱 backdrop 的具体规格）。与 DeepSeek Chat 相比剩下的差距：图片只能拖到 composer 卡片上——拖到聊天记录区会让浏览器直接导航到文件；灯箱关闭钮是裸 `×` 文本字符（button 不继承字体，且该字形的墨迹在行框中心之上，因此明显偏斜），backdrop 用 `color-mix(label-primary 74%)`，dark 下反转成刺眼的白色蒙层；一条消息的多张图各自以最大 240px 的块竖着堆叠，因为画廊容器本身被钉在 240px；客户端完全不执行也不展示图片限额——用户可以攒 50 张图，直到提交后收到原始的 `attachment-error (TOO_MANY_IMAGES)` toast，眼看附件栏清空又回滚。
+issue #2248 的第二步对齐，接在[附件展示 note](2026-08-11-web-attachment-display-alignment.zh.md) 之后（其 toast 与原子组件包的决策继续有效；其附件栏后由[内联图片 composer Note](2026-09-05-inline-image-composer.zh.md)退役；本 note 取代其中历史画廊几何与灯箱 backdrop 的具体规格）。与 DeepSeek Chat 相比剩下的差距：图片只能拖到 composer 卡片上——拖到聊天记录区会让浏览器直接导航到文件；灯箱关闭钮是裸 `×` 文本字符（button 不继承字体，且该字形的墨迹在行框中心之上，因此明显偏斜），backdrop 用 `color-mix(label-primary 74%)`，dark 下反转成刺眼的白色蒙层；一条消息的多张图各自以最大 240px 的块竖着堆叠，因为画廊容器本身被钉在 240px；客户端完全不执行也不展示图片限额——用户可以攒 50 张图，直到提交后收到原始的 `attachment-error (TOO_MANY_IMAGES)` toast，眼看草稿清空又回滚。
 
 ## 决策
 
-**整页拖放。** InputBar 在 document 上绑定 `dragenter`/`dragover`/`dragleave`/`drop`（enter/leave 深度计数、视口边缘与 `dragend` 复位、按 `Files` 类型门控使文本拖拽保留原生 textarea 路径），并渲染 `ui-attachment` 新增的 `DropOverlay` 原子组件：经 body portal、不接收指针事件的全视口层（DeepSeek Chat DragMask 的视觉——白色 70% 加 10px 模糊，dark 为 `rgba(39,39,48,0.7)`，插画、标题、上限行），`disabled` 变体宣告锁定或忙碌的 composer。指针惰性是承重的：拖拽事件继续命中下方页面，深度计数永远看不到遮罩自己。document 级监听状态是安全的，因为 composer-bar slot 为 `kind: 'single'`。
+**编辑器拖放。** rail 退役把文件拖放迁进了 composer 编辑器：其 keymap 注册 `DRAGOVER_COMMAND`/`DROP_COMMAND`，把 `Files` 类型的拖拽路由到 `intakeFiles`，拖放高亮画在编辑器上。此前的 `InputBar` 在 document 上绑定 `dragenter`/`dragover`/`dragleave`/`drop`（enter/leave 深度计数、视口边缘与 `dragend` 复位、按 `Files` 类型门控使文本拖拽保留原生 textarea 路径），并渲染经 body portal、不接收指针事件的全视口 `DropOverlay` 原子组件；该遮罩与整页拖放目标随 rail 一起退役，因此拖到聊天记录区上的文件不再落入 composer。
 
 **灯箱。** 关闭钮换成 `ui-primitives` 的 `IconCloseOutline16`（Modal 的先例——在 viewBox 内居中的 SVG 不依赖字体度量）。backdrop 用共享的对话框遮罩（`--dsw-alias-bg-mask-1` 加 `--dsw-mask-blur`，两个主题都是黑基色），画在独立的兄弟图层上，因为 `backdrop-filter` 画在容器上会把预览图自己也模糊掉。
 
@@ -32,4 +32,4 @@ issue #2248 的第二步对齐，接在[附件展示 note](2026-08-11-web-attach
 
 ## 后果
 
-拖到窗口任何位置都能进附件栏，超限加入在手势发生的那一刻就以点名上限的文案失败，历史图片像 DeepSeek Chat 一样平铺。载体的默认请求体预算扩大约 5 倍，并且仍是单请求驻留内存上界（桥把请求体整体缓冲；已记录在 connection README 的限制节）。fixture 传输用硬编码的默认数字镜像该投影——改配置的部署会与 fixture 模式的文案分叉，对 keyless 演示通道可接受。画廊左右切换、灯箱缩放与下载、非图片文件卡片仍然推迟（#2248）。
+拖到 composer 编辑器会作为内联 chip 进入，超限加入在手势发生的那一刻就以点名上限的文案失败，历史图片像 DeepSeek Chat 一样平铺。载体的默认请求体预算扩大约 5 倍，并且仍是单请求驻留内存上界（桥把请求体整体缓冲；已记录在 connection README 的限制节）。fixture 传输用硬编码的默认数字镜像该投影——改配置的部署会与 fixture 模式的文案分叉，对 keyless 演示通道可接受。画廊左右切换、灯箱缩放与下载、非图片文件卡片仍然推迟（#2248）。
