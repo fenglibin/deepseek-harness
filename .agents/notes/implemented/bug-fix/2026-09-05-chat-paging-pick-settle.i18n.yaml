@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-05-chat-paging-pick-settle.md
+2026-09-05-chat-paging-pick-settle.md: 20ea98c135a57cc76c2d692d8061edef8bb65395
+2026-09-05-chat-paging-pick-settle.zh.md: ae94e4e167215c505f6d512f481b63d936789ed6

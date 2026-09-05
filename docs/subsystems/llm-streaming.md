@@ -879,9 +879,10 @@ abstract resolveRoute(signal?: AbortSignal): Promise<ImageDescriberRoute | undef
  * Describe every reference that has no description yet.
  * @param refs - durable normalized attachments in owning-message order.
  * @param signal - cancellation shared by every call this batch makes.
+ * @param sessionId - owning session, stamped on the understanding call.
  * @returns one description or `undefined` per input, aligned by index.
  */
-abstract describe( refs: readonly ImageAttachmentRef[], signal?: AbortSignal, ): Promise<readonly ImageDescriptionResult[]>
+abstract describe( refs: readonly ImageAttachmentRef[], signal?: AbortSignal, sessionId?: GenerateOptions['sessionId'], ): Promise<readonly ImageDescriptionResult[]>
 ```
 
 Types: [ImageAttachmentRef](attachment.md)

@@ -1318,7 +1318,7 @@ function renderLifecycle(): string {
   const maintenance = 'curated Mermaid sequence; exact event signatures live in the generated Cordis catalog'
   return [
     ...generatedHeader('Agent Turn And Step Lifecycle'),
-    'This sequence is the visual companion to [architecture.md](architecture.md#turn-flow). It keeps durable replay facts on `session/event` and live control/status on `agent/*`.',
+    'This sequence is the visual companion to [architecture.md](architecture.zh.md#turn-flow). It keeps durable replay facts on `session/event` and live control/status on `agent/*`.',
     '',
     '```mermaid',
     'sequenceDiagram',
@@ -1502,7 +1502,7 @@ function renderIndex(docs: GraphDoc[]): string {
   const maintenance = 'mixed: each linked page declares generated, hybrid, or curated mode'
   return [
     ...generatedHeader('Documentation Graph Index'),
-    'These diagrams show relationships that the generated catalogs do not. Use them to find package relationships, capability seams, event flow, model-facing tools, app composition, and runtime lifecycle paths. Exact signatures and type definitions still live in the [subsystem pages](subsystems/core.md) (types + the generated Cordis API regions) and [tool-catalog.md](tool-catalog.md).',
+    'These diagrams show relationships that the generated catalogs do not. Use them to find package relationships, capability seams, event flow, model-facing tools, app composition, and runtime lifecycle paths. Exact signatures and type definitions still live in the [subsystem pages](subsystems/core.zh.md) (types + the generated Cordis API regions) and [tool-catalog.md](tool-catalog.md).',
     '',
     'The process decision behind this index is recorded in [the documentation graph Agent Note](../.agents/notes/archived/process/2026-07-03-documentation-graph-atlas.md).',
     '',

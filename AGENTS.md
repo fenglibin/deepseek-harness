@@ -6,7 +6,7 @@ DeepSeek Harness 是一个一切皆插件的 Cordis agent harness（智能体框
 
 **首个 tagged release 发布时删除本节。** 在此之前，优先保证地基正确，而非做兼容垫片：可自由重命名或重新打包，并更新所有引用。后端会拒绝旧的磁盘格式。SQLite 使用单调递增的 `SCHEMA_VERSION`；`dsh-session` 将 `SESSION_FORMAT_VERSION` 保持在 `0`，不提供任何兼容性承诺。
 
-**应用启动。** 只有 `dsh` profile 可以启动受支持的 Node 应用；package bin、demo 以及公开 SDK 的 argv 逃逸均在禁止之列（[规则](docs/architecture.zh.md#application-launch)）。
+**应用启动。** 只有 `dsh` profile 可以启动受支持的 Node 应用；package bin、demo 以及公开 SDK 的 argv 逃逸均在禁止之列（[规则](docs/architecture.zh.md#应用启动)）。
 
 ## 仓库布局
 
@@ -102,7 +102,7 @@ pnpm run demo:ptc -- "task"  # headless PTC 模式运行（需要 key）
 ## 约定
 
 - 每个 npm package 都是 `@deepseek-ai/dsh-<name>`；vendor 包会重新设定 scope（[映射](docs/rescope.zh.md)）且为 `private: true`。`@deepseek-ai/cordis` 是每个 harness package 的 peerDependency（+ dev）。
-- 处处使用 ESM（`"type": "module"`）。跨 package 使用包名，本地相对导入使用 `.ts`。配置子进程在纯 Node 下运行构建后的 `lib/`；源码回归测试使用其声明的启动器（[测试策略](docs/testing.zh.md#test-subprocess-launch-modes)）。`dsh` CLI 源码启动经由 tsx 的 ESM-only hook（`node --import tsx/esm`）运行；它触达的模块必须保持 ESM（不能只有 CJS 导出）——在 engines 覆盖范围内 Node 的原生 TypeScript 模式不可用（[源码启动契约](.agents/notes/implemented/architecture/2026-07-29-dsh-source-launch-tsx-esm.zh.md)）。Raw/Web 的 `cordis.yml` 裸插件必须出现在其 resolver manifest 的 `dependencies` 中；`verify-cordis-config` 强制此项。
+- 处处使用 ESM（`"type": "module"`）。跨 package 使用包名，本地相对导入使用 `.ts`。配置子进程在纯 Node 下运行构建后的 `lib/`；源码回归测试使用其声明的启动器（[测试策略](docs/testing.zh.md#测试子进程启动模式)）。`dsh` CLI 源码启动经由 tsx 的 ESM-only hook（`node --import tsx/esm`）运行；它触达的模块必须保持 ESM（不能只有 CJS 导出）——在 engines 覆盖范围内 Node 的原生 TypeScript 模式不可用（[源码启动契约](.agents/notes/implemented/architecture/2026-07-29-dsh-source-launch-tsx-esm.zh.md)）。Raw/Web 的 `cordis.yml` 裸插件必须出现在其 resolver manifest 的 `dependencies` 中；`verify-cordis-config` 强制此项。
 - **注册即副作用（effects）**：所有贡献都经由 `ctx.effect()` / `ctx.on()`；registry 的 `register()` 返回 disposer。
 - **运行时不变式断言的是归属关系。** 检查权威事件流或可变数据，而不是 service/方法是否存在、plugin 元数据或 effects，也不是固定的纯示例。没有合理关系时，一个有解释的空伴生（companion）才是正确的（[package 不变式规则](packages/AGENTS.md)）。
 - **类型化事件使用声明合并（declaration merging）**与可合并扩展的 map。事件 JSDoc 需要 `@mode` 与 payload 的 `@param`；payload 中不出现的 scoped key 需要 `@dshScopeScan unsupported`。公共 service 方法要记录参数与非 void 返回值。`SessionEventMap` 成员默认 required-on-read——不识别某类型的构建会拒绝写入日志，除非该事件带信封的 `ignorable: true`；只有结构性格式变更才提升 `SESSION_FORMAT_VERSION`（[机制](.agents/notes/implemented/architecture/2026-08-10-session-log-version-mechanism.zh.md)）。
@@ -123,12 +123,12 @@ pnpm run demo:ptc -- "task"  # headless PTC 模式运行（需要 key）
 - **让注释保持局部。** 不复述代码；除非本地确有必要，否则不解释远处行为，也不扩充无关注释（[依据](.agents/notes/implemented/process/2026-08-09-concrete-prose-names-actors-and-recorded-facts.zh.md)）。
 - **并行取值优先对称**；无法解释的不对称通常意味着漏做了抽取。
 - **测试描述行为，而不是正确性。** 行为过时了就连同测试一起改；在 PR 里解释原因。
-- **非平凡变更必须在同一 PR 中包含一条 Agent Note；** 只有机械式/局部编辑可豁免（[范围](.agents/notes/README.zh.md#when-to-write-one)）。已归档的 notes 是冻结的：绝不修改，也不把它们当作当前权威（[归档策略](.agents/notes/README.zh.md#archiving-and-deletion)）。
+- **非平凡变更必须在同一 PR 中包含一条 Agent Note；** 只有机械式/局部编辑可豁免（[范围](.agents/notes/README.zh.md#when-to-write-one)）。已归档的 notes 是冻结的：绝不修改，也不把它们当作当前权威（[归档策略](.agents/notes/README.zh.md#归档与删除)）。
 - **Client UI 文案归 locale 所有。** 产品文本要经类型化字典与 `t` 或本地化 primitive props 路由；`verify-client-ui-i18n` 拒绝硬编码文案（[决策](.agents/notes/implemented/architecture/2026-08-23-locale-owned-client-ui-copy.zh.md)）。
 - **测试策略** — [docs/testing.md](docs/testing.zh.md)。每个非平凡的、模型或产品用户可见的变更都要更新无密钥的录制会话快照；[快照归属](snapshots/AGENTS.md)将顶层目录树保留给会话驱动用例，其余期望输出保持 owner-local。Fixture 在 macOS/Linux 上回放；修 fixture，不要修 normalizer。
 - **提前设计每个工具的 UI 呈现。** Host presenter 保持纯函数；Web 卡片从原始事件与持久化的结果元数据派生（[cookbook](docs/cookbook/adding-a-tool.zh.md)）。
 - **为能力接缝、生命周期路径与 transcript 输出规划 unit、e2e 和 snapshot 覆盖**；缺失的 snapshot-harness 支持要并入同一变更。
-- **两个 SDK 都投影 loop。** Agent-loop、session-lifecycle 与 `SessionEventMap` 的变更要在同一 PR 中更新 TypeScript 与 Python SDK 的期望输出；`pnpm run test` 两者都不覆盖（[面](docs/testing.zh.md#when-a-snapshot-test-is-required)）。
+- **两个 SDK 都投影 loop。** Agent-loop、session-lifecycle 与 `SessionEventMap` 的变更要在同一 PR 中更新 TypeScript 与 Python SDK 的期望输出；`pnpm run test` 两者都不覆盖（[面](docs/testing.zh.md#何时需要快照测试)）。
 - **审慎选择 PR 历史。** 拆分相互独立的变更；传播前先修好引入问题的 PR。独立/stack 分支可以 merge-forward 或 rebase。重写使用 `--force-with-lease`，远端有移动就中止，绝不使用裸 `--force`；在改取更新的 base 之前，先保存进行中的 merge-forward 检查点（[依据](.agents/notes/implemented/process/2026-08-02-native-github-stacks-and-optional-rebases.zh.md)）。
 - **标签：** 每个 PR 一个 `kind/*`，所有实质内容打 `area/*`，并填原生 Issue Type（[分类法](.agents/notes/implemented/process/2026-08-08-unified-github-label-taxonomy.zh.md)）。
 - TODO 标记：按紧急程度使用 `FIXME`/`TODO`/`XXX`（[语义](docs/development.zh.md)）。

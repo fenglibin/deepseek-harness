@@ -3,11 +3,11 @@
 
 # Session Persistence Event Catalog
 
-Every event type that can appear in a session's durable event log: the complete persisted `SessionEvent` envelope and each member of the merge-extensible `SessionEventMap` — the owning vocabulary in `@deepseek-ai/dsh-session` plus every plugin declaration merge into `@deepseek-ai/dsh-session/types` in this repo — with source JSDoc, full payload declaration, surface badge, and declaration site. It complements [session.md](subsystems/session.md) (surface ordering and the `deriveMessages()` projection), [persistence.md](subsystems/persistence.md) (how the log is made durable), and the generated region of [session.md](subsystems/session.md#cordis-surface) (the live bus wiring — a log event is NOT a cordis event; it reaches listeners via the single `session/event` emit).
+Every event type that can appear in a session's durable event log: the complete persisted `SessionEvent` envelope and each member of the merge-extensible `SessionEventMap` — the owning vocabulary in `@deepseek-ai/dsh-session` plus every plugin declaration merge into `@deepseek-ai/dsh-session/types` in this repo — with source JSDoc, full payload declaration, surface badge, and declaration site. It complements [session.md](subsystems/session.zh.md) (surface ordering and the `deriveMessages()` projection), [persistence.md](subsystems/persistence.zh.md) (how the log is made durable), and the generated region of [session.md](subsystems/session.zh.md#cordis-surface) (the live bus wiring — a log event is NOT a cordis event; it reaches listeners via the single `session/event` emit).
 
 This file is GENERATED from source (`scripts/gen-persistence-catalog.ts`) and verified fresh by `pnpm run verify-persistence-catalog` (part of `doc-sync`) — do not edit it by hand. Declaration blocks retain the source declaration and nested property JSDoc, removing only the indentation imposed by a containing interface/module, and use a `ts persistence-catalog` fence (skipped by doc-typecheck because declarations reference types from their owning modules). Type names in a payload link to the page that documents them. See [the persistence-log-catalog Agent Note](../.agents/notes/archived/process/2026-07-04-persistence-log-catalog.md).
 
-The envelope declarations below compose each event's `type`, monotonic `seq`, epoch-ms `time`, `data`, the optional `ignorable` unknown-type skip marker, and the conditional `surfaceOp`/`sourceEventSeqs` fields. **surface** marks a `SurfaceEventType` member: it produces an LLM message and declares how it joins the surface list. **log-only** marks everything else: a durable, replayable record with no derived-history contribution. Every payload is JSON-serializable (enforced at `Session.append`), and the whole format is pinned at `SESSION_FORMAT_VERSION = 0` — pre-release, no compatibility implied ([the version stance](subsystems/persistence.md)). Scope: the packages in this repo; a downstream plugin can merge further event types, which are outside this catalog by construction.
+The envelope declarations below compose each event's `type`, monotonic `seq`, epoch-ms `time`, `data`, the optional `ignorable` unknown-type skip marker, and the conditional `surfaceOp`/`sourceEventSeqs` fields. **surface** marks a `SurfaceEventType` member: it produces an LLM message and declares how it joins the surface list. **log-only** marks everything else: a durable, replayable record with no derived-history contribution. Every payload is JSON-serializable (enforced at `Session.append`), and the whole format is pinned at `SESSION_FORMAT_VERSION = 0` — pre-release, no compatibility implied ([the version stance](subsystems/persistence.zh.md)). Scope: the packages in this repo; a downstream plugin can merge further event types, which are outside this catalog by construction.
 
 ## Event envelope
 
@@ -158,7 +158,7 @@ Source: [`packages/preset/agent-presets/src/session.ts:28`](../packages/preset/a
 }
 ```
 
-Types: [ToolCallId](subsystems/core.md)
+Types: [ToolCallId](subsystems/core.zh.md)
 
 Source: [`packages/interaction/user-approval/src/types.ts:44`](../packages/interaction/user-approval/src/types.ts)
 
@@ -213,7 +213,7 @@ Source: [`packages/interaction/user-approval/src/index.ts:32`](../packages/inter
 'assistant/chunk': { turn: number; step: number; chunk: StreamChunk }
 ```
 
-Types: [StreamChunk](subsystems/llm-streaming.md)
+Types: [StreamChunk](subsystems/llm-streaming.zh.md)
 
 Source: [`packages/core/session/src/types.ts:246`](../packages/core/session/src/types.ts)
 
@@ -235,7 +235,7 @@ Source: [`packages/core/session/src/types.ts:246`](../packages/core/session/src/
 'assistant/message': { turn: number; step: number; message: AssistantMessage; usage?: TokenUsage; interrupted?: true }
 ```
 
-Types: [TokenUsage](subsystems/llm-streaming.md)
+Types: [TokenUsage](subsystems/llm-streaming.zh.md)
 
 Source: [`packages/core/session/src/types.ts:257`](../packages/core/session/src/types.ts)
 
@@ -260,7 +260,7 @@ Source: [`packages/core/session/src/types.ts:257`](../packages/core/session/src/
 }
 ```
 
-Source: [`packages/interaction/commands/src/types.ts:103`](../packages/interaction/commands/src/types.ts)
+Source: [`packages/interaction/commands/src/types.ts:125`](../packages/interaction/commands/src/types.ts)
 
 <a id="commandrun--log-only"></a>
 
@@ -280,7 +280,7 @@ Source: [`packages/interaction/commands/src/types.ts:103`](../packages/interacti
 'command/run': { commandId: CommandId; name: string; args?: string; source: CommandSource }
 ```
 
-Source: [`packages/interaction/commands/src/types.ts:96`](../packages/interaction/commands/src/types.ts)
+Source: [`packages/interaction/commands/src/types.ts:118`](../packages/interaction/commands/src/types.ts)
 
 ### `compaction/*`
 
@@ -389,7 +389,7 @@ Source: [`packages/compaction/compaction/src/types.ts:23`](../packages/compactio
 )
 ```
 
-Types: [ContentBlock](subsystems/core.md) · [TokenUsage](subsystems/llm-streaming.md)
+Types: [ContentBlock](subsystems/core.zh.md) · [TokenUsage](subsystems/llm-streaming.zh.md)
 
 Source: [`packages/compaction/compaction/src/types.ts:33`](../packages/compaction/compaction/src/types.ts)
 
@@ -407,7 +407,7 @@ Source: [`packages/compaction/compaction/src/types.ts:33`](../packages/compactio
 'delivery/change': DeliveryChangeMeta
 ```
 
-Source: [`packages/delivery/delivery/src/domain.ts:94`](../packages/delivery/delivery/src/domain.ts)
+Source: [`packages/delivery/delivery/src/types.ts:184`](../packages/delivery/delivery/src/types.ts)
 
 ### `feedback/*`
 
@@ -637,7 +637,7 @@ Source: [`packages/sandbox/sandbox-policy/src/session-mode.ts:33`](../packages/s
 'schedule/change': ScheduleChange
 ```
 
-Types: [ScheduleChange](subsystems/schedule.md)
+Types: [ScheduleChange](subsystems/schedule.zh.md)
 
 Source: [`packages/schedule/schedule/src/types.ts:219`](../packages/schedule/schedule/src/types.ts)
 
@@ -687,7 +687,7 @@ Source: [`packages/core/session/src/types.ts:319`](../packages/core/session/src/
 'session/title': SessionTitleEventData
 ```
 
-Types: [SessionTitleEventData](subsystems/session-title.md)
+Types: [SessionTitleEventData](subsystems/session-title.zh.md)
 
 Source: [`packages/session/session-title/src/index.ts:76`](../packages/session/session-title/src/index.ts)
 
@@ -700,9 +700,9 @@ Source: [`packages/session/session-title/src/index.ts:76`](../packages/session/s
 'session/title-llm-request': SessionTitleLlmRequestEventData
 ```
 
-Types: [SessionTitleLlmRequestEventData](subsystems/session-title.md)
+Types: [SessionTitleLlmRequestEventData](subsystems/session-title.zh.md)
 
-Source: [`packages/session/session-title-llm/src/index.ts:44`](../packages/session/session-title-llm/src/index.ts)
+Source: [`packages/session/session-title-llm/src/index.ts:47`](../packages/session/session-title-llm/src/index.ts)
 
 ### `session-log-deepseek/*`
 
@@ -795,7 +795,7 @@ Source: [`packages/subagent/tool-subagent/src/model-selection-state.ts:17`](../p
 'team/member': { version: 1; teamId: TeamId; member: TeamMemberSnapshot }
 ```
 
-Types: [TeamId](subsystems/agent-team.md) · [TeamMemberSnapshot](subsystems/agent-team.md)
+Types: [TeamId](subsystems/agent-team.zh.md) · [TeamMemberSnapshot](subsystems/agent-team.zh.md)
 
 Source: [`packages/experimental/agent-team/src/types.ts:223`](../packages/experimental/agent-team/src/types.ts)
 
@@ -813,7 +813,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:223`](../packages/experi
 }
 ```
 
-Types: [TeamId](subsystems/agent-team.md) · [TeamMessageId](subsystems/agent-team.md)
+Types: [TeamId](subsystems/agent-team.zh.md) · [TeamMessageId](subsystems/agent-team.zh.md)
 
 Source: [`packages/experimental/agent-team/src/types.ts:229`](../packages/experimental/agent-team/src/types.ts)
 
@@ -826,7 +826,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:229`](../packages/experi
 'team/message/queued': { version: 1; teamId: TeamId; message: TeamMessageSnapshot }
 ```
 
-Types: [TeamId](subsystems/agent-team.md) · [TeamMessageSnapshot](subsystems/agent-team.md)
+Types: [TeamId](subsystems/agent-team.zh.md) · [TeamMessageSnapshot](subsystems/agent-team.zh.md)
 
 Source: [`packages/experimental/agent-team/src/types.ts:227`](../packages/experimental/agent-team/src/types.ts)
 
@@ -839,7 +839,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:227`](../packages/experi
 'team/task': { version: 1; teamId: TeamId; task: TeamTaskSnapshot }
 ```
 
-Types: [TeamId](subsystems/agent-team.md) · [TeamTaskSnapshot](subsystems/agent-team.md)
+Types: [TeamId](subsystems/agent-team.zh.md) · [TeamTaskSnapshot](subsystems/agent-team.zh.md)
 
 Source: [`packages/experimental/agent-team/src/types.ts:225`](../packages/experimental/agent-team/src/types.ts)
 
@@ -854,7 +854,7 @@ Source: [`packages/experimental/agent-team/src/types.ts:225`](../packages/experi
 'todo/write': { todos: TodoItem[] }
 ```
 
-Types: [TodoItem](subsystems/todo.md)
+Types: [TodoItem](subsystems/todo.zh.md)
 
 Source: [`packages/todo/tool-todo/src/types.ts:31`](../packages/todo/tool-todo/src/types.ts)
 
@@ -873,7 +873,7 @@ Source: [`packages/todo/tool-todo/src/types.ts:31`](../packages/todo/tool-todo/s
 'tool/call': { turn: number; step: number; callId: ToolCallId; name: string; arguments: string }
 ```
 
-Types: [ToolCallId](subsystems/core.md)
+Types: [ToolCallId](subsystems/core.zh.md)
 
 Source: [`packages/core/session/src/types.ts:263`](../packages/core/session/src/types.ts)
 
@@ -1028,7 +1028,7 @@ Source: [`packages/workflow/tool-workflow/src/types.ts:47`](../packages/workflow
 'turn/end': { turn: number; reason: TurnEndReason }
 ```
 
-Types: [TurnEndReason](subsystems/session.md)
+Types: [TurnEndReason](subsystems/session.zh.md)
 
 Source: [`packages/core/session/src/types.ts:232`](../packages/core/session/src/types.ts)
 

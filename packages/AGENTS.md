@@ -1,6 +1,6 @@
 # AGENTS.md — Harness Packages
 
-These package-specific rules supplement the repo-wide [conventions](../AGENTS.md#conventions).
+These package-specific rules supplement the repo-wide [conventions](../AGENTS.md#约定).
 
 - **Plugin exports:** service packages default-export their service class; function plugins named-export `name` / `inject` / `Config` / `apply` and have no default export. Mixing the forms makes the Loader discard the function plugin's namespace ([postmortem](../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)).
 - **Optional services use `ctx.get(name)`.** Reserve `ctx.<name>` for declared injections; the property proxy is topology-sensitive, while strict `ctx.get` reads the global service store ([postmortem](../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)).
@@ -15,10 +15,10 @@ These package-specific rules supplement the repo-wide [conventions](../AGENTS.md
 - **Publish state only at its commit point.** Emit each notification and update derived state only after the operation succeeds; derive caches, prompts, UI echoes, replay, and query views from one authoritative source.
 - **Apply bounds to the complete result.** Enforce byte, token, item, and time limits where the complete emitted or retained value, including wrappers and metadata, is known; test tiny and exact limits, oversized single chunks, and multibyte byte limits.
 - **Registry contributions prove disposal** through the HMR-safety test required by [testing policy](../docs/testing.zh.md): dispose the fiber and observe removal.
-- **Specs run concurrently** in forked workers beside other gate processes. Own each acquired port, path, and child process through teardown; a spec that passes only when run alone is a defect in the spec ([execution model](../docs/testing.zh.md#how-specs-execute)).
+- **Specs run concurrently** in forked workers beside other gate processes. Own each acquired port, path, and child process through teardown; a spec that passes only when run alone is a defect in the spec ([execution model](../docs/testing.zh.md#spec-如何被执行)).
 - **Every package owns `./invariant`.** Register the manifest name; check an event/data relation or give empty installers package-specific `No runtime invariant:` reasons. Generated companions, unexplained empties, and ignored reporters fail [`verify-package-invariants`](../.agents/notes/implemented/architecture/2026-07-19-package-invariant-runtime-contracts.zh.md).
 
-[Naming rules](../docs/cookbook/adding-a-package.zh.md#name-the-role-that-exists):
+[Naming rules](../docs/cookbook/adding-a-package.zh.md#使用符合实际的角色名称):
 
 - **Package tsconfig:** extends `tsconfig.base.json` (Client: `tsconfig.base.client.json`), sets `rootDir: src` and `outDir: lib/types`, references workspace dependencies plus `runtime-diagnostics/invariants`, and registers in one aggregate. Packages with distinct Host and Client compiler faces use `tsconfig.host.json` and `tsconfig.client.json` leaves plus a solution-only root; ordinary two-entry Client plugins do not split ([layout](../docs/development.zh.md#typescript-project-layout)).
 - `src/types.ts` contains only types — no runtime code.

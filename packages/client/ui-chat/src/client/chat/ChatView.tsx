@@ -308,6 +308,27 @@ export function ChatView({
   /** Paging anchor: semantic row/position at click, updated by reader scrolls
    * while the request is pending and restored after the prepend lands. */
   const anchorRef = useRef<PagingAnchor | null>(null)
+  /**
+   * An older-history request whose prepend has not landed. Bottom-pinning
+   * bookkeeping re-pins the scrollport while such a request is in flight, so
+   * the anchor has to outlive it: the prepend still owes the reader a restore,
+   * or a pending pick its settle.
+   */
+  const pagingRef = useRef(false)
+  /**
+   * The row and offset a restore promised while the request was still busy.
+   * The busy row shares the column with the flow and leaves it when the
+   * request ends, which moves every row up by its height; the promise is
+   * re-read then instead of trusting a recorded height, so an engine that
+   * already anchored the scroll makes the correction a no-op.
+   */
+  const promisedRef = useRef<PagingAnchor | null>(null)
+  /**
+   * Settles the pending pick against the latest rows; assigned every render so
+   * the layout effect and the paging effect share one closure without taking a
+   * dependency on it.
+   */
+  const settlePendingRef = useRef<(local: HTMLDivElement) => boolean>(() => false)
   const firstSeqRef = useRef<number | null>(null)
   const openedRef = useRef(false)
   const lastKeyRef = useRef<string | null>(null)
@@ -414,7 +435,9 @@ export function ChatView({
   }, [scheduleActiveTurn])
 
   const toBottom = (el: HTMLElement): void => {
-    anchorRef.current = null
+    // A page in flight owns its anchor even while the scrollport sits on the
+    // floor: the prepend that lands still has to restore it (or settle a pick).
+    if (!pagingRef.current) anchorRef.current = null
     el.scrollTop = el.scrollHeight
     observedTopRef.current = el.scrollTop
     atBottomRef.current = true
@@ -461,20 +484,23 @@ export function ChatView({
     if (anchorRef.current !== null && firstSeq !== null && firstSeqRef.current !== null && firstSeq < firstSeqRef.current) {
       const anchor = anchorRef.current
       anchorRef.current = null
+      pagingRef.current = false
       // A page loaded to reach a navigation target settles there instead of
-      // restoring the reader's pre-page position.
-      const pendingTurn = pendingTurnRef.current
-      const pendingItem = pendingTurn === null
-        ? undefined
-        : turnNavigationItems.find(item => item.turn === pendingTurn)
-      const target = pendingItem === undefined ? null : anchorElement(local, pendingItem.anchorKey)
-      if (pendingItem !== undefined && target !== null) {
-        pendingTurnRef.current = null
-        settleAt(local, target, pendingItem)
+      // restoring the reader's pre-page position; `settleAt` records the
+      // position it delivered, so only the restore path writes the ledger.
+      // While the request is still busy the column carries its busy row, and
+      // that row leaves it one commit later: the paging effect settles the
+      // pick then, and the restore re-reads its row through `promisedRef`.
+      const settled = !loadingOlder && settlePendingRef.current(local)
+      if (settled) {
+        promisedRef.current = null
       } else {
         const row = anchorElement(local, anchor.key)
         if (row !== null) el.scrollTop += flowTop(row, el) - anchor.top
         observedTopRef.current = el.scrollTop
+        // A busy request still holds its row in the column, so the restore is
+        // re-read when the request ends instead of trusted as final.
+        promisedRef.current = loadingOlder ? anchor : null
       }
       firstSeqRef.current = firstSeq
       /* v8 ignore next -- ?? arm: a prepend adds nodes, so the flow list here is never empty. */
@@ -526,7 +552,9 @@ export function ChatView({
     setAtBottom(isAtBottom)
     const position = isAtBottom ? null : scrollPosition(local, el)
     if (isAtBottom) {
-      anchorRef.current = null
+      // Reaching the floor abandons a restore, but never one that is still in
+      // flight: the page it belongs to has not landed yet.
+      if (!pagingRef.current) anchorRef.current = null
     } else if (anchorRef.current !== null && position !== null) {
       anchorRef.current = { key: position.anchorKey, top: position.anchorTop }
     }
@@ -543,6 +571,7 @@ export function ChatView({
       if (position !== null) {
         anchorRef.current = { key: position.anchorKey, top: position.anchorTop }
       }
+      pagingRef.current = true
       loadOlder()
     }
   }
@@ -594,10 +623,30 @@ export function ChatView({
     return () => { observer.disconnect() }
   }, [])
 
-  // A failed/empty page leaves the head unchanged. Once the request leaves
-  // its busy state there is no future prepend for the saved anchor to own.
   useEffect(() => {
-    if (!loadingOlder) anchorRef.current = null
+    if (loadingOlder) return
+    // Keep the promise a restore made against the taller column: the row it
+    // anchored has just moved up with the busy row that left.
+    const promised = promisedRef.current
+    promisedRef.current = null
+    const local = listRef.current
+    /* v8 ignore next -- ref-null guard: the effect only runs while mounted. */
+    if (local === null) return
+    if (promised !== null) {
+      const row = anchorElement(local, promised.key)
+      if (row !== null) {
+        const el = scrollerOf(local)
+        el.scrollTop += flowTop(row, el) - promised.top
+        observedTopRef.current = el.scrollTop
+      }
+    }
+    // A failed/empty page leaves the head unchanged. Once the request leaves
+    // its busy state there is no future prepend for the saved anchor to own —
+    // unless the prepend already landed, which the restore branch records by
+    // disarming the request itself.
+    if (!pagingRef.current) return
+    pagingRef.current = false
+    anchorRef.current = null
   }, [loadingOlder])
 
   const loadOlderAnchored = (): void => {
@@ -613,6 +662,7 @@ export function ChatView({
         }
       }
     }
+    pagingRef.current = true
     loadOlder()
   }
   // The paging entry point the two automation paths below call; a ref keeps the
@@ -626,6 +676,21 @@ export function ChatView({
   // turn and page back to it).
   const turnNavigationItemsRef = useRef(turnNavigationItems)
   turnNavigationItemsRef.current = turnNavigationItems
+
+  // Settling a pick is not the prepend branch's job alone: an armed pick whose
+  // page lands while the reader is pinned to the floor has no anchor to
+  // restore, and the branch that owns the restore never runs for it. Reading
+  // the item through the ref keeps this closure current for both callers.
+  settlePendingRef.current = (local: HTMLDivElement): boolean => {
+    const pendingTurn = pendingTurnRef.current
+    if (pendingTurn === null) return false
+    const item = turnNavigationItemsRef.current.find(entry => entry.turn === pendingTurn)
+    const row = item === undefined ? null : anchorElement(local, item.anchorKey)
+    if (item === undefined || row === null) return false
+    pendingTurnRef.current = null
+    settleAt(local, row, item)
+    return true
+  }
 
   // The drawer hands a turn number; the rail hands the loaded item. Both paths
   // converge on the same settle / page flow, and a stable closure identity
@@ -664,21 +729,27 @@ export function ChatView({
 
   // A navigation target a landed page did not bring in keeps the older history
   // coming; each hop re-arms the paging anchor so the reader's position holds
-  // until the turn is loaded AND its row renders (the prepend branch settles).
+  // until the turn is loaded AND its row renders.
   useEffect(() => {
-    const pendingTurn = pendingTurnRef.current
-    if (pendingTurn === null || loadingOlder || !hasMore) return
-    const item = turnNavigationItems.find(entry => entry.turn === pendingTurn)
-    if (item === undefined) {
-      if (autoPagedSeqRef.current === firstSeq) return
-      autoPagedSeqRef.current = firstSeq
-      loadOlderAnchoredRef.current()
-      return
-    }
+    if (loadingOlder) return
     const local = listRef.current
     /* v8 ignore next -- ref-null guard: the effect only runs while mounted. */
     if (local === null) return
-    if (anchorElement(local, item.anchorKey) !== null) return
+    // The pick settles as soon as its row exists, however that row arrived.
+    // Waiting for the prepend branch alone strands a pick armed from the floor:
+    // the page that carries the row in restores nothing there, so the reader
+    // watched history grow without ever reaching the message they picked.
+    if (settlePendingRef.current(local)) return
+    if (!hasMore) {
+      // No history left to page in: a request that can never resolve releases
+      // its anchor, and an unreachable pick is retired instead of staying
+      // armed for a later page to settle on behind the reader's back.
+      pagingRef.current = false
+      anchorRef.current = null
+      pendingTurnRef.current = null
+      return
+    }
+    if (pendingTurnRef.current === null) return
     if (autoPagedSeqRef.current === firstSeq) return
     autoPagedSeqRef.current = firstSeq
     loadOlderAnchoredRef.current()
@@ -770,7 +841,12 @@ export function ChatView({
               onClick={() => {
                 const local = listRef.current
                 /* v8 ignore next -- ref-null guard: the button only renders alongside the mounted list. */
-                if (local !== null) toBottom(scrollerOf(local))
+                if (local === null) return
+                // An explicit return to the floor also abandons a pick: no page
+                // landing later may scroll the reader back to that turn.
+                pendingTurnRef.current = null
+                pagingRef.current = false
+                toBottom(scrollerOf(local))
               }}
             >
               <IconChevronDownOutline14 />

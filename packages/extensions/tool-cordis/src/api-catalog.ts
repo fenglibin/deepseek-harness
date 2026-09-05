@@ -1066,9 +1066,9 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['when a configured route exists but cannot serve the call.'],
       },
       {
-        signature: 'abstract describe( refs: readonly ImageAttachmentRef[], signal?: AbortSignal, ): Promise<readonly ImageDescriptionResult[]>',
+        signature: 'abstract describe( refs: readonly ImageAttachmentRef[], signal?: AbortSignal, sessionId?: GenerateOptions[\'sessionId\'], ): Promise<readonly ImageDescriptionResult[]>',
         description: 'Describe every reference that has no description yet.',
-        parameters: [{ name: 'refs', description: 'durable normalized attachments in owning-message order.' }, { name: 'signal', description: 'cancellation shared by every call this batch makes.' }],
+        parameters: [{ name: 'refs', description: 'durable normalized attachments in owning-message order.' }, { name: 'signal', description: 'cancellation shared by every call this batch makes.' }, { name: 'sessionId', description: 'owning session, stamped on the understanding call.' }],
         returns: 'one description or `undefined` per input, aligned by index.',
       },
     ],
@@ -4268,7 +4268,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GenerateOptions',
-    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\' | \'image-understanding\';\n}',
+    declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\' | \'image-understanding\';\n    requestImagePolicy?: ImageRequestPolicy;\n}',
   },
   {
     name: 'GenericCallView',

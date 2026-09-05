@@ -2414,6 +2414,10 @@ describe('ChatView', () => {
         nodes: [
           assistant(3, 'a0', 4, 1), userInTurn(5, 'q', 5), assistant(6, 'a', 5, 1),
         ],
+        // A fresh timings map rebuilds the fixture timeline: sharing the
+        // previous one would keep the Turn order of the window the reader
+        // started from, and no page could ever grow the loaded Turn set.
+        turnTimings: new Map([[4, { startTime: 3_000 }], [5, { startTime: 5_000 }]]),
       })
     })
     expect(h.loadOlder).toHaveBeenCalledTimes(2)
@@ -2425,6 +2429,9 @@ describe('ChatView', () => {
           userInTurn(1, '尚未渲染的提问', 1), assistant(3, 'a0', 4, 1),
           userInTurn(5, 'q', 5), assistant(6, 'a', 5, 1),
         ],
+        turnTimings: new Map([
+          [1, { startTime: 1_000 }], [4, { startTime: 3_000 }], [5, { startTime: 5_000 }],
+        ]),
       })
     })
     expect(h.loadOlder).toHaveBeenCalledTimes(2)
@@ -2548,5 +2555,245 @@ describe('ChatView', () => {
     const failedView = render(<failed.ChatView {...failed.props} />)
     expect(failedView.getByText('Compaction cancelled.')).toBeTruthy()
     expect(failedView.container.querySelector('[data-state="error"]')).not.toBeNull()
+  })
+})
+
+describe('ChatView history paging', () => {
+  /** Band height the scripted layout gives every occupied column child. */
+  const ROW_HEIGHT = 100
+  /** Scrollport height the scripted layout reports. */
+  const VIEWPORT_HEIGHT = 300
+  /** ChatView's TURN_SCROLL_MARGIN: the gap it leaves above a navigated row. */
+  const SETTLE_MARGIN = 24
+
+  function bandRect(top: number, bottom: number): DOMRect {
+    return {
+      top, bottom, height: bottom - top, left: 0, right: 800, width: 800, x: 0, y: top,
+      toJSON: () => ({}),
+    }
+  }
+
+  /**
+   * Script a vertical layout for the ChatView flow: every occupied column
+   * child owns one ROW_HEIGHT band in document order and the scrollport is a
+   * VIEWPORT_HEIGHT window over that stack. jsdom has no layout engine, so
+   * rects are derived from the live DOM rather than recorded per row — a row
+   * React has only just committed measures correctly, which is exactly what
+   * the prepend restore reads.
+   * @param scroller - the ChatView scroll element.
+   * @returns a restore function for the patched prototype.
+   */
+  function installFlowLayout(scroller: HTMLElement): () => void {
+    const original = Object.getOwnPropertyDescriptor(Element.prototype, 'getBoundingClientRect')
+    const bands = (): HTMLElement[] =>
+      [...scroller.querySelectorAll<HTMLElement>('[data-chat-flow] > *:not(:empty):not([hidden])')]
+    const height = (): number => Math.max(VIEWPORT_HEIGHT, bands().length * ROW_HEIGHT)
+    let scrollTop = 0
+    Object.defineProperty(scroller, 'clientHeight', { configurable: true, get: () => VIEWPORT_HEIGHT })
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, get: height })
+    Object.defineProperty(scroller, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: (value: number) => { scrollTop = Math.max(0, Math.min(value, height() - VIEWPORT_HEIGHT)) },
+    })
+    Element.prototype.getBoundingClientRect = function (this: Element): DOMRect {
+      if (this === scroller) return bandRect(0, VIEWPORT_HEIGHT)
+      const index = bands().indexOf(this as HTMLElement)
+      return index < 0
+        ? bandRect(0, 0)
+        : bandRect(index * ROW_HEIGHT - scrollTop, (index + 1) * ROW_HEIGHT - scrollTop)
+    }
+    return () => {
+      if (original !== undefined) {
+        Object.defineProperty(Element.prototype, 'getBoundingClientRect', original)
+      }
+    }
+  }
+
+  /** Reader-driven position change: the browser reports it as a scroll event. */
+  function readerScrollTo(scroller: HTMLElement, top: number): void {
+    scroller.scrollTop = top
+    fireEvent.scroll(scroller)
+  }
+
+  /**
+   * Build a reporter for the position a programmatic write produced, the way a
+   * browser does before the next paint. A write that moved nothing produces no
+   * event.
+   * @param scroller - the ChatView scroll element.
+   * @returns a deliver function to call after every commit.
+   */
+  function scrollDelivery(scroller: HTMLElement): () => void {
+    let delivered = Number.NaN
+    return (): void => {
+      if (scroller.scrollTop === delivered) return
+      delivered = scroller.scrollTop
+      fireEvent.scroll(scroller)
+    }
+  }
+
+  /** The flow row at the top of the scrollport, with its offset from the edge. */
+  function topRow(scroller: HTMLElement): { key: string; offset: number } {
+    const rows = [...scroller.querySelectorAll<HTMLElement>('[data-chat-flow-key]')]
+    const row = rows.find(candidate => candidate.getBoundingClientRect().bottom > 0) ?? rows[0]
+    if (row === undefined) throw new Error('the flow has no rows to measure')
+    return { key: row.dataset.chatFlowKey ?? '', offset: row.getBoundingClientRect().top }
+  }
+
+  /** Offset from the scrollport's top edge to one keyed flow row. */
+  function rowOffset(scroller: HTMLElement, key: string): number {
+    const row = scroller.querySelector<HTMLElement>(`[data-chat-flow-key="${key}"]`)
+    if (row === null) throw new Error(`row "${key}" is not rendered`)
+    return row.getBoundingClientRect().top
+  }
+
+  /**
+   * Two loaded Turns (5 and 6) in front of a whole log that starts at Turn 1.
+   * Every page carries a fresh timings map: the fixture reuses the previous
+   * timeline when the timings object is shared, and a reused timeline would
+   * keep the Turn order of the window the reader started from.
+   */
+  function pagedStory() {
+    const timings = (turns: readonly number[]): Map<number, { startTime: number }> =>
+      new Map(turns.map(turn => [turn, { startTime: turn * 1_000 }]))
+    const loaded = [
+      userInTurn(50, '第五条提问', 5), assistant(51, '第五条回答', 5, 1),
+      userInTurn(60, '第六条提问', 6), assistant(61, '第六条回答', 6, 1),
+    ]
+    const outline = [
+      { turn: 1, prompt: '第一条提问' },
+      { turn: 2, prompt: '第二条提问' },
+      { turn: 5, prompt: '第五条提问' },
+      { turn: 6, prompt: '第六条提问' },
+    ]
+    const turnFour = [userInTurn(40, '第四条提问', 4), assistant(41, '第四条回答', 4, 1)]
+    const turnOneAndTwo = [
+      userInTurn(10, '第一条提问', 1), assistant(11, '第一条回答', 1, 1),
+      userInTurn(20, '第二条提问', 2), assistant(21, '第二条回答', 2, 1),
+    ]
+    const turnZero = [userInTurn(5, '第零条提问', 0), assistant(6, '第零条回答', 0, 1)]
+    return {
+      timings, loaded, outline, turnFour, turnOneAndTwo, turnZero,
+      openedTimings: timings([5, 6]),
+      turnFourTimings: timings([4, 5, 6]),
+      allTimings: timings([1, 2, 4, 5, 6]),
+      withZeroTimings: timings([0, 1, 2, 4, 5, 6]),
+    }
+  }
+
+  it('settles on a picked user message whose page lands while pinned to the floor', () => {
+    // Re-entry pins the reader to the floor. Picking a message the loaded
+    // window does not hold then pages older history in; while that request is
+    // in flight the busy row grows the column head and the browser reports the
+    // compensating position — a scroll the bottom-pinning bookkeeping used to
+    // read as "the reader is following again", dropping the paging anchor.
+    // Without that anchor the page that finally carries the picked message in
+    // restores nothing, so the reader watched the scrollbar shrink without
+    // ever reaching the message they picked.
+    vi.stubGlobal('requestAnimationFrame', () => 1)
+    const story = pagedStory()
+    const h = makeHarness(
+      { nodes: story.loaded, turnOutline: story.outline, turnTimings: story.openedTimings },
+      { hasMore: true },
+    )
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLElement
+    const restoreLayout = installFlowLayout(scroller)
+    const deliver = scrollDelivery(scroller)
+    try {
+      // Re-entry (no saved position) leaves the reader on the floor.
+      readerScrollTo(scroller, scroller.scrollHeight)
+      expect(scroller.scrollTop).toBe(scroller.scrollHeight - scroller.clientHeight)
+
+      fireEvent.click(screen.getByRole('button', { name: '打开用户消息列表' }))
+      fireEvent.click(screen.getByText('第二条提问'))
+      expect(h.loadOlder).toHaveBeenCalledTimes(1)
+
+      // Request in flight: the busy row grows the column head, the browser
+      // keeps the visible rows put and reports the new position.
+      act(() => { h.setSession({ loadingOlder: true }) })
+      readerScrollTo(scroller, scroller.scrollTop + ROW_HEIGHT)
+      // Page one carries Turn 4 in — still newer than the pick.
+      act(() => {
+        h.set({ nodes: [...story.turnFour, ...story.loaded], turnTimings: story.turnFourTimings })
+      })
+      deliver()
+      act(() => { h.setSession({ loadingOlder: false }) })
+      deliver()
+      expect(h.loadOlder).toHaveBeenCalledTimes(2)
+
+      // Page two carries the pick in; the view must land on it.
+      act(() => { h.setSession({ loadingOlder: true }) })
+      readerScrollTo(scroller, scroller.scrollTop + ROW_HEIGHT)
+      act(() => {
+        h.set({
+          nodes: [...story.turnOneAndTwo, ...story.turnFour, ...story.loaded],
+          turnTimings: story.allTimings,
+        })
+      })
+      deliver()
+      act(() => { h.setSession({ loadingOlder: false }) })
+      deliver()
+      expect(h.loadOlder).toHaveBeenCalledTimes(2)
+      expect(rowOffset(scroller, 'fixture:user:20')).toBe(SETTLE_MARGIN)
+
+      fireEvent.click(screen.getByRole('button', { name: '打开用户消息列表' }))
+      const drawer = screen.getByRole('dialog')
+      expect(within(drawer).getByText('第二条提问').closest('button')?.getAttribute('aria-current'))
+        .toBe('true')
+    } finally {
+      restoreLayout()
+    }
+  })
+
+  it('keeps a later manual page on the reader, not on the settled pick', () => {
+    // A pick that stayed armed after its page landed used to hijack every
+    // later prepend: the reader scrolled up for older history and the page
+    // that arrived scrolled them back down to the turn they had picked.
+    vi.stubGlobal('requestAnimationFrame', () => 1)
+    const story = pagedStory()
+    const h = makeHarness(
+      { nodes: story.loaded, turnOutline: story.outline, turnTimings: story.openedTimings },
+      { hasMore: true },
+    )
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLElement
+    const restoreLayout = installFlowLayout(scroller)
+    const deliver = scrollDelivery(scroller)
+    try {
+      readerScrollTo(scroller, scroller.scrollHeight)
+      fireEvent.click(screen.getByRole('button', { name: '打开用户消息列表' }))
+      fireEvent.click(screen.getByText('第二条提问'))
+      act(() => { h.setSession({ loadingOlder: true }) })
+      readerScrollTo(scroller, scroller.scrollTop + ROW_HEIGHT)
+      act(() => {
+        h.set({
+          nodes: [...story.turnOneAndTwo, ...story.turnFour, ...story.loaded],
+          turnTimings: story.allTimings,
+        })
+      })
+      deliver()
+      act(() => { h.setSession({ loadingOlder: false }) })
+      deliver()
+      expect(rowOffset(scroller, 'fixture:user:20')).toBe(SETTLE_MARGIN)
+
+      // The reader takes over and pulls the column up for older history.
+      readerScrollTo(scroller, 10)
+      expect(h.loadOlder).toHaveBeenCalledTimes(2)
+      const held = topRow(scroller)
+      act(() => { h.setSession({ loadingOlder: true }) })
+      act(() => {
+        h.set({
+          nodes: [...story.turnZero, ...story.turnOneAndTwo, ...story.turnFour, ...story.loaded],
+          turnTimings: story.withZeroTimings,
+        })
+      })
+      deliver()
+      act(() => { h.setSession({ loadingOlder: false }) })
+      deliver()
+      expect(rowOffset(scroller, held.key)).toBeCloseTo(held.offset, 0)
+    } finally {
+      restoreLayout()
+    }
   })
 })

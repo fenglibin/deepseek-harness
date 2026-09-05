@@ -1,6 +1,6 @@
 # AGENTS.md — Web client stack
 
-Rules for `packages/client/*` (the browser side of the dsh web GUI) plus its build entry `apps/web`. They supplement the repo-wide [conventions](../../AGENTS.md#conventions) and the [package rules](../README.zh.md). Read the current [Web Client architecture](../../docs/subsystems/web-client.zh.md), [Slots reference](../../docs/subsystems/slots.zh.md), and [Conversation reference](../../docs/subsystems/conversation.zh.md) before changing the corresponding layer.
+Rules for `packages/client/*` (the browser side of the dsh web GUI) plus its build entry `apps/web`. They supplement the repo-wide [conventions](../../AGENTS.md#约定) and the [package rules](../README.zh.md). Read the current [Web Client architecture](../../docs/subsystems/web-client.zh.md), [Slots reference](../../docs/subsystems/slots.zh.md), and [Conversation reference](../../docs/subsystems/conversation.zh.md) before changing the corresponding layer.
 
 Packages here are named with the directory prefix: `@deepseek-ai/dsh-client-<name>`.
 
