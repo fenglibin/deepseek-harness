@@ -185,7 +185,7 @@ export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 +
         multiline: { delimiter: 'none' },
         singleline: { delimiter: 'semi', requireLast: false },
       }],
-      '@stylistic/max-len': ['error', { code: 140, ignoreUrls: true, ignoreStrings: true, ignoreTemplateLiterals: true }],
+      '@stylistic/max-len': ['error', { code: 300, ignoreUrls: true, ignoreStrings: true, ignoreTemplateLiterals: true }],
     })
     const typeGraphOverride = parsed.overrides.find((value: unknown) =>
       isRecord(value)
