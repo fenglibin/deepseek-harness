@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-07-08-interactive-side-sessions.md) | 中文
-
 ## 问题
 
 用户可能希望在不改变当前会话主上下文的前提下，探索一个来自活跃会话的问题。现有原语无法提供这种产品形态：[会话存储 fork](../../implemented/feature/2026-06-30-session-store-fork-api.zh.md) 创建的是一个未绑定的会话，而 [fork subagent](../../implemented/feature/2026-06-21-subagent-capability-seam.zh.md) 是模型驱动的任务，其 transcript（文本记录）会折叠为一条工具结果。两者都不能给用户一个独立的对话，也都不能在父会话中同时记录结论和产生该结论的侧会话。

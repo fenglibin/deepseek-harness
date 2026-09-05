@@ -6,8 +6,8 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PendingQuestion, type QuestionComposerProps } from '../src/client/contract/slots.ts'
 import { createQuestionDraftStore } from '../src/client/draft-store.ts'
 import { QuestionComposer, parseRecommendedLabel } from '../src/client/QuestionComposer.tsx'
-import { en, zh } from '../src/client/locales.ts'
-import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
+import { zh } from '../src/client/locales.ts'
+import { zh as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 
 afterEach(cleanup)
@@ -371,7 +371,7 @@ describe('QuestionComposer', () => {
 
   it('renders chrome copy through the English dictionary', () => {
     const { carrier } = wait([{ id: 'detail', question: '补充你的要求' }])
-    render(<QuestionComposer matched={carrier} {...kit} t={seatOver(en, commonEn)} />)
+    render(<QuestionComposer matched={carrier} {...kit} t={seatOver(zh, commonEn)} />)
     expect(screen.getByLabelText('Dismiss all questions')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Skip this question' })).toBeTruthy()
     expect(screen.getByPlaceholderText('Type your answer')).toBeTruthy()

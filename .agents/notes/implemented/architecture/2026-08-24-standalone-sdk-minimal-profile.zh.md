@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-24-standalone-sdk-minimal-profile.md) | 中文
-
 ## 问题
 
 极简 SDK agent 需要显式插件清单。若把它表达为完整 `sdk` profile 上的 overlay，所有 `dsh-base` 服务仍保持挂载，排除逻辑则依赖分散在无关插件中的筛选器与 disable 配置项。以后新增的 base 配置项即使没有进入面向模型的工具清单，也可能改变运行时行为。

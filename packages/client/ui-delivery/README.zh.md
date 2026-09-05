@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-delivery
 
-[English](README.md) | 中文
-
 ## 概述
 
 本包在 Web GUI 中以两个只读视图渲染交付纪律界面。持久**时间线卡片**把 `delivery/change` 会话事件折叠为一个 keyed Conversation 节点，因此任务卡片在其 create 事件处出现在转录中，并在每次变更（阶段转换与每条变更/设计/拆分记录）时重新渲染。**悬浮卡片**固定在会话正文左边缘，展示当前任务的规模分级（`L0`/`L1`/`L2`）、其阶段、截断的目标，展开后还展示其分级所要求阶段（`created` → … → `accepted`）的进度条与 record 工具迄今已写入的产物路径（`.dsh/changes/<id>.md`、`.dsh/design/<id>.md`、`openspec/changes/<id>/spec.md`）。悬浮卡片从 host 计算的 `delivery` 投影读取实时任务；两个视图均为只读——任务通过模型侧工具推进。

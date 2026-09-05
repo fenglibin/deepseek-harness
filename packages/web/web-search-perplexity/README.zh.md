@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-web-search-perplexity
 
-[English](README.md) | 中文
-
 ## 概述
 
 有了 `dsh-web-search-perplexity`，harness 可以通过 Perplexity 搜索 web，一次调用同时获得模型生成的答案与可引用来源。当部署持有 Perplexity API 密钥、并希望获得生成答案时选择它。Perplexity 没有结果数量控制，因此返回的来源会在事后被截断到请求的上限。Perplexity 省略结构化结果元数据时，来源回退为只含 URL 的引用。面向模型的 `web_search` 工具位于 `dsh-tool-web`。

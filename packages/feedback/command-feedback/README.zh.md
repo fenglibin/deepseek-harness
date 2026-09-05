@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-command-feedback
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-command-feedback` 让用户告诉 harness 他们对会话的看法：输入 `/feedback` 加一条评价，评价即被记录并得到确认。记录是即时的，绝不会启动模型工作，因此在对话的任何时刻都是安全的——模型既看不到这条评价，也不会被打断。确认文本会点名会话与匿名用户，并报告部署的遥测策略下会话如何被共享。命令随 Web 客户端交付，无需任何配置；无头模式、ACP（Agent Client Protocol）与 JSON-RPC 入口不提供斜杠命令，因此无法运行它。

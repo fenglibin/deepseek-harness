@@ -1,57 +1,5 @@
-/** Copy dictionaries for the MCP servers settings section. */
-
-/** English strings (the key-set source of truth for this pair). */
-export const en = {
-  nav: 'MCP',
-  title: 'MCP Servers',
-  intro: 'Manage the MCP servers the model can call tools from.',
-  add: 'Add server',
-  edit: 'Edit',
-  remove: 'Delete',
-  close: 'Close',
-  cancel: 'Cancel',
-  save: 'Save',
-  saving: 'Saving…',
-  readOnly: 'The settings document is read-only in this deployment.',
-  empty: 'No MCP servers configured.',
-  enabled: 'Enabled',
-  disabled: 'Disabled',
-  serverName: 'Server name',
-  transport: 'Transport',
-  transportStdio: 'stdio',
-  transportStreamableHttp: 'streamable-http',
-  command: 'Command',
-  args: 'Arguments',
-  cwd: 'Working directory',
-  url: 'URL',
-  env: 'Environment variables',
-  headers: 'Headers',
-  addTitle: 'Add MCP server',
-  editTitle: 'Edit {server}',
-  deleteTitle: 'Delete {server}?',
-  deleteDescription: 'Deleting {server} removes its configuration.',
-  deleteConfirm: 'Delete {server}',
-  deleting: 'Deleting {server}…',
-  saved: 'Saved {server}.',
-  failed: 'The change could not be saved.',
-  conflict: 'Someone else changed these settings. Close and reopen to edit the current values.',
-  serverNameInvalid: 'Use letters, digits, dashes, and underscores (1-32 characters).',
-  serverNameDuplicate: 'A server already uses this name.',
-  commandRequired: 'Command is required.',
-  urlRequired: 'URL is required.',
-  envHint: 'One KEY=value per line.',
-  headersHint: 'One Header=value per line.',
-  argsHint: 'Space-separated arguments.',
-  enabledLabel: 'Enabled',
-  refresh: 'Refresh',
-  toolsCount: '{count} tools',
-}
-
-/** The settings.mcp namespace key union. */
-export type McpKey = keyof typeof en
-
-/** Chinese strings (same keys as {@link en}). */
-export const zh: { [Key in keyof typeof en]: string } = {
+/** Chinese strings. */
+export const zh = {
   nav: 'MCP',
   title: 'MCP 服务器',
   intro: '管理模型可以调用工具的 MCP 服务器。',
@@ -95,4 +43,7 @@ export const zh: { [Key in keyof typeof en]: string } = {
   enabledLabel: '启用',
   refresh: '刷新',
   toolsCount: '{count} 个工具',
-}
+} satisfies Record<string, string>
+
+/** The settings.mcp namespace key union. */
+export type McpKey = keyof typeof zh

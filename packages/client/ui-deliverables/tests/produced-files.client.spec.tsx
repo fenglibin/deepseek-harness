@@ -31,7 +31,7 @@ import {
 } from '../src/client/turn-deliverables.ts'
 import { apply, inject } from '../src/client/index.ts'
 import { apply as applyInvariant } from '../src/invariant.ts'
-import { en, zh } from '../src/client/locales.ts'
+import { zh } from '../src/client/locales.ts'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 
 const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
@@ -519,7 +519,7 @@ describe('ProducedFiles row', () => {
         matched={['a.md', 'b.md', 'c.md', 'd.md', 'e.md', 'f.md', 'g.md']}
         openFile={() => {}}
         {...capability(false)}
-        t={makeTranslate(en)}
+        t={makeTranslate(zh)}
       />,
     )
     const row = view.container.querySelector('[data-produced-files-row]')

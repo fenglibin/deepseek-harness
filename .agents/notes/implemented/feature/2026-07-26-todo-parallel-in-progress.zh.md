@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-26-todo-parallel-in-progress.md) | 中文
-
 ## 问题
 
 [原始 `todo_write` 设计](2026-06-29-todo-write-tool.zh.md)在 `execute` 和持久日志不变式中都强制每个列表至多一个 `in_progress` 任务。该不变式假设工作是顺序进行的，但 harness 会运行真正并行的工作（通过委派工具启动的并发 subagent、后台 bash 命令、工作流扇出），而一个只能标出单个活跃任务的列表无法表示这种情况。模型被迫要么把并行任务错误标记为 `pending`，要么把它们合并成一个含糊的条目，导致 UI 进度清单少报了实际正在运行的工作。

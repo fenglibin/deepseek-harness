@@ -206,7 +206,7 @@ export class AgentPresets extends TypertRemoteService {
     // below, and the ACP, SDK-server, and headless entry points all create one.
     // The invariant companion is the check that fails loud, at assembly. Why an
     // unjoined agent matters at all has one home: the [Agent
-    // Note](../../../../.agents/notes/implemented/architecture/2026-08-10-host-plane-ownership-after-presets.md).
+    // Note](../../../../.agents/notes/implemented/architecture/2026-08-10-host-plane-ownership-after-presets.zh.md).
     //
     // Known false positive: a session created bare and bound later by
     // `recompose` is warned about once, before its first bind. Shipped Web

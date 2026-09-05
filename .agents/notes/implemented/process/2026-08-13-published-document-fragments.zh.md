@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-13-published-document-fragments.md) | 中文
-
 ## Problem
 
 `verify-md-links` 使用 GitHub 的 Markdown 标题 id 校验 fragment，而文档网站使用 VitePress 渲染标题。包含较多标点的标题与翻译后的标题可能通过源码校验，却在已发布 HTML 中没有对应 id。VitePress 构建成功只会校验目标页面，不会校验 fragment id。

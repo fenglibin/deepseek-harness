@@ -1,7 +1,5 @@
 # 配置驱动的提示词命令（Prompt Command）设计文档
 
-[English](prompt-command-config-design.md) | 中文
-
 本文记录「提示词命令」特性的完整设计：从需求对齐、方案决策，到架构与数据流，作为实现与验收的依据。决策的「为什么」与「放弃项」见对应 Agent Note（`.agents/notes/implemented/feature/2026-09-03-prompt-command-kind.md`）。
 
 ## 1. 背景与动机

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-04-configuration-source-ownership.md) | 中文
-
 ## Problem
 
 `$DSH_HOME/.env` 刚刚[变成普通环境层](2026-08-04-credentials-yaml-and-user-environment-layer.zh.md)，这使得 harness 解析面向用户的值时面对的是一个压平的 `process.env`，再也说不清某个值来自哪里。由此产生三个后果。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-23-python-sdk-windows-x64-runtime.md) | 中文
-
 ## Problem
 
 Python SDK 运行时分发需要 Windows 载体，同时不能创建另一个应用入口，也不能削弱现有原生目标所使用的 installed-wheel 证据。Windows 的可执行文件名、Python wheel 标签、ConPTY addon、ripgrep sidecar、shell 组合、虚拟环境与进程启动规则均不同于 Linux 和 macOS。仅凭跨平台单元测试或非 Windows 可执行文件声称支持 Windows，会使 `pip` 实际选择的产物未经证明。

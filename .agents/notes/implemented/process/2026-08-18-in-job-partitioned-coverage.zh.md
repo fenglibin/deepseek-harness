@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-18-in-job-partitioned-coverage.md) | 中文
-
 ## 问题
 
 原生 Windows 覆盖率是拉取请求完整清单中反馈最慢的路径。把插桩套件保留在单个 Vitest 进程内并只使用 1 个 worker，可以避开较大进程内 worker 池曾出现的 worker 丢失和 Node 24 CJS lexer 故障，但一次失败可能超过 14 分钟才会显现，而且门禁调度器会在子进程结束前扣住输出。

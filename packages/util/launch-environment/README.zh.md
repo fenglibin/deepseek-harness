@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-launch-environment
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-launch-environment` 在启动时把本次运行的环境冻结为一份不可变快照，并记录每个值来自哪一层。解析一个名字会按可信度从高到低搜索各层——继承的进程环境、调用目录的 `.env`、然后是 Harness 主目录的 `.env`——因此胜出的值总是携带其来源。调用方也可以只从命名的层子集中解析，这是拒绝而非降级：无论之后信任顺序如何变化，被省略的层都不可达。这些值仍会进入 `process.env` 供配置表达式与第三方库使用，但 harness 解析任何内容都不把那份压平视图当作依据。它是一个零依赖库，由产品包直接导入；`cordis.yml` 无法加载它。

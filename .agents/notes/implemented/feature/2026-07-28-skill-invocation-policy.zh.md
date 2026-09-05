@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-28-skill-invocation-policy.md) | 中文
-
 ## 问题
 
 skill 注册表最初将发现操作视为模型目录：`ctx.skills.list()` 会移除禁止模型调用的 skill，而 `ctx.skills.get()` 仍是不过滤内容的可信 loader。该设计足以支持由模型发起的加载，却无法表示与 Claude 兼容的四类 skill：仅向用户公开、仅向模型公开、同时向两者公开，或者两者均不公开。TUI 从面向模型过滤后的列表中生成用户自动补全，并允许通过 `get()` 加载任意精确名称，这进一步放大了两类调用策略不匹配的问题。

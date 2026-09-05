@@ -5,8 +5,6 @@ kind: "package-library"
 
 # dsh-util-crypto
 
-[English](README.md) | 中文
-
 ## 概述
 
 零依赖、可在浏览器使用的 UUID 与字节编码辅助函数。UUID 铸造基于 `crypto.getRandomValues`——所有发布上下文都提供的那个随机原语。`crypto.randomUUID` 是安全上下文限定的 Web API：经普通 HTTP 在局域网地址上提供的页面或 worker（浏览器预览部署）根本没有这个方法，必须在那里运行的代码不能调它。全仓 `no-restricted-properties` lint 规则把 `crypto.randomUUID` 的调用者指到这里；只跑在 Node 的代码从 `node:crypto` 导入 `randomUUID` 维持原样。

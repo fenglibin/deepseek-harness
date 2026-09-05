@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-skill-badge
 
-[English](README.md) | 中文
-
 ## 概述
 
 agent（智能体）可以通过该内置提供方加载官方「powered by dsh」徽章 skill（技能），并遵循其指令，给文档、pull request 以及其他用 DeepSeek Harness 生成的内容添加署名徽章。该提供方没有配置，随附 CLI（命令行界面）组合以禁用状态包含该插件，因此部署方需要显式启用。该 skill 同时提供 Markdown 片段和随包分发的 PNG，供无法可靠导入远程图片的系统使用。

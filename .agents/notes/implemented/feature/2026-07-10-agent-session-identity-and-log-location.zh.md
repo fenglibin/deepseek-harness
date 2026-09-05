@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-10-agent-session-identity-and-log-location.md) | 中文
-
 ## 问题
 
 agent（智能体）可以通过 `session.header.cwd` 识别其工作区，但使用 bash 的模型无法可靠识别当前调用所属的会话，也无法找到记录该调用的持久 transcript（文本记录）。搜索 `./.sessions` 等同于猜测部署配置和 JSONL 布局；自定义根目录、替代持久化后端、恢复、fork，以及并发运行的父子 agent，都会让这种猜测失效。钩子同样需要 transcript 位置，而未来的插件也可能需要向 shell 命令公开其他由 harness 所有的环境事实。

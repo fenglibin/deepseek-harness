@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-11-property-based-testing.md) | 中文
-
 > 属性测试套件首次运行即发现了 BlockAssembler 重复 `block-end` 的真实 bug。
 
 ## 问题

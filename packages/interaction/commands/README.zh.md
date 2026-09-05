@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-commands
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-commands` 让用户能在交互式 Harness UI 中输入 `/command [input]`，并直接针对接收命令的 agent（智能体）执行，不产生模型消息。插件注册命令时提供名称、描述、可选的输入提示与图片接受标志，以及可中止的处理器；交互式适配器按 agent 发现并分派这些命令。挂载在 agent 上下文之下的命令生产插件可以注册精确限定到该 agent 的命令，它会遮蔽同名的全局定义。每次命令执行都会记录在接收 agent 的会话日志中，结果由适配器渲染，绝不进入模型历史。斜杠命令随 `dsh` CLI 与 Web 客户端一起提供。

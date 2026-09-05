@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-18-compaction-capability-seam.md) | 中文
-
 ## 问题
 
 长时间运行的 agent（智能体）对话会无限增长。随着事件日志不断累积轮次，派生出的消息历史最终逼近模型的上下文窗口，模型随即在响应中途停止生成（`max-tokens`），或表现退化。**上下文压缩（context compaction）** 是对此的缓解手段：用一段简洁的摘要替换一批较早的历史，保持近期上下文完整。

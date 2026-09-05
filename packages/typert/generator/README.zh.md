@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-typert-generator
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-typert-generator` 在构建时把源代码 TypeScript 转换为与编译器无关的数据与可运行产物：它分析工作区各包的类型树，生成 `FaceModel` 与类型图，并输出包含受支持 Zod schema 与 `TYPERT` 反射贡献的可执行 JavaScript，以及配套声明文件。它是构建时库而非插件——绝不会在实时 agent 会话中运行。仓库的 Host tsdown 会自动运行它；业务包通过导出 `./typert` 与 `./client/typert` 入口选择加入，生成器会校验这些导出与发布文件清单。静态消费方也可以直接调用分析器进行类型检查或目录生成，无需发布任何内容。

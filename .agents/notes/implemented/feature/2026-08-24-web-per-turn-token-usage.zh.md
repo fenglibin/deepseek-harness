@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-24-web-per-turn-token-usage.md) | 中文
-
 ## Problem
 
 Web Chat 在编辑框附近显示会话累计 token 用量，但该值无法解释一个已完成轮次的消耗。分页历史窗口可能从轮次中间开始，重试可能消耗多次模型调用，流式事件与最终事件可能重复携带同一次 attempt 的用量，而可选 cache 字段也不能证明精确总量。将局部小计显示成轮次用量，会让已记录的提供方事实显得比实际更完整。

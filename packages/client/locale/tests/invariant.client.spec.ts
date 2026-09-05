@@ -19,7 +19,7 @@ describe('invariant companion', () => {
     nodeApply(new Context())
   })
 
-  it('client apply provides ctx.locale seeded with the zh/en common namespace', async () => {
+  it('client apply provides ctx.locale seeded with the zh common namespace', async () => {
     // The feature registers its own Language settings row, hence the slots edge.
     expect(inject).toEqual(['slots', 'remote', 'settingsScope'])
     const ctx = new Context()
@@ -32,6 +32,5 @@ describe('invariant companion', () => {
     expect(locale).toBeInstanceOf(LocaleRuntime)
     // Seeded dictionaries occupy the (ns, locale) seats even while empty.
     expect(() => (locale as LocaleRuntime).register(COMMON_NS, 'zh', {})).toThrow('already has locale')
-    expect(() => (locale as LocaleRuntime).register(COMMON_NS, 'en', {})).toThrow('already has locale')
   })
 })

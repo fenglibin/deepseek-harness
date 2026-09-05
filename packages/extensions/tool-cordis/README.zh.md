@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-cordis
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-tool-cordis` 给模型提供七个作用于当前 DSH 进程实时 Cordis 运行时的工具：检查已加载的内容与动态包可用之物，定义包含 host 半、浏览器半或两者的包，运行它、停止它并移除它。包带版本——插件持有若干不可变的包版本，模型在失败后可以追加修正版并更新过去。定义只存在于进程内存中，DSH 重启即消失；本包不写仓库文件、不安装任何包、不改 `cordis.yml`。它还增加一个教这套工作流的系统提示词章节；把它与 `@deepseek-ai/dsh-cordis-host-runner` 一同组合，后者负责沙箱与运行往返。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-08-agent-scope-contexts.md) | 中文
-
 ## 问题
 
 一个应用需要在多个 agent（智能体）之间共享基础设施，同时让每个 agent 拥有自己的工具、提示词贡献、策略和监听器。共享的适配器、持久化和用户界面属于部署层面；而 persona、工具变体或监听器往往只属于某一个 agent。

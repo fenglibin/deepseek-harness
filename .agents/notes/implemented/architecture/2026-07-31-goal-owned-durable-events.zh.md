@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-goal-owned-durable-events.md) | 中文
-
 ## 问题
 
 Goal 状态与 inbox 状态具有不同的生命周期。无论相关模型上下文是否获准进入步骤，goal 变更都必须在重启与 fork 后保留；inbox 消息则可能在步骤调度期间被编辑、领取、拒绝或丢弃。把 goal 变更编码到 Round 为 0 的 inbox 消息中，会让队列放置成为领域提交点，并迫使回放对账插入、准入、消息标识、来源元数据与渲染内容。

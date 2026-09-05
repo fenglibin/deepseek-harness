@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-session-telemetry-otel
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-session-telemetry-otel` 通过 OpenTelemetry 日志投递会话记录，是[会话遥测 seam](../session-telemetry/README.zh.md) 的后端，也是部署方唯一要加载的条目。其 `mode` 决定会话记录是跟随实时流、仅在记录反馈时释放，还是留在本地：`FULL` 把每条记录立即交给 OTel SDK，`FEEDBACK_ONLY` 在 `feedback/record` 落地时回放权威日志，`DISABLED`（默认值）不构造任何内容也不共享任何内容。上传模式会原样组合 OTel JS SDK——`LoggerProvider` → `BatchLogRecordProcessor` → OTLP/HTTP 日志导出器——并把每条记录映射到 `logger.emit()`，因此批处理、重试、排队与丢失策略都遵循 SDK。记录携带 seam 脱敏 waterfall（瀑布式事件）返回的完整事件数据，因此向可信边界之外导出的部署方要挂载自己的脱敏规则。模式、配置与导出面在前；实现内部细节放在下方可折叠的开发者章节中。

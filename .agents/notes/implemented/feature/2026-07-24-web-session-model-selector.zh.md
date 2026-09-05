@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-24-web-session-model-selector.md) | 中文
-
 ## 问题
 
 Web 对话需要一项由 Host 提供、可见且可更改的会话模型选择。如果照搬 TUI 的呈现方式，或在浏览器中硬编码 DeepSeek 模型，就会让模型发现逻辑和步骤边界语义分散到不同前端中。响应运行期间发生的切换还需要一个原子边界：提示词变量与请求路由不能观测到不同的选择。

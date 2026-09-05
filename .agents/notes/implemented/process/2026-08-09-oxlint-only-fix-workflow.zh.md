@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-09-oxlint-only-fix-workflow.md) | 中文
-
 ## 问题
 
 [仓库 linter 迁移](2026-07-29-oxlint-linter.zh.md)保留了一次仅用于格式化的 ESLint 调用，因为当时认为 Oxlint 的 JavaScript 插件桥接层只能用于校验。固定版本的 Oxlint 工具链能够执行 `@stylistic/eslint-plugin` 提供的安全修复，因此单独的格式化器重复引入了配置边界、命令启动过程，以及对 `eslint` 和 `@typescript-eslint/parser` 的直接依赖。

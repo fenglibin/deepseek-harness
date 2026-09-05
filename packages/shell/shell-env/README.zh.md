@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-shell-env
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-shell-env` 提供每次模型 shell 调用——bash 或 pwsh——所运行的受信 `DSH_*` 环境：内置事实如 `DSH_HOME`、`DSH_SHELL=1` 与 agent（智能体）的 `DSH_SESSION_ID`，以及活跃持久化后端定位到 JSONL 产物时的 `DSH_SESSION_JSONL`。插件作者可以注册自己的事实，带声明键、按每次执行收集，并随插件释放；重复所有权或未声明的运行时键会响亮失败，而不是静默覆盖。注册表不会改变模型看到的其他任何内容——shell 工具拥有各自的 schema 与提示词。任何挂载了模型 shell 工具的组合都适合选择它；配置只决定 Harness 主目录。

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-session-persistence-jsonl
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-session-persistence-jsonl` 把每个会话存为一份仅追加 JSONL 日志——默认以带校验和的 Zstandard 帧存储，禁用压缩时以换行分隔的原始文本行存储。它提供与任何持久化后端相同的逻辑 `SessionEvent` 流，因此选择它不会改变 agent loop、模型或回放的任何行为；压缩、打包与崩溃恢复都是存储内部细节。当消费方需要按会话的磁盘产物时选择它：`locate(meta)` 返回 transcript 路径，选择 `compression: 'none'` 后日志可作为纯文本按行读取。根目录是唯一必填配置；持久性、延迟实体化与中断轮次恢复都随后端提供。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-web-result-card.md) | 中文
-
 ## Problem
 
 `web_search` 与 `web_fetch` 工具各自声明了一个 generic 待处理卡片（`presentCall`，`kind: 'search'`/`'fetch'`），但没有 `presentResult`，因此一个已完成的 web 调用抵达 UI 时只剩下面向模型的 render 文本。对于想渲染引用列表或抓取摘要的 web 前端而言，该文本是有损的：`web_search` 的 render 把每个来源的 `title`、`snippet`、`publishedAt` 压进一行以 title 或 hostname 标注的自由文本 markdown（`packages/web/tool-web/src/search.ts` 中的 `formatSearchOutput`），因此重新解析 render 无法恢复各来源字段；`web_fetch` 的 render 也仅在一行 header 里携带 `url` 与 `statusCode`。渲染意图约定（[标签联合类型](../architecture/2026-07-02-tool-render-intent-union.zh.md)）此前没有一个可供 web 工具声明、用以携带结构化结果的分支。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-10-readme-known-limitations-gate.md) | 中文
-
 ## 问题
 
 [文档标准](../../../../docs/AGENTS.md)规定限制项归属包 README。没有统一结构时，章节缺失便无法区分“经审计确认没有限制”与“忘记编写文档”，不同的标题还会妨碍全仓库搜索。

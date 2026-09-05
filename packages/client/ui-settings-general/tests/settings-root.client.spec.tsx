@@ -5,7 +5,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SettingsRootComponentProps } from '../src/client/shell-contract.ts'
 import { SettingsRoot } from '../src/client/SettingsRoot.tsx'
-import { en } from '../src/client/locales.ts'
+import { zh } from '../src/client/locales.ts'
 
 afterEach(() => {
   cleanup()
@@ -75,7 +75,7 @@ function mount({
     useWorkspaces: unusedHook,
     wide,
     reconnect,
-    t: makeTranslate(en),
+    t: makeTranslate(zh),
     useConnectionState: (select) => {
       const [, force] = useState(0)
       useEffect(() => {

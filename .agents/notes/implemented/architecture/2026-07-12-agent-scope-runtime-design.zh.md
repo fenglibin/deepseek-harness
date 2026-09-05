@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-12-agent-scope-runtime-design.md) | 中文
-
 ## 问题
 
 [agent（智能体）作用域约定](2026-07-08-agent-scope-contexts.zh.md)对贡献者而言很简单：通过 `agent.ctx` 注册，解析出一个全局加单 agent 的视图，仅在 setup 完成后发布，并保持作用域直到工作停止。运行时必须在协作式插件框架、异步创建、可重入监听器、持久化会话提交以及 worker 或进程故障等场景下维护这份约定。

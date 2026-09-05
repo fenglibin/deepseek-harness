@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-20-unified-json-value-schema-dsl.md) | 中文
-
 ## 问题
 
 工具参数使用一套精简的作者侧 schema DSL，subagent／工作流的结构化输出则使用另一套原始 JSON Schema 子集和校验器。两套词汇在根类型、标量约束和校验方式上并不一致；如果继续沿用这种划分，类型化的规范工具输出约定要么还需重复实现两条路径，要么只能接受部分投影无法强制执行的 schema。

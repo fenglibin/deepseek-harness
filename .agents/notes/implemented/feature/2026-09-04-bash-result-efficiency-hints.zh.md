@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-04-bash-result-efficiency-hints.md) | 中文
-
 ## Problem
 
 一次剖析会话（`session-68379efa`，2 个 turn、389 个 step、112.9 分钟墙钟）的耗时来自模型行为而非执行缓慢：用 `bash` 搜索（`grep` 出现在 85 条命令中、`find` 15 条，而 `fs_search` 工具被调用 0 次）；用 5 次 90–300 秒的固定 `sleep` 等待，而不是 `job_output` 的 `wait: true`；探测约 20 分钟后才调用 `ask_user_question`。模型所需的每一种能力都已存在。

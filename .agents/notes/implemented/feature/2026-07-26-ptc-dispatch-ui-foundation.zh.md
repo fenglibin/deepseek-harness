@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-26-ptc-dispatch-ui-foundation.md) | 中文
-
 > 范围：让 UI 能以与原生工具调用相同的保真度渲染 PTC mode 轮次的宿主侧约定变更，即其他 PTC mode UI Agent Note 赖以构建的基础。传输设计归 [PTC mode 基础](2026-06-15-ptc.zh.md)所有；模型可见的 `description` 参数、携带完整内容的 `tool/code-dispatch` 载荷，以及 `dsh` 配置树上临时的 `DSH_TOOLS_MODE` 启用开关，归本篇所有。
 
 ## 问题

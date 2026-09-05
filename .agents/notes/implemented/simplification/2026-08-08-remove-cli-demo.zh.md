@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-08-remove-cli-demo.md) | 中文
-
 ## 问题
 
 在 [`dsh --profile headless`](../architecture/2026-08-06-app-owned-command-line.zh.md) 成为产品的一次性命令后，`@deepseek-ai/dsh-cli-demo` 仍是承担同一工作的第二个应用包。它另行拥有一套可执行文件、参数语法、应用组装、取消生命周期、文本／JSON／stream-JSON 输出约定、构建产物、配套文档和测试套件。两个入口组装的树也不相同，因此 demo 成功不能证明已交付的 `headless` profile 可用，用户还必须在功能重叠的命令之间作出选择。

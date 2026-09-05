@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-08-web-background-job-display.md) | 中文
-
 ## 问题
 
 `ctx.jobs` 已经承载了 harness 在后台启动的全部长时工作——`bash`、`pwsh`、`pty-send`，以及一次性后台 subagent——但它唯一的读者是模型。[`dsh-tool-jobs`](../../../../packages/jobs/tool-jobs/README.zh.md) 暴露了 `job_list`、`job_output` 和 `job_kill`，除此之外没有任何东西观察这个注册表。

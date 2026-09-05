@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-cmdline
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-cmdline` 让你的应用持有自己的命令行：启动器只保留属于自己的 flag（`--profile`、`--patch`、配置 dump），并把**其后的一切**原样交给你的应用，因此 flag、`--help` 文本与解析错误都由你的应用决定。你从这些参数解析出的值会胜过配置中写下的任何默认值，且无需写回任何内容。你的应用还获得一个有边界的进程退出请求，接到启动器的关停上。当你编写接受自有 flag 的应用 bin 时使用它；它本身不增加任何提示词、schema 或面向模型的表面。

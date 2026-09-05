@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-09-parallel-subagent-delegations.md) | 中文
-
 ## 问题
 
 想要扇出的模型会把多个 `subagent` 调用合并进同一条 assistant 消息：这个批次本身就是并行意图。委派工具此前没有声明 `isConcurrencySafe` 分类器，按安全侧原则设计的调度器（[并行工具调用 Agent Note](2026-07-10-parallel-tool-call-execution.zh.md)）便把每个前台委派都当作独占屏障：GUI 里显示九张卡片，却只有一个子 agent（智能体）在运行，其余八个要在它的整个运行期间排在其后等待。

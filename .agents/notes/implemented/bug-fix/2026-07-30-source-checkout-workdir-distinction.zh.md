@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-source-checkout-workdir-distinction.md) | 中文
-
 ## 问题
 
 `harness:source` 提示词段遵循[源码位置决策](../../archived/feature/2026-07-21-dsh-system-prompt-source-path.md)，但原有措辞把 checkout 称为「你自己的源代码」，却没有区分该路径与会话 workspace。在 persona 不声明 `{{cwd}}` 的普通 TUI 配置中，这可能是系统提示词开头附近唯一固定的绝对路径。因此，DeepSeek V4 可能会直接用 harness checkout 回答「what's the workdir?」，而不是确定会话的当前工作目录。

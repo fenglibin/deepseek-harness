@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-web-telemetry-default-mount.md) | 中文
-
 ## 问题
 
 遥测 seam 与 OTel 后端（[revival Note](2026-07-23-session-telemetry-otel-revival.zh.md)）自完成以来从未接入任何部署组合：没有 roster 行、没有开关、没有节奏口径，内部部署对用户会话的可观测性为零。需要一个部署决策：哪些 surface 上报、报到哪、什么节奏、怎么关、CI 怎么隔离。

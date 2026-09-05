@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-20-routed-model-context-and-compaction-policy.md) | 中文
-
 ## 问题
 
 当一个进程把请求路由到不同容量的模型时，压缩（compaction）不能安全地应用同一个全局上下文窗口。相同模型 id 也可能存在于多个提供方下，适配器还可能接受不在建议目录中的动态 id。错误容量要么让压缩触发过晚并造成原本可避免的溢出，要么让压缩触发过早并丢弃有用上下文。

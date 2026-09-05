@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-05-prompt-variables-and-tool-guidance-ownership.md) | 中文
-
 ## 问题
 
 组装后的系统提示词存在四个缺陷，同属一类：harness 已知的事实在别处被手工重述，然后漂移。

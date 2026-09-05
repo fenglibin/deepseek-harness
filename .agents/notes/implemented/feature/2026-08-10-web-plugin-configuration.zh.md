@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-web-plugin-configuration.md) | 中文
-
 > 三个分节、分层解析与暂存保存表单依然有效。Host 白名单与无键卡片列表已被[由插件自己拥有的设置表层](../architecture/2026-08-12-plugin-owned-settings-surface.zh.md)取代：每一个已注册的命名空间都被服务，卡片以它所编辑的命名空间为键。
 
 ## 问题

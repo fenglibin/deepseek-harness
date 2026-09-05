@@ -1,6 +1,6 @@
 /**
  * Generic per-session projection value store (push model; see the
- * session-projection subsystem page, docs/subsystems/session-projection.md):
+ * session-projection subsystem page, docs/subsystems/session-projection.zh.md):
  * the host is the only computation site; the client holds finished
  * whole values per key — `key → { value, seq }` — seeded by a follow opening
  * baseline and updated by Session Controller `projection` frames,
@@ -18,12 +18,12 @@ import { Notifier } from './notifier.ts'
 // dsh-session chain would drag the host `Context.sessions` merge into the
 // client program (one program must not hold both sides). No second
 // client-side "views" table (rejected in the Alternatives of
-// .agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.md).
+// .agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.zh.md).
 export type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 
 /**
  * The fifth framework hook seat (see the session-projection subsystem page,
- * docs/subsystems/session-projection.md): key-addressed
+ * docs/subsystems/session-projection.zh.md): key-addressed
  * projection reader delivered through the standard kit. `undefined` uniformly
  * means capability absent — host unit unmounted, or no baseline/frame has
  * carried the key yet. The selector overload mirrors useSession (per-key uSES

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-turn-usage-sums-disclosed-cache-buckets.md) | 中文
-
 ## Problem
 
 `deriveTurnTokenUsage` 过去用 `values.every(isCount) ? safeSum(values) : undefined` 对每个用量子桶求和。因此只要有一个 attempt 没有上报 `cacheReadTokens`，整个分桶就会被丢弃，轮次用量披露显示缓存命中率为 0，而同一轮次的底部统计——它读取的是只对已上报值求和的持久化 `tokenUsage` projection——却显示超过 90%。一个真实会话可以复现该差距：第 1 轮有 30 个 attempt，其中第 8 步上报的是 `{"inputTokens":34540,"outputTokens":100,"totalTokens":34640}`，不含任何缓存分桶，于是披露隐藏了 1421880 个缓存输入 token 中的 1327616 个。

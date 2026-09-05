@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-30-event-domain-semantics.md) | 中文
-
 ## 问题
 
 harness 通过 Cordis 事件分类体系扩展 agent loop（智能体循环）（见[微内核事件分类体系 Agent Note](2026-06-11-microkernel-event-taxonomy.zh.md)）。随着该分类体系的增长，三个事件域之间的界限变得模糊：

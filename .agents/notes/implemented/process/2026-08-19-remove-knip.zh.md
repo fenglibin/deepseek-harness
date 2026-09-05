@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-19-remove-knip.md) | 中文
-
 ## 问题
 
 Knip 从静态源码图推导未使用文件、export 和依赖。DeepSeek Harness 还会从包 manifest（元数据清单）和配置中装载 Cordis 插件、向 `lib/` 生成 Typert 契约面、拆分 Host 与 Client 程序，并声明仅由生成代码或运行时装载代码消费的依赖。因此，仓库必须维护 workspace 专用入口列表和忽略依赖例外，才能让受支持路径通过扫描。包与测试布局变化还必须维护这份对可执行图的第二重近似描述。

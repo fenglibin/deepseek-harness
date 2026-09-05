@@ -15,7 +15,7 @@ import { onboardingReadiness } from './store.ts'
 import type { ModelsOperations } from './operations.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
 import { ProviderEditor } from './ProviderEditor.tsx'
-import type { en } from './locales.ts'
+import type { zh } from './locales.ts'
 import { OnboardingModal } from './OnboardingModal.tsx'
 import styles from './DeepSeekOnboardingDialog.module.css'
 
@@ -32,7 +32,7 @@ export interface DeepSeekOnboardingInjected {
   /** Settings schema and immutable path callbacks. */
   schema: SettingsSchemaOperations
   /** Feature copy. */
-  t: (key: keyof typeof en) => string
+  t: (key: keyof typeof zh) => string
 }
 
 /** Slot owner props plus the feature's injected dependencies. */

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-07-default-model-follows-the-picker.md) | 中文
-
 ## 问题
 
 会话模型选择器与部署默认值是同一项偏好的两个层次。如果选择器只影响其所在会话，下一个空白会话可能选择不同模型，用户却没有途径使默认值与选择器一致。如果默认值位于 Host 网关内部，直接创建 Agent 的入口只有依赖 Host 或复制状态才能共享它。

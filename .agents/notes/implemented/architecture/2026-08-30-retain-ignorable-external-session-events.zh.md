@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-30-retain-ignorable-external-session-events.md) | 中文
-
 ## 问题
 
 会话事件信封包含 `ignorable?: true`，读取器因此可以接受不认识的信息性事件，而不必把每次词汇增加都视为新的会话格式。[PR #3087](https://github.com/deepseek-harness/deepseek-harness/pull/3087) 在没有发现第一方生产方后删除了该字段，并把每个未知事件都改为读取必需项。

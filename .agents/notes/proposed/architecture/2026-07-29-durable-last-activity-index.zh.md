@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-07-29-durable-last-activity-index.md) | 中文
-
 ## 问题
 
 一个冷会话（已持久化、未附加）对「用户上次是什么时候在这里发出 prompt」没有权威的已存储答案。`dsh-host-apiproxy` 从可选 projection cache 的 `lastPromptAt` 提供 `updatedAt`，缺失时回退到 `createdAt`，Web 客户端按该值为 Session 树排序。cache 采用 fail-soft 并异步写入 checkpoint，因此缺失或延迟的记录会让最近收到 prompt 的 Session 排得过旧。

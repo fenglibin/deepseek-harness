@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-delivery-tools-web-preset-wiring.md) | 中文
-
 ## 问题
 
 交付纪律能力已在 base bundle 中交付（`delivery` + `tool-delivery`，B1–B5 批次），却从未真正进入 Web 会话。Web 界面禁用了 base 里所有 agent-plane 工具行、改由每个会话挂载预设，但 `tool-delivery` 既没有被那里禁用、也没有被任何预设挂载，且没有任何 system-prompt 段落告诉模型何时使用这些工具。结果是：Web 应用里的编码智能体回退到 `todo_write` 来跟踪工作，因此从不写入 `.dsh/changes/` 或 `.dsh/design/` 产物，设计/拆分门禁被静默绕过。

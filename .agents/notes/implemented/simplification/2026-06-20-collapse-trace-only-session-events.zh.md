@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-20-collapse-trace-only-session-events.md) | 中文
-
 ## 问题
 
 会话事件词汇中包含一些一等事件，它们不属于可回放的对话历史，在生产环境中几乎没有消费方。`usage` 已经作为模型流分片存在，之后循环又追加了一个独立的 `usage` 事件。`error` 与 `turn/end { kind: 'error', message, code }` 中的循环失败原因重复；ACP（Agent Client Protocol）结算读取轮次结束原因，而消息投影和 UI 投影都会跳过独立的 `error` 事件。

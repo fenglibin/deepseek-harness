@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-24-owner-local-profile-tests-and-guides.md) | 中文
-
 ## 问题
 
 顶层 `examples/` 树混合了四种互不相同的角色：重复的应用组合、跨包 profile 测试、包专属 Loader fixture，以及可运行的用户指南。它的 umbrella workspace manifest 主要用于让任意嵌套 Cordis 文件解析包，因此测试与文档位置决定了依赖解析，也让不受支持的 demo launcher 看起来像产品接口。

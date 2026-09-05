@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-continuable-subagent-report-tool.md) | 中文
-
 ## 问题
 
 可继续的进程内 subagent 能够接收 parent 后续发来的消息、保留后代、结算并冷恢复，但基础生命周期无法让它们将选中内容发送给直接 parent。child 的完整输出已可从持久化会话中重建，因此缺失的能力是显式投递，而非结果存储。

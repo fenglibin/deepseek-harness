@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-resume-selector-batch-projection.md) | 中文
-
 ## 问题
 
 打开 TUI `/resume` 选择器时，会在一个无界 `Promise.all` 中对每个列出的会话调用一次 `sessionQuery.readSession()`。每次调用都会在 `SessionCorpus.load()` 内部重新列出整个持久化存储（O(N²) 次列表查询）、读取并解压完整日志、通过 `Session` 构造函数对每个事件做回放验证，并将 header 和事件深克隆多达三次——而这一切只为推导一行选择器条目的标题、最近活动时间、最后一个 `turn/end` 标签、提供方/模型路由和目标阶段。在真实存储上（185 个会话、压缩后 87 MB、约 35.3 万个事件），选择器需要数十秒才能打开，且开销随日志总大小而非会话数量增长。

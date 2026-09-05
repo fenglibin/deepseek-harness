@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-28-web-terminal-card.md) | 中文
-
 ## 问题
 
 bash 工具的调用与结果都声明 `card: 'terminal'`（[渲染意图联合类型](../architecture/2026-07-02-tool-render-intent-union.zh.md)）：调用视图携带命令、一段可选的模型撰写描述以及工作目录，结果视图携带输出、退出码与终止信号。该视图早已抵达浏览器——host、connection 与 runtime 把它投递到 `ConversationSnapshot` 的 `callView`/`resultView` 上——原 TUI 曾把它渲染为带 `$` 提示符的卡片，附退出行与首尾高度上限。

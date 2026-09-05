@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-05-inline-image-composer.md) | 中文
-
 ## 问题
 
 草稿图片此前位于 Lexical 编辑器之外，是 input facade 持有的扁平 `imageIds: DraftAttachmentId[]` 数组，由独立附件 rail（`conversation.input.attachments`）渲染。文字与图片是两套互相独立的货币，于是 `sendSession` 把 prompt 组装成 `[...serializedImages, ...text]`——图片永远排在文字之前，丢弃用户在 composer 中摆放的交错顺序。rail 本身也是独立的滚动表面，草稿无法用一条有序流程同时呈现文字与图片。

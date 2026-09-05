@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-13-bounded-cold-blank-verification.md) | 中文
-
 ## Problem
 
 Web 会话树会隐藏空白 Session，并把当前选中的空白项复用为 New Session。已附加 Session 可以从内存事件日志派生空白状态，但 `session.list` 通常不会加载每一份冷日志。把所有已物化的冷 Session 都视为非空，会暴露旧版本留下的空 Session；反过来，把 projection cache 中的 `blank: true` 当成当前事实，则可能在日志已经前进而 fail-soft cache 仍然陈旧时隐藏真实对话。

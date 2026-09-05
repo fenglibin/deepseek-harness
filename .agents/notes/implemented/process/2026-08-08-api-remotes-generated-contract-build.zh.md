@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-08-api-remotes-generated-contract-build.md) | 中文
-
 ## 问题
 
 Host 的 `@Remote` 方法需要先由 Typert 生成 `/remote` 声明和运行时贡献，Client 的 `api-remotes/src/client/index.ts` 才能通过类型检查并打包这些贡献。若根构建先把 Host 与 Client 两张 Project Reference 图一起交给 tsc，Client 会在生成产物存在之前编译；若增加独立 contracts 预处理，又会让 generator 脱离正常 Host 图重复编译，并允许陈旧产物掩盖错误依赖。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-19-package-invariant-runtime-contracts.md) | 中文
-
 ## 问题
 
 包自有不变量服务让发布和注册实现了全覆盖，但最初的生成基线允许空安装器。后续方案又用针对插件名称、注入、effect、服务方法和纯工具库中的固定示例的通用断言替代这些空实现。这些断言虽然让每个 companion 都能执行，却没有提高系统安全性：TypeScript、Cordis 启动、包测试和模块加载测试已经约束这些形状，而不变量服务应当发现不可能出现的运行时状态。

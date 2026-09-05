@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-list-agents-residency-vocabulary.md) | 中文
-
 ## 问题
 
 `list_agents` 把可继续 child 的进程驻留状态投影为 `running | idle | complete`。`complete` 读起来像一项终态工作，且结果就在某处，但底层事实只表示没有驻留的 Activation：对话完好无损，`send_message` 可以继续它，而且它对 child 的结果不作任何断言。读到 `complete` 的模型会合理地寻找可收集结果，或向一个它以为已经结束的对话发送替代工作。

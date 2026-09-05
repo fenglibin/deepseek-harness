@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-source-run-without-managed-installer.md) | 中文
-
 ## 问题
 
 仓库自带的源码安装器可以提供稳定的启动器、相互隔离的 staging worktree、原子升级、回滚存储，以及用于个人定制的共享维护工作流。与此同时，仓库还必须在包管理器之外负责第二套生命周期：安装宿主依赖、提示输入凭证、接管检出、管理符号链接归属、协调 staging 分支、处理升级恢复，以及持续保持安装器与随附维护 skill（技能）的兼容性。

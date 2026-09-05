@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-18-session-history-and-event-transport.md) | 中文
-
 ## 问题
 
 浏览器同时消费三类生命周期不同的数据：可持久化并分页的 Session 日志、需要 opening baseline 才能在重连后收敛的进程内状态，以及无需重放的即时通知。

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-webhook-github
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-webhook-github` 会在注入的 `ctx.webServer` 上注册一条精确 HTTP 路由。它限制并验证 GitHub 原始 JSON body，投影提供方无关的交付，调用 `ctx.webhookRuntime.dispatch()`，并在不等待规则或 Session 的情况下返回 `202`。部署需要为通用 webhook runtime 提供经过身份验证的 GitHub 入口时，请使用它。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-08-background-subagent-tasks.md) | 中文
-
 ## 问题
 
 [subagent seam](2026-06-21-subagent-capability-seam.zh.md) 会返回 `SubagentRun`，但原先面向模型的工具会同步收集每一次运行。因此，各自独立的慢速委派要么一直占用父调用，要么按串行方式运行。

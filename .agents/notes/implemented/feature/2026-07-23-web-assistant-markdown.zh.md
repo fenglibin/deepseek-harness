@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-23-web-assistant-markdown.md) | 中文
-
 ## 问题
 
 Web 对话通过会话事件、历史回放与流式累积保留 assistant Markdown 源文本，但其最末端的文本原语会按字面渲染源文本。若修改共享原语，用户消息与 steering（中途引导）消息也会被格式化；若在运行时中解析，则会把呈现状态混入不依赖 React 的会话投影。

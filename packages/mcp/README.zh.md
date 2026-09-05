@@ -5,8 +5,6 @@ kind: "package-group"
 
 # MCP — 模型上下文协议
 
-[English](README.md) | 中文
-
 ## 概述
 
 `mcp/` 组把 harness 连接到 Model Context Protocol（MCP）工具服务器生态。本组的包挂载外部服务器——文件系统、GitHub、数据库或记忆服务器——让模型把它们的工具当作原生工具、以稳定的服务器限定名称使用。每台服务器是一条配置项；默认不启用任何服务器，因此按需逐台开启。只桥接 Tools 能力：MCP resources 与 prompts 不受支持。本页映射该组；逐包约定由包 README 负责。

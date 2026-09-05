@@ -6,7 +6,7 @@ import type {
   PluginInventorySettingsTabInjected,
   PluginInventorySettingsTabProps,
 } from '../src/client/PluginInventorySettingsTab.tsx'
-import { en, type PluginInventoryLocaleKey } from '../src/client/locales.ts'
+import { zh, type PluginInventoryLocaleKey } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
@@ -14,7 +14,7 @@ type Snapshot = Awaited<ReturnType<PluginInventorySettingsTabInjected['list']>>
 const t = ((key: PluginInventoryLocaleKey, params?: Record<string, string>): string =>
   Object.entries(params ?? {}).reduce(
     (text, [name, value]) => text.replaceAll(`{${name}}`, value),
-    en[key],
+    zh[key],
   )) as PluginInventorySettingsTabProps['t']
 
 function props(
@@ -76,18 +76,18 @@ const SNAPSHOT = {
 
 async function renderReady(snapshot: Snapshot = SNAPSHOT): Promise<ReturnType<typeof render>> {
   const view = render(<PluginInventorySettingsTab {...props(async () => snapshot)} />)
-  await screen.findByRole('searchbox', { name: en.search })
+  await screen.findByRole('searchbox', { name: zh.search })
   return view
 }
 
 const globalToggle = (): HTMLElement =>
-  screen.getByRole('button', { name: (name: string) => name.startsWith(en.globalTitle) })
+  screen.getByRole('button', { name: (name: string) => name.startsWith(zh.globalTitle) })
 
 describe('PluginInventorySettingsTab', () => {
   it('shows the default preset first and keeps the global plane collapsed', async () => {
     const view = await renderReady()
 
-    const switcher = screen.getByRole('button', { name: en.switcherLabel })
+    const switcher = screen.getByRole('button', { name: zh.switcherLabel })
     expect(switcher.textContent).toBe('标准模式 (default)')
     fireEvent.click(switcher)
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
@@ -97,47 +97,47 @@ describe('PluginInventorySettingsTab', () => {
     ])
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryAllByRole('menuitem')).toHaveLength(0)
-    expect(screen.getByText(en.presetSubtitle)).toBeTruthy()
+    expect(screen.getByText(zh.presetSubtitle)).toBeTruthy()
     expect(view.container.querySelector('[data-preset-plugin-count]')?.getAttribute('data-preset-plugin-count')).toBe('6')
 
     // Only the preset group lists rows while the global plane stays collapsed.
     expect(screen.getAllByRole('listitem')).toHaveLength(6)
-    expect(screen.getAllByText(en.enabledTag)).toHaveLength(3)
-    expect(screen.getByText(en.conditionalTag)).toBeTruthy()
-    expect(screen.getByText(en.disabledTag)).toBeTruthy()
-    expect(screen.getByText(en.failedTag)).toBeTruthy()
+    expect(screen.getAllByText(zh.enabledTag)).toHaveLength(3)
+    expect(screen.getByText(zh.conditionalTag)).toBeTruthy()
+    expect(screen.getByText(zh.disabledTag)).toBeTruthy()
+    expect(screen.getByText(zh.failedTag)).toBeTruthy()
     expect(screen.getByRole('img', { name: 'Running' })).toBeTruthy()
     // No live fiber, no dot: file-state rows carry only their enablement tag.
     expect(screen.queryByRole('img', { name: 'Not running' })).toBeNull()
 
     expect(globalToggle().getAttribute('aria-expanded')).toBe('false')
     expect(view.container.querySelector('[data-plugin-count]')?.getAttribute('data-plugin-count')).toBe('7')
-    expect(screen.getByText(`1 ${en.failedCountLabel}`)).toBeTruthy()
+    expect(screen.getByText(`1 ${zh.failedCountLabel}`)).toBeTruthy()
 
     // A preset row expands into its provenance facts.
     fireEvent.click(screen.getByRole('button', { name: 'pwsh, Conditional' }))
-    expect(screen.getByText(en.fromPreset)).toBeTruthy()
+    expect(screen.getByText(zh.fromPreset)).toBeTruthy()
     expect(screen.getByText('标准模式')).toBeTruthy()
-    expect(screen.getByText(en.condition)).toBeTruthy()
+    expect(screen.getByText(zh.condition)).toBeTruthy()
     expect(screen.getByText('process.platform === \'win32\'')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'pwsh, Conditional' }))
-    expect(screen.queryByText(en.condition)).toBeNull()
+    expect(screen.queryByText(zh.condition)).toBeNull()
 
     // A failed preset row names its runtime state instead of a condition.
     fireEvent.click(screen.getByRole('button', { name: 'crashy, Failed' }))
-    expect(screen.getByText(en.runtime)).toBeTruthy()
+    expect(screen.getByText(zh.runtime)).toBeTruthy()
     expect(screen.getByText('Failed to start')).toBeTruthy()
 
     // A row declaring no id has no Loader identity line, only its module.
     fireEvent.click(screen.getByRole('button', { name: 'anonymous, Enabled' }))
     expect(view.container.querySelector('[data-loader-entry]')).toBeNull()
-    expect(screen.getByText(en.moduleLabel).nextElementSibling?.textContent).toBe('@fixture/anonymous')
+    expect(screen.getByText(zh.moduleLabel).nextElementSibling?.textContent).toBe('@fixture/anonymous')
   })
 
   it('expands the global plane with failures first and preset-provided rows inline', async () => {
     const view = await renderReady()
 
-    expect(screen.queryByText(en.presetEnabledTag)).toBeNull()
+    expect(screen.queryByText(zh.presetEnabledTag)).toBeNull()
     fireEvent.click(globalToggle())
     expect(globalToggle().getAttribute('aria-expanded')).toBe('true')
     const failed = view.container.querySelector('[data-plugin-scope="global"] [data-failed="true"]')
@@ -146,11 +146,11 @@ describe('PluginInventorySettingsTab', () => {
     expect(view.container.querySelector('[data-plugin-scope="global"] li')).toBe(failed)
 
     // Rows the presets took over sit inline, marked instead of plainly disabled.
-    expect(screen.getAllByText(en.presetEnabledTag)).toHaveLength(2)
+    expect(screen.getAllByText(zh.presetEnabledTag)).toHaveLength(2)
 
     fireEvent.click(screen.getByRole('button', { name: 'tool-bash, Enabled via presets' }))
-    expect(screen.getByText(en.presetProvidedDetail)).toBeTruthy()
-    expect(screen.getByText(en.enabledIn)).toBeTruthy()
+    expect(screen.getByText(zh.presetProvidedDetail)).toBeTruthy()
+    expect(screen.getByText(zh.enabledIn)).toBeTruthy()
     expect(screen.getByText('标准模式 · ptc')).toBeTruthy()
 
     // The failed global card reports its runtime state.
@@ -163,17 +163,17 @@ describe('PluginInventorySettingsTab', () => {
 
     // A disabled row outside every preset stays plainly disabled.
     fireEvent.click(screen.getByRole('button', { name: 'dormant, Disabled' }))
-    expect(screen.queryByText(en.presetProvidedDetail)).toBeNull()
+    expect(screen.queryByText(zh.presetProvidedDetail)).toBeNull()
 
     fireEvent.click(globalToggle())
     expect(globalToggle().getAttribute('aria-expanded')).toBe('false')
-    expect(screen.queryByText(en.presetEnabledTag)).toBeNull()
+    expect(screen.queryByText(zh.presetEnabledTag)).toBeNull()
   })
 
   it('switches the inspected preset in place, including broken ones', async () => {
     const view = await renderReady()
     const pickPreset = (label: string): void => {
-      fireEvent.click(screen.getByRole('button', { name: en.switcherLabel }))
+      fireEvent.click(screen.getByRole('button', { name: zh.switcherLabel }))
       fireEvent.click(screen.getByRole('menuitem', { name: label }))
     }
 
@@ -181,7 +181,7 @@ describe('PluginInventorySettingsTab', () => {
     expect(view.container.querySelector('[data-preset-plugin-count]')?.getAttribute('data-preset-plugin-count')).toBe('3')
     fireEvent.click(screen.getAllByRole('button', { name: 'tool-bash, Enabled' })[0]!)
     // An unnamed preset labels provenance by its id.
-    expect(screen.getByText(en.fromPreset).nextElementSibling?.textContent).toBe('ptc')
+    expect(screen.getByText(zh.fromPreset).nextElementSibling?.textContent).toBe('ptc')
 
     pickPreset('坏预设 (failed to load)')
     expect(screen.getByRole('alert').textContent).toBe('the composition file is missing')
@@ -190,7 +190,7 @@ describe('PluginInventorySettingsTab', () => {
 
   it('collapses the preset group until a search forces it open', async () => {
     const view = await renderReady()
-    const toggle = screen.getByRole('button', { name: en.presetTitle })
+    const toggle = screen.getByRole('button', { name: zh.presetTitle })
 
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
     fireEvent.click(toggle)
@@ -199,11 +199,11 @@ describe('PluginInventorySettingsTab', () => {
     expect(view.container.querySelector('[data-preset-plugin-count]')?.getAttribute('data-preset-plugin-count')).toBe('6')
     expect(view.container.querySelectorAll('[data-plugin-scope="preset"] li')).toHaveLength(0)
 
-    fireEvent.change(screen.getByRole('searchbox', { name: en.search }), { target: { value: 'pwsh' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: zh.search }), { target: { value: 'pwsh' } })
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByText(en.conditionalTag)).toBeTruthy()
+    expect(screen.getByText(zh.conditionalTag)).toBeTruthy()
 
-    fireEvent.change(screen.getByRole('searchbox', { name: en.search }), { target: { value: '' } })
+    fireEvent.change(screen.getByRole('searchbox', { name: zh.search }), { target: { value: '' } })
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(toggle)
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
@@ -215,9 +215,9 @@ describe('PluginInventorySettingsTab', () => {
     const localized: PluginInventorySettingsTabInjected['presetName'] = preset =>
       preset.trust === 'system' ? `Localized ${preset.id}` : preset.name ?? preset.id
     render(<PluginInventorySettingsTab {...props(async () => SNAPSHOT, localized)} />)
-    await screen.findByRole('searchbox', { name: en.search })
+    await screen.findByRole('searchbox', { name: zh.search })
 
-    const switcher = screen.getByRole('button', { name: en.switcherLabel })
+    const switcher = screen.getByRole('button', { name: zh.switcherLabel })
     expect(switcher.textContent).toBe('Localized standard (default)')
     fireEvent.click(switcher)
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
@@ -228,7 +228,7 @@ describe('PluginInventorySettingsTab', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
 
     fireEvent.click(screen.getByRole('button', { name: 'pwsh, Conditional' }))
-    expect(screen.getByText(en.fromPreset).nextElementSibling?.textContent).toBe('Localized standard')
+    expect(screen.getByText(zh.fromPreset).nextElementSibling?.textContent).toBe('Localized standard')
 
     fireEvent.click(globalToggle())
     fireEvent.click(screen.getByRole('button', { name: 'tool-bash, Enabled via presets' }))
@@ -237,36 +237,36 @@ describe('PluginInventorySettingsTab', () => {
 
   it('jumps from a preset-provided row to the preset that enables it', async () => {
     await renderReady()
-    fireEvent.click(screen.getByRole('button', { name: en.switcherLabel }))
+    fireEvent.click(screen.getByRole('button', { name: zh.switcherLabel }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'ptc' }))
 
     fireEvent.click(globalToggle())
     fireEvent.click(screen.getByRole('button', { name: 'tool-bash, Enabled via presets' }))
-    fireEvent.click(screen.getByRole('button', { name: en.viewInPreset }))
-    expect(screen.getByRole('button', { name: en.switcherLabel }).textContent)
+    fireEvent.click(screen.getByRole('button', { name: zh.viewInPreset }))
+    expect(screen.getByRole('button', { name: zh.switcherLabel }).textContent)
       .toBe('标准模式 (default)')
   })
 
   it('searches across scopes and points at matches in other presets', async () => {
     const view = await renderReady()
-    const search = screen.getByRole('searchbox', { name: en.search })
+    const search = screen.getByRole('searchbox', { name: zh.search })
 
     fireEvent.change(search, { target: { value: 'tool-bash' } })
     // Searching forces the collapsed global plane and drawer open.
     expect(view.container.querySelector('[data-preset-plugin-count]')?.getAttribute('data-preset-plugin-count')).toBe('1')
     expect(view.container.querySelector('[data-plugin-count]')?.getAttribute('data-plugin-count')).toBe('1')
-    expect(screen.getByText(en.presetEnabledTag)).toBeTruthy()
-    expect(screen.queryByText(`1 ${en.failedCountLabel}`)).toBeNull()
+    expect(screen.getByText(zh.presetEnabledTag)).toBeTruthy()
+    expect(screen.queryByText(`1 ${zh.failedCountLabel}`)).toBeNull()
     const hint = screen.getByText((text: string) => text.startsWith('2 more matches'))
     expect(hint).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'ptc' }))
-    expect(screen.getByRole('button', { name: en.switcherLabel }).textContent).toBe('ptc')
+    expect(screen.getByRole('button', { name: zh.switcherLabel }).textContent).toBe('ptc')
 
     // A match visible only in another preset keeps the pointer without rows.
     fireEvent.change(search, { target: { value: 'crashy' } })
     expect(view.container.querySelector('[data-preset-plugin-count]')?.getAttribute('data-preset-plugin-count')).toBe('0')
     expect(screen.getByText((text: string) => text.startsWith('1 more matches'))).toBeTruthy()
-    expect(screen.queryByText(en.emptySearch)).toBeNull()
+    expect(screen.queryByText(zh.emptySearch)).toBeNull()
 
     // A match on a Loader entry id only reaches the global plane.
     fireEvent.change(search, { target: { value: '8a1b2c3d' } })
@@ -274,7 +274,7 @@ describe('PluginInventorySettingsTab', () => {
     expect(screen.queryByText((text: string) => text.includes('more matches'))).toBeNull()
 
     fireEvent.change(search, { target: { value: 'not-a-plugin' } })
-    expect(screen.getByText(en.emptySearch)).toBeTruthy()
+    expect(screen.getByText(zh.emptySearch)).toBeTruthy()
     expect(screen.queryAllByRole('listitem')).toHaveLength(0)
   })
 
@@ -286,16 +286,16 @@ describe('PluginInventorySettingsTab', () => {
       ],
     } as unknown as Snapshot)
 
-    expect(screen.queryByRole('button', { name: en.switcherLabel })).toBeNull()
+    expect(screen.queryByRole('button', { name: zh.switcherLabel })).toBeNull()
     expect(globalToggle().getAttribute('aria-expanded')).toBe('true')
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
 
     fireEvent.click(screen.getByRole('button', { name: 'hmr, Enabled' }))
-    expect(screen.getByText(en.runtime)).toBeTruthy()
+    expect(screen.getByText(zh.runtime)).toBeTruthy()
     expect(view.container.querySelector('[data-loader-entry]')?.textContent).toBe('hmr')
     fireEvent.click(screen.getByRole('button', { name: 'off, Disabled' }))
-    expect(screen.getAllByText(en.moduleLabel).length).toBeGreaterThan(0)
-    expect(screen.queryByText(en.runtime)).toBeNull()
+    expect(screen.getAllByText(zh.moduleLabel).length).toBeGreaterThan(0)
+    expect(screen.queryByText(zh.runtime)).toBeNull()
   })
 
   it('renders a preset-only snapshot without the global section', async () => {
@@ -309,8 +309,8 @@ describe('PluginInventorySettingsTab', () => {
       }],
     })
 
-    expect(screen.queryByRole('button', { name: (name: string) => name.startsWith(en.globalTitle) })).toBeNull()
-    expect(screen.queryByText(en.empty)).toBeNull()
+    expect(screen.queryByRole('button', { name: (name: string) => name.startsWith(zh.globalTitle) })).toBeNull()
+    expect(screen.queryByText(zh.empty)).toBeNull()
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
   })
 
@@ -320,22 +320,22 @@ describe('PluginInventorySettingsTab', () => {
       .mockResolvedValueOnce({ entries: [] })
     render(<PluginInventorySettingsTab {...props(list)} />)
 
-    expect((await screen.findByRole('alert')).textContent).toBe(en.error)
+    expect((await screen.findByRole('alert')).textContent).toBe(zh.error)
     expect(screen.queryByText('private transport detail')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: en.retry }))
+    fireEvent.click(screen.getByRole('button', { name: zh.retry }))
     await waitFor(() => { expect(list).toHaveBeenCalledTimes(2) })
-    expect(await screen.findByText(en.empty)).toBeTruthy()
+    expect(await screen.findByText(zh.empty)).toBeTruthy()
   })
 
   it('contains a synchronous Remote failure and ignores a result after unmount', async () => {
     const syncFailure = vi.fn(() => { throw new Error('namespace unavailable') }) as PluginInventorySettingsTabInjected['list']
     const failed = render(<PluginInventorySettingsTab {...props(syncFailure)} />)
-    expect((await screen.findByRole('alert')).textContent).toBe(en.error)
+    expect((await screen.findByRole('alert')).textContent).toBe(zh.error)
     failed.unmount()
 
     const deferred = Promise.withResolvers<Snapshot>()
     const pending = render(<PluginInventorySettingsTab {...props(() => deferred.promise)} />)
-    expect(screen.getByText(en.loading)).toBeTruthy()
+    expect(screen.getByText(zh.loading)).toBeTruthy()
     pending.unmount()
     await act(async () => { deferred.resolve(SNAPSHOT) })
 

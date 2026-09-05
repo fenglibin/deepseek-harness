@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-02-session-search-not-shipped-default.md) | 中文
-
 ## 问题
 
 [交付清单决策](2026-07-31-even-out-shipped-tool-rosters.zh.md)把 `tool-session-query` 设为共享 [`cordis.patch.yml`](../../../../packages/bundle/base/cordis.patch.yml) 的默认行，于是交付的 TUI 与 Web surface 把这五个会话搜索工具（`session_search`、`session_event_search`、`session_trace`、`session_event_trace`、`session_event_read`）呈现给了模型。这与[面向模型的会话查询工具决策](2026-07-24-model-facing-session-query-tools.zh.md)相抵触，该决策持需显式启用的立场，包 README 将其记录为「shipped host compositions do not mount it by default」。这项默认设置还交付了一个提示词段，向模型讲授一套既往工作搜索工作流，而没有任何用户要求过。

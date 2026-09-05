@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-21-headless-reasoning-progress.md) | 中文
-
 ## 问题
 
 一次性 headless runner 会等待 Agent（智能体）完全停稳，再打印最终 assistant 文本。具备推理能力的提供方已经把推理作为持久化的 `assistant/chunk` 事件暴露，但耗时较长的推理响应会让终端在运行完成前始终保持静默。最终答案必须继续作为 stdout 中唯一的载荷，使命令替换和其他消费方保持稳定的结果通道。

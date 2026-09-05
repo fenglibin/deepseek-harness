@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-02-web-thinking-tail-scroll.md) | 中文
-
 ## 问题
 
 Web Think 行在结算与流式 block 中都把 reasoning 首行渲染成折叠摘要。首行一旦出现，之后每个 reasoning delta 只会改变隐藏的正文。于是快速模型在思考时看起来静止，用户必须展开完整思维链才能确认输出仍在推进。产品事项表已经要求“thinking：滚动展示思维链更新、可展开”；当前行只满足了后半项。

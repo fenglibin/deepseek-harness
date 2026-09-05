@@ -28,12 +28,12 @@ import { deriveKeyRef, ModelsSettingsStore } from '../src/client/store.ts'
 import { createModelsOperations } from '../src/client/operations.ts'
 import type { ModelsOperations } from '../src/client/operations.ts'
 import type { ProviderRow } from '../src/client/store.ts'
-import { en } from '../src/client/locales.ts'
+import { zh } from '../src/client/locales.ts'
 import { settingsSchema } from './settings-schema.client.ts'
 
 afterEach(cleanup)
 
-const t: ModelsSectionInjected['t'] = key => en[key]
+const t: ModelsSectionInjected['t'] = key => zh[key]
 const OPENAI_TARGET = { provider: 'openai', displayName: 'openai' }
 const openaiCopy = (template: string): string => providerCopy(template, OPENAI_TARGET)
 const DEEPSEEK_TARGET = { provider: 'deepseek-official', displayName: 'DeepSeek' }
@@ -41,7 +41,7 @@ const deepSeekCopy = (template: string): string => providerCopy(template, DEEPSE
 
 /** Open one row's capacity disclosure (1-based, as the labels read). */
 function expandRow(position: number): void {
-  fireEvent.click(screen.getByLabelText(`${en.modelAdvanced} ${String(position)}`))
+  fireEvent.click(screen.getByLabelText(`${zh.modelAdvanced} ${String(position)}`))
 }
 
 /** The capacity inputs of every open row, in row order. */
@@ -368,14 +368,14 @@ async function lockedLightweight(face: object) {
 
 /** Open the add dialog on the chooser. */
 async function addDialog(): Promise<HTMLElement> {
-  fireEvent.click(screen.getByRole('button', { name: en.add }))
+  fireEvent.click(screen.getByRole('button', { name: zh.add }))
   return await screen.findByRole('dialog')
 }
 
 /** Open the add dialog and pick one directory provider inside it. */
 async function addProvider(provider: string): Promise<HTMLElement> {
   const dialog = await addDialog()
-  fireEvent.change(within(dialog).getByLabelText<HTMLSelectElement>(en.provider), {
+  fireEvent.change(within(dialog).getByLabelText<HTMLSelectElement>(zh.provider), {
     target: { value: provider },
   })
   return dialog
@@ -401,7 +401,7 @@ async function mountFirstRun(overrides: Parameters<typeof scriptedFace>[0] = {})
  */
 async function mountDeepSeekCard(overrides: Parameters<typeof scriptedFace>[0] = {}) {
   const mounted = await mountSection(overrides)
-  fireEvent.click(screen.getByRole('button', { name: deepSeekCopy(en.editProvider) }))
+  fireEvent.click(screen.getByRole('button', { name: deepSeekCopy(zh.editProvider) }))
   return mounted
 }
 
@@ -472,28 +472,28 @@ describe('ModelsSection', () => {
     // no stored apiKey → its card opens itself, over a row that keeps its
     // place in the list.
     expect(screen.getByText('DeepSeek')).toBeTruthy()
-    expect(await screen.findByRole('dialog', { name: deepSeekCopy(en.editProvider) })).toBeTruthy()
-    expect(screen.getByLabelText(en.keyInput)).toBeTruthy()
+    expect(await screen.findByRole('dialog', { name: deepSeekCopy(zh.editProvider) })).toBeTruthy()
+    expect(screen.getByLabelText(zh.keyInput)).toBeTruthy()
     expect(screen.getByText('openai')).toBeTruthy()
     expect(screen.queryByText('Active')).toBeNull()
     expect(screen.queryByText('Inactive')).toBeNull()
-    expect(screen.getByText(en.add)).toBeTruthy()
+    expect(screen.getByText(zh.add)).toBeTruthy()
   })
 
   it('leaves the unkeyed provider a plain row once another provider is usable', async () => {
     await mountSection()
     // openai's key is stored, so the user is not blocked and nothing on the
     // page opens itself over them.
-    expect(screen.queryByLabelText(en.keyInput)).toBeNull()
-    const configured = screen.getByRole('img', { name: en.credentialConfigured })
-    expect(configured.getAttribute('title')).toBe(en.credentialConfigured)
+    expect(screen.queryByLabelText(zh.keyInput)).toBeNull()
+    const configured = screen.getByRole('img', { name: zh.credentialConfigured })
+    expect(configured.getAttribute('title')).toBe(zh.credentialConfigured)
     expect(configured.className).toContain('credentialDotConfigured')
     expect(configured.closest('li')?.textContent).toContain('openai')
-    const missing = screen.getByRole('img', { name: en.credentialMissing })
+    const missing = screen.getByRole('img', { name: zh.credentialMissing })
     expect(missing.closest('li')?.textContent).toContain('DeepSeek')
     // The card is still one click away.
-    fireEvent.click(screen.getByRole('button', { name: deepSeekCopy(en.editProvider) }))
-    expect(screen.getByLabelText(en.keyInput)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: deepSeekCopy(zh.editProvider) }))
+    expect(screen.getByLabelText(zh.keyInput)).toBeTruthy()
   })
 
   it('marks only a confirmed missing reference and leaves native or unavailable state unmarked', async () => {
@@ -516,13 +516,13 @@ describe('ModelsSection', () => {
 
     // Every row without a confirmed key carries the dot now, the first-run
     // setup row included: the card lives in its dialog, and the row is a row.
-    const missing = screen.getAllByRole('img', { name: en.credentialMissing })
+    const missing = screen.getAllByRole('img', { name: zh.credentialMissing })
       .find(dot => dot.closest('li')?.textContent?.includes('openai') === true)
     if (missing === undefined) throw new Error('openai carries no missing-key dot')
-    expect(missing.getAttribute('title')).toBe(en.credentialMissing)
+    expect(missing.getAttribute('title')).toBe(zh.credentialMissing)
     expect(missing.className).toContain('credentialDotMissing')
     expect(missing.closest('li')?.textContent).toContain('openai')
-    expect(screen.queryByRole('img', { name: en.credentialConfigured })).toBeNull()
+    expect(screen.queryByRole('img', { name: zh.credentialConfigured })).toBeNull()
     expect(screen.getByText('zombie').closest('li')?.querySelector('[role="img"]')).toBeNull()
   })
 
@@ -545,8 +545,8 @@ describe('ModelsSection', () => {
       renderSlot={() => null}
     />)
     // Now a row with an Edit button, not an open card.
-    expect(screen.getAllByText(en.edit).length).toBeGreaterThan(1)
-    expect(screen.queryByLabelText(en.keyInput)).toBeNull()
+    expect(screen.getAllByText(zh.edit).length).toBeGreaterThan(1)
+    expect(screen.queryByLabelText(zh.keyInput)).toBeNull()
   })
 
   it('decides setup need from the joined credential state and the first-run posture', () => {
@@ -575,7 +575,7 @@ describe('ModelsSection', () => {
   it('uses one stable provider identity in action copy', () => {
     const target = { provider: 'deepseek-official', displayName: 'DeepSeek' }
     expect(providerTargetLabel(target)).toBe('DeepSeek (deepseek-official)')
-    expect(providerCopy(en.deleteTitle, target)).toBe('Delete DeepSeek (deepseek-official)?')
+    expect(providerCopy(zh.deleteTitle, target)).toBe('Delete DeepSeek (deepseek-official)?')
     expect(providerTargetLabel(OPENAI_TARGET)).toBe('openai')
   })
 
@@ -590,18 +590,18 @@ describe('ModelsSection', () => {
 
   it('stores a typed key write-only from the first-run card without touching settings', async () => {
     const { set, mutate, face } = await mountFirstRun()
-    const key = screen.getByLabelText<HTMLInputElement>(en.keyInput)
+    const key = screen.getByLabelText<HTMLInputElement>(zh.keyInput)
     fireEvent.change(key, { target: { value: '  sk-live  ' } })
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.apply))
     await waitFor(() => { expect(set).toHaveBeenCalledWith('DEEPSEEK_API_KEY', 'sk-live') })
     expect(mutate).not.toHaveBeenCalled()
     // The saved key re-loads the join; the settings answer rides the shared
     // mirror, so the reload shows as a directory read rather than a describe.
     await waitFor(() => { expect(face.llm.listProviders.mock.calls.length).toBeGreaterThan(1) })
     expect((await screen.findByRole('status')).textContent).toBe(
-      providerCopy(en.savedProvider, { provider: 'deepseek-official', displayName: 'DeepSeek' }),
+      providerCopy(zh.savedProvider, { provider: 'deepseek-official', displayName: 'DeepSeek' }),
     )
-    fireEvent.click(screen.getByText(en.add))
+    fireEvent.click(screen.getByText(zh.add))
     expect(screen.queryByRole('status')).toBeNull()
   })
 
@@ -633,26 +633,26 @@ describe('ModelsSection', () => {
       onClose={onClose}
     />)
 
-    const key = screen.getByLabelText<HTMLInputElement>(en.keyInput)
-    const save = screen.getByText<HTMLButtonElement>(en.onboardingSave)
+    const key = screen.getByLabelText<HTMLInputElement>(zh.keyInput)
+    const save = screen.getByText<HTMLButtonElement>(zh.onboardingSave)
     expect(document.activeElement).toBe(key)
     expect(key.required).toBe(true)
     expect(save.disabled).toBe(true)
-    expect(screen.getByText(en.onboardingLater)).toBeTruthy()
-    expect(screen.queryByText(en.customized)).toBeNull()
-    expect(screen.queryByLabelText(en.baseUrl)).toBeNull()
+    expect(screen.getByText(zh.onboardingLater)).toBeTruthy()
+    expect(screen.queryByText(zh.customized)).toBeNull()
+    expect(screen.queryByLabelText(zh.baseUrl)).toBeNull()
 
     fireEvent.change(key, { target: { value: '   ' } })
-    expect(screen.getByText(en.keyRequired)).toBeTruthy()
+    expect(screen.getByText(zh.keyRequired)).toBeTruthy()
     expect(key.getAttribute('aria-invalid')).toBe('true')
     expect(save.disabled).toBe(true)
 
     fireEvent.change(key, { target: { value: '  sk-onboarding  ' } })
-    expect(screen.queryByText(en.keyRequired)).toBeNull()
+    expect(screen.queryByText(zh.keyRequired)).toBeNull()
     expect(save.disabled).toBe(false)
     fireEvent.click(save)
 
-    expect(await screen.findByText(en.onboardingSaving)).toBeTruthy()
+    expect(await screen.findByText(zh.onboardingSaving)).toBeTruthy()
     expect(set).toHaveBeenCalledWith('DEEPSEEK_API_KEY', 'sk-onboarding')
     expect(mutate).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
@@ -669,13 +669,13 @@ describe('ModelsSection', () => {
     const { mutate } = await mountDeepSeekCard({
       mutate: vi.fn(() => Promise.resolve(remoteOk(wireNamespaces()[0]))),
     })
-    fireEvent.click(screen.getByText(en.customized))
-    const baseURL = screen.getByLabelText<HTMLInputElement>(en.baseUrl)
+    fireEvent.click(screen.getByText(zh.customized))
+    const baseURL = screen.getByLabelText<HTMLInputElement>(zh.baseUrl)
     // The deepseek placeholder is pinned to the public endpoint, not the
     // effective value (which may reflect a launch-environment override).
     expect(baseURL.placeholder).toBe('https://api.deepseek.com')
     fireEvent.change(baseURL, { target: { value: 'https://next2' } })
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.apply))
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     // Only the field that actually changed: reasoningEffort was already
     // 'high' in the loaded profile, so it produces no op.
@@ -690,20 +690,20 @@ describe('ModelsSection', () => {
     const { mutate } = await mountDeepSeekCard({
       mutate: vi.fn(() => Promise.resolve(remoteOk(wireNamespaces()[0]))),
     })
-    fireEvent.click(screen.getByText(en.customized))
-    expect(screen.getByText(en.modelsInherited)).toBeTruthy()
-    expect(screen.getAllByLabelText(new RegExp(en.modelId)).map(input => (input as HTMLInputElement).value))
+    fireEvent.click(screen.getByText(zh.customized))
+    expect(screen.getByText(zh.modelsInherited)).toBeTruthy()
+    expect(screen.getAllByLabelText(new RegExp(zh.modelId)).map(input => (input as HTMLInputElement).value))
       .toEqual(['deepseek-v4-flash', 'deepseek-v4-pro'])
 
-    fireEvent.click(screen.getByText(en.addModel))
-    const ids = screen.getAllByLabelText(new RegExp(en.modelId))
-    const names = screen.getAllByLabelText(new RegExp(en.modelName))
+    fireEvent.click(screen.getByText(zh.addModel))
+    const ids = screen.getAllByLabelText(new RegExp(zh.modelId))
+    const names = screen.getAllByLabelText(new RegExp(zh.modelName))
     expandRow(3)
     fireEvent.change(ids[2] as HTMLInputElement, { target: { value: 'private-preview' } })
     fireEvent.change(names[2] as HTMLInputElement, { target: { value: 'Private Preview' } })
     // Only row 3 is open, so its capacity is addressed by its own label.
-    fireEvent.change(screen.getByLabelText(`${en.contextWindow} 3`), { target: { value: '131072' } })
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.change(screen.getByLabelText(`${zh.contextWindow} 3`), { target: { value: '131072' } })
+    fireEvent.click(screen.getByText(zh.apply))
 
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     expect(mutate.mock.calls[0]).toEqual([
@@ -722,13 +722,13 @@ describe('ModelsSection', () => {
 
   it('rejects duplicate DeepSeek model ids before writing', async () => {
     const { mutate } = await mountDeepSeekCard()
-    fireEvent.click(screen.getByText(en.customized))
-    fireEvent.click(screen.getByText(en.addModel))
-    const ids = screen.getAllByLabelText(new RegExp(en.modelId))
+    fireEvent.click(screen.getByText(zh.customized))
+    fireEvent.click(screen.getByText(zh.addModel))
+    const ids = screen.getAllByLabelText(new RegExp(zh.modelId))
     fireEvent.change(ids[2] as HTMLInputElement, { target: { value: 'deepseek-v4-flash' } })
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.apply))
 
-    await screen.findByText(`Model 3: ${en.modelIdDuplicate}`)
+    await screen.findByText(`Model 3: ${zh.modelIdDuplicate}`)
     expect(mutate).not.toHaveBeenCalled()
   })
 
@@ -794,10 +794,10 @@ describe('ModelsSection', () => {
     const { mutate } = await mountDeepSeekCard({
       mutate: vi.fn(() => Promise.resolve(remoteOk(wireNamespaces()[0]))),
     })
-    fireEvent.click(screen.getByText(en.customized))
+    fireEvent.click(screen.getByText(zh.customized))
     expandRow(1)
     expandRow(2)
-    const windows = capacityInputs(en.contextWindow)
+    const windows = capacityInputs(zh.contextWindow)
     // The inherited 1000000 reads back short.
     expect((windows[0] as HTMLInputElement).value).toBe('1M')
 
@@ -813,7 +813,7 @@ describe('ModelsSection', () => {
 
     fireEvent.change(windows[1] as HTMLInputElement, { target: { value: '256K' } })
     fireEvent.blur(windows[1] as HTMLInputElement)
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.apply))
 
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     expect(mutate.mock.calls[0]).toEqual([
@@ -832,10 +832,10 @@ describe('ModelsSection', () => {
 
   it('keeps unreadable context-window text on screen and refuses the write', async () => {
     const { mutate } = await mountDeepSeekCard()
-    fireEvent.click(screen.getByText(en.customized))
+    fireEvent.click(screen.getByText(zh.customized))
     expandRow(1)
     expandRow(2)
-    const windows = capacityInputs(en.contextWindow)
+    const windows = capacityInputs(zh.contextWindow)
     fireEvent.change(windows[0] as HTMLInputElement, { target: { value: '1 gazillion' } })
     // Blurring a row that is not the edited one leaves the buffer alone.
     fireEvent.blur(windows[1] as HTMLInputElement)
@@ -843,8 +843,8 @@ describe('ModelsSection', () => {
     // The text the user typed is still there to correct.
     expect((windows[0] as HTMLInputElement).value).toBe('1 gazillion')
 
-    fireEvent.click(screen.getByText(en.apply))
-    await screen.findByText(`Model 1: ${en.modelContextInvalid}`)
+    fireEvent.click(screen.getByText(zh.apply))
+    await screen.findByText(`Model 1: ${zh.modelContextInvalid}`)
     expect(mutate).not.toHaveBeenCalled()
   })
 
@@ -879,15 +879,15 @@ describe('ModelsSection', () => {
       readOnly={false}
       onClose={() => {}}
     />)
-    fireEvent.click(screen.getByText(en.customized))
-    expect(screen.getByText(en.modelsCustomized)).toBeTruthy()
-    expect(screen.getAllByLabelText(new RegExp(en.modelId)).map(input => (input as HTMLInputElement).value))
+    fireEvent.click(screen.getByText(zh.customized))
+    expect(screen.getByText(zh.modelsCustomized)).toBeTruthy()
+    expect(screen.getAllByLabelText(new RegExp(zh.modelId)).map(input => (input as HTMLInputElement).value))
       .toEqual(['user-only-model'])
 
-    fireEvent.click(screen.getByText(en.resetModels))
+    fireEvent.click(screen.getByText(zh.resetModels))
 
-    expect(screen.getByText(en.modelsInherited)).toBeTruthy()
-    expect(screen.getAllByLabelText(new RegExp(en.modelId)).map(input => (input as HTMLInputElement).value))
+    expect(screen.getByText(zh.modelsInherited)).toBeTruthy()
+    expect(screen.getAllByLabelText(new RegExp(zh.modelId)).map(input => (input as HTMLInputElement).value))
       .toEqual(base === undefined ? ['deepseek-v4-flash', 'deepseek-v4-pro'] : ['pinned-by-deployment'])
   })
 
@@ -896,10 +896,10 @@ describe('ModelsSection', () => {
     // the first, which then fell back to rendering its stored NaN as `NaN` —
     // losing the text the user was told they could still correct.
     await mountDeepSeekCard()
-    fireEvent.click(screen.getByText(en.customized))
+    fireEvent.click(screen.getByText(zh.customized))
     expandRow(1)
     expandRow(2)
-    const windows = capacityInputs(en.contextWindow)
+    const windows = capacityInputs(zh.contextWindow)
     fireEvent.change(windows[0] as HTMLInputElement, { target: { value: 'not a number' } })
     fireEvent.blur(windows[0] as HTMLInputElement)
     fireEvent.change(windows[1] as HTMLInputElement, { target: { value: '2M' } })
@@ -910,13 +910,13 @@ describe('ModelsSection', () => {
 
   it('re-keys the typed text around a removed row', async () => {
     await mountDeepSeekCard()
-    fireEvent.click(screen.getByText(en.customized))
-    const windows = (): HTMLInputElement[] => capacityInputs(en.contextWindow)
+    fireEvent.click(screen.getByText(zh.customized))
+    const windows = (): HTMLInputElement[] => capacityInputs(zh.contextWindow)
     const removeRow = (at: number): void => {
-      fireEvent.click(screen.getAllByLabelText(new RegExp(en.removeModel))[at] as HTMLElement)
+      fireEvent.click(screen.getAllByLabelText(new RegExp(zh.removeModel))[at] as HTMLElement)
     }
     // Three rows, with text parked on the outer two.
-    fireEvent.click(screen.getByText(en.addModel))
+    fireEvent.click(screen.getByText(zh.addModel))
     expandRow(1)
     expandRow(2)
     expandRow(3)
@@ -946,22 +946,22 @@ describe('ModelsSection', () => {
     const { mutate } = await mountDeepSeekCard({
       mutate: vi.fn(() => Promise.resolve(remoteOk(wireNamespaces()[0]))),
     })
-    fireEvent.click(screen.getByText(en.customized))
+    fireEvent.click(screen.getByText(zh.customized))
     expandRow(1)
-    const windows = capacityInputs(en.contextWindow)
+    const windows = capacityInputs(zh.contextWindow)
     fireEvent.change(windows[0] as HTMLInputElement, { target: { value: 'garbage' } })
     fireEvent.blur(windows[0] as HTMLInputElement)
-    fireEvent.click(screen.getByText(en.resetModels))
+    fireEvent.click(screen.getByText(zh.resetModels))
 
     // Reset collapses every row, so the restored capacity needs opening again.
     expandRow(1)
-    const restored = capacityInputs(en.contextWindow)
+    const restored = capacityInputs(zh.contextWindow)
     expect((restored[0] as HTMLInputElement).value).toBe('1M')
 
     // Reset put the draft back where it started, so Apply writes nothing at
     // all rather than persisting whatever the stale text had parsed to.
-    fireEvent.click(screen.getByText(en.apply))
-    await waitFor(() => { expect(screen.queryByText(en.apply)).toBeNull() })
+    fireEvent.click(screen.getByText(zh.apply))
+    await waitFor(() => { expect(screen.queryByText(zh.apply)).toBeNull() })
     expect(mutate).not.toHaveBeenCalled()
   })
 
@@ -969,24 +969,24 @@ describe('ModelsSection', () => {
     const { mutate } = await mountDeepSeekCard({
       mutate: vi.fn(() => Promise.resolve(remoteOk(wireNamespaces()[0]))),
     })
-    fireEvent.click(screen.getByText(en.customized))
+    fireEvent.click(screen.getByText(zh.customized))
     expandRow(1)
     expandRow(2)
     // The profile's own cap is the placeholder both rows inherit.
-    expect(capacityInputs(en.maxTokens).map(input => input.placeholder)).toEqual(['256K', '256K'])
+    expect(capacityInputs(zh.maxTokens).map(input => input.placeholder)).toEqual(['256K', '256K'])
 
-    fireEvent.change(screen.getByLabelText(`${en.maxTokens} 2`), { target: { value: '64K' } })
-    fireEvent.blur(screen.getByLabelText(`${en.maxTokens} 2`))
-    expect(screen.getByLabelText<HTMLInputElement>(`${en.maxTokens} 2`).value).toBe('64K')
+    fireEvent.change(screen.getByLabelText(`${zh.maxTokens} 2`), { target: { value: '64K' } })
+    fireEvent.blur(screen.getByLabelText(`${zh.maxTokens} 2`))
+    expect(screen.getByLabelText<HTMLInputElement>(`${zh.maxTokens} 2`).value).toBe('64K')
 
     // Dropping the row above carries the cap text down with its own row.
-    fireEvent.click(screen.getAllByLabelText(new RegExp(en.removeModel))[0] as HTMLElement)
-    expect(screen.getByLabelText<HTMLInputElement>(`${en.maxTokens} 1`).value).toBe('64K')
+    fireEvent.click(screen.getAllByLabelText(new RegExp(zh.removeModel))[0] as HTMLElement)
+    expect(screen.getByLabelText<HTMLInputElement>(`${zh.maxTokens} 1`).value).toBe('64K')
     // The disclosure closes on a second press.
     expandRow(1)
-    expect(screen.queryByLabelText(`${en.maxTokens} 1`)).toBeNull()
+    expect(screen.queryByLabelText(`${zh.maxTokens} 1`)).toBeNull()
 
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.apply))
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     expect(mutate.mock.calls[0]).toEqual([
       'llm-deepseek',
@@ -1001,8 +1001,8 @@ describe('ModelsSection', () => {
 
   it('settles a pasted id and refuses whitespace that would never match', async () => {
     await mountDeepSeekCard()
-    fireEvent.click(screen.getByText(en.customized))
-    const ids = screen.getAllByLabelText<HTMLInputElement>(new RegExp(en.modelId))
+    fireEvent.click(screen.getByText(zh.customized))
+    const ids = screen.getAllByLabelText<HTMLInputElement>(new RegExp(zh.modelId))
     fireEvent.change(ids[0] as HTMLInputElement, { target: { value: '  deepseek-v4-flash  ' } })
     fireEvent.blur(ids[0] as HTMLInputElement)
     expect((ids[0] as HTMLInputElement).value).toBe('deepseek-v4-flash')
@@ -1028,31 +1028,31 @@ describe('ModelsSection', () => {
       onChange={vi.fn()}
       onReset={vi.fn()}
     />)
-    expect(screen.getByLabelText<HTMLInputElement>(`${en.modelId} 1`).value).toBe('')
+    expect(screen.getByLabelText<HTMLInputElement>(`${zh.modelId} 1`).value).toBe('')
     expandRow(1)
-    expect(screen.getByLabelText<HTMLInputElement>(`${en.contextWindow} 1`).placeholder)
-      .toBe(en.contextWindowPlaceholder)
-    expect(screen.getByLabelText<HTMLInputElement>(`${en.maxTokens} 1`).placeholder)
-      .toBe(en.maxTokensPlaceholder)
+    expect(screen.getByLabelText<HTMLInputElement>(`${zh.contextWindow} 1`).placeholder)
+      .toBe(zh.contextWindowPlaceholder)
+    expect(screen.getByLabelText<HTMLInputElement>(`${zh.maxTokens} 1`).placeholder)
+      .toBe(zh.maxTokensPlaceholder)
   })
 
   it('can empty and reset the model override, then clear optional fields without dropping hidden data', async () => {
     const { mutate } = await mountDeepSeekCard({
       mutate: vi.fn(() => Promise.resolve(remoteOk(wireNamespaces()[0]))),
     })
-    fireEvent.click(screen.getByText(en.customized))
-    fireEvent.click(screen.getAllByLabelText(new RegExp(en.removeModel))[0] as HTMLElement)
-    fireEvent.click(screen.getByLabelText(new RegExp(en.removeModel)))
-    expect(screen.getByText(en.modelsEmpty)).toBeTruthy()
-    fireEvent.click(screen.getByText(en.resetModels))
-    expect(screen.getByText(en.modelsInherited)).toBeTruthy()
+    fireEvent.click(screen.getByText(zh.customized))
+    fireEvent.click(screen.getAllByLabelText(new RegExp(zh.removeModel))[0] as HTMLElement)
+    fireEvent.click(screen.getByLabelText(new RegExp(zh.removeModel)))
+    expect(screen.getByText(zh.modelsEmpty)).toBeTruthy()
+    fireEvent.click(screen.getByText(zh.resetModels))
+    expect(screen.getByText(zh.modelsInherited)).toBeTruthy()
 
-    const names = screen.getAllByLabelText(new RegExp(en.modelName))
+    const names = screen.getAllByLabelText(new RegExp(zh.modelName))
     expandRow(1)
-    const windows = capacityInputs(en.contextWindow)
+    const windows = capacityInputs(zh.contextWindow)
     fireEvent.change(names[0] as HTMLInputElement, { target: { value: '' } })
     fireEvent.change(windows[0] as HTMLInputElement, { target: { value: '' } })
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.apply))
 
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     expect(mutate.mock.calls[0]).toEqual([
@@ -1072,11 +1072,11 @@ describe('ModelsSection', () => {
   it('clears an inherited override with an unset op, never a whole-section replace', async () => {
     // A whole-section replace would clobber sibling overrides to clear one field.
     const { mutate } = await mountDeepSeekCard()
-    fireEvent.click(screen.getByText(en.customized))
-    const url = screen.getByLabelText<HTMLInputElement>(en.baseUrl)
+    fireEvent.click(screen.getByText(zh.customized))
+    const url = screen.getByLabelText<HTMLInputElement>(zh.baseUrl)
     expect(url.value).toBe('https://base')
     fireEvent.change(url, { target: { value: '' } })
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.apply))
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     // This editor clears one field through an unset op so it cannot clobber
     // sibling overrides with a whole-section replacement.
@@ -1109,8 +1109,8 @@ describe('ModelsSection', () => {
       readOnly={false}
       onClose={() => {}}
     />)
-    fireEvent.click(screen.getByText(en.customized))
-    const baseURL = screen.getByLabelText<HTMLInputElement>(en.baseUrl)
+    fireEvent.click(screen.getByText(zh.customized))
+    const baseURL = screen.getByLabelText<HTMLInputElement>(zh.baseUrl)
     expect(baseURL.placeholder).toBe('https://api.deepseek.com')
     fireEvent.change(baseURL, { target: { value: 'https://x' } })
     expect(baseURL.value).toBe('https://x')
@@ -1120,26 +1120,26 @@ describe('ModelsSection', () => {
 
   it('rejects an invalid draft before writing', async () => {
     const { mutate } = await mountDeepSeekCard()
-    fireEvent.click(screen.getByText(en.customized))
-    fireEvent.change(screen.getByLabelText(en.baseUrl), { target: { value: 'not-a-url' } })
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.customized))
+    fireEvent.change(screen.getByLabelText(zh.baseUrl), { target: { value: 'not-a-url' } })
+    fireEvent.click(screen.getByText(zh.apply))
     await screen.findByText(/baseURL/)
     expect(mutate).not.toHaveBeenCalled()
   })
 
   it('edits a pi-ai profile with the curated fields only', async () => {
     const { mutate } = await mountSection()
-    fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.editProvider) }))
+    fireEvent.click(screen.getByRole('button', { name: openaiCopy(zh.editProvider) }))
     // The configured credential shows as the stored placeholder.
-    const editorKey = await screen.findByLabelText<HTMLInputElement>(en.keyInput)
-    await waitFor(() => { expect(editorKey.placeholder).toBe(en.keyStored) })
+    const editorKey = await screen.findByLabelText<HTMLInputElement>(zh.keyInput)
+    await waitFor(() => { expect(editorKey.placeholder).toBe(zh.keyStored) })
     // pi-ai carries Base URL too: the stored override shows as the value and
     // the effective profile endpoint as its placeholder source.
-    fireEvent.click(screen.getByText(en.customized))
-    const url = screen.getByLabelText<HTMLInputElement>(en.baseUrl)
+    fireEvent.click(screen.getByText(zh.customized))
+    const url = screen.getByLabelText<HTMLInputElement>(zh.baseUrl)
     expect(url.value).toBe('https://proxy')
     fireEvent.change(url, { target: { value: 'https://proxy/v2' } })
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.apply))
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     // Only the edited field travels: apiKeyEnv and headers were already stored
     // with these values, so no op restates them.
@@ -1154,16 +1154,16 @@ describe('ModelsSection', () => {
     await mountSection()
 
     const dialog = await addDialog()
-    const pick = within(dialog).getByLabelText<HTMLSelectElement>(en.provider)
+    const pick = within(dialog).getByLabelText<HTMLSelectElement>(zh.provider)
     expect(pick.value).toBe('')
-    expect(within(dialog).getByLabelText(en.addManualUrl)).toBeTruthy()
+    expect(within(dialog).getByLabelText(zh.addManualUrl)).toBeTruthy()
     // No provider is picked yet, so neither card is open.
-    expect(within(dialog).queryByText(en.customTitle)).toBeNull()
-    expect(within(dialog).queryByLabelText(en.keyInput)).toBeNull()
+    expect(within(dialog).queryByText(zh.customTitle)).toBeNull()
+    expect(within(dialog).queryByLabelText(zh.keyInput)).toBeNull()
 
     // Re-picking the placeholder is not a route named "".
     fireEvent.change(pick, { target: { value: '' } })
-    expect(within(dialog).queryByLabelText(en.keyInput)).toBeNull()
+    expect(within(dialog).queryByLabelText(zh.keyInput)).toBeNull()
   })
 
   it('opens a declared route\'s card asking for what the adapter cannot default', async () => {
@@ -1179,22 +1179,22 @@ describe('ModelsSection', () => {
     // The route is in no catalog, so the card reaches for the name and the
     // protocol the way the create card does rather than sending the user to
     // settings.yaml for what only this route names.
-    expect(screen.getByLabelText(en.customApi)).toBeTruthy()
-    expect(screen.getByLabelText(en.customDisplayName, { exact: true })).toBeTruthy()
+    expect(screen.getByLabelText(zh.customApi)).toBeTruthy()
+    expect(screen.getByLabelText(zh.customDisplayName, { exact: true })).toBeTruthy()
   })
 
   it('adopts a picked route through the dialog and leaves the endpoint question behind', async () => {
     await mountSection()
 
     await addProvider('anthropic')
-    expect(screen.getByLabelText(en.keyInput)).toBeTruthy()
-    expect(screen.queryByLabelText(en.addManualUrl)).toBeNull()
-    expect(screen.queryByText(en.customTitle)).toBeNull()
+    expect(screen.getByLabelText(zh.keyInput)).toBeTruthy()
+    expect(screen.queryByLabelText(zh.addManualUrl)).toBeNull()
+    expect(screen.queryByText(zh.customTitle)).toBeNull()
 
     // Returning to the chooser keeps the manual way available.
-    fireEvent.click(screen.getByText(en.addBack))
-    expect(screen.queryByLabelText(en.keyInput)).toBeNull()
-    expect(screen.getByLabelText(en.addManualUrl)).toBeTruthy()
+    fireEvent.click(screen.getByText(zh.addBack))
+    expect(screen.queryByLabelText(zh.keyInput)).toBeNull()
+    expect(screen.getByLabelText(zh.addManualUrl)).toBeTruthy()
   })
 
   it('adds a dormant provider with a derived reference and stores its key', async () => {
@@ -1202,19 +1202,19 @@ describe('ModelsSection', () => {
     // The chooser lists the addable routes behind a placeholder; picking one
     // opens the editor for it, and the placeholder leaves with the choice.
     const dialog = await addDialog()
-    const pick = within(dialog).getByLabelText<HTMLSelectElement>(en.provider)
+    const pick = within(dialog).getByLabelText<HTMLSelectElement>(zh.provider)
     expect([...pick.options].map(option => option.value)).toEqual(['', 'anthropic', 'broken', 'plain'])
     expect(pick.value).toBe('')
     fireEvent.change(pick, { target: { value: 'anthropic' } })
     expect([...pick.options].map(option => option.value)).toEqual(['anthropic', 'broken', 'plain'])
     // A dormant profile has no endpoint anywhere: the pi-ai placeholder
     // falls back to the provider-default wording.
-    fireEvent.click(screen.getByText(en.customized))
-    expect(screen.getByLabelText<HTMLInputElement>(en.baseUrl).placeholder).toBe(en.baseUrlDefault)
-    const addKey = screen.getByLabelText<HTMLInputElement>(en.keyInput)
-    expect(addKey.placeholder).toBe(en.keyPlaceholderNative)
+    fireEvent.click(screen.getByText(zh.customized))
+    expect(screen.getByLabelText<HTMLInputElement>(zh.baseUrl).placeholder).toBe(zh.baseUrlDefault)
+    const addKey = screen.getByLabelText<HTMLInputElement>(zh.keyInput)
+    expect(addKey.placeholder).toBe(zh.keyPlaceholderNative)
     fireEvent.change(addKey, { target: { value: 'sk-ant' } })
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.apply))
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     expect(mutate.mock.calls[0]).toEqual([
       'llm-pi-ai',
@@ -1227,7 +1227,7 @@ describe('ModelsSection', () => {
   it('keeps pi-ai provider-native authentication when no key is entered', async () => {
     const { mutate, set } = await mountSection()
     await addProvider('anthropic')
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.apply))
     await waitFor(() => { expect(mutate).toHaveBeenCalledOnce() })
     expect(mutate.mock.calls[0]).toEqual([
       'llm-pi-ai',
@@ -1257,8 +1257,8 @@ describe('ModelsSection', () => {
       .mockResolvedValueOnce(remoteOk(undefined))
     const { face, controller, mirror } = await mountSection({ mutate, set })
     await addProvider('anthropic')
-    fireEvent.change(screen.getByLabelText<HTMLInputElement>(en.keyInput), { target: { value: 'sk-ant' } })
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.change(screen.getByLabelText<HTMLInputElement>(zh.keyInput), { target: { value: 'sk-ant' } })
+    fireEvent.click(screen.getByText(zh.apply))
     await screen.findByText('credential store unavailable')
     expect(mutate).toHaveBeenCalledOnce()
     face.settings.describe.mockResolvedValue(remoteOk({
@@ -1273,7 +1273,7 @@ describe('ModelsSection', () => {
       await controller.load()
     })
     expect(controller.store.getSnapshot().namespaces.get('llm-pi-ai')?.revision).toBe(1)
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.apply))
     await waitFor(() => { expect(set).toHaveBeenCalledTimes(2) })
     expect(mutate).toHaveBeenCalledOnce()
     expect(set).toHaveBeenLastCalledWith('ANTHROPIC_API_KEY', 'sk-ant')
@@ -1282,16 +1282,16 @@ describe('ModelsSection', () => {
   it('switches the add card target and degrades unknown or broken targets loudly', async () => {
     await mountSection()
     const dialog = await addDialog()
-    const pick = within(dialog).getByLabelText<HTMLSelectElement>(en.provider)
+    const pick = within(dialog).getByLabelText<HTMLSelectElement>(zh.provider)
     fireEvent.change(pick, { target: { value: 'broken' } })
     await screen.findByText(/unresolvable settings path/)
     fireEvent.change(pick, { target: { value: 'plain' } })
     await waitFor(() => {
-      expect(screen.getAllByText(content => content.includes(en.advancedHint)).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(content => content.includes(zh.advancedHint)).length).toBeGreaterThan(0)
     })
     // The hint-only card cannot apply anything, and offers no key field.
-    expect(screen.getByText<HTMLButtonElement>(en.apply).disabled).toBe(true)
-    expect(screen.queryAllByLabelText(en.keyInput)).toHaveLength(0)
+    expect(screen.getByText<HTMLButtonElement>(zh.apply).disabled).toBe(true)
+    expect(screen.queryAllByLabelText(zh.keyInput)).toHaveLength(0)
   })
 
   it('surfaces a rejected settings write and never stores the key after it', async () => {
@@ -1299,8 +1299,8 @@ describe('ModelsSection', () => {
       mutate: vi.fn(() => Promise.resolve(remoteFail('llm-pi-ai: unknown pi-ai provider "bogus"', 'settings/rejected'))),
     })
     await addProvider('anthropic')
-    fireEvent.change(screen.getByLabelText<HTMLInputElement>(en.keyInput), { target: { value: 'sk-x' } })
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.change(screen.getByLabelText<HTMLInputElement>(zh.keyInput), { target: { value: 'sk-x' } })
+    fireEvent.click(screen.getByText(zh.apply))
     await screen.findByText(/unknown pi-ai provider/)
     expect(set).not.toHaveBeenCalled()
   })
@@ -1320,8 +1320,8 @@ describe('ModelsSection', () => {
       t={t}
       renderSlot={() => null}
     />)
-    const key = await screen.findByLabelText<HTMLInputElement>(en.keyInput)
-    expect(key.placeholder).toBe(en.keyPlaceholder)
+    const key = await screen.findByLabelText<HTMLInputElement>(zh.keyInput)
+    expect(key.placeholder).toBe(zh.keyPlaceholder)
   })
 
   it('tells the user to reopen when another writer moved the namespace first', async () => {
@@ -1330,10 +1330,10 @@ describe('ModelsSection', () => {
     const { set } = await mountDeepSeekCard({
       mutate: vi.fn(() => Promise.resolve(remoteFail('changed since it was read', 'settings/conflict'))),
     })
-    fireEvent.click(screen.getByText(en.customized))
-    fireEvent.change(screen.getByLabelText<HTMLInputElement>(en.baseUrl), { target: { value: 'https://mine' } })
-    fireEvent.click(screen.getByText(en.apply))
-    await screen.findByText(en.conflict)
+    fireEvent.click(screen.getByText(zh.customized))
+    fireEvent.change(screen.getByLabelText<HTMLInputElement>(zh.baseUrl), { target: { value: 'https://mine' } })
+    fireEvent.click(screen.getByText(zh.apply))
+    await screen.findByText(zh.conflict)
     expect(set).not.toHaveBeenCalled()
   })
 
@@ -1341,21 +1341,21 @@ describe('ModelsSection', () => {
     await mountDeepSeekCard({
       mutate: vi.fn(() => Promise.resolve(remoteFail('the host refused', 'settings/rejected'))),
     })
-    fireEvent.click(screen.getByText(en.customized))
-    fireEvent.change(screen.getByLabelText<HTMLInputElement>(en.baseUrl), { target: { value: 'https://next' } })
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.customized))
+    fireEvent.change(screen.getByLabelText<HTMLInputElement>(zh.baseUrl), { target: { value: 'https://next' } })
+    fireEvent.click(screen.getByText(zh.apply))
     await screen.findByText('the host refused')
     // Not stuck in `applying…`: the finally cleared busy, so Apply is live again.
-    expect(screen.getByText(en.apply)).toBeTruthy()
+    expect(screen.getByText(zh.apply)).toBeTruthy()
   })
 
   it('surfaces a shadowed credential write on the card', async () => {
     await mountFirstRun({
       set: vi.fn(() => Promise.resolve(remoteFail('credentials: DEEPSEEK_API_KEY is shadowed by the read-only environment'))),
     })
-    const key = screen.getByLabelText<HTMLInputElement>(en.keyInput)
+    const key = screen.getByLabelText<HTMLInputElement>(zh.keyInput)
     fireEvent.change(key, { target: { value: 'sk-live' } })
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.apply))
     await screen.findByText(/shadowed by the read-only environment/)
     expect(screen.queryByRole('status')).toBeNull()
   })
@@ -1367,48 +1367,48 @@ describe('ModelsSection', () => {
         configured: ref === 'OPENAI_API_KEY', source: 'env', writable: false,
       }])),
     )))
-    fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.editProvider) }))
-    const editorKey = await screen.findByLabelText<HTMLInputElement>(en.keyInput)
-    await waitFor(() => { expect(editorKey.placeholder).toBe(en.keyEnvLocked) })
+    fireEvent.click(screen.getByRole('button', { name: openaiCopy(zh.editProvider) }))
+    const editorKey = await screen.findByLabelText<HTMLInputElement>(zh.keyInput)
+    await waitFor(() => { expect(editorKey.placeholder).toBe(zh.keyEnvLocked) })
     expect(editorKey.disabled).toBe(true)
   })
 
   it('keeps a failed credential describe silent and the input usable', async () => {
     const { face, set } = await mountSection()
     face.credentials.describe.mockImplementation(() => Promise.resolve(remoteFail('down', 'gateway/internal')))
-    fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.editProvider) }))
-    const editorKey = await screen.findByLabelText<HTMLInputElement>(en.keyInput)
-    expect(editorKey.placeholder).toBe(en.keyPlaceholderNative)
+    fireEvent.click(screen.getByRole('button', { name: openaiCopy(zh.editProvider) }))
+    const editorKey = await screen.findByLabelText<HTMLInputElement>(zh.keyInput)
+    expect(editorKey.placeholder).toBe(zh.keyPlaceholderNative)
     fireEvent.change(editorKey, { target: { value: 'sk-live' } })
-    fireEvent.click(screen.getByText(en.apply))
+    fireEvent.click(screen.getByText(zh.apply))
     await waitFor(() => { expect(set).toHaveBeenCalledTimes(1) })
   })
 
   it('requires confirmation before removing a user-added provider', async () => {
     const { mutate, unset } = await mountSection()
-    fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.removeProvider) }))
-    const dialog = screen.getByRole('dialog', { name: openaiCopy(en.deleteTitle) })
-    expect(dialog.textContent).toContain(openaiCopy(en.deleteDescriptionWithCredential))
-    expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: en.cancel }))
+    fireEvent.click(screen.getByRole('button', { name: openaiCopy(zh.removeProvider) }))
+    const dialog = screen.getByRole('dialog', { name: openaiCopy(zh.deleteTitle) })
+    expect(dialog.textContent).toContain(openaiCopy(zh.deleteDescriptionWithCredential))
+    expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: zh.cancel }))
     expect(unset).not.toHaveBeenCalled()
     expect(mutate).not.toHaveBeenCalled()
-    fireEvent.click(within(dialog).getByRole('button', { name: en.cancel }))
-    expect(screen.queryByRole('dialog', { name: openaiCopy(en.deleteTitle) })).toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: zh.cancel }))
+    expect(screen.queryByRole('dialog', { name: openaiCopy(zh.deleteTitle) })).toBeNull()
     expect(mutate).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.removeProvider) }))
-    fireEvent.click(within(screen.getByRole('dialog', { name: openaiCopy(en.deleteTitle) }))
-      .getByRole('button', { name: en.close }))
-    expect(screen.queryByRole('dialog', { name: openaiCopy(en.deleteTitle) })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: openaiCopy(zh.removeProvider) }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: openaiCopy(zh.deleteTitle) }))
+      .getByRole('button', { name: zh.close }))
+    expect(screen.queryByRole('dialog', { name: openaiCopy(zh.deleteTitle) })).toBeNull()
     expect(mutate).not.toHaveBeenCalled()
 
-    fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.removeProvider) }))
-    fireEvent.click(within(screen.getByRole('dialog', { name: openaiCopy(en.deleteTitle) }))
-      .getByRole('button', { name: openaiCopy(en.deleteConfirm) }))
+    fireEvent.click(screen.getByRole('button', { name: openaiCopy(zh.removeProvider) }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: openaiCopy(zh.deleteTitle) }))
+      .getByRole('button', { name: openaiCopy(zh.deleteConfirm) }))
     await waitFor(() => { expect(unset).toHaveBeenCalledWith('OPENAI_API_KEY') })
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     expect(unset.mock.invocationCallOrder[0]).toBeLessThan(mutate.mock.invocationCallOrder[0] as number)
-    expect(screen.queryByRole('dialog', { name: openaiCopy(en.deleteTitle) })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: openaiCopy(zh.deleteTitle) })).toBeNull()
     expect(mutate.mock.calls[0]).toEqual([
       'llm-pi-ai',
       [{ op: 'unset', path: ['providers', 'openai'] }],
@@ -1422,21 +1422,21 @@ describe('ModelsSection', () => {
       resolveRemoval = resolve
     }))
     await mountSection({ mutate })
-    fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.removeProvider) }))
-    const dialog = screen.getByRole('dialog', { name: openaiCopy(en.deleteTitle) })
-    const confirm = within(dialog).getByRole<HTMLButtonElement>('button', { name: openaiCopy(en.deleteConfirm) })
+    fireEvent.click(screen.getByRole('button', { name: openaiCopy(zh.removeProvider) }))
+    const dialog = screen.getByRole('dialog', { name: openaiCopy(zh.deleteTitle) })
+    const confirm = within(dialog).getByRole<HTMLButtonElement>('button', { name: openaiCopy(zh.deleteConfirm) })
     fireEvent.click(confirm)
     fireEvent.click(confirm)
     await waitFor(() => { expect(mutate).toHaveBeenCalledOnce() })
     expect(confirm.disabled).toBe(true)
-    expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: en.cancel }).disabled).toBe(true)
-    expect(within(dialog).getByRole('button', { name: openaiCopy(en.deleting) })).toBe(confirm)
-    fireEvent.click(within(dialog).getByRole('button', { name: en.close }))
-    expect(screen.getByRole('dialog', { name: openaiCopy(en.deleteTitle) })).toBe(dialog)
+    expect(within(dialog).getByRole<HTMLButtonElement>('button', { name: zh.cancel }).disabled).toBe(true)
+    expect(within(dialog).getByRole('button', { name: openaiCopy(zh.deleting) })).toBe(confirm)
+    fireEvent.click(within(dialog).getByRole('button', { name: zh.close }))
+    expect(screen.getByRole('dialog', { name: openaiCopy(zh.deleteTitle) })).toBe(dialog)
     expect(mutate).toHaveBeenCalledOnce()
     await act(async () => { resolveRemoval(remoteOk(wireNamespaces()[2]!)) })
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: openaiCopy(en.deleteTitle) })).toBeNull()
+      expect(screen.queryByRole('dialog', { name: openaiCopy(zh.deleteTitle) })).toBeNull()
     })
   })
 
@@ -1457,7 +1457,7 @@ describe('ModelsSection', () => {
       renderSlot={() => null}
     />)
     expect(screen.getByText(/directory down/)).toBeTruthy()
-    fireEvent.click(screen.getByText(en.retry))
+    fireEvent.click(screen.getByText(zh.retry))
     await waitFor(() => { expect(screen.queryByText(/directory down/)).toBeNull() })
   })
 
@@ -1481,37 +1481,37 @@ describe('ModelsSection', () => {
       t={t}
       renderSlot={() => null}
     />)
-    expect(screen.getByText(en.readOnly)).toBeTruthy()
-    expect(screen.getAllByText<HTMLButtonElement>(en.remove).every(button => button.disabled)).toBe(true)
-    expect(screen.getByText<HTMLButtonElement>(en.add).disabled).toBe(true)
+    expect(screen.getByText(zh.readOnly)).toBeTruthy()
+    expect(screen.getAllByText<HTMLButtonElement>(zh.remove).every(button => button.disabled)).toBe(true)
+    expect(screen.getByText<HTMLButtonElement>(zh.add).disabled).toBe(true)
   })
 
   it('opens one row\'s card as a dialog and closes it without writing', async () => {
     const { mutate } = await mountSection()
-    const edit = screen.getByRole('button', { name: openaiCopy(en.editProvider) })
+    const edit = screen.getByRole('button', { name: openaiCopy(zh.editProvider) })
     fireEvent.click(edit)
     // The dialog is named by the action that opened it, so a screen reader
     // announcing the Edit button finds the card it opened carrying that name.
-    const dialog = await screen.findByRole('dialog', { name: openaiCopy(en.editProvider) })
-    expect(within(dialog).getByLabelText(en.keyInput)).toBeTruthy()
+    const dialog = await screen.findByRole('dialog', { name: openaiCopy(zh.editProvider) })
+    expect(within(dialog).getByLabelText(zh.keyInput)).toBeTruthy()
     // The row keeps its place in the list behind the dialog: the card is not
     // the row's expanded state any more, so the list stays a list of rows.
-    expect(screen.getByText('openai').closest('li')?.textContent).toContain(en.edit)
+    expect(screen.getByText('openai').closest('li')?.textContent).toContain(zh.edit)
 
     // Dismissal by the chrome discards the draft, as the card's own cancel
     // does, rather than leaving a half-typed key alive behind the rows.
-    fireEvent.click(screen.getByRole('button', { name: en.close }))
+    fireEvent.click(screen.getByRole('button', { name: zh.close }))
     expect(screen.queryByRole('dialog')).toBeNull()
     fireEvent.click(edit)
-    fireEvent.click(await screen.findByText(en.cancel))
+    fireEvent.click(await screen.findByText(zh.cancel))
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(mutate).not.toHaveBeenCalled()
   })
 
   it('closes the card when a refresh drops the row it was editing', async () => {
     const { face, controller } = await mountSection()
-    fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.editProvider) }))
-    expect(await screen.findByRole('dialog', { name: openaiCopy(en.editProvider) })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: openaiCopy(zh.editProvider) }))
+    expect(await screen.findByRole('dialog', { name: openaiCopy(zh.editProvider) })).toBeTruthy()
     face.llm.listConfigurableProviders.mockImplementation(() => Promise.resolve(remoteOk([
       { provider: 'deepseek-official', displayName: 'DeepSeek', settingsNs: 'llm-deepseek', settingsPath: [] },
     ])))
@@ -1525,37 +1525,37 @@ describe('ModelsSection', () => {
   it('cancels the add dialog\'s card back to the chooser, not out of the dialog', async () => {
     await mountSection()
     await addProvider('anthropic')
-    fireEvent.click(screen.getByText(en.cancel))
+    fireEvent.click(screen.getByText(zh.cancel))
     // The card's cancel is a step back: the dialog keeps the choice it was
     // opened for, so the operator can pick another way in.
-    await waitFor(() => { expect(screen.queryByLabelText(en.keyInput)).toBeNull() })
+    await waitFor(() => { expect(screen.queryByLabelText(zh.keyInput)).toBeNull() })
     expect(screen.getByRole('dialog')).toBeTruthy()
-    expect(screen.getByLabelText(en.provider)).toBeTruthy()
+    expect(screen.getByLabelText(zh.provider)).toBeTruthy()
   })
 
   it('opens the first-run card by itself and remembers its dismissal', async () => {
     await mountFirstRun()
     // Nothing is usable yet, so the unkeyed whole-section provider opens its
     // own card — the same dialog Edit opens, not a second kind of card.
-    const dialog = await screen.findByRole('dialog', { name: deepSeekCopy(en.editProvider) })
-    expect(within(dialog).getByLabelText(en.keyInput)).toBeTruthy()
-    fireEvent.click(within(dialog).getByText(en.cancel))
+    const dialog = await screen.findByRole('dialog', { name: deepSeekCopy(zh.editProvider) })
+    expect(within(dialog).getByLabelText(zh.keyInput)).toBeTruthy()
+    fireEvent.click(within(dialog).getByText(zh.cancel))
     expect(screen.queryByRole('dialog')).toBeNull()
     // Dismissal is this card's own: the provider falls back to an ordinary row
     // carrying the missing-key dot, and reopens through Edit.
-    expect(screen.getAllByRole('img', { name: en.credentialMissing })
+    expect(screen.getAllByRole('img', { name: zh.credentialMissing })
       .some(dot => dot.closest('li')?.textContent?.includes('DeepSeek') === true)).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: deepSeekCopy(en.editProvider) }))
-    expect(await screen.findByRole('dialog', { name: deepSeekCopy(en.editProvider) })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: deepSeekCopy(zh.editProvider) }))
+    expect(await screen.findByRole('dialog', { name: deepSeekCopy(zh.editProvider) })).toBeTruthy()
   })
 
   it('hands the section to the add dialog over the first-run card', async () => {
     await mountFirstRun()
-    await screen.findByRole('dialog', { name: deepSeekCopy(en.editProvider) })
+    await screen.findByRole('dialog', { name: deepSeekCopy(zh.editProvider) })
     // One card at a time: reaching for a new provider closes the card the
     // posture opened, so no draft is left open behind the dialog.
     await addDialog()
-    expect(screen.queryByRole('dialog', { name: deepSeekCopy(en.editProvider) })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: deepSeekCopy(zh.editProvider) })).toBeNull()
   })
 
   it('loads on first render of an idle controller', async () => {
@@ -1609,12 +1609,12 @@ describe('ModelsSection', () => {
       .mockResolvedValueOnce(remoteFail('the host refused', 'settings/rejected'))
       .mockResolvedValueOnce(remoteOk(wireNamespaces()[2]!))
     const { unset } = await mountSection({ mutate })
-    fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.removeProvider) }))
-    const dialog = screen.getByRole('dialog', { name: openaiCopy(en.deleteTitle) })
-    const confirm = within(dialog).getByRole('button', { name: openaiCopy(en.deleteConfirm) })
+    fireEvent.click(screen.getByRole('button', { name: openaiCopy(zh.removeProvider) }))
+    const dialog = screen.getByRole('dialog', { name: openaiCopy(zh.deleteTitle) })
+    const confirm = within(dialog).getByRole('button', { name: openaiCopy(zh.deleteConfirm) })
     fireEvent.click(confirm)
     await within(dialog).findByText('the host refused')
-    expect(screen.getByRole('dialog', { name: openaiCopy(en.deleteTitle) })).toBe(dialog)
+    expect(screen.getByRole('dialog', { name: openaiCopy(zh.deleteTitle) })).toBe(dialog)
     expect(unset).toHaveBeenCalledOnce()
     expect(mutate).toHaveBeenCalledOnce()
 
@@ -1622,17 +1622,17 @@ describe('ModelsSection', () => {
     await waitFor(() => { expect(unset).toHaveBeenCalledTimes(2) })
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(2) })
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: openaiCopy(en.deleteTitle) })).toBeNull()
+      expect(screen.queryByRole('dialog', { name: openaiCopy(zh.deleteTitle) })).toBeNull()
     })
   })
 
   it('retains credentials that are not identified as page-managed', async () => {
     const { unset, mutate } = await mountSection()
     const target = { provider: 'zombie', displayName: 'zombie' }
-    fireEvent.click(screen.getByRole('button', { name: providerCopy(en.removeProvider, target) }))
-    const dialog = screen.getByRole('dialog', { name: providerCopy(en.deleteTitle, target) })
-    expect(dialog.textContent).toContain(providerCopy(en.deleteDescription, target))
-    fireEvent.click(within(dialog).getByRole('button', { name: providerCopy(en.deleteConfirm, target) }))
+    fireEvent.click(screen.getByRole('button', { name: providerCopy(zh.removeProvider, target) }))
+    const dialog = screen.getByRole('dialog', { name: providerCopy(zh.deleteTitle, target) })
+    expect(dialog.textContent).toContain(providerCopy(zh.deleteDescription, target))
+    fireEvent.click(within(dialog).getByRole('button', { name: providerCopy(zh.deleteConfirm, target) }))
     await waitFor(() => { expect(mutate).toHaveBeenCalledOnce() })
     expect(unset).not.toHaveBeenCalled()
     expect(mutate.mock.calls[0]).toEqual([
@@ -1746,9 +1746,9 @@ async function mountLightweight(script?: (face: ReturnType<typeof scriptedFace>[
 describe('lightweight model card', () => {
   it('disables the picker and says so when the browser cannot write', async () => {
     await mountSection()
-    expect(screen.getByText(en.lightweightModelReadOnly)).toBeTruthy()
-    expect(screen.getByLabelText<HTMLSelectElement>(en.lightweightModel).disabled).toBe(true)
-    const save = screen.getByText(en.lightweightModelSave).closest('button')
+    expect(screen.getByText(zh.lightweightModelReadOnly)).toBeTruthy()
+    expect(screen.getByLabelText<HTMLSelectElement>(zh.lightweightModel).disabled).toBe(true)
+    const save = screen.getByText(zh.lightweightModelSave).closest('button')
     expect(save?.disabled).toBe(true)
   })
 
@@ -1756,15 +1756,15 @@ describe('lightweight model card', () => {
     const { face, lightweight } = await mountLightweight((wire) => {
       wire.settings.mutate = vi.fn(() => Promise.resolve(lightweightAnswer({ provider: 'openai', model: 'gpt-4o-mini' })))
     })
-    const select = screen.getByLabelText<HTMLSelectElement>(en.lightweightModel)
+    const select = screen.getByLabelText<HTMLSelectElement>(zh.lightweightModel)
     expect([...select.options].map(option => option.textContent)).toEqual([
-      en.lightweightModelUnset,
+      zh.lightweightModelUnset,
       'DeepSeek / DeepSeek Chat',
       'OpenAI / GPT-4o mini',
     ])
     fireEvent.change(select, { target: { value: LW_OPENAI } })
     await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(true) })
-    fireEvent.click(screen.getByText(en.lightweightModelSave))
+    fireEvent.click(screen.getByText(zh.lightweightModelSave))
     await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(false) })
     expect(face.settings.mutate.mock.calls[0]?.[0]).toBe('lightweight-model')
   })
@@ -1780,11 +1780,11 @@ describe('lightweight model card', () => {
     const { lightweight } = await mountFace(scripted, 'host')
     await waitFor(() => { expect(lightweight.store.getSnapshot().catalogStatus).toBe('ready') })
     // A vanished route stays listed, which is the only way to clear it.
-    expect(screen.getByLabelText<HTMLSelectElement>(en.lightweightModel).value).toBe(LW_GHOST)
+    expect(screen.getByLabelText<HTMLSelectElement>(zh.lightweightModel).value).toBe(LW_GHOST)
     expect(screen.getByText('ghost / ghost-1')).toBeTruthy()
-    fireEvent.change(screen.getByLabelText(en.lightweightModel), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText(zh.lightweightModel), { target: { value: '' } })
     await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(true) })
-    fireEvent.click(screen.getByText(en.lightweightModelSave))
+    fireEvent.click(screen.getByText(zh.lightweightModelSave))
     await waitFor(() => { expect(lightweight.store.getSnapshot().selected).toBeUndefined() })
     expect(scripted.face.settings.mutate.mock.calls[0]?.[1]).toEqual([
       { op: 'set', path: ['provider'], value: '' },
@@ -1794,10 +1794,10 @@ describe('lightweight model card', () => {
 
   it('discards a staged route without writing', async () => {
     const { face, lightweight } = await mountLightweight()
-    const select = screen.getByLabelText<HTMLSelectElement>(en.lightweightModel)
+    const select = screen.getByLabelText<HTMLSelectElement>(zh.lightweightModel)
     fireEvent.change(select, { target: { value: LW_DEEPSEEK } })
     await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(true) })
-    fireEvent.click(screen.getByText(en.lightweightModelDiscard))
+    fireEvent.click(screen.getByText(zh.lightweightModelDiscard))
     await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(false) })
     select.value = LW_DEEPSEEK
     expect(face.settings.mutate.mock.calls).toHaveLength(0)
@@ -1809,10 +1809,10 @@ describe('lightweight model card', () => {
     const scripted = scriptedFace()
     scripted.face.session.modelCatalog = vi.fn(() => gate.then(() => remoteOk(MODEL_CATALOG)))
     const { lightweight } = await mountFace(scripted, 'host')
-    expect(screen.getByText(en.lightweightModelRetrying)).toBeTruthy()
+    expect(screen.getByText(zh.lightweightModelRetrying)).toBeTruthy()
     expect(lightweight.store.getSnapshot().catalogStatus).toBe('loading')
     release?.()
-    await waitFor(() => { expect(screen.queryByText(en.lightweightModelRetrying)).toBeNull() })
+    await waitFor(() => { expect(screen.queryByText(zh.lightweightModelRetrying)).toBeNull() })
   })
 
   it('retries a failed catalog request and reports an empty catalog', async () => {
@@ -1821,12 +1821,12 @@ describe('lightweight model card', () => {
       .mockResolvedValueOnce(remoteFail('catalog down', 'gateway/internal'))
       .mockResolvedValue(remoteOk({ ...MODEL_CATALOG, groups: [] }))
     const { lightweight } = await mountFace(scripted, 'host')
-    await waitFor(() => { expect(screen.getByText(en.retry)).toBeTruthy() })
-    fireEvent.click(screen.getByText(en.retry))
-    await waitFor(() => { expect(screen.getByText(en.lightweightModelEmpty)).toBeTruthy() })
+    await waitFor(() => { expect(screen.getByText(zh.retry)).toBeTruthy() })
+    fireEvent.click(screen.getByText(zh.retry))
+    await waitFor(() => { expect(screen.getByText(zh.lightweightModelEmpty)).toBeTruthy() })
     expect(lightweight.store.getSnapshot().candidates).toHaveLength(0)
     // Only the "no model" option survives an empty catalog.
-    expect(screen.getByLabelText<HTMLSelectElement>(en.lightweightModel).options).toHaveLength(1)
+    expect(screen.getByLabelText<HTMLSelectElement>(zh.lightweightModel).options).toHaveLength(1)
   })
 
   it('keeps the picker disabled and labelled while the save is in flight', async () => {
@@ -1835,11 +1835,11 @@ describe('lightweight model card', () => {
     const { lightweight } = await mountLightweight((wire) => {
       wire.settings.mutate = vi.fn(() => gate.then(() => lightweightAnswer({ provider: 'deepseek-official', model: 'deepseek-chat' })))
     })
-    fireEvent.change(screen.getByLabelText(en.lightweightModel), { target: { value: LW_DEEPSEEK } })
-    fireEvent.click(screen.getByText(en.lightweightModelSave))
-    await waitFor(() => { expect(screen.getByText(en.lightweightModelSaving)).toBeTruthy() })
-    expect(screen.getByText(en.lightweightModelSaving).closest('button')?.disabled).toBe(true)
-    expect(screen.getByLabelText<HTMLSelectElement>(en.lightweightModel).disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(zh.lightweightModel), { target: { value: LW_DEEPSEEK } })
+    fireEvent.click(screen.getByText(zh.lightweightModelSave))
+    await waitFor(() => { expect(screen.getByText(zh.lightweightModelSaving)).toBeTruthy() })
+    expect(screen.getByText(zh.lightweightModelSaving).closest('button')?.disabled).toBe(true)
+    expect(screen.getByLabelText<HTMLSelectElement>(zh.lightweightModel).disabled).toBe(true)
     release?.()
     await waitFor(() => { expect(lightweight.store.getSnapshot().saving).toBe(false) })
   })
@@ -1848,9 +1848,9 @@ describe('lightweight model card', () => {
     const { lightweight } = await mountLightweight((wire) => {
       wire.settings.mutate = vi.fn(() => Promise.resolve(lightweightAnswer({ provider: '', model: '' })))
     })
-    fireEvent.change(screen.getByLabelText(en.lightweightModel), { target: { value: LW_DEEPSEEK } })
-    fireEvent.click(screen.getByText(en.lightweightModelSave))
-    await waitFor(() => { expect(screen.getByText(en.lightweightModelFailed)).toBeTruthy() })
+    fireEvent.change(screen.getByLabelText(zh.lightweightModel), { target: { value: LW_DEEPSEEK } })
+    fireEvent.click(screen.getByText(zh.lightweightModelSave))
+    await waitFor(() => { expect(screen.getByText(zh.lightweightModelFailed)).toBeTruthy() })
     expect(lightweight.store.getSnapshot()).toMatchObject({ failed: true, dirty: true })
   })
 })

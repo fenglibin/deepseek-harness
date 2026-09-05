@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-response-language
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-response-language` 规定模型撰写用户可见文本时使用的语言。它只注册一个系统提示词段落来声明该语言，不添加工具、不提供服务、不持有持久状态。

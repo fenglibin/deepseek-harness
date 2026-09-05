@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-coverage-exempt-heavy-suites.md) | 中文
-
 ## Problem
 
 CI 覆盖率 lane（`check:ci:coverage`）的墙钟被少数几个重型测试文件钉死：本地 6-worker 全量剖析中，555 个测试文件聚合 1595 秒，其中 `packages/typert/generator/tests/type-model.spec.ts` 一个文件占 885 秒，前 10 个文件占聚合时长的 84%。这类套件的共同点是每个用例都做全工作区编译器分析或真实子进程 fixture（测试前置数据），v8 插桩把这类代码的运行时间放大数倍。

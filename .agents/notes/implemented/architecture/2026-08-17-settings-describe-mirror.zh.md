@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-17-settings-describe-mirror.md) | 中文
-
 ## 问题
 
 一次冷启动的 web boot 在约 200ms 内发出十五次 `settings.describe`，且每新增一个持有偏好设置的客户端插件，该计数再加二。两个机制叠加：`SettingsScopeBinder.bind()` 为每个绑定的 scope 启动一次全量文档读取（产品组合中有六个 scope，外加插件目录 tab、welcome 门与 models onboarding join），而 `onConnected` 在**首次**连接时同样发出 `connection/reset`，于是上述每个读取方都立即重读了几毫秒前刚取到的应答。每个读取方还各自持有失效订阅与各自的 `refreshIfLoaded` 式防护，且十五次独立读取原则上可能落在十五个不同的文档 revision 上。

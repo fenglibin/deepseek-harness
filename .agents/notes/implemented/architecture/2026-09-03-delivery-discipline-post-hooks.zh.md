@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-delivery-discipline-post-hooks.md) | 中文
-
 ## 问题
 
 B1–B3 为任务提供了只进不退的生命周期与记录、门禁前置条件，但 `accepted` 在模型选择写的记录之外没有任何验证即可到达：验收前没有运行 `openspec validate`、回归套件或深度自检，因此设计文档「只有全部验证通过才允许进入 accepted」的后置闸门（§6.3、§6.4）缺失。

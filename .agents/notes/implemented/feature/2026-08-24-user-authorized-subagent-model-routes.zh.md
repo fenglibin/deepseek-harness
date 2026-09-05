@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-24-user-authorized-subagent-model-routes.md) | 中文
-
 ## Problem
 
 注册 LLM 适配器会使其路由可达，但不代表授权 Agent 为子级选择每一个可达模型。针对实时适配器注册表的单一启用偏好，会在另一个提供方或模型出现时静默扩大范围。产品需要一项显式且稳定的授权决定，同时避免把可能很大的模型目录渲染进父 Agent 的每次请求。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-27-web-at-mention-discovery-and-row-content.md) | 中文
-
 ## Problem
 
 在 Web composer 里 `@` 之后继续输入很慢，而被填满的菜单里塞着并不能区分候选的文字。背后是三个缺陷，一次击键就能全部触达。

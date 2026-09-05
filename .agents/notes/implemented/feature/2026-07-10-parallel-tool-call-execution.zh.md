@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-10-parallel-tool-call-execution.md) | 中文
-
 ## 问题
 
 一条 assistant 消息可以包含多个并列的 `tool-call` 块。尽管模型已经同时请求了这些调用，串行执行仍会叠加各个独立读取和 Web 请求的延迟。

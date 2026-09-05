@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-12-pi-ai-route-default-input-modalities.md) | 中文
-
 ## 问题
 
 `settings.yaml` 里没有任何写法能把一个手写的 pi-ai 模型描述成接受图片，而适配器对已安装 pi-ai catalog 未描述的每个模型都假定纯文本。部署通过 Web UI 的“添加自定义提供商”卡片新增的模型统统属于这一类，因此一个提供视觉模型的 OpenAI 兼容网关，无论实际提供什么，报出来的都是 `inputModalities: ['text']`。

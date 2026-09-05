@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-08-08-semantic-composer-chain-phases.md) | 中文
-
 ## 问题
 
 浏览器的 `conversation.composer` 链先按一个全局数值 `priority` 对所有候选项排序，再选出第一个返回匹配项的选择器。问题采用默认优先级 `0`，审批采用 `1`，一次性或父级不可用时使用的只读 subagent composer 采用 `-10`。因此，选中一次性 subagent 历史记录后，即使其下方有等待应答的问题或审批，界面仍可能显示只读说明。

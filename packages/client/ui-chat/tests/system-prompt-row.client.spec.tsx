@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { ChatNode } from '../src/client/contract/chat-nodes.ts'
 import { SystemPromptNodeView } from '../src/client/chat/SystemPromptRow.tsx'
-import { en } from '../src/client/locale.ts'
+import { zh } from '../src/client/locale.ts'
 
 afterEach(cleanup)
 
@@ -23,7 +23,7 @@ describe('SystemPromptNodeView', () => {
     }
     const { container } = render(<SystemPromptNodeView
       node={node}
-      t={makeTranslate(en)}
+      t={makeTranslate(zh)}
     />)
 
     const disclosure = screen.getByRole('button', { name: 'System prompt' })

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-18-tool-row-file-open-failure.md) | 中文
-
 ## 问题
 
 工具行路径点击已经通过聊天视图注入的 `openFile` 调用 `session/openWorkspacePath`。inject 吞掉了每一次 Host 或操作系统拒绝，因此缺少桌面打开器、远程或非回环载体、或 Host 无法交接的路径，都会让该行看起来像成功。读者看不到原因，也无法再试一次。

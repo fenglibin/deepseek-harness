@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-05-profile-plugin-bundles.md) | 中文
-
 ## Problem
 
 `dsh` 启动器硬编码了自己的组合：`base.cordis.yml` + `web.cordis.yml` 随 `apps/cli` 一起交付，三种各自定制的入口模式（`--config`、`web`、`-p`）各带一套层栈，外加一个全局的个人 overlay（`$DSH_HOME/config.yaml`）。想把树外插件（一个 TUI、一个提供方扩展包）装进已交付的表层，只能修改仓库；第三方包也没有任何位置可以贡献默认组合。

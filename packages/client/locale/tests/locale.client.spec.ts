@@ -36,34 +36,24 @@ describe('LocaleRuntime', () => {
     vi.unstubAllGlobals()
   })
 
-  it('translates through the active-locale -> en -> key chain', () => {
+  it('translates through the active-locale -> key chain', () => {
     const { svc } = make()
     svc.register('ns', 'zh', { hello: '你好' })
-    svc.register('ns', 'en', { hello: 'Hello', onlyEn: 'English only' })
     const t = svc.bind('ns')
     expect(svc.getLocale().active).toBe('zh')
     expect(t('hello')).toBe('你好')
-    // The active locale misses this key; the en fallback supplies it.
-    expect(t('onlyEn')).toBe('English only')
-    svc.setLocale('en')
-    expect(t('hello')).toBe('Hello')
     expect(t('missing.key')).toBe('missing.key')
   })
 
-  it('falls through to the common vocabulary after the namespace misses (production keys)', () => {
+  it('falls through to the common vocabulary after the namespace misses', () => {
     const { svc } = make()
-    // The shipped common pair is registered by apply; the bench registers it
-    // directly to pin the production chain: ns -> common -> en -> key.
+    // The shipped common dictionary is registered by apply; the bench registers
+    // it directly to pin the production chain: ns -> common -> key.
     svc.register('common', 'zh', { retry: '重试' })
-    svc.register('common', 'en', { retry: 'Retry' })
-    svc.register('ns', 'en', { own: 'Own' })
+    svc.register('ns', 'zh', { own: '自有' })
     const t = svc.bind('ns')
     expect(t('retry')).toBe('重试')
-    // zh is active and `ns` has no zh dictionary at all: the en fallback answers.
-    expect(t('own')).toBe('Own')
-    svc.setLocale('en')
-    expect(t('retry')).toBe('Retry')
-    expect(t('own')).toBe('Own')
+    expect(t('own')).toBe('自有')
     // common itself must not recurse: a miss inside common echoes the key.
     // (Wide-string ns hits the untyped bind overload — the typed one rejects
     // unknown keys at compile time, which is the point of the typed registry contract.)
@@ -105,11 +95,12 @@ describe('LocaleRuntime', () => {
     const r0 = svc.getSnapshot().revision
     svc.register('ns', 'zh', { k: 'v' })
     expect(svc.getSnapshot().revision).toBe(r0 + 1)
-    svc.setLocale('en')
-    expect(seen).toEqual([r0 + 1, r0 + 2])
+    svc.addLanguage({ id: 'ja', label: '日本語', fallback: 'zh' })
+    svc.setLocale('ja')
+    expect(seen).toEqual([r0 + 1, r0 + 2, r0 + 3])
     off()
     svc.setLocale('zh')
-    expect(seen).toHaveLength(2)
+    expect(seen).toHaveLength(3)
   })
 
   it('isolates a throwing subscriber: the rest still see the new revision', () => {
@@ -119,9 +110,10 @@ describe('LocaleRuntime', () => {
       const seen: number[] = []
       svc.subscribe(() => { throw new Error('boom') })
       svc.subscribe(() => { seen.push(svc.getSnapshot().revision) })
-      svc.setLocale('en')
-      expect(seen).toEqual([1])
-      expect(spy).toHaveBeenCalledOnce()
+      svc.addLanguage({ id: 'ja', label: '日本語', fallback: 'zh' })
+      svc.setLocale('ja')
+      expect(seen).toEqual([1, 2])
+      expect(spy).toHaveBeenCalledTimes(2)
     } finally {
       spy.mockRestore()
     }
@@ -141,39 +133,39 @@ describe('LocaleRuntime', () => {
   it('setLocale writes through the scope and republishes only on a real change', () => {
     const host = stubSettingsScope<LocaleSettings>()
     const { svc, events } = make(host)
-    svc.setLocale('en')
-    expect(svc.getLocale().active).toBe('en')
-    expect(host.set).toHaveBeenCalledWith('preference', 'en')
-    expect(events).toHaveLength(1)
-    expect(events[0]).toBe(svc.getLocale())
-    expect(events[0]!.revision).toBe(1)
+    svc.addLanguage({ id: 'ja', label: '日本語', fallback: 'zh' })
+    svc.setLocale('ja')
+    expect(svc.getLocale().active).toBe('ja')
+    expect(host.set).toHaveBeenCalledWith('preference', 'ja')
+    expect(events.map(snapshot => snapshot.active)).toEqual(['ja'])
     // Re-selecting the active locale publishes nothing (no subscriber churn)
     // but still writes: the active value may be a provisional browser-derived
     // resolution nothing has stored, and picking it is an explicit choice that
     // must outlive this browser.
-    svc.setLocale('en')
+    svc.setLocale('ja')
     expect(events).toHaveLength(1)
     expect(host.set).toHaveBeenCalledTimes(2)
-    expect(host.set).toHaveBeenLastCalledWith('preference', 'en')
+    expect(host.set).toHaveBeenLastCalledWith('preference', 'ja')
   })
 
   it('persists an explicit pick of the provisional locale, so a shared DSH home agrees', () => {
     // A browser naming no shipped language opens at FALLBACK_LOCALE with
     // nothing stored. Choosing that same language in the menu must become
-    // durable, or a Chinese browser sharing the home still opens Chinese.
+    // durable, or an English browser sharing the home still opens Chinese.
     stubLanguages('fr-FR')
     const host = stubSettingsScope<LocaleSettings>()
     const { svc } = make(host)
-    expect(svc.getLocale().active).toBe('en')
+    expect(svc.getLocale().active).toBe('zh')
     expect(host.set).not.toHaveBeenCalled()
-    svc.setLocale('en')
-    expect(host.set).toHaveBeenCalledWith('preference', 'en')
+    svc.setLocale('zh')
+    expect(host.set).toHaveBeenCalledWith('preference', 'zh')
   })
 
   it('setLocale without a host scope stays process-local', () => {
     const { svc, events } = make()
-    svc.setLocale('en')
-    expect(svc.getLocale().active).toBe('en')
+    svc.addLanguage({ id: 'ja', label: '日本語', fallback: 'zh' })
+    svc.setLocale('ja')
+    expect(svc.getLocale().active).toBe('ja')
     expect(events).toHaveLength(1)
   })
 
@@ -185,10 +177,10 @@ describe('LocaleRuntime', () => {
   it('registers an external locale for selection, translation, persistence, and reversible disposal', () => {
     const host = stubSettingsScope<LocaleSettings>()
     const { svc, events } = make(host)
-    svc.register('ns', 'en', { hello: 'Hello' })
+    svc.register('ns', 'zh', { hello: '你好' })
     svc.register('ns', 'JA', { hello: 'こんにちは' })
-    const dispose = svc.addLanguage({ id: 'ja', label: '日本語', fallback: 'EN' })
-    expect(svc.getLocale().locales).toContainEqual({ id: 'ja', label: '日本語', fallback: 'en' })
+    const dispose = svc.addLanguage({ id: 'ja', label: '日本語', fallback: 'ZH' })
+    expect(svc.getLocale().locales).toContainEqual({ id: 'ja', label: '日本語', fallback: 'zh' })
 
     svc.setLocale('JA')
     expect(svc.getLocale().active).toBe('ja')
@@ -197,8 +189,8 @@ describe('LocaleRuntime', () => {
 
     dispose()
     expect(svc.getLocale().active).toBe('zh')
-    expect(svc.getLocale().locales.map(locale => locale.id)).toEqual(['zh', 'en'])
-    expect(svc.bind('ns')('hello')).toBe('Hello')
+    expect(svc.getLocale().locales.map(locale => locale.id)).toEqual(['zh'])
+    expect(svc.bind('ns')('hello')).toBe('你好')
     const revision = svc.getLocale().revision
     dispose()
     expect(svc.getLocale().revision).toBe(revision)
@@ -207,10 +199,10 @@ describe('LocaleRuntime', () => {
 
   it('uses fallback copy until a language dictionary registers later', () => {
     const { svc } = make()
-    svc.register('ns', 'en', { hello: 'Hello' })
-    svc.addLanguage({ id: 'ja', label: '日本語', fallback: 'en' })
+    svc.register('ns', 'zh', { hello: '你好' })
+    svc.addLanguage({ id: 'ja', label: '日本語', fallback: 'zh' })
     svc.setLocale('ja')
-    expect(svc.bind('ns')('hello')).toBe('Hello')
+    expect(svc.bind('ns')('hello')).toBe('你好')
 
     const revision = svc.getLocale().revision
     svc.register('ns', 'ja', { hello: 'こんにちは' })
@@ -220,7 +212,7 @@ describe('LocaleRuntime', () => {
 
   it('rejects duplicate and malformed locale definitions', () => {
     const { svc } = make()
-    expect(() => svc.addLanguage({ id: 'EN', label: 'Other English', fallback: 'en' }))
+    expect(() => svc.addLanguage({ id: 'ZH', label: 'Other Chinese', fallback: 'zh' }))
       .toThrow('already registered')
     expect(() => svc.addLanguage({ id: 'bad locale', label: 'Bad', fallback: 'en' }))
       .toThrow('not a BCP 47-style tag')
@@ -245,35 +237,35 @@ describe('LocaleRuntime', () => {
 
   it('walks each language fallback recursively for every dictionary key', () => {
     const { svc } = make()
-    svc.register('ns', 'en', { base: 'English', shared: 'English shared' })
+    svc.register('ns', 'zh', { base: '中文', shared: '中文共享' })
     svc.register('ns', 'fr', { shared: 'Français' })
     svc.register('ns', 'fr-CA', { local: 'Québec' })
-    svc.register('common', 'en', { commonBase: 'Common English' })
+    svc.register('common', 'zh', { commonBase: '公共中文' })
     svc.register('common', 'fr', { commonShared: 'Common French' })
-    svc.addLanguage({ id: 'fr', label: 'Français', fallback: 'en' })
+    svc.addLanguage({ id: 'fr', label: 'Français', fallback: 'zh' })
     svc.addLanguage({ id: 'fr-CA', label: 'Français (Canada)', fallback: 'fr' })
     svc.setLocale('fr-CA')
     const t = svc.bind('ns')
     expect(t('local')).toBe('Québec')
     expect(t('shared')).toBe('Français')
-    expect(t('base')).toBe('English')
+    expect(t('base')).toBe('中文')
     expect(t('commonShared')).toBe('Common French')
-    expect(t('commonBase')).toBe('Common English')
+    expect(t('commonBase')).toBe('公共中文')
   })
 
   it('rejects a fallback cycle exposed by re-registering an unloaded language', () => {
     const { svc } = make()
-    svc.register('ns', 'en', { base: 'English' })
-    const removeFr = svc.addLanguage({ id: 'fr', label: 'Français', fallback: 'en' })
+    svc.register('ns', 'zh', { base: '中文' })
+    const removeFr = svc.addLanguage({ id: 'fr', label: 'Français', fallback: 'zh' })
     svc.addLanguage({ id: 'fr-CA', label: 'Français (Canada)', fallback: 'fr' })
     svc.setLocale('fr-CA')
     removeFr()
-    expect(svc.bind('ns')('base')).toBe('English')
+    expect(svc.bind('ns')('base')).toBe('中文')
     expect(() => svc.addLanguage({ id: 'de', label: 'Deutsch', fallback: 'fr-CA' }))
       .toThrow('locale fallback "fr" is not registered')
     expect(() => svc.addLanguage({ id: 'fr', label: 'Français', fallback: 'fr-CA' }))
       .toThrow('fallback cycle')
-    expect(svc.getLocale().locales.map(locale => locale.id)).toEqual(['zh', 'en', 'fr-CA'])
+    expect(svc.getLocale().locales.map(locale => locale.id)).toEqual(['zh', 'fr-CA'])
   })
 
   it('adopts a saved external locale when its definition registers later', () => {
@@ -282,7 +274,7 @@ describe('LocaleRuntime', () => {
     host.publish({ status: 'ready', value: { preference: 'ja' }, revision: 1, writable: true })
     expect(svc.getLocale().active).toBe('zh')
 
-    svc.addLanguage({ id: 'ja', label: '日本語', fallback: 'en' })
+    svc.addLanguage({ id: 'ja', label: '日本語', fallback: 'zh' })
     expect(svc.getLocale().active).toBe('ja')
     expect(events.map(snapshot => snapshot.active)).toEqual(['ja'])
     expect(host.set).not.toHaveBeenCalled()
@@ -291,58 +283,60 @@ describe('LocaleRuntime', () => {
   it('adopts a Host preference over the browser language without writing it back', () => {
     const host = stubSettingsScope<LocaleSettings>()
     const { svc, events } = make(host)
-    host.publish({ status: 'ready', value: { preference: 'en' }, revision: 1, writable: true })
-    expect(svc.getLocale().active).toBe('en')
+    svc.addLanguage({ id: 'ja', label: '日本語', fallback: 'zh' })
+    host.publish({ status: 'ready', value: { preference: 'ja' }, revision: 1, writable: true })
+    expect(svc.getLocale().active).toBe('ja')
     expect(events).toHaveLength(1)
     expect(host.set).not.toHaveBeenCalled()
-    host.publish({ value: { preference: 'en' }, revision: 2 })
+    host.publish({ value: { preference: 'ja' }, revision: 2 })
     expect(events).toHaveLength(1)
   })
 
   it('an absent Host preference returns to the browser-derived locale', () => {
     const host = stubSettingsScope<LocaleSettings>()
     const { svc } = make(host)
-    host.publish({ status: 'ready', value: { preference: 'en' }, revision: 1, writable: true })
-    expect(svc.getLocale().active).toBe('en')
+    svc.addLanguage({ id: 'ja', label: '日本語', fallback: 'zh' })
+    host.publish({ status: 'ready', value: { preference: 'ja' }, revision: 1, writable: true })
+    expect(svc.getLocale().active).toBe('ja')
     host.publish({ value: {}, revision: 2 })
     expect(svc.getLocale().active).toBe('zh')
   })
 
   it('adopts a section already standing at construction and releases its subscription on dispose', async () => {
     const host = stubSettingsScope<LocaleSettings>()
-    host.publish({ status: 'ready', value: { preference: 'en' }, revision: 1, writable: true })
+    host.publish({ status: 'ready', value: { preference: 'zh' }, revision: 1, writable: true })
     const { ctx, svc } = make(host)
-    expect(svc.getLocale().active).toBe('en')
+    expect(svc.getLocale().active).toBe('zh')
     expect(host.listenerCount()).toBe(1)
     await ctx.fiber.dispose()
     expect(host.listenerCount()).toBe(0)
   })
 
-  it('opens provisionally in the browser language, matching regional variants on their primary subtag', () => {
+  it('opens provisionally in Chinese regardless of browser language, matching regional variants', () => {
     stubLanguages('en-GB', 'zh-CN')
-    expect(make().svc.getLocale().active).toBe('en')
+    expect(make().svc.getLocale().active).toBe('zh')
     stubLanguages('zh-Hant-TW')
     expect(make().svc.getLocale().active).toBe('zh')
-    // An unshipped language walks the list to the first one this app ships.
+    // An unshipped language walks the list to the only one this app ships.
     stubLanguages('fr-FR', 'en-US')
-    expect(make().svc.getLocale().active).toBe('en')
+    expect(make().svc.getLocale().active).toBe('zh')
     // Only `language` populated: an empty ordered list, and a host that
     // exposes no `languages` property at all.
     vi.stubGlobal('navigator', { languages: [], language: 'en-US' })
-    expect(make().svc.getLocale().active).toBe('en')
+    expect(make().svc.getLocale().active).toBe('zh')
     vi.stubGlobal('navigator', { language: 'en-US' })
-    expect(make().svc.getLocale().active).toBe('en')
-    // No shipped language anywhere in the browser's preferences: en is the
+    expect(make().svc.getLocale().active).toBe('zh')
+    // No shipped language anywhere in the browser's preferences: zh is the
     // product default rather than an arbitrary near-match.
     stubLanguages('fr-FR', 'de')
-    expect(make().svc.getLocale().active).toBe('en')
+    expect(make().svc.getLocale().active).toBe('zh')
   })
 
   it('re-evaluates browser languages as external definitions register and unload', () => {
     stubLanguages('pt-BR', 'zh-CN')
     const { svc } = make()
     expect(svc.getLocale().active).toBe('zh')
-    const dispose = svc.addLanguage({ id: 'pt-BR', label: 'Português (Brasil)', fallback: 'en' })
+    const dispose = svc.addLanguage({ id: 'pt-BR', label: 'Português (Brasil)', fallback: 'zh' })
     expect(svc.getLocale().active).toBe('pt-BR')
     dispose()
     expect(svc.getLocale().active).toBe('zh')
@@ -354,8 +348,6 @@ describe('LocaleRuntime', () => {
     // reach the resolution at all.
     stubLanguages('zh-CN')
     const { svc } = make()
-    expect(svc.getLocale().active).toBe('en')
-    svc.setLocale('zh')
     expect(svc.getLocale().active).toBe('zh')
   })
 
@@ -366,33 +358,24 @@ describe('LocaleRuntime', () => {
     expect(svc.getLocale().active).toBe('zh')
   })
 
-  it('serves English as both the opening locale and the dictionary fallback', () => {
+  it('serves Chinese as both the opening locale and the dictionary fallback', () => {
     // One constant covers both jobs: the locale the UI opens in with no usable
     // browser signal, and the dictionary backing a key the active locale
-    // misses. Safe to share only because the shipped zh/en dictionaries carry
-    // identical key sets (asserted below on a registered pair).
-    expect(FALLBACK_LOCALE).toBe('en')
+    // misses. With one shipped locale the two are the same language.
+    expect(FALLBACK_LOCALE).toBe('zh')
     vi.stubGlobal('window', undefined)
     const { svc } = make()
-    // A key present only in en resolves for a zh reader through the fallback.
-    svc.register('ns', 'zh', {})
-    svc.register('ns', 'en', { onlyEn: 'English only' })
-    svc.setLocale('zh')
+    svc.register('ns', 'zh', { onlyZh: '仅中文' })
     expect(svc.getLocale().active).toBe('zh')
-    expect(svc.bind('ns')('onlyEn')).toBe('English only')
-    // The reverse no longer resolves: a zh-only key is unreachable from en, so
-    // the key itself surfaces (fail loud) rather than silently rendering zh.
-    svc.register('ns2', 'zh', { onlyZh: '仅中文' })
-    svc.register('ns2', 'en', {})
-    svc.setLocale('en')
-    expect(svc.bind('ns2')('onlyZh')).toBe('onlyZh')
+    expect(svc.bind('ns')('onlyZh')).toBe('仅中文')
+    // A key absent from every dictionary surfaces the key itself (fail loud).
+    expect(svc.bind('ns')('missing')).toBe('missing')
   })
 
-  it('starts with exactly the two shipped locales and their fallback relation', () => {
+  it('starts with exactly the single shipped locale', () => {
     const { svc } = make()
     expect(svc.getLocale().locales).toEqual([
-      { id: 'zh', label: '中文', fallback: 'en' },
-      { id: 'en', label: 'English' },
+      { id: 'zh', label: '中文' },
     ])
   })
 })

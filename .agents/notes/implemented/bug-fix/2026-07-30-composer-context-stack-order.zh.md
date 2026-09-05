@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-composer-context-stack-order.md) | 中文
-
 ## 问题
 
 Goal、Todo 与 Queue 独立注册到同一个 `conversation.input.dock` 列表，但各自的注册顺序与间距规则没有编码组合矩阵。因此，渲染器将 Todo 放在 Queue 和 Goal 之前，而 Queue 与 Goal 都带有用于 composer 边界的负外边距。三者同时出现时，Queue 与 Goal 相接，Goal 与 composer 相接，颠倒了设计层级。

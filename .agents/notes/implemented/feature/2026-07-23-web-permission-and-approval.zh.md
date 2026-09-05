@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-23-web-permission-and-approval.md) | 中文
-
 ## 问题
 
 Web 承载层启动的是一个不受限的 agent（智能体）：`bootHost` 组合了 `dsh-bash-local` 与 `dsh-fs-local`，因此每个 Web 会话都以完整文件访问权限运行，既无审批通道，也无权限管控——而 ACP 组合早在数月前就已交付完整的沙箱化产品路径（沙箱提供方 + 策略归属 + 受限的 shell/fs + 审批 + 预设）。Web 协议约定其实早已预留了对应位置——`approval/requested`/`approval/resolved` 的 mux 帧、携带 `ApprovalResponsePayload` 的 `POST /api/respond`、client 侧的 `pendingBuffers`——但 host 的 `respond` 只是一个 stub，没有应答者把 `ctx.approval` 桥接到流上，没有 RPC 暴露权限选择，PendingCard 把审批渲染成可见却无法应答的样子。

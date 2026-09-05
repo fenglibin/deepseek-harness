@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-07-tool-call-timeout-policy.md) | 中文
-
 ## 问题
 
 [超时/截止时间 Agent Note](2026-07-06-timeout-deadline-library.zh.md) 将计时与分类原语提取到了 `@deepseek-ai/dsh-timeout`，但超时策略仍然附着在各个能力和面向模型的 schema 上。`bash` 暴露了 `timeoutMs`；`web_fetch` 暴露了 `timeout_ms`；`web_search` 没有面向模型的超时参数，尽管提供方已经遵循 `exec.signal`；未来的 grep/glob 工具要么直接导入超时库，要么自行发明超时策略。对于一个插件 SDK 来说，这是错误的编写范式：工具作者通常只需将 `exec.signal` 转发给其调用的实现，而部署策略来决定预算。

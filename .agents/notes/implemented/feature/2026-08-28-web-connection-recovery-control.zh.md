@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-28-web-connection-recovery-control.md) | 中文
-
 ## Problem
 
 Web Client 会在故障后自动重建 Remote event generation 与物理 WebSocket，但页面既不显示断联，也不提供用户恢复操作。logical generation 与 physical socket 的重试循环还可能错位：`retry #N` 消息可能描述另一个 logical generation，而浏览器仍在等待同一个物理连接候选。Host 每 30 秒才发送一次空闲 WebSocket Ping，用户在恢复 Host 或网络后也无法主动要求一次全新尝试。

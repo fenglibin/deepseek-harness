@@ -9,7 +9,7 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { EnterBehaviorRow } from '../src/client/settings/EnterBehaviorRow.tsx'
 import type { EnterBehaviorRowProps } from '../src/client/settings/EnterBehaviorRow.tsx'
 import { ComposerSubmissionPolicy } from '../src/client/input/submission-policy.ts'
-import { en } from '../src/client/locales.ts'
+import { zh } from '../src/client/locales.ts'
 
 afterEach(() => {
   cleanup()
@@ -41,7 +41,7 @@ function mount() {
     useWorkspaces: emptyWorkspaces(),
     useBusyEnter: bindSnapshotSelector(policy.busyEnter),
     setBusyEnter,
-    t: makeTranslate(en),
+    t: makeTranslate(zh),
   }
   render(<EnterBehaviorRow {...props} />)
   return { policy, setBusyEnter }

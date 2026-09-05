@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-19-experimental-package-name-prefix.md) | 中文
-
 ## 问题
 
 目录归属、私有 manifest 与发布系列过滤可以阻止实验性包进入发布，但 npm specifier 或 Cordis 配置项无法体现该状态。外观稳定的包名可能被复制到其他组合中，而读者看不出其完整公开约定仍处于实验阶段。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-21-deepseek-llm-api-request-extensions.md) | 中文
-
 ## 问题
 
 权威会话日志包含请求边界、原始响应分片、组装后消息、工具活动、插件事件与失败事实，模型消息列表无法保留全部内容。OTel 会话遥测路径独立于模型请求投影和批处理该日志，使用部署方选择的共享模式，并刻意丢弃大多数 assistant 分片。因此，DeepSeek 官方 API 无法从普通请求消息或遥测流重建完整 harness 轨迹。

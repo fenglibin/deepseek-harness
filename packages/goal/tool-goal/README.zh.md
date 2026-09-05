@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-goal
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-tool-goal` 为模型提供基于持久 goal 服务的三个工具：`get_goal` 读取当前 goal，`create_goal` 创建新 goal，`update_goal` 编辑、暂停、恢复、完成或阻塞它。模型可以从人类直接请求中推断长期目标并创建 goal；更新必须携带先前读取到的精确 id 与 revision。权限在执行时强制：create、edit、pause 和 resume 要求顶层 agent 的当前轮次中存在人类直接消息；complete 和 blocked 在自动续行期间还接受当前 Goal Round。可配置的阈值（默认 3）约束自主 Round 多快可以自行报告 `blocked`。当模型需要自行管理 goal 时，与 `dsh-goal` 一起挂载它。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-npm-release-sequences.md) | 中文
-
 ## 问题
 
 这个仓库有三组互不相干的可发布包，却没有任何发布通道把它们送上 registry。

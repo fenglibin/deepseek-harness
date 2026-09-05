@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-25-subagent-policy-inheritance.md) | 中文
-
 ## 问题
 
 沙箱与审批覆盖项都是按会话的日志折叠。进程内 subagent 会获得一个新会话，因此 spawn 子 agent（智能体）过去会回退到部署默认值，fork 子 agent 则只能看到其已完成轮次前缀中的切换。因此，委派可能放宽已经切换到 `read-only` 的父级。

@@ -5,8 +5,6 @@ kind: "package-group"
 
 # packages/preset
 
-[English](README.md) | 中文
-
 ## 概述
 
 preset 组提供按会话的 agent（智能体）组装：agent preset 是一个目录，内含一份 `agent.cordis.yml`；从 preset 组装的会话会运行该 preset 的工具、提示词段落与 skill（技能），而其他会话各自保持自己的。`agent-presets` 拥有名单——对已配置根目录与 harness home 的发现、受防护的按 agent 挂载，以及只复制的创作方式——`persona` 则提供可组装的行，让 preset 不止能改变 agent 的工具、也能改变它的身份。两者合起来让一个进程可以同时运行多个组装方式不同的 agent。

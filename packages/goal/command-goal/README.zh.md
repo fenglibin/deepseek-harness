@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-command-goal
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-command-goal` 为用户提供基于持久 goal 服务的 `/goal` 命令：用户可以直接在 UI 中创建、编辑、暂停、恢复、清除并查看当前 goal，无需模型参与。命令在其 Cordis scope 中注册，因此读取该 scope 的命令适配器能发现并执行它；命令文本与输出都留在 UI 中——绝不进入模型请求。每项被接受的变更都会通过 goal 服务的持久 `goal/change` 事件落盘。图片附件可以随 create 或 edit 一起提交，并以一条普通用户消息发出，供后续 Goal Round 读取。为挂载了命令适配器的交互式部署选择它；没有适配器的无头与自动化应用不需要它。

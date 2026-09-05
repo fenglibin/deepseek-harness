@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-20-core-data-structures-catalog.md) | 中文
-
 ## 问题
 
 试图理解 harness 的读者可以在 [architecture.md](../../../../docs/architecture.zh.md) 中找到它的*行为*（服务图、会话/轮次/步骤生命周期、事件分类体系），却找不到一个统一描述其*词汇*的地方，也就是这些行为所传递的数据结构。类型定义只存在于源码中，散落在 `packages/*/src/types.ts` 各处，因此要理解「什么是 `Message`、`SessionEvent`、`StreamChunk`」，就必须直接阅读声明。文字目录会有所帮助，但复述或复制粘贴类型定义的目录会在字段发生变化时立即腐化，而不同步的类型文档比没有文档更糟，因为读者会信任它。

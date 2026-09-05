@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-28-remove-synthetic-log-only-turns.md) | 中文
-
 ## 问题
 
 会话存储曾暴露 `appendOutOfBand()`，让插件可以在没有 agent（智能体）轮次运行时发布延迟到达的纯日志事件。该方法会用 `turn/start` 和 `turn/end` 包住事件，再将其刷写。这保留了「每个持久事件都必须位于轮次内」的旧规则，却让同一个标识符既表示模型循环执行，又表示仅持久化更新。

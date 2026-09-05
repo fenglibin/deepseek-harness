@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-17-filesystem-tool-schemas.md) | 中文
-
 ## 问题
 
 [文件系统能力 seam Agent Note](../architecture/2026-06-17-filesystem-capability-seam.zh.md) 定义了文件系统能力 seam（`ctx.fs`）、包拆分（`dsh-fs`、`dsh-fs-local`、`dsh-tool-fs`，加上 `dsh-fs-observation-policy` 策略插件），以及针对 read-before-write/edit 检查的已观测文件／陈旧版本策略——[拆分文件系统 seam](../simplification/2026-06-26-fsspec-style-fs-seam.zh.md)和[事件门](../architecture/2026-06-26-file-context-as-event-gate.zh.md) Agent Note 后来将其从 `ctx.fs` 移至 `dsh-fs-observation-policy` 插件的 `fs/*` 事件门上。首次文件系统工具交付剩余的决策是面向模型的 schema：模型在 `read`、`write` 和 `edit` 中看到哪些参数。

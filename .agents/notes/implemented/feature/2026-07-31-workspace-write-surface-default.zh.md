@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-workspace-write-surface-default.md) | 中文
-
 ## 问题
 
 已交付的终端和浏览器界面在两套不同的无约束组合下暴露相同的编码工具。Web 挂载了沙箱与权限服务，却选择 `danger-full-access`；TUI 则直接挂载不受限的本地 bash 与文件系统提供方。因此，在用户主动选择这类权限之前，全新的编码会话就能修改其同 UID 进程可达的任意路径。

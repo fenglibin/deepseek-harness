@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-18-pi-ai-wire-compat-surface.md) | 中文
-
 ## Problem
 
 pi-ai 依据提供方 id 与 baseURL 决定每个请求的形状——系统提示词由哪个角色承载、输出上限写在哪个字段、是否发出 `store` 与 `stream_options`、工具定义是否携带 `strict`。对于其检测无法识别的端点，答案是「这就是 OpenAI 本身」：`detectCompat` 返回 `supportsDeveloperRole: true`、`maxTokensField: "max_completion_tokens"`、`supportsStore: true`。而手工声明的路由按其构造就是 pi-ai 未随附的端点，于是每一条这样的路由都收到了 OpenAI 自己的请求形状。

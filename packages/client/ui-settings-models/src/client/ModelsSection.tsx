@@ -30,7 +30,7 @@ import type { ModelsOperations } from './operations.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
 import { providerCopy } from './provider-identity.ts'
 import type { ProviderIdentity } from './provider-identity.ts'
-import type { en } from './locales.ts'
+import type { zh } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
 /** Injected dependencies of {@link ModelsSection} (slot `inject`). */
@@ -50,7 +50,7 @@ export interface ModelsSectionInjected {
   /** Settings schema and immutable path callbacks. */
   schema: SettingsSchemaOperations
   /** Section copy. */
-  t: (key: keyof typeof en) => string
+  t: (key: keyof typeof zh) => string
 }
 
 /** The child slots this section declares and dispatches (see ./slot-contract.ts). */

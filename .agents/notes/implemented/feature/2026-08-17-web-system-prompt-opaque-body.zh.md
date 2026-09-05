@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-17-web-system-prompt-opaque-body.md) | 中文
-
 ## Problem
 
 Chat 的 `系统提示词` 行和上下文注入共用 `DisclosureRow` 外壳，其展开内容区需要呈现请求的 system 字段。如果把该字段渲染成 Markdown——标题、强调、列表——读者看到的将是模型从未收到的排版文档。上下文注入已经用 141px 代码块滚动区和保留模型所见字节与换行的 `<pre>` 文本解决了同一件事，因此该行需要复用这一呈现，而不是再造一套。

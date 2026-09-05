@@ -5,8 +5,6 @@ kind: "package-group"
 
 # packages/experimental
 
-[English](README.md) | 中文
-
 ## 概述
 
 实验组包含不属于任何正式发布的原型能力：它们运行在真实 harness 上，但约定可能变更，也不提供支持承诺。本组包含 Agent Teams、跨 realm Inspector，以及预览部署使用的浏览器 worker 运行时与镜像打包器。用这些包来尝试未发布的能力；它们没有稳定性承诺，已发布产品不得依赖它们。

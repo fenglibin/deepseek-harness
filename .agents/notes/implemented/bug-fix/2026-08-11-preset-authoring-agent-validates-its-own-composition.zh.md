@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-preset-authoring-agent-validates-its-own-composition.md) | 中文
-
 ## 问题
 
 `cordis` preset 随包发布 `editing-cordis-compositions`，它是 agent 创作 preset 时唯一的指导来源。其中四条陈述与事实不符，而分量最重的两条恰好指向该 skill 自称「最容易让人栽跟头的规则」。

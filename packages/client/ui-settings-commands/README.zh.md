@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-settings-commands
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-client-ui-settings-commands` 提供「提示词命令」设置页。它编辑 `prompt-commands` 设置命名空间——即 `@deepseek-ai/dsh-command-prompt-config` 注册的可复用 `/name` 提示词快捷方式列表。列表通过分步编辑器支持新增与编辑，删除则经过页内风险确认，使每次改动都显式且可追溯。

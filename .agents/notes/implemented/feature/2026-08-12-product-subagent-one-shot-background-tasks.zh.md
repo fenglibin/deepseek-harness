@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-12-product-subagent-one-shot-background-tasks.md) | 中文
-
 ## 问题
 
 Codex 与 Claude Code 提供方已经能够运行一项自包含任务并返回一个最终回答，而 `dsh-tool-subagent` 也已经能够把任意 one-shot 提供方接入通用后台 Job 运行时。随附产品工具行禁用了这条路径，因此即使委托与 agent 的下一步操作彼此独立，agent 也只能等待产品回答。

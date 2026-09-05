@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-lightweight-model
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-lightweight-model` 持有一个可选的 provider/model 路由，供辅助模型调用使用，而不是复用会话自己的模型。会话标题与压缩摘要——LLM 接缝中用 `GenerateOptions.purpose` 标记的两类调用——会先查询 `ctx.lightweightModel`，再回落到主请求使用的路由，因此当会话所用模型无法胜任一个很短的辅助请求时，标题仍然能生成。该路由默认为空；用户在「设置」→「模型」中挑选后，已挂载的设置提供方会把这个选择叠加到组合配置项之上。当辅助调用应该运行在比会话更便宜或更快的模型上时，请选择本包。

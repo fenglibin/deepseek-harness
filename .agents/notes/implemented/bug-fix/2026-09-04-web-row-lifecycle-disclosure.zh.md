@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-04-web-row-lifecycle-disclosure.md) | 中文
-
 ## Problem
 
 工具行本应在调用运行期间展开、在结算的瞬间折叠。只有一个组件实现了这一点：`packages/client/ui-tool` 里的 `ToolRow` 通过 `state === 'running'` 打开，并用 `useRef` + `useEffect` 的迁移守卫来折叠。`packages/client/ui-chat` 里的 `ReasoningRow` 手抄了一份副本。其他所有展示工具或命令结果的行都只持有一个裸的 `useState(false)`，既不在运行时展开，也不在结算时折叠。

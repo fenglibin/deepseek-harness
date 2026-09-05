@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-20-explicit-web-index-paths.md) | 中文
-
 ## 问题
 
 无条件 SPA 回退会让每个未匹配的 GET 或 HEAD 请求看起来都成功。失效的普通链接，以及缺失的 JavaScript、样式表、source map 或 manifest，都会收到状态码为 200 的 HTML 外壳，导致浏览器、缓存与监控无法区分有效页面入口和缺失资源。

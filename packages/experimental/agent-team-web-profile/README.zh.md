@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-agent-team-web-profile
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-experimental-agent-team-web-profile` 是 [Agent Teams](../agent-team/README.zh.md) 的私有 Web 层。把它放在 `@deepseek-ai/dsh-web-app` 与 [`@deepseek-ai/dsh-experimental-agent-team-profile`](../agent-team-profile/README.zh.md) 之后，即可在浏览器中显示 Team roster、任务板与 teammate 导航。移除任一实验层都会让稳定的 base 与 Web composition 保持不变。正式发布会排除本包，因此只能从源码 checkout 使用。

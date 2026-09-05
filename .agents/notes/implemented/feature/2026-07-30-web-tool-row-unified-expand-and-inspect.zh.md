@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-web-tool-row-unified-expand-and-inspect.md) | 中文
-
 ## 问题
 
 聊天视图的工具行交互已经分裂成多种方言：ToolRow 通过前导图标切换展开、且仅限有 args body 的调用，bash 示例有自己的一套展开方式，todo / ask-question 行只能展开原始 args，单文件工具完全不可展开，而调用的 OUTPUT 只能通过详情面板查看。失败的 bash 命令（exit≠0 但结算为 `isError:false`）在折叠行上没有任何失败信号。此外聊天行没有跳转到 trajectory 记录的入口，且 chat → trajectory → chat 切换会丢失阅读位置（标签环会卸载非活跃视图）。

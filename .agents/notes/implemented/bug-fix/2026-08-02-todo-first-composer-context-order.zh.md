@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-02-todo-first-composer-context-order.md) | 中文
-
 ## 问题
 
 composer 上下文堆栈将 Goal 渲染在 Todo 之前，但 Harness 设计稿把当前任务计划排在进行中的目标和待处理 Queue 之前。Todo 还把 Queue 包装层的 776px 宽度用作自身的可见卡片宽度，而 Goal 和 Queue 面板则渲染在共享的 752px 卡片列上。结果既颠倒了预期的信息层级，也让 Todo 比相邻两个面板更宽。

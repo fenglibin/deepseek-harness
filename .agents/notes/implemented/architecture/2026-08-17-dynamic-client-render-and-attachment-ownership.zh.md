@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-17-dynamic-client-render-and-attachment-ownership.md) | 中文
-
 ## 问题
 
 宿主编写的客户端图管理浏览器插件，但三条呈现路径位于其生命周期之外。Web 内核创建 React 根和由外壳持有的组装伪 entry，`ui-conversation` 以包值形式导入附件组件，外壳还导入 ui-theme 的全局样式。因此，禁用、失败或重载某个插件时，并不能同时管理属于该插件的全部渲染与 CSS。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-user-message-drawer-pages-for-a-prompt.md) | 中文
-
 ## Problem
 
 `UserTurnPanel` 只列出窗口内携带 `user` 节点的已加载轮次，一条都没有时返回 `null`。历史分页的切分点位于倒数第 50 条 append-surface 消息的 group start，而这个 group start 是 Assistant 消息自身的 source 区间，并非轮次边界，因此当一个会话的最新轮次很长时，打开的窗口内只有 Assistant 产出、没有用户提示词。抽屉会一直隐藏，直到读者手动向前翻页到足以让一条用户消息进入窗口。

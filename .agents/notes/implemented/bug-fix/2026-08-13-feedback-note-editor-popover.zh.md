@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-13-feedback-note-editor-popover.md) | 中文
-
 ## Problem
 
 消息反馈的 Web 界面（[#2262](https://github.com/deepseek-harness/deepseek-harness/pull/2262)）把控件贡献给 `conversation.chat.assistant-actions`，该槽位渲染在已定稿助手消息共享的 IconActions 行内。那一行是单条固定高度的 `flex` 线，`flex-wrap` 保持初始值 `nowrap` 且 `height: 28px`，按 28px 图标加一个时钟来定尺寸。备注编辑器作为一个内联组挂进去，内含 `width: 260px` 的 textarea 加 Save 与 Cancel。

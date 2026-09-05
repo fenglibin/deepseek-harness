@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-08-04-artifact-first-npm-baseline-publication.md) | 中文
-
 ## 问题
 
 monorepo 中可运行的源码并不能证明发布后的包可运行。workspace link、TypeScript paths、tsx 源码加载和工作树里残留的 `lib/` 都可能补上发布 tarball 中缺失的文件或依赖。即使现有构建产物测试使用普通 Node，它仍直接读取工作树中的 `lib/`，没有验证 `package.json#files` 最终选中了什么，也没有验证包管理器安装后的文件布局。一次开发模式正常的执行因此可能发布为缺少 bundle chunk、声明文件、配置或资源的包。

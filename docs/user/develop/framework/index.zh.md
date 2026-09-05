@@ -1,7 +1,5 @@
 # 插件与生命周期
 
-[English](index.md) | 中文
-
 本页介绍 Cordis 插件模型和生命周期状态机。
 
 ## Fiber 状态机

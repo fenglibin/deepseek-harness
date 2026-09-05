@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-26-pi-ai-grant-payload-json-image.md) | 中文
-
 ## Problem
 
 一次面向 github.com 的 GitHub Copilot 登录在提交环节失败：`credentials-local: record "llm-pi-ai/github-copilot" payload holds a value JSON cannot represent`。pi-ai 的 Copilot 凭据以显式 `undefined` 携带可选成员（未填 Enterprise 域名时为 `enterpriseUrl: undefined`——这是 `JSON.stringify` 会直接丢弃的 JavaScript 惯用写法），而 `llm-pi-ai` 的存储桥接把凭据对象原样作为 grant payload 提交。凭据存储的校验器正当地拒绝 `undefined` 为不可表示，于是所有流程留有未填可选成员的 grant 都无法落盘，提供方已经完成授权之后登录却报失败。

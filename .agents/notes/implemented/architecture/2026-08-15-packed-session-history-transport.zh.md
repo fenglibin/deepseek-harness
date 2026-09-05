@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-15-packed-session-history-transport.md) | 中文
-
 ## 问题
 
 `session.page` 与 `session.follow` opening snapshot 会向远程 Client 提供一段有界的逻辑 Session event 区间。提供方流可能在一个未完成尾部中产生数十万个 token 大小的 `assistant/chunk` 事件。先展开每条持久化行，再序列化每个逻辑事件，会在协议中重复相同 envelope。在 Client 边界展开 packed response 还会重新创建同样数量的 event object、journal entry、Location index、Definition match 和 State update，拖慢 conversation replay。

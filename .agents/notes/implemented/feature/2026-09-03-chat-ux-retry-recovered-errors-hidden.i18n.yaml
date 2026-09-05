@@ -1,6 +1,0 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-03-chat-ux-retry-recovered-errors-hidden.md
-2026-09-03-chat-ux-retry-recovered-errors-hidden.md: 74e55c533d0738087cd724ea471ab9f3f8830497
-2026-09-03-chat-ux-retry-recovered-errors-hidden.zh.md: d8a8fad056e68f85109e7ffd0c52bd6c2fc36340

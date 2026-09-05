@@ -1,7 +1,5 @@
 # Cookbook: 新增设置卡片
 
-[English](adding-a-settings-card.md) | 中文
-
 插件如何把自己的配置放上 Web 设置页。这条路径上没有任何一步需要改动本仓库：Host 服务每一个已注册的 settings 命名空间，而**插件配置**分区以卡片所编辑的命名空间为键，因此同时注册了两个半侧的插件会被自动配对。
 
 两个半侧住在同一个包里——Host 半侧在 `src/`，浏览器半侧在 `src/client/`，以 `./client` 导出并用 `dsh.client` 声明。[`packages/client/ui-theme`](../../packages/client/ui-theme) 是这种打包方式的现成例子；本分区自带的卡片在 [`packages/client/ui-settings-plugins`](../../packages/client/ui-settings-plugins)。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-20-unwrap-injected-content-envelopes.md) | 中文
-
 ## 问题
 
 两类注入的会话内容在渲染进模型 transcript（文本记录）时被包在 XML 封套里：`steering/message` 包成 `<steering source="…">…</steering>`，`context/message` 包成 `<context source="…">…</context>`（后者有一个 `'raw'` 退出选项可跳过封套）。这些封套意在告诉模型「这是注入内容，不是用户在说话」。

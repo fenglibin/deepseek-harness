@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-26-fsspec-style-fs-seam.md) | 中文
-
 ## 问题
 
 [文件系统能力 seam](../architecture/2026-06-17-filesystem-capability-seam.zh.md)中的文件系统能力目前让一个抽象 `FileSystem` 服务同时负责两项不同工作：

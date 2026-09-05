@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-22-unified-send-and-coalesced-user-messages.md) | 中文
-
 ## 问题
 
 agent（智能体）的对外驱动接口逐渐长出三个近乎平行的动词——`send`、`steer`、`inject`——各自带有独立的选项类型、独立的实时事件叙事，以及独立的持久事件。`send` 和 `steer` 都会把一条冻结的 inbox 记录入队并发出 `agent/queued`；`inject` 则绕过 inbox，写入一条独立的 `context/message` 持久事件。这三个动词实际上只沿两条独立的轴变化：一个队列项加入哪个队列（一个全新的轮次，还是当前活跃的轮次），以及这个队列项是否让模型运行。把这个 2×2 编码成三个手写方法，掩盖了其中的对称性，让「排入一个轮次但不唤醒驱动器」无法表达，也让 `cancel()` 无从在保留排队工作的前提下中止一个轮次。

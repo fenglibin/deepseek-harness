@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-20-todo-event-ownership.md) | 中文
-
 ## 问题
 
 `SessionEventMap` 可通过声明合并扩展，使每个插件都能添加持久记录，而无需让核心会话包依赖所有事件生产方。`todo/write` 及其 `TodoItem` payload 由 todo 领域生产和解释；核心会话只提供通用的追加、回放、surface 与不变量扩展机制。在核心中声明 todo 专属类型或关系，会让会话主干拥有一个它既不生产、也无法完整校验的插件词汇。

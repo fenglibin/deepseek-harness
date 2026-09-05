@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-compaction
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-compaction` 让长时会话把较早历史压缩（compaction）成一条摘要消息、保持近期对话不变，并像摘要一直存在那样继续下去——配合 `dsh-compaction-basic` 之类的后端与可选的 `/compact` 命令即可实现。被压缩的内容仍保留在会话日志中，因此回放会话可以还原出完全相同的对话。当你实现压缩后端、构建触发压缩的组件，或需要识别压缩后的消息时，才需要本包——它本身不执行任何压缩。只想开箱即用地获得该功能时，请选择随附后端。

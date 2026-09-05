@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-mcp-manager
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-mcp-manager` 拥有一份用户管理的 MCP 服务器列表，并为每个已启用条目挂载一个 `dsh-mcp-client` 实例，在每次设置变更时协调存活实例集合。它是裸 mcp-client 插件面向用户的对应物：用户不需要为每个服务器手工编辑一行 `cordis.yml`，而是由配置界面读写单个 `mcp` settings 分节，manager 则挂载、丢弃或替换这些编辑所蕴含的桥接。它还通过 `mcp` Remote 命名空间报告每个服务器的实时连接状态、诊断文本与工具名，因此配置界面可以展示一次用户编辑究竟造成了什么。当 MCP 服务器属于运行时由用户管理的数据时加上它；默认什么都不启用，因此每个服务器都是一次显式选择。

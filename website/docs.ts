@@ -69,7 +69,9 @@ function localized<T>(value: T | Record<DocsLocale, T>, locale: DocsLocale): T {
 }
 
 function mirroredPages(pages: MirroredPage[]): DocsPage[] {
-  return pages.flatMap(page => (['root', 'en'] as const).map((locale) => {
+  // Documentation is Chinese-only: the English route tree and the English
+  // sources it projected were removed, so only the root locale is published.
+  return pages.flatMap(page => (['root'] as const).map((locale) => {
     const aliases = page.sourceAliases === undefined
       ? undefined
       : Array.isArray(page.sourceAliases) ? page.sourceAliases : page.sourceAliases[locale]
@@ -449,8 +451,7 @@ const reference = [
  */
 export const localeCollections = {
   root: ['zh-guide', 'zh-develop', 'zh-reference'],
-  en: ['en-guide', 'en-develop', 'en-reference'],
-} as const satisfies Record<DocsLocale, readonly DocsSidebar[]>
+} as const satisfies { root: readonly DocsSidebar[] }
 
 /** A sidebar group, matched to pages by `label`. */
 export interface DocsSection {

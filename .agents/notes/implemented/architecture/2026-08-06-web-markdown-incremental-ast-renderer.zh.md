@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-web-markdown-incremental-ast-renderer.md) | 中文
-
 ## Problem
 
 `MarkdownText` 在每次流式发布时都重新解析整个已累积的回复:react-markdown 的纯字符串 API 每次渲染都新建 unified processor,并对全文跑完 micromark → mdast → hast → React,因此每个 chunk 的主线程工作量随回复长度线性增长,整个流的累计成本随之二次增长。既有缓解手段(帧级合并、隔离的流式尾部、围栏 plain 臂)约束的是这份工作跑多频繁、波及多广,从未约束每次重新解析多少文本。修复它需要 AST 级输入——冻结已定型的块、只重新解析源文本尾部——这是纯字符串封装在结构上无法表达的。

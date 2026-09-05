@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-27-dispose-ladder-to-consumer.md) | 中文
-
 ## 问题
 
 `SubprocessHandle.dispose(graces)` 与 `SubprocessDisposeGraces` 把一整套拆卸*策略*——等待 stdin EOF、再 SIGTERM、再 SIGKILL，每一层由调用方提供的时间窗约束——放在了一个其余动词均为单一机制的 seam 上。它始终只有一个消费方（ACP（Agent Client Protocol）subagent 后端）；bash 走 `terminate()` 与服务拆卸，LSP 主机运行自己的协议优先关闭流程。然而每个未来后端都必须实现该阶梯才能满足接口，实现包也仅为阶梯的层级时限背上了 `dsh-timeout` 依赖。

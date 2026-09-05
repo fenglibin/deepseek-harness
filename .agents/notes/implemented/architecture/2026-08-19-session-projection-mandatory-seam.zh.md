@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-19-session-projection-mandatory-seam.md) | 中文
-
 ## 问题
 
 可选的投影注册表会让 host 行为读取投影状态的插件在缺少该状态时仍然激活。除非读取方拒绝缺失的注册表或 key，否则 host 行为或 subagent 目录字段可能静默消失。只有批量读取也会在消费方只需要一个 host 值时物化每个客户端 view。部分贡献位置有意保留可选的 `ctx.inject` 注册形式，因此其读取方需要明确的缺失状态规则。

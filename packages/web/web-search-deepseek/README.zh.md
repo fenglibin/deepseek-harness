@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-web-search-deepseek
 
-[English](README.md) | 中文
-
 ## 概述
 
 有了 `dsh-web-search-deepseek`，harness 可以通过 DeepSeek 原生搜索检索 web，使用部署已有的 `DEEPSEEK_API_KEY`。当部署希望使用 DeepSeek 原生搜索、并接受一次搜索在延迟与 token 上消耗一个完整模型轮次时选择它，因为 DeepSeek 不提供专用搜索端点。结果来自 DeepSeek 返回的结构化搜索块，绝不会从回复文本中抓取。凭据缺失时调用以结构化错误失败；响应缺少搜索结果块时会响亮地失败，而非降级。面向模型的 `web_search` 工具位于 `dsh-tool-web`。

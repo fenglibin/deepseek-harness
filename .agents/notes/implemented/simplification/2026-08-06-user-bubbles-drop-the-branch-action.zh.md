@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-user-bubbles-drop-the-branch-action.md) | 中文
-
 ## 问题
 
 每个 user 气泡和已消费的 steering（中途引导）气泡都渲染分支控件，受[已完成轮次尾部决策](../bug-fix/2026-08-02-message-fork-actions-require-completed-turn-tail.zh.md)的门禁约束。在这些气泡上，该门禁实际上是永久性的：开轮的 user 消息后面必然跟着本轮自己的节点，已消费的 steering 消息按构造就处在轮次中间，因此只有当轮次结束时该消息之后一个节点都没有——即在第一个模型事件之前就取消——控件才可能启用。读者因此看到一个永远不会启用的控件，tooltip 许诺的是这个按钮到达不了的状态。这个操作入口本身也有误导：在消息 seq 处 fork 会切在所在轮次的 `turn/end`，「在我的消息处分支」实际会把下方的回答一并带走，与在自己气泡上看到分支时「分叉重问」的直觉预期恰好相反。

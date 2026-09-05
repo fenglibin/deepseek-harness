@@ -40,7 +40,7 @@ const SEARCH_HINT = '[hint: code search through the fs_search tool is structured
   + 'prefer it over grep/find for locating code]'
 
 const REPO_TEST_HINT = '[hint: this runs the whole repository suite (measured ~143 s for 17,429 tests); '
-  + 'scope it to the affected packages — see docs/testing.md]'
+  + 'scope it to the affected packages — see docs/testing.zh.md]'
 
 /**
  * Drop one leading `cd <path> &&`, which is how a model wraps most commands

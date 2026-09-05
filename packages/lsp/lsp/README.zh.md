@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-lsp
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-lsp` 为 harness 提供语言服务器代码导航：agent 可以转到符号的定义、查找其引用、跳转到其实现或阅读悬停文档，代码导航服务（`ctx.lsp`）会把每个查询路由到拥有该文件扩展名的语言服务器提供方。提供方按品牌化 id 与文件扩展名注册，因此更换提供方绝不会改变请求导航的方式，也不会改变模型看到的内容。该服务恰好暴露四种只读操作，没有通用 JSON-RPC 逃生口；它自身不贡献提示词或工具 schema——面向模型的 `lsp` 工具位于 `dsh-tool-lsp`。与 `dsh-lsp-stdio` 之类的提供方及该工具组合，即可为 agent 提供精确导航；本包单独加载时什么也不做。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-27-typescript-sdk-and-sdk-subagent-backend.md) | 中文
-
 ## 问题
 
 stdio JSON-RPC 对外服务接口（`@deepseek-ai/dsh-sdk-jsonrpc-server`，见[单文件可执行 Agent Note](../architecture/2026-07-10-single-file-executable-sdk-runtime-distribution.zh.md)）当时只有一个客户端：Python SDK。想要同样「把 harness 作为子进程驱动」能力的 TypeScript 消费方——仓库测试、自动化，尤其是一个其子进程是*完整 harness 运行时*（而非通用 ACP agent（智能体））的 subagent 后端——没有可导入的内容：请求/通知载荷形状只以匿名对象字面量存在于服务器内部，传输类也躺在服务器插件包里。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-09-filesystem-absence-observation.md) | 中文
-
 ## 问题
 
 事件门控的文件系统策略最初只把成功读取和变更记录成目标版本。如果某个会话读取文件后，外部命令将其删除，第一次带防护的变更会正确地因陈旧而失败，但按指示执行的重新读取会在发出 `fs/observed` 前返回 `FS_NOT_FOUND`。因此，旧的存在版本会一直保留：写入仍不断选择 `replaceIfVersion`，提供方仍不断拒绝缺失目标，而面向模型的「re-read the file, then retry」指令则形成无法恢复的循环。

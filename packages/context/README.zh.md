@@ -5,8 +5,6 @@ kind: "package-group"
 
 # context/ — 请求上下文插件
 
-[English](README.md) | 中文
-
 ## 概述
 
 context 组提供不定义任何工具、为每次请求添加模型可见内容的插件：工作区指令文件成为指引，`@file` mention 提供路径补全，其他会话可以作为有界快照被引用，模型还能看到当前时间与 agent 的 tmux 位置，另有一个 row 规定模型写给人的内容所用语言。除 `agent-instructions`（随默认 `dsh-agent-spine-demo` 组合包发布并默认启用，可通过组合包配置禁用）与 `response-language`（随 `dsh-base` 发布并默认启用，可由 overlay 固定或关闭）外，其余全部需主动启用。上下文是持久的：注入的指令与引用以 user 角色消息进入会话历史，因此与其他对话内容一样持久、可回放、可压缩。`response-language` row 则不然——它贡献一个在每次装配时重建的系统提示词段落，从不进入历史。本页是组的映射；包级约定由各包 README 负责。

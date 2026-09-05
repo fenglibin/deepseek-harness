@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-vitest-jsdom-webstorage-ownership.md) | 中文
-
 ## 问题
 
 受支持的 Node 版本范围包含会预留进程级 `globalThis.localStorage` 的版本。未设置 `--localstorage-file` 时，Node 26 将该属性暴露为 `undefined`；Vitest 检测到这个预留键后，不会用 jsdom 的隔离 `Storage` 对象覆盖该属性。因此，组件测试套件尚未验证产品行为便会失败，而主要的 Node 24 覆盖率通道仍能通过，因为该运行时默认不会预留此键。

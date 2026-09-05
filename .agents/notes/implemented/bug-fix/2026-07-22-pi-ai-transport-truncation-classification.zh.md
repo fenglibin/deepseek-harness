@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-22-pi-ai-transport-truncation-classification.md) | 中文
-
 ## 问题
 
 一次 TUI 运行的模型连接在流式输出中途断开，只浮现出一条 `terminated` 通知，而一个被截断的 Anthropic 响应则浮现出 `Anthropic stream ended before message_stop`。两者都是传输层截断——连接在提供方的终止 SSE（Server-Sent Events）事件之前就已断开——然而 `dsh-llm-pi-ai` 中的 `classifyPiAiError` 对两者都不匹配，最终落入兜底的 `PI_AI_ERROR`。由于 `PI_AI_ERROR` 不在 `llm-retry` 的 `DEFAULT_RETRYABLE_CODES`（`RATE_LIMIT`、`SERVER`、`TIMEOUT`、`TRANSPORT`）中，一次可恢复的断开被当作永久性失败处理，从未被重试。

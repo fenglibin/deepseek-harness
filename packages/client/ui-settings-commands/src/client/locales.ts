@@ -39,30 +39,3 @@ export const zh: Record<PromptCommandKey, string> = {
   readOnly: '当前部署的设置为只读，无法修改命令。',
   invalid: '命令名需为小写字母、数字、连字符或下划线；命令名、描述和提示词内容不能为空',
 }
-
-/** English copy. */
-export const en: Record<PromptCommandKey, string> = {
-  nav: 'Prompt Commands',
-  title: 'Prompt Commands',
-  empty: 'No prompt commands',
-  emptyHint: 'Add reusable prompt shortcuts; type / to invoke them.',
-  add: 'Add command',
-  edit: 'Edit command',
-  delete: 'Delete',
-  deleteTitle: 'Delete command',
-  deleteDescription: 'This /command will no longer be available after deletion. This cannot be undone.',
-  deleteAcknowledge: 'I confirm I want to delete this command',
-  deleteCancel: 'Cancel',
-  deleteConfirm: 'Delete',
-  save: 'Save',
-  cancel: 'Cancel',
-  fieldName: 'Command name',
-  fieldTitle: 'Display name',
-  fieldDescription: 'Description',
-  fieldPrompt: 'Prompt text',
-  fieldHint: 'Input hint',
-  titleOptional: 'Optional',
-  hintOptional: 'Optional',
-  readOnly: 'This deployment stores settings read-only.',
-  invalid: 'Command name must be lowercase letters, digits, hyphens, or underscores; name, description, and prompt text are required',
-}

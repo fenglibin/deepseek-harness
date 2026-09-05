@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-07-27-session-projection-and-command-log.md) | 中文
-
 ## 问题
 
 三个在途的 web 功能——todo（#497）、goal（#527）、plan mode（#587）——都要从会话日志推导按会话的状态并呈现到浏览器客户端，而三者各自发明了一套同样的机制：

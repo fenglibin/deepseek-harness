@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-25-workspace-ui-product-flow.md) | 中文
-
 ## Problem
 
 [Domain KV storage 与 Workspace entity](../../proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.zh.md)定义了 Workspace 的持久实体、路径规范和有序 Session 账本，但没有定义 Host 接线、历史数据初始化或 GUI 动线。GUI 同时呈现 Workspace 和 Session；用户进入 New Session 后必须能够立即输入，即使此时还没有 Host Session，甚至没有 Host Workspace。

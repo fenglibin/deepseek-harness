@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-goal
 
-[English](README.md) | 中文
-
 ## 概述
 
 本包在 Web GUI 中渲染 goal 表面：composer 上下文堆栈里的一条条带，显示会话的当前目标，并提供编辑、暂停、恢复与清除动作。它从宿主计算的投影读取活目标，把每次变更都经 goal 服务路由，并把拒绝内联呈现。它还把每条持久的 `/goal` 命令运行投影为聊天中的 `Command input` 气泡，让用户或模型输入的 goal 命令出现在文本记录中。goal 创建不归本插件。除 `minimal` 外，随附的 Web preset 都会在其 agent scope 中挂载 `/goal`。

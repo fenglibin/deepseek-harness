@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-26-inspector-execution-realms-and-protocol-planes.md) | 中文
-
 ## Problem
 
 Inspector 包的代码运行在三个 JavaScript 环境中：浏览器 Client、Host Node 主线程和 Inspector Worker thread。只按功能命名目录时，文件路径无法说明代码在哪里运行，也无法说明它可以持有哪些标识符。

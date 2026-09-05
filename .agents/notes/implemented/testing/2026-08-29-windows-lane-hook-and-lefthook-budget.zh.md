@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-29-windows-lane-hook-and-lefthook-budget.md) | 中文
-
 ## 问题
 
 两件事让 Windows 覆盖率 lane 在既没碰套件、也没碰 gate 的分支上持续失败。

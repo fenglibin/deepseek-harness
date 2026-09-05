@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-13-credential-records-and-authorization-flows.md) | 中文
-
 ## Problem
 
 harness 的凭据平面只能表达一种机密：藏在某个环境变量名之后的值。`CredentialRef` 是一个 POSIX 标识符，解析时按进程环境、受管文件、`.env` 回退分层，每个消费方按操作读取。这恰好覆盖 API key，此外什么都不覆盖。

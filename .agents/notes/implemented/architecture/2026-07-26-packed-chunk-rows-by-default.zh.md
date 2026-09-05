@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-26-packed-chunk-rows-by-default.md) | 中文
-
 ## 问题
 
 提供方流会产生大量 token 大小的 `assistant/chunk` 增量事件，其重复 JSON 封装可能比载荷本身更大。会话日志必须将每个分片保留为独立的逻辑事件：实时 `session/event` 传递、序号、`sourceEventSeqs`、回放、取消证据和 UI 流式输出都依赖这些边界。

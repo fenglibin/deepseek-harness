@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-22-web-bind-address.md) | 中文
-
 ## 问题
 
 Web 应用可以用 Host 用户的 authority 运行命令。同机使用只需要 loopback 可达性；CLI 若提供全接口模式，就会在没有 TLS 或明确代理约定时暗示支持网络部署。

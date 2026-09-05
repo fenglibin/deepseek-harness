@@ -73,27 +73,24 @@ describe('document language', () => {
     expect(langOf()).toBe('zh-CN')
   })
 
-  it('follows a locale switch in both directions with BCP 47 tags', async () => {
+  it('follows the locale switch with BCP 47 tags', async () => {
     const { locale } = await bench()
     expect(langOf()).toBe('zh-CN')
-    locale.setLocale('en')
-    // `en` needs no region; `zh` names its script variant, which bare `zh`
-    // leaves ambiguous for pronunciation and font selection.
-    expect(langOf()).toBe('en')
+    // `zh` names its script variant, which bare `zh` leaves ambiguous.
     locale.setLocale('zh')
     expect(langOf()).toBe('zh-CN')
   })
 
-  it('follows an explicit Host preference that overrides browser detection', async () => {
-    // Stored preference wins over the zh browser pinned above.
-    const { locale } = await bench('en')
-    await vi.waitFor(() => { expect(locale.getLocale().active).toBe('en') })
-    await vi.waitFor(() => { expect(langOf()).toBe('en') })
+  it('follows an explicit Host preference that matches the resolved locale', async () => {
+    // Stored preference is adopted even when it equals browser detection.
+    const { locale } = await bench('zh')
+    await vi.waitFor(() => { expect(locale.getLocale().active).toBe('zh') })
+    await vi.waitFor(() => { expect(langOf()).toBe('zh-CN') })
   })
 
   it('uses an external locale definition for the document language', async () => {
     const { locale } = await bench()
-    locale.addLanguage({ id: 'pt-BR', label: 'Português', fallback: 'en' })
+    locale.addLanguage({ id: 'pt-BR', label: 'Português', fallback: 'zh' })
     locale.setLocale('pt-BR')
     expect(langOf()).toBe('pt-BR')
   })

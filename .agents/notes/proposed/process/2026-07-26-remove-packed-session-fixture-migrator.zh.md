@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-07-26-remove-packed-session-fixture-migrator.md) | 中文
-
 ## 问题
 
 仓库的默认写入器和快照检查会使会话 fixture（测试前置数据）保持规范打包行布局。在永久强制机制之外仍保留 `pnpm run migrate:packed-session-fixtures`，唯一原因是让携带旧版 fixture 改动的在途分支可以合并当前 `master`，并在不重新录制模型输出的情况下通过机械转换收敛。

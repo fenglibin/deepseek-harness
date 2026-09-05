@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-base
 
-[English](README.md) | 中文
-
 ## 概述
 
 每个基于 base 的 `dsh --profile` 表层都运行在 `dsh-base` 上，因此这些表层共享模型连接、完整工具集、持久会话历史和 workspace 安全默认值。随附的 `sdk-minimal` profile 刻意改用完整的独立配置树。你通常不直接操作本 bundle——随附的 base-backed profile 已经包含它，自定义 base-backed profile 则把它放在第一位。需要其他默认值时，应修改自己的 profile patch 或添加后续 bundle；本包不是供导入的库。

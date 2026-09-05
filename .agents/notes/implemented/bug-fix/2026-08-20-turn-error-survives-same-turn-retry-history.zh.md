@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-20-turn-error-survives-same-turn-retry-history.md) | 中文
-
 ## 问题
 
 Web 的 `turn-error` Definition 一旦发现所属轮次携带任何 `llm/retry` 事件，就永久抑制自身节点。这条规则编码的是[有界 LLM 请求恢复](../architecture/2026-06-21-bounded-llm-request-recovery.zh.md)最初交付的重试模型：当时重试会关闭失败轮次并开启下一个编号轮次——带重试历史的轮次只可能是中间失败，其事实已经落在重试行上，而耗尽后的终态失败落在一个没有重试事件的后续轮次里。

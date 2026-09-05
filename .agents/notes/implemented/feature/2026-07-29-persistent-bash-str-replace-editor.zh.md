@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-29-persistent-bash-str-replace-editor.md) | 中文
-
 ## 问题
 
 部分部署需要只调用一次的 Bash schema，同时要求 shell 状态跨模型轮次保留；另一些部署需要与终端选择无关的 Claude 风格 `str_replace_editor`。把两个工具绑在一起或按某个基准命名，会阻碍复用并模糊配置归属。

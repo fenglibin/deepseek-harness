@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-20-remove-agent-boundary-mirror-events.md) | 中文
-
 ## 问题
 
 循环在 `SessionEvent` 中记录规范 transcript（文本记录），同时还发出一组并行的实时 `agent/*` 边界镜像事件：`agent/turn-start`、`agent/turn-end`、`agent/step-start` 和 `agent/step-end`。这些镜像迫使消费方在同一持久事实的两个真源之间做选择。ACP（Agent Client Protocol）已经为提示词结算和已提交输出选择会话日志，因为它是唯一持久、可重放的记录；消费实时镜像需要把它的时序与日志中已经存储的边界进行调和。stdio UI 是唯一仍从镜像事件渲染轮次边界的生产环境消费方；它已经从 `session/event` 渲染工具调用和工具结果。

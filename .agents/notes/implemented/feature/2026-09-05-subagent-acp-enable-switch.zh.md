@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-05-subagent-acp-enable-switch.md) | 中文
-
 ## Problem
 
 `dsh-subagent-acp` 在被挂载的那一刻就注册 `SubagentProvider`。某个部署为可选的子 agent 挂载了该行、但其命令不存在——例如在未安装 CodeBuddy 的机器上——却仍然要承担注册以及 `apply` 里的任何配置校验，尽管该 provider 永远无法启动运行。唯一的关闭方式是把这一行从组合里整体移除，这同时也会丢掉用户可能想保留的配置。

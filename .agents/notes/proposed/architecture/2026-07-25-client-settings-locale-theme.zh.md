@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-07-25-client-settings-locale-theme.md) | 中文
-
 ## 问题
 
 浏览器端已有的 Settings 直接写在 Sidebar 内，语言和主题也由组件本地状态直接改 DOM。这使 Settings 无法由独立插件扩展，偏好状态没有稳定的跨插件服务约定，主题注册表同时承担状态与呈现职责。

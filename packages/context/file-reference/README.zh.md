@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-file-reference
 
-[English](README.md) | 中文
-
 ## 概述
 
 宿主驱动 UI 使用 `dsh-file-reference` 提供 `@file` 补全：UI 为指定 agent 请求路径候选，模型输入 `@path` 或 `@"path with spaces"`，选中候选后，匹配的 mention 作为普通提示词文本插入。seam 本身不拥有文件系统访问——具体提供方（如 `@deepseek-ai/dsh-file-reference-local`）负责提供候选、排序、缓存与失效。选中候选绝不读取或附带文件内容；模型必须调用文件系统工具才能查看文件。Session Controller 通过 `fileReferences/list` Remote 向浏览器消费方暴露同一发现能力。

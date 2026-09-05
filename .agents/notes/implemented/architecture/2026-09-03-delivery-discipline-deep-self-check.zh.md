@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-delivery-discipline-deep-self-check.md) | 中文
-
 ## 问题
 
 对照[交付纪律设计](../../../../docs/design/delivery-discipline-rationale.zh.md)对 B1–B3 批次做深度自检，发现领域、fold、投影、状态机、CAS 与门禁在端到端 probe 下均正确，但暴露了三个具体缺口：(1) §6.4 规模 proxy 只实现了 `descriptionChars`，漏掉了 `todoCount`/`touchedFiles` 与 `requireOpenspecForBugs`；(2) `runtime.ts` 带有一处 `oxlint-disable-next-line`（针对 `no-useless-constructor`），违反「禁止 lint 抑制注释」规则；(3) 缺少把 `l1`/`l2` 任务走到 `accepted`、以及替换 accepted 任务的端到端测试。

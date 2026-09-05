@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-web-queue-steer-action.md) | 中文
-
 ## 问题
 
 Web composer 原本会在 agent（智能体）运行期间把所有 Enter 提交作为 Queue 入队。QueueDock 已经为每条待处理消息提供可寻址的行，持久 transcript（文本记录）也已能把消费后的 steer 事件渲染为用户样式气泡，但 Web 既没有连接这两个界面的操作，也没有让用户从 composer 直接选择当前轮次 steering 的手势。

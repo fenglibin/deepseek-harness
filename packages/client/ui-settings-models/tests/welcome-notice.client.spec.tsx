@@ -13,14 +13,13 @@ import { WelcomeNotice } from '../src/client/WelcomeNotice.tsx'
 import type { WelcomeNoticeProps } from '../src/client/WelcomeNotice.tsx'
 import { decodeWelcomeSection, WelcomeNoticeStore } from '../src/client/welcome-store.ts'
 import type { WelcomeSection } from '../src/client/welcome-store.ts'
-import { en, zh } from '../src/client/locales.ts'
+import { zh } from '../src/client/locales.ts'
 import {
   WELCOME_NOTICE_ACK_FIELD, WELCOME_NOTICE_SETTINGS_NAMESPACE,
   WELCOME_NOTICE_VERSION,
 } from '../src/onboarding-copy.ts'
 
 const WELCOME_NOTICE_COPY = {
-  en: { title: en.welcomeTitle, body: en.welcomeBody, continueLabel: en.welcomeContinue },
   zh: { title: zh.welcomeTitle, body: zh.welcomeBody, continueLabel: zh.welcomeContinue },
 }
 
@@ -99,12 +98,12 @@ function mount(
 
 describe('WelcomeNotice', () => {
   it('uses the exact owner copy in both GUI locales', () => {
-    expect(WELCOME_NOTICE_COPY.en).toEqual({
+    expect(WELCOME_NOTICE_COPY.zh).toEqual({
       title: 'Internal Testing Notice',
       body: "DeepSeek Harness 0.1 remains in testing for Harness developers. Many areas need further improvement, and we welcome feedback from the developer community. DeepSeek Harness's core plugins and foundational APIs will continue to evolve rapidly over the coming months.\n\nWe look forward to exploring the limits of intelligence with developers around the world, building on open-source, open, reusable, and composable infrastructure. We welcome Harness developers everywhere to join the DSH plugin ecosystem.",
       continueLabel: 'Continue',
     })
-    expect(en.welcomeBody).toBe(WELCOME_NOTICE_COPY.en.body)
+    expect(zh.welcomeBody).toBe(WELCOME_NOTICE_COPY.zh.body)
     expect(zh.welcomeBody).toBe(WELCOME_NOTICE_COPY.zh.body)
   })
 

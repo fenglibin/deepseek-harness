@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-29-todo-write-tool.md) | 中文
-
 ## 问题
 
 harness 为模型提供了 bash 和 subagent 工具，却没有办法记录结构化的任务列表。todo 列表有两个同等重要的用途：引导模型规划多步骤工作并保持当前活跃工作明确；同时为交互式宿主提供实时进度清单。调研的所有参考编码 agent（智能体），包括 claude-code、opencode、codex、oh-my-pi 和 pi，都提供了某种形式的此类功能；本 harness 此前没有。

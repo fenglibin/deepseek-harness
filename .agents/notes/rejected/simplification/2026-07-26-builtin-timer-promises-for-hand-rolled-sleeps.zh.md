@@ -2,8 +2,6 @@
 
 Status: rejected — 实现（PR #679）证伪了行为等价前提：vitest 的假时钟不拦截 `node:timers/promises`，这次替换用确定性的快速测试换来约 10 行删除，得不偿失
 
-[English](2026-07-26-builtin-timer-promises-for-hand-rolled-sleeps.md) | 中文
-
 ## 问题
 
 三个包手写了用 promise 包装的定时器，而 `node:timers/promises` 内置模块早已提供同等能力；其他包（`dsh-llm-mock-server` 的 `pause()`、`dsh-lsp-stdio`、`dsh-acp-snapshot`）已经在使用该内置模块，因此这些手写副本同时也是一处一致性缺口：

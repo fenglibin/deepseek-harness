@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-host-plugin-inventory
 
-[English](README.md) | 中文
-
 ## 概述
 
 客户端与设置页可以展示宿主当前组合了什么：调用 `pluginInventory/list` 即按 Loader 顺序返回当前的非组条目——条目 id、模块标识、有效启用状态与根 Fiber 阶段（`pending`、`loading`、`active`、`failed` 或 `unloading`；条目没有存活根 Fiber 时为 `null`）。当部署组合了 Agent 预设 roster 时，快照还携带每个预设一组——id、trust、显示名、默认标记、健康状态与压平后的组合行——因为挂载 roster 的部署把模型侧插件运行在预设组合里，而不是 Loader 自己的条目上。该快照只表示调用当下：Loader 是唯一的生命周期权威，本包不拥有缓存、历史、来源模型、事件流或修改路径。Client 包通过显式的 [`api-remotes`](../../api/remotes/README.zh.md) 组合消费这个 Remote，而不导入 Host 实现。

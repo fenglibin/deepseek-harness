@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-18-client-build-environment.md) | 中文
-
 ## Problem
 
 浏览器业务包需要按部署构建选择静态行为，但 Web client 有两条互不包含的产物路径：Vite 构建静态壳，共享 tsdown preset 构建运行时加载的动态插件。只在一条路径替换环境变量会使相同业务表达式因所在包类型不同而产生不同结果。

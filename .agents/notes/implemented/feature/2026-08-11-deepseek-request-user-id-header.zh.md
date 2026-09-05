@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-deepseek-request-user-id-header.md) | 中文
-
 ## 问题
 
 当调用方提供 `GenerateOptions.sessionId` 时，直连 DeepSeek 请求已携带 `x-deepseek-harness-session-id`，让提供方侧支持与诊断可以关联同一对话中的多个轮次。但请求缺少跨会话的稳定身份，而 harness 已为遥测与反馈持久化匿名用户 id。另行生成 id 会破坏关联；把它放进提供方无关的归属辅助函数，则会让每个 HTTP 适配器都发送稳定的逐用户标识。

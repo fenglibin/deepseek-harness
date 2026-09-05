@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-fork-anchor-floors-to-event-seq.md) | 中文
-
 ## 问题
 
 在已停止的助手消息上点 fork 毫无反应——没有子会话，没有报错，也没有任何可见变化。

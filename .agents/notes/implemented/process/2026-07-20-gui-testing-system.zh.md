@@ -4,8 +4,6 @@ Status: implemented
 
 > 路径更新（2026-08-27，Remote 迁移）：本文三层理念与黄金路径方法仍为现行；对象层 spec 分布于 `packages/api/session-controller/tests/` 和 `packages/test-support/client-runtime/tests/`，Remote 与承载 spec 分布于 `packages/api/gateway/tests/` 和 `packages/client/connection/tests/`。组件 spec 是各 `packages/client/*/tests/` 下的插件级 jsdom 套件。组件 spec 形态遵循 [slot 体系标准](../architecture/2026-07-22-slot-type-chain-implementation.zh.md)：props 直喂——store 份额来自 `createXXXStore().create()`（真引擎，获认可的无额外机制路径），框架钩子用普通桩；无渲染机制、不挂载提供方。slot 归属和注册表语义归 2 层地界（`ui-renderer` + `ui-slots` 套件），不归组件 spec。
 
-[English](2026-07-20-gui-testing-system.md) | 中文
-
 > 分工线：本篇只讲 GUI（`packages/{client,host}/*` + `apps/web`）特有的测试结构；全仓测试政策（分层原则、with-key 政策、真实实现优先、REAL-composition）见 [docs/testing.md](../../../../docs/testing.zh.md)，不在此复述。
 
 ## Problem

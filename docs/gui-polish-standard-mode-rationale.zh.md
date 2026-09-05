@@ -1,7 +1,5 @@
 # 改造方案：标准模式（Chat view）UI 与 CodeBuddy 对齐
 
-[English](gui-polish-standard-mode-rationale.md) | 中文
-
 > 状态：待用户对齐
 > 涉及分支：`feat/gui-polish-session-delete-resize-model-filter`
 > 范围：`packages/client/ui-tool/*` + `packages/client/ui-chat/src/client/chat/ReasoningRow*` + `packages/client/ui-conversation/src/client/locales.ts`

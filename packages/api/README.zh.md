@@ -5,8 +5,6 @@ kind: "package-group"
 
 # api/ — Remote API 层
 
-[English](README.md) | 中文
-
 ## 概述
 
 `api/` 组提供应用的 Remote 层：Client 环境可以调用运行在 Host 上的业务能力——管理目标、运行命令、查看插件清单、发现文件与会话引用——调用方式是类型化方法，并接收结果或转发的 Host 事件。`remotes` 决定暴露哪些能力、以及每次调用如何到达正确会话的 agent；`gateway` 在 Client 与 Host 之间承载调用及其结果。技术栈运行在应用共享的 Connection 之上；流式会话数据刻意不在其中。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-02-scoped-slot-abdication.md) | 中文
-
 ## Problem
 
 `conversation.composer.bar` 是每页只注册一次的 `single`、`session-maybe` slot，因此每个 Session 渲染的都是同一个注册项。该 entry 内部的一次崩溃（组件渲染或 inject 工厂）会让它在注册存续期内彻底退休：`SlotCore` 用一个 `WeakSet` 保存已 abdicate 的 entry，并永久把它们排除在 `entriesOfSlot` 之外，唯一的恢复方式是刷新页面。用户可见的结果是：composer 同时在所有 Session 中消失，只有刷新后才回来；已输入的草稿不丢，因为它存放在逐 Session 的持久化 store 中。

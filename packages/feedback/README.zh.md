@@ -5,8 +5,6 @@ kind: "package-group"
 
 # feedback/：记录的人类反馈
 
-[English](README.md) | 中文
-
 ## 概述
 
 feedback 组收集用户对 harness 工作成果的意见：用户可以提交一条关于整个会话的自由文本评价，也可以对单条 assistant 消息评分或加备注。两类反馈都不会到达模型——它们是关于输出的信号，绝不是输入。用户通过 `/feedback` 命令记录会话评价；产品界面通过 `messageFeedback` 服务读取和修改逐消息评分。两个包相互独立：会话评价与逐消息评分互不影响。本页是组的映射；包 README 与[反馈子系统页](../../docs/subsystems/feedback.zh.md)负责各自的包级约定。

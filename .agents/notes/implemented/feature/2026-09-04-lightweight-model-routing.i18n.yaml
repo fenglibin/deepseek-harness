@@ -1,6 +1,0 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-04-lightweight-model-routing.md
-2026-09-04-lightweight-model-routing.md: eed7946284eac7d5fd194b47b038d782e96d8f07
-2026-09-04-lightweight-model-routing.zh.md: 6bd738b75a9d39fae1c5c9eb71c3bbc6fc1dce5a

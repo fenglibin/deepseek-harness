@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-02-typert-remote-method-calls.md) | 中文
-
 ## Problem
 
 Host API Proxy 当时在一个包里同时承担直接方法调用、带状态交互和 Session 事件流。三者的生命周期、路由语义和客户端编程界面不同，继续共用一个业务导出包会让业务 Service、传输协议、状态机和客户端类型彼此耦合。

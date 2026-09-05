@@ -36,7 +36,7 @@ import { ModelListEditor } from './ModelListEditor.tsx'
 import { deriveKeyRef, protocolChoices } from './store.ts'
 import type { ModelsOperations } from './operations.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
-import type { en } from './locales.ts'
+import type { zh } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
 /** Per-adapter-family curated field sets (unknown namespaces get the hint alone). */
@@ -70,7 +70,7 @@ export interface ProviderEditorProps {
   /** The Host operations this card writes and interrogates through. */
   operations: ModelsOperations
   /** Section copy. */
-  t: (key: keyof typeof en) => string
+  t: (key: keyof typeof zh) => string
   /** Disable writes (read-only settings provider). */
   readOnly: boolean
   /** Render only the credential field and actions, without provider settings. */
@@ -80,11 +80,11 @@ export interface ProviderEditorProps {
   /** Give the credential field initial focus when this editor mounts. */
   autoFocusCredential?: boolean
   /** Override the dismiss action copy. */
-  cancelLabelKey?: keyof typeof en
+  cancelLabelKey?: keyof typeof zh
   /** Override the idle commit action copy. */
-  submitLabelKey?: keyof typeof en
+  submitLabelKey?: keyof typeof zh
   /** Override the in-flight commit action copy. */
-  submitBusyLabelKey?: keyof typeof en
+  submitBusyLabelKey?: keyof typeof zh
   /** Close the editor; `changed` reports whether an Apply committed. */
   onClose: (changed: boolean) => void
 }

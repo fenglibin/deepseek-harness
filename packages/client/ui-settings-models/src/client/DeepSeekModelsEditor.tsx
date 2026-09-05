@@ -10,7 +10,7 @@ import type { ReactNode } from 'react'
 import {
   IconChevronDownOutline14, IconChevronRightOutline14, IconPlusOutline16, IconTrashOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { en } from './locales.ts'
+import type { zh } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
 /** One catalog entry kept structurally open so hidden or future fields survive an edit. */
@@ -133,7 +133,7 @@ export interface DeepSeekModelsEditorProps {
   /** Fallback output cap used when a row omits its exact value. */
   defaultMaxTokens: number | undefined
   /** Section copy. */
-  t: (key: keyof typeof en) => string
+  t: (key: keyof typeof zh) => string
   /** Disable every mutation. */
   disabled: boolean
   /** Replace the user-owned array after one visible edit. */

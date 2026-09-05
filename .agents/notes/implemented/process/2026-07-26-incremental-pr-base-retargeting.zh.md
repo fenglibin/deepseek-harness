@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-26-incremental-pr-base-retargeting.md) | 中文
-
 ## 问题
 
 将 PR（Pull Request）的 base 分支当前顶端提交合入 PR 分支的过程中，base 分支可能继续前移。若改从新的顶端提交重新开始，就会丢弃已经完成的冲突解决和验证工作。重写已经推送的合并还会抹去可供评审的历史记录。

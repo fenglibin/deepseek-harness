@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-session-row-identity-covers-the-preset.md) | 中文
-
 ## 问题
 
 `SessionManager.buildListSnapshot` 按值对列表行做记忆化：一次 wire 刷新会铸造全新的 summary 对象，因此与缓存项相等的行会被替换为缓存实例，下游每一个 `SessionListItem` memo 才能持续命中。它声明的约定是「每个字段都相同就复用缓存对象」，而那段比较是手写枚举字段的，其中没有 `agentPreset`。

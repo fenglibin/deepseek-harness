@@ -2,8 +2,6 @@
 
 状态：已实现
 
-[English](2026-08-19-session-projection-state-and-client-views.md) | 中文
-
 ## 问题
 
 投影注册表会持久化各单元的内部折叠状态，却没有运行时 schema；与此同时，`SessionProjectionMap` 描述的是 `view` 返回的客户端值。这使恢复出的状态未经校验，也让同一张类型表看似同时描述两种可能不同的值。host 消费方还需要读取当前折叠状态，但不应为此序列化全部已注册客户端视图，也不应把内部状态暴露到客户端协议。

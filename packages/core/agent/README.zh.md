@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-agent
 
-[English](README.md) | 中文
-
 ## 概述
 
 使用 `dsh-agent`，你可以创建或恢复 agent、发送后续提示词、中途引导（steering）当前步骤、注入面向模型（model-facing）的上下文、取消活动，并等待 agent 进入空闲——这一切都通过每个插件面向编程的 `Agent` 句柄与跟踪运行中 agent 的实时注册表（`ctx.agents`）完成。该包还携带进程本地发起方作用域，把异步工作归因于启动它的 agent，并声明插件用来观察或拦截进行中工作的 `agent/*` 事件词汇。它不依赖循环：具体的创建与驱动位于 `dsh-agent-loop`，它在此注册工厂，因此驱动器保持可替换。构建 UI、钩子、编排器或涉及实时 agent 的扩展插件时请选择本包；接口本身不运行任何模型调用。

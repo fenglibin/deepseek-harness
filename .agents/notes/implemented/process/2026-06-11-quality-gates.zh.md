@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-11-quality-gates.md) | 中文
-
 本记录中的钩子/CI 对称设计已由[快速本地 Git 钩子](2026-07-22-fast-local-git-hooks.zh.md)取代；CI 仍是执行完整检查的路径。
 
 ## 问题

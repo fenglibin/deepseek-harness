@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-telemetry-anonymous-user-id.md) | 中文
-
 ## 问题
 
 session telemetry 已默认挂载（[默认挂载 Note](2026-07-31-web-telemetry-default-mount.zh.md)），但 OTel Resource 只有 `service.name`/`service.version`，没有任何用户级标识——接收端无法按用户聚合、无法数活跃用户。此前唯一相关口径是一条未实现的「hostname/本机 IP 哈希派生 user.id」裁定。需要给 OTel 回流一个语义干净的匿名用户身份。

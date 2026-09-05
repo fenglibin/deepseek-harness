@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-workspace-sidebar-order-and-folding.md) | 中文
-
 ## 问题
 
 Session 很多的 Workspace 会占满整个侧边栏，把其他 Workspace 挤出可见范围。紧凑列表需要有界的默认高度，同时仍要提供到达每条 Session 的明确入口。侧边栏还需要面向活动时间的顺序，但 `WorkspaceView.sessionIds` 是持久的手动记账，不能被 Session 活动改写。

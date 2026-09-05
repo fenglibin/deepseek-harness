@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-input-trigger
 
-[English](README.md) | 中文
-
 ## 概述
 
 本包为 Web GUI 提供输入触发流水线：检测光标处键入的 `/` 与 `@`，显示分组候选菜单，并把 pick 路由到已注册 source。source 经 `ctx.inputTriggers` 注册——`/` 命令 source（ui-commands）、`@` 文件与会话引用 source（ui-reference），以及任何业务包——对话接线层按会话驱动这条流水线。键入触发器会 seed 为该触发器注册的所有 source；chrome launcher 也可以在当前选区上只打开一个 source。流水线仅做呈现：pick 产出命令声明或引用插入，其后果属于消费它们的宿主与输入包。

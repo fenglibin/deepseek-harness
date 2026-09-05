@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-18-model-selected-subagent-routes.md) | 中文
-
 ## 问题
 
 `dsh-tool-subagent` 可以配置子级 `AgentOptions`，两个进程内提供方也已把这些值合并到父 Agent 的 LLM 选择之上。但面向模型的工具不能为某个适合的子任务请求不同的提供方、模型或推理强度。为每条 LLM 路由加载一个名称不同的委派工具会重复 schema，并把每次调用的调度选择变成部署配置。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-12-separate-source-launch-from-build.md) | 中文
-
 ## 问题
 
 TypeScript 源码启动器无需在每次调用前完成整个仓库的构建。Web 界面则需要已构建的前端与 Client plugin 产物。由同一个包脚本同时负责这两项操作，会让重复启动 TUI、无头模式和 Web 时都承担全仓库构建延迟，也会掩盖浏览器产物何时刷新。

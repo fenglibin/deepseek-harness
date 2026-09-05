@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-18-sqlite-physical-chunk-row-compression.md) | 中文
-
 ## 问题
 
 标量 [`session-persistence-sqlite`](../../../../packages/session/session-persistence-sqlite/README.zh.md) 后端为每个逻辑 `SessionEvent` 存储一个物理行。提供方流会生成 token 大小的 `assistant/chunk` 事件，并重复轮次、步骤、块、类型和 envelope 字段，因此事务批处理可以减少提交次数，却不能减少行数或重复 JSON payload。逻辑流不能合并，因为分片边界、序列号、时间戳、回放、部分输出、UI 保真度和 `sourceEventSeqs` 仍然可观察。

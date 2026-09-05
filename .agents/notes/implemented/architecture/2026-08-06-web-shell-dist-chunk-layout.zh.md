@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-web-shell-dist-chunk-layout.md) | 中文
-
 ## Problem
 
 apps/web 的壳此前打成单一约 1.2 MB（minified）的 index 分片，其中约八成是 vendor 字节——KaTeX、boot 语法与 shiki 引擎、react-dom、markdown 流水线——与全部 workspace 壳代码（约五分之一）熔在一起。任何一行壳代码改动都让整个 chunk 换哈希，再次访问的客户端全量重新下载；`dist/assets/` 是 100 多个文件的单层平铺（主分片、23 个懒加载语法 chunk、59 个 KaTeX 字体面、sourcemap 混居），无从导航。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-28-web-agent-runtime-context.md) | 中文
-
 ## 问题
 
 CLI（命令行界面）共享 base 配置了空的部署 persona，Web overlay 没有替换它，而 Web 启动器既未添加源码提示词段，也未添加交互界面提示词段。会话 header 会记录工作目录，供工具与持久化使用，但模型提示词既不说明该目录，也不标识 DeepSeek Harness Web GUI。因此，当用户提出「修改这个页面的主题」之类的请求时，即使用户指的是承载当前会话的 GUI，agent（智能体）也会在所选项目中搜索一个未明确说明的页面。

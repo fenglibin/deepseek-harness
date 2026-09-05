@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-17-readme-assets-on-cdn.md) | 中文
-
 ## 问题
 
 公开中文 README 嵌入了 3 张社区二维码。使用仓库相对路径时，每次替换都依赖源码变更以及独立的公开仓库发布流程，即使图片字节并未改变产品代码或文档文字。

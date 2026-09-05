@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # @deepseek-ai/dsh-experimental-agent-team-profile
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-experimental-agent-team-profile` 是在 `@deepseek-ai/dsh-base` 之上启用 [Agent Teams](../agent-team/README.zh.md) 的私有 profile 层。它的 patch 会插入 Team domain 与 Team-scoped 工具、禁用名称重叠的全局 continuable-child control，并保留普通的一次性 fresh 与 fork delegation 工具。必须将本包显式添加到已初始化的源码 checkout profile；正式发布会排除本包。

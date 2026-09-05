@@ -2,8 +2,6 @@
 
 Status: rejected — 独立的持久化 Service Definition 包是持久化能力 seam 预期的模块化角色拆分。将其折叠进 `dsh-session` 虽能减少包数量，却会牺牲更清晰的后端边界。
 
-[English](2026-06-20-fold-session-persistence-interface.md) | 中文
-
 ## 问题
 
 `dsh-session-persistence` 是一个 Service Definition 包，其核心概念已经由 `dsh-session` 拥有：`SessionHeader`、`SessionEvent`、`SessionId`、`session/event` 与 `session/flush`。该包额外添加了抽象的 `SessionPersistence` 服务、共享写入协调器和约定辅助工具。提供方包依赖它，为实现恢复，`agent-loop`（智能体循环）还需要按需查找这个同级服务。

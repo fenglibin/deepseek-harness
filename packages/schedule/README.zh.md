@@ -5,8 +5,6 @@ kind: "package-group"
 
 # schedule/ — 仅限会话内的提醒
 
-[English](README.md) | 中文
-
 ## 概述
 
 schedule 组为运行中的会话提供会话本地提醒：让 agent 在稍后、绝对时间或固定间隔提醒你，每条提醒到期时都会作为同一会话中的普通消息到达。它的宿主包拥有三个管理工具，并可通过可选的 Session projection registry 发布完整活动记录集合。独立的 [`ui-schedule`](../client/ui-schedule/README.zh.md) 浏览器插件把该 projection 渲染为只读的当前状态目录，[`ui-workspace`](../client/ui-workspace/README.zh.md) 则为尽力而为的列表值明确非空的普通行与搜索结果显示闹钟。该标识只报告缓存所知的活动状态，不保证 live runtime 存在。提醒在重启后依然存在，但只留在会话内部：没有电子邮件、短信或推送通知。本页是组地图；各包 README 拥有自己的约定。

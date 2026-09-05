@@ -23,29 +23,5 @@ export const zh = {
   'relative.now': '现在到期',
   'relative.future': '{value}{unit}后',
   'relative.overdue': '已逾期 {value}{unit}',
-} as const
-
-/** English dictionary, key-identical to the Chinese source of truth. */
-export const en: Record<ScheduleCatalogKey, string> = {
-  'trigger.one': '{count} reminder',
-  'trigger.other': '{count} reminders',
-  'list.aria': 'Active reminders',
-  'status.scheduled': 'Scheduled',
-  'status.overdue': 'Overdue',
-  'frequency.once': 'Once',
-  'frequency.every': 'Every {value} {unit}',
-  'unit.day.one': 'day',
-  'unit.day.other': 'days',
-  'unit.hour.one': 'hour',
-  'unit.hour.other': 'hours',
-  'unit.minute.one': 'minute',
-  'unit.minute.other': 'minutes',
-  'unit.second.one': 'second',
-  'unit.second.other': 'seconds',
-  'relative.now': 'Due now',
-  'relative.future': 'in {value} {unit}',
-  'relative.overdue': '{value} {unit} overdue',
-}
-
-/** Key domain of the Schedule catalog namespace. */
+} as const/** Key domain of the Schedule catalog namespace. */
 export type ScheduleCatalogKey = keyof typeof zh

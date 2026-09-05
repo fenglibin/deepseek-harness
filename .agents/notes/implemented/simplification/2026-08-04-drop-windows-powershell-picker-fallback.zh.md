@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-04-drop-windows-powershell-picker-fallback.md) | 中文
-
 ## 问题
 
 原生目录选择器的 win32 分支在 koffi `IFileOpenDialog` 子进程之下保留了一条两级 PowerShell 回退：先 `pwsh.exe`，再 `powershell.exe`（Windows PowerShell 5.1），两者运行同一个主动启用 `SetProcessDPIAware` 的 WinForms 脚本。该链的存在是为了在 koffi 层「不可用」时仍能给出一个可用的选择器，但它可能保护的每一个触发条件都是我们自己打包或部署的失败，而不是操作系统的：

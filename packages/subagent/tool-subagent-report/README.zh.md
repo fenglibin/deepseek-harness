@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-subagent-report
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-tool-subagent-report` 为每个可继续的进程内子级提供一条返回通道，指向启动它的 agent（智能体）：它安装子级作用域的 `report` 工具，以及指示子级使用该工具的提示词指导。工具及其指导只存在于这些子级内部——根 agent、一次性 subagent、远程提供方与同级作用域永远看不到它们。被接受的报告会以普通父级消息到达父级，前缀为 `Background subagent <child-id> reported:`。可继续模式不依赖本包，也不依赖控制包；本包只负责子到父方向。

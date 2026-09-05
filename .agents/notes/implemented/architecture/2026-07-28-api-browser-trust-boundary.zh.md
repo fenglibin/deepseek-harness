@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-28-api-browser-trust-boundary.md) | 中文
-
 ## 问题
 
 Web GUI 宿主以纯 loopback HTTP 提供 `/api`（默认 `127.0.0.1:3080`；CLI 拒绝 `--host 0.0.0.0`），而这个面上有远程代码执行级别的方法——`session.prompt` 驱动的 agent（智能体）可以运行 bash。浏览器会用两种经典方式把操作者变成攻击此类本地 API 的「混淆代理人」：恶意页面发出跨站「简单请求」 POST（`text/plain`——不经 CORS 预检即发出），其副作用照常执行、只是响应不可读；以及 DNS rebinding 后的源以「同源」身份直连 socket，CORS 整体失效，只有 `Host` 头会暴露攻击者的域名。在本决策之前，系统里唯一的浏览器信任检查（`isTrustedNativeDialogRequest`：回环 socket、同源、回环 Host）只守着一个装饰性的路由——`host.pickDirectory`，其原生对话框弹在宿主屏幕上——而所有真正具有严重后果的方法都没有防护。按 RPC 逐个设防也活不过应用内目录浏览器：它存在的意义就是服务合法的远程客户端，回环规则恰恰会拒绝它们。

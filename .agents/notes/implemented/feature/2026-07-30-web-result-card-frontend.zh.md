@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-web-result-card-frontend.md) | 中文
-
 ## Problem
 
 `web_search` 和 `web_fetch` 工具声明了 `card: 'web'` result view（[web result card](2026-07-30-web-result-card.zh.md)）：一个 `kind` 标签联合,携带结构化的被引用 sources 加可选的 provider answer（`kind: 'search'`),或抓取的 URL 及其 HTTP 状态（`kind: 'fetch'`）。该视图早已抵达浏览器 —— host、connection、runtime 将它作为 `resultView` 投递到 `ConversationSnapshot` —— 但 Web 客户端忽略了它:一次已完成的 web 调用只渲染为摊平的模型可见文本,正是约定笔记所解释的、结构化视图要替代的那种有损渲染。`web_search` 到达读者时是每个 source 一行自由文本 markdown,而非可点击 source 的引用列表;`web_fetch` 是它的 markdown 正文,没有检索摘要。

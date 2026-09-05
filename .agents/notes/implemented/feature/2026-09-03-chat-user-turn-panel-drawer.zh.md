@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-chat-user-turn-panel-drawer.md) | 中文
-
 ## 问题
 
 真正的 Chat 会话动辄几十轮，把它们当作一条平面滚动条读毫无效率。Chat 视图早就有 [`TurnNavigator`](../../../../packages/client/ui-chat/src/client/chat/TurnNavigator.tsx) 这个紧凑的右侧导航条——每个已加载 turn 一个小刻度，点击跳转到对应位置——但它只有 28 像素宽，每个刻度只在 hover 时展开两条短预览行。想要"翻一翻自己之前提过哪些问题、哪一轮要求切换成 Compact 模式"的真实用例，必须一个一个 hover 才能读到内容，速度太慢。

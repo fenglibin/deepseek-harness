@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-24-web-capability-seam.md) | 中文
-
 ## 问题
 
 harness 需要面向模型的 web 工具，但不能将模型约定绑定到某一家厂商的 API 形状上。搜索是当前的压力点：从一开始就同时支持 Exa 搜索和 Perplexity 搜索——两种刻意不同的提供方形状（Exa 返回扁平的 `results[]`，每项包含 `{title, url, highlights, publishedDate}`；Perplexity 返回一段生成式回答加引用列表）——正是用来证明归一化的 web 约定并非只是镜像某一家厂商。Fetch 是另一项独立操作：匿名公开 HTTP(S) fetch 后端涉及传输、安全、重定向、解码和大小限制等关注点，与提供方支撑的搜索并不相同。

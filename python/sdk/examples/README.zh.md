@@ -1,7 +1,5 @@
 # Python SDK 示例
 
-[English](README.md) | 中文
-
 基于唯一应用启动器 `dsh --profile sdk-minimal` 的可运行 Python SDK 示例。Python 客户端负责 JSON-RPC stdio；profile 负责 agent 组合、持久化、执行策略与插件。
 
 ## 运行极简 agent

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-04-web-latency-throughput-metrics.md) | 中文
-
 ## 问题
 
 Web 聊天已经记录了逐步骤的 LLM（大语言模型）计时（`stepStartTime`／`firstTokenTime`／`completedTime`）和逐步骤 usage，trajectory 视图也按步骤展示它们，但聊天界面既回答不了「这一轮响应有多快」，也回答不了「这个会话跑得有多快」：assistant 页脚只显示轮次实际耗时，统计行也只折算墙钟时间总量。

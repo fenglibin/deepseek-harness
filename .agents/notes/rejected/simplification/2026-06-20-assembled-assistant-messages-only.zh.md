@@ -2,8 +2,6 @@
 
 Status: rejected — 高保真分片回放、失败流的部分输出与快照回放目前依赖持久化的 `assistant/chunk` 事件。只有具备无信息损失的回放或产物替代方案后，才能删除分片。
 
-[English](2026-06-20-assembled-assistant-messages-only.md) | 中文
-
 ## 问题
 
 当前的规范会话日志会持久化模型流式输出的每一个 `assistant/chunk`。[会话持久化 Agent Note](../../implemented/architecture/2026-06-14-session-persistence.zh.md)选择这一方案是为了 token 级回放保真度和连续的 `seq`，但其代价日益增长：JSONL fixture（测试前置数据）被大量微小的增量记录占据，快照场景通过对分片事件分组来回放模型，ACP（Agent Client Protocol）加载时从分片重建先前的 assistant 输出，而任何未来的日志读取方都必须区分持久的消息历史与 token 级追踪。

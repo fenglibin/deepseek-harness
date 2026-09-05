@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-15-agent-initiator-scope.md) | 中文
-
 ## 问题
 
 harness 中存在两种有用但不同的上下文概念。Cordis `Context` 负责选择服务、注册归属和生命周期；`agent.ctx` 是一个存活 Agent 所拥有的扁平注册作用域。Agent 与会话身份描述的则是异步操作主体。若把根 `ctx.agent` 改成「当前正在运行的 Agent」，就会混淆这两种含义，并在单进程并发驱动多个 Agent 时失效。

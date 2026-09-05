@@ -5,8 +5,6 @@ kind: "package-group"
 
 # examples/：可复用组合 bundle
 
-[English](README.md) | 中文
-
 ## 概述
 
 examples 组提供可复用 agent 主干，供需要具体组合但不想手工组装的测试与自定义部署使用。其 npm 名称中的 `-demo` 后缀表明它是支持基础设施，而非产品接口。ACP、SDK 与单次执行应用分别通过 `acp`、`sdk` 或 `sdk-minimal`、`headless` profile 启动。本组不包含应用入口。

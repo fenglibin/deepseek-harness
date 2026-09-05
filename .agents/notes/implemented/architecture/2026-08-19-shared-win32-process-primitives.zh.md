@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-19-shared-win32-process-primitives.md) | 中文
-
 ## Problem
 
 Windows ACL sandbox 拥有 restricted token、SID、DACL、grant 与 workspace policy，但其进程启动路径还同时承载通用 Koffi ABI、命令行引用、匿名管道、继承 stdio、Job 设置、wait 与 HANDLE 清理。第二个 Windows process consumer 否则只能依赖 sandbox policy 或复制 native resource 逻辑，而 allocation 与失败清理修复也必须在多份实现间保持同步。

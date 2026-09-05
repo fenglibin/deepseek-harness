@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-05-durable-web-schedule.md) | 中文
-
 ## 问题
 
 在对话中创建的提醒必须始终归属于确切的那个 Session，并且跨进程重启存活。进程本地 timer 或 inbox 项无法提供这种持久性，而全局 scheduler 或私有数据库又会引入第二套身份、持久化和生命周期系统。

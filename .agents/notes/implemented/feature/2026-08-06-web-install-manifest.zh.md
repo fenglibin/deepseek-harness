@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-web-install-manifest.md) | 中文
-
 ## 问题
 
 Web 构建产物已有文档标题和 favicon，却没有可供浏览器发现稳定安装身份、启动边界或安装后呈现方式的 manifest（元数据清单）。添加这类元数据也可能暗示应用并不具备的能力：service worker 会让人以为应用提供离线约定，而单一语言或调色板取值会错误描述这个能够解析浅色与深色主题的双语 UI。

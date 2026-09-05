@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-19-web-index-injection-table.md) | 中文
-
 ## Problem
 
 Web 壳的启动 HTML 需要三类注入：client-modules 的引导协议（`__ModuleLoader__` 注册队列内联脚本、parser 阻塞的 preload `<script src>`、`__DSH_BOOT__` 全局图）与 ui-theme 的首帧主题脚本。旧机制是 `webServer.tapIndex(html => html)` 字符串变换：每个注册方各自用正则找 `<head>`/`<body>` 改 HTML。静态 worker 部署（页面是构建产物、host 树在 Web Worker 里）没有「服 HTML」这一步，于是 worker 侧只能在 `/__boot__` 载荷里手工重抄同一批数据（graph + theme，经 `ctx.get` 硬掏），页面侧再用手写代码（facade 安装、theme 应用、preload 循环）把 tap 干的事重演一遍——同一份启动语义存在三份实现。

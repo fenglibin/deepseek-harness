@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-shell
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-shell` 定义运行 shell 命令的执行器服务（`ctx.shell`）：前台命令在结束时以有界输出 resolve，后台进程则立即返回句柄。仓库中的每个 shell 执行器——本地 Bash、沙箱 Bash、本地 PowerShell、沙箱 PowerShell——都实现这同一个约定，因此面向模型的 `bash` 与 `pwsh` 工具在任何一个之上都能不加改动地工作。调用方先提交请求，再在任何命令运行前拿到一份默认值与上限都已显式填好的 spec。该服务本身从不向模型渲染任何内容；所有模型可见的输出与沙箱指引都归 shell 工具所有。

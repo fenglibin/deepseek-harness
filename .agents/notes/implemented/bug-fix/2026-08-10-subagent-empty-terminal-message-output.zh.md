@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-subagent-empty-terminal-message-output.md) | 中文
-
 ## 问题
 
 当 `max-tokens` 步骤只组装了工具调用块时，agent loop（智能体循环）会追加一条空内容的 `assistant/message`，因为 `BlockAssembler.blocks()` 会丢弃被截断的工具调用；这条消息仅记录 usage。三个消费方独立选取子 agent 的输出，并把这条 usage 记录当成输出。进程内驱动的 `readResult` 与 continuable Activation 的 `subagent/end` capture 不加过滤地选取最后一条 `assistant/message`，SDK 后端的观察器则让任何 `assistant/message` 优先于累积的文本。在被 max-tokens 截断的多步轮次中，最后那条空消息导致 `SubagentResult.output`、工具结果、遥测与 `subagent/end.lastAssistantMessage` 都漏掉真实的部分回答。进程内驱动也没有流式文本兜底，因此被取消的子 agent 若其唯一文本只存在于 `assistant/chunk` 事件中，也会报告 `[]`。

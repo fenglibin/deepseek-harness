@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-22-evidence-based-larger-hosted-runners.md) | 中文
-
 ## 问题
 
 高度分片的 CI 拓扑通过把主 Node 工作分散到 40 个 Linux 作业、把 Windows 工作分散到 9 个作业来达到延迟目标。大多数门禁本身的耗时短于代码检出、运行器设置、缓存恢复和依赖安装这些准备阶段，因此反复执行多轮设置既增加成本，也带来延迟波动。一次托管运行中最慢的 Linux 作业用时 49 秒，而一个 Windows lint 分片却耗时 231 秒，其中仅代码检出、缓存恢复和安装就占了 158 秒。

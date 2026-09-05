@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-27-web-file-and-session-references.md) | 中文
-
 ## 问题
 
 Web 输入框已有可复用的斜杠命令／引用触发流水线，但它的 `@` source 只是不会产生实际作用的 subagent 标签文本。Web 需要由宿主提供工作区路径发现和结构化跨会话快照，同时避免在浏览器中扫描宿主文件系统或把会话身份绑定到显示标签。

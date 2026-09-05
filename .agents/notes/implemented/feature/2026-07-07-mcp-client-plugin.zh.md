@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-07-mcp-client-plugin.md) | 中文
-
 ## 问题
 
 harness 此前无法消费 MCP（Model Context Protocol）生态中的工具。MCP 是工具服务器的新兴标准——GitHub、文件系统、数据库、代码搜索以及数百个社区服务器都通过 MCP 暴露工具。用户希望将 harness 指向一个或多个 MCP 服务器，让其工具以原生的模型可见工具形式出现，而无需为每个服务器编写胶水代码。

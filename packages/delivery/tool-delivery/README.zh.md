@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-delivery
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-tool-delivery` 为模型提供六个操作持久化同会话交付任务的工具：`get_delivery_task` 读取当前任务，`create_delivery_task` 创建任务（根据目标长度自动分级），`record_change` 记录一条变更，`record_design` 记录一条设计，`record_spec` 记录一条 spec，`advance_delivery_task` 推进阶段。门禁强度是部署选择：`stateful`（默认）在至少存在一条变更记录之前阻止推进到 `implemented`，在至少存在一条设计记录之前阻止推进到 `designed`，在至少存在一条 spec 记录之前阻止推进到 `specified`；`advisory` 只提醒而不阻止，`off`（或 `enabled: false`）完全不注册工具。当 agent 应当保持一个可见、可追溯变更并按纪律生命周期推进的任务时选择它。

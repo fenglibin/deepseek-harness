@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-05-context-meter-blind-to-compaction.md) | 中文
-
 ## 问题
 
 composer 的[上下文仪表](../feature/2026-08-05-composer-context-meter-breakdown.zh.md)的圆环、百分比与 `~已用 / 容量` 标题都取自 `contextPressure.pressureTokens`，即提供方报告的最新提示词规模。这个数字只在某个请求报告用量时才会移动，而压缩（compaction）不报告用量：`compaction-basic` 通过直连的 `ctx.llm.stream()` 调用生成摘要，只追加 `compaction/start`、`compaction/summary`、用作替换的 `user/message` 和 `compaction/end`——没有 `assistant/message`，也没有用量分片。

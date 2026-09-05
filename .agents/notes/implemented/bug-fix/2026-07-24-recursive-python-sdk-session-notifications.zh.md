@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-24-recursive-python-sdk-session-notifications.md) | 中文
-
 ## 问题
 
 Python SDK 过去通过将每条通知的 payload 与根会话 ID 直接比较来过滤轮次通知。直接子 agent 的生命周期通知因 parent ID 指向根会话而能够通过，但孙级生命周期通知与所有后代 `session.event` 都会被拒绝。JSON-RPC 服务器仍会发出这些通知，因此它们会堆积在底层全局队列中，而高层消费者会丢失嵌套轨迹的关系与结束状态。

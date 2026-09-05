@@ -1,7 +1,5 @@
 # 交付纪律子系统（Delivery Discipline）方案
 
-[English](delivery-discipline-rationale.md) | 中文
-
 > 状态：决策已对齐，待最终确认（编码暂缓）
 > 目标读者：维护者与决策者
 > 关联诉求：为每个执行的任务引入「变更记录 + 设计方案 + openspec 任务拆分 + 验证验收 + 后置自检 + 程序化门禁 + 页面呈现 + 配置化」的强制工程流程。

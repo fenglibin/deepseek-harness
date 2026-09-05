@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-24-adapter-owned-reasoning-effort-capabilities.md) | 中文
-
 ## 问题
 
 推理强度过去只能在适配器中配置，因此对话无法在多次请求之间发现或更改所选模型支持的等级。若将某个适配器的等级联合类型提升到 `dsh-llm`，所有提供方和模型都必须采用一套自身可能并不支持的名称；若改用提供方特有的 options 对象，agent loop（智能体循环）又无法校验最终生效的请求，也无法通过持久化记录准确重建该请求。

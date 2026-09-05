@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-12-simplify-session-log-representation.md) | 中文
-
 ## 问题
 
 会话日志维护着两种表示，其机制复杂度超出了消费方的实际需求：一个伪链表 surface 和自定义的请求头增量。

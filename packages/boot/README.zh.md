@@ -5,8 +5,6 @@ kind: "package-group"
 
 # boot/：共享的 app bin 启动粘合层
 
-[English](README.md) | 中文
-
 ## 概述
 
 boot 组提供每个 dsh app bin 启动所需的全部能力：`app-boot` 把 `cordis.yml` 连同你的环境与 patch 层变成运行中的应用，并给出清晰的失败信息；`cmdline` 让应用持有自己的命令行 flag 与 `--help`。借助这些包，你可以运行 `dsh`，也可以编写以同样方式启动的新应用或测试 fixture。两者都是 `apps/cli` 与测试专用 Loader fixture 导入的库，绝不是组合加载的插件。本页是组的映射；各包 README 负责各自的包级约定。

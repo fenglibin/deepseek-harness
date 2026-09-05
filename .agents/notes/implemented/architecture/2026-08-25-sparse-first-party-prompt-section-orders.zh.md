@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-25-sparse-first-party-prompt-section-orders.md) | 中文
-
 ## 问题
 
 仓库自带的系统提示词段分散在二十多个包中，各自声明互不关联的数字字面量。主要工具序列连续占用 100 到 117，后续插入还使用半步数值。因此，后续更改可能在无法看到完整分配表的情况下与已有段发生冲突。

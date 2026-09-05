@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-delivery-discipline-client-ui.md) | 中文
-
 ## 问题
 
 B1–B4 交付了任务领域、工具、门禁、产物持久化与后置命令，但 Web GUI 没有呈现其中任何内容：用户看不到当前交付任务的分级、阶段或产物清单，因此设计文档「让每个阶段可见」的目标（§2、§6.6）未达成。

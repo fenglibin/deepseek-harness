@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-slash-catalog-follows-preset-switch.md) | 中文
-
 ## 问题
 
 preset 把决定 `/` 菜单内容的那些行搬走了。Web 组装禁用了宿主面的 `skill-filesystem`、`tool-skill`、`plan-mode` 和 `command-compact`，改由 preset 提供，因此一个会话有哪些命令和技能，是它自身组成的属性，而不是部署的属性。

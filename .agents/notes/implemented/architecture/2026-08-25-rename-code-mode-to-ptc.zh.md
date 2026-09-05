@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-25-rename-code-mode-to-ptc.md) | 中文
-
 ## 问题
 
 通过生成的 SDK 与 `run_code` 传输层向模型呈现工具的注册表模式，发布时用的名字是 Code Mode；而选择该模式的客户端预设早已以「PTC mode」发布（locale `presetPtcName: 'PTC mode'`，中文 `PTC 模式`）。同一功能有两套名字：配置值、插件与事件名、文件与文档写的是 `code`／`code-mode`，用户可见的名字却是「PTC mode」。预发布阶段的更名必须一次性更新所有引用——不加任何兼容别名。

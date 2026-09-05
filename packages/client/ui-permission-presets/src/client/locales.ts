@@ -17,25 +17,7 @@ export const zh = {
 } satisfies Record<string, string>
 
 /** The settings.permission namespace key union. */
-export type PermissionSettingsKey = keyof typeof zh
-
-/** English dictionary, checked complete against the zh key set. */
-export const en = {
-  'title': 'Permission',
-  'description': 'Choose the default permission mode for new sessions',
-  'loading': 'Loading',
-  'unavailable': 'Unavailable',
-  'preset.readOnly': 'Read Only',
-  'preset.workspaceWrite': 'Workspace Write',
-  'preset.fullAccess': 'Full access',
-  'confirm.title': 'Enable Full access?',
-  'confirm.description': 'Full access lets new sessions reduce confirmation steps and perform more actions directly, including sensitive operations, file changes, or external commands. Only use it when you trust subsequent tasks.',
-  'confirm.acknowledge': 'I understand the risks and want to continue',
-  'confirm.cancel': 'Cancel',
-  'confirm.enable': 'Enable Full access',
-} satisfies Record<PermissionSettingsKey, string>
-
-/** Simplified Chinese dictionary for the current-session popup gate. */
+export type PermissionSettingsKey = keyof typeof zh/** Simplified Chinese dictionary for the current-session popup gate. */
 export const accessZh = {
   'preset.readOnly': '仅可查看',
   'preset.workspaceWrite': '可写入工作区',

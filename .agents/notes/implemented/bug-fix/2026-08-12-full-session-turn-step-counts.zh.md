@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-12-full-session-turn-step-counts.md) | 中文
-
 ## 问题
 
 Web 聊天统计条的每个非 token 数字都折算自 `StatsLine` 已加载的会话窗口（`deriveStats` 遍历 `chat.legacy.nodes`）：「N 轮 · M 步」计数、LLM 与工具墙钟时间、TTFT／吞吐平均值。历史按每页 50 条消息分页，因此每点一次「加载更早」窗口变大、所有数字随之增长——7 轮 · 44 步在翻一页后变成 10 轮 · 89 步，LLM 时长同样攀升。产品预期是与客户端加载了多少历史无关的全会话数字。同一统计条里的 token 账目早已采用正确架构：持久的 `tokenUsage` 投影。

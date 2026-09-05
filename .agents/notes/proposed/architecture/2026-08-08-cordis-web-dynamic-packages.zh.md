@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-08-08-cordis-web-dynamic-packages.md) | 中文
-
 ## Problem
 
 模型需要在不修改仓库源码、不重新构建应用、不刷新浏览器的前提下，临时扩展当前 DSH 进程。扩展既可能运行在 Host 的 Node.js 进程，也可能运行在 Client 浏览器页面，还可能由 Host 取数、Client 展示，共同组成一个插件。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-04-tighten-hook-protocol-contract.md) | 中文
-
 ## 问题
 
 `dsh-hook-protocol`/bridge 约定中有四部分没有遵守 [subagent observe/enrich Agent Note](../../archived/feature/2026-06-30-subagent-observe-enrich.md) 记下的准则——后者因缺少消费方而删除 `agentType` 生命周期字段，以下各项没有通过同一检验：

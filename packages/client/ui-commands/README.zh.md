@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-commands
 
-[English](README.md) | 中文
-
 ## 概述
 
 在 composer 中键入 `/` 命令会打开匹配的表面——已注册的弹窗、宿主命令的输入或直接执行——命令行绝不会被静默降级为普通提示词。业务包经 `ctx.commandUi` 贡献命令表面：注册 popupSelect 贡献项（`/model`、`/permission`），或用选择器装饰既有宿主命令，宿主保留其目录行与参数声明。空格与回车对照会话目录解析命令行：带 `input` 的宿主描述符是 `leadingInput`，注册了 `CommandUiSpec` 的是 `popupSelect`，其余全部是 `execute`。

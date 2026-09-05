@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-product-subagent-providers-in-shared-host.md) | 中文
-
 ## 问题
 
 [Codex 与 Claude Code 提供方约定](../feature/2026-08-04-claude-code-and-codex-subagent-backends.zh.md)最初以可独立安装的包交付，由部署环境在通用 subagent 工具旁加载。Agent Preset 后来成为单个 agent（智能体）的模型可见工具的常规责任方，但 preset 不能安全地拥有这些产品提供方：`ctx.subagents` 是进程级注册表，提供方名称在 Host 内唯一，而宿主消费方会跨会话解析同一个注册表。因此，重复组装 preset 会争用同一组已配置名称。如果要求用户同时编辑 Profile 和 Preset，也会使通用 preset 配置项本身不完整。

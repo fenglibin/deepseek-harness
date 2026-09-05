@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-coverage-uncovered-locations.md) | 中文
-
 ## 问题
 
 per-file 100% 覆盖率门禁失败时，vitest 只输出文件级错误行（`ERROR: Coverage for lines (…) does not meet global threshold (100%) for <file>`）——知道哪个文件没达标，不知道差在哪几行。内置 `text` 报表虽有 Uncovered Line #s 列，但它是全仓几百个文件的大表：该列按表宽截断、只有行号没有列号、不区分语句/分支/函数，且达标文件同样占行。结果是 CI 上的覆盖率红报无法直接据此处理，定位具体缺口只能本地重跑一遍 html 报表。

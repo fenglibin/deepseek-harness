@@ -5,8 +5,6 @@ kind: "package-group"
 
 # terminal/：持久 PTY 能力家族
 
-[English](README.md) | 中文
-
 ## 概述
 
 `terminal/` 组为 agent 提供持久且限定所有者范围的终端会话：shell 与 REPL 状态——cwd、导出的变量、激活的环境、正在运行的交互式子进程——都能跨工具调用存活。三个包共同覆盖整个家族：`terminal/` 提供限定所有者范围的 `ctx.terminals` 会话服务（会话获得不透明 id，每个操作都限制在所属 agent 内）；`terminal-bash/` 在共享沙箱策略下启动交互式 bash 或 pwsh shell；`tool-terminal/` 提供 6 个结果有界的面向模型工具。终端是单次 bash 与文件系统工具的补充：仅在需要交互式 stdin 或跨调用状态时使用。会话只存在于进程本地，harness 重启后不会恢复。

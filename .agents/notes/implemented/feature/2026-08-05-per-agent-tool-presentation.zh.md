@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-05-per-agent-tool-presentation.md) | 中文
-
 ## 问题
 
 agent preset 已经能按会话组装一个 agent 的工具，却管不了这些工具以何种**形态**抵达模型。PTC mode——一个 `run_code` 工具加一份生成的 TypeScript SDK，用一段程序替代一串调用——此前是宿主 `dsh-tools` 那一行上的部署级 `mode` 字段。一个部署要么所有会话都跑 PTC mode，要么一个都不跑，于是那个显而易见的产品形态（预设选择器里「代码模式」与标准/极简/创造并列）无处安放。

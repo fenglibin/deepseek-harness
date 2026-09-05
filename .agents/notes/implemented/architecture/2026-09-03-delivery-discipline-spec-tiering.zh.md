@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-delivery-discipline-spec-tiering.md) | 中文
-
 ## 问题
 
 B1 与 B2 为会话提供了带设计记录与 `designed` 门禁的可追溯变更任务，但 `specified` 阶段（存在于 `l2` 顺序中）仍无法到达：没有任何东西记录 spec，也没有任何东西要求 spec，且 `l2` 分级没有自动的规模信号。

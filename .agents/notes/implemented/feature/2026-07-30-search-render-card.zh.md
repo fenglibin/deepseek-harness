@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-search-render-card.md) | 中文
-
 ## 问题
 
 `grep` 与 `glob` 返回结构化的 canonical 值——`grep` 是扁平的 `{ matches: [{ path, lineNumber, line }] }`，`glob` 是 `{ paths: string[] }`——但每个 UI 只见过它们面向模型的渲染文本：`grep` 把匹配按文件头分组、每行 `Line N:`，`glob` 打印换行连接的路径列表，两者在内联上限（`grepMaxMatches`，默认 250；`globMaxResults`，默认 100）把后续结果落到 spill 文件时都追加一个 spill 脚注。想把搜索结果渲染成可展开的按文件匹配组、或可选择的路径列表的 Web 前端，只能去重新解析那段文本。两个工具都已声明调用时的[渲染意图](../architecture/2026-07-02-tool-render-intent-union.zh.md)（`GenericCallView`，`kind: 'search'`），但没有结果阶段视图，所以已完成的调用回退到渲染原始文本的 generic 卡片。

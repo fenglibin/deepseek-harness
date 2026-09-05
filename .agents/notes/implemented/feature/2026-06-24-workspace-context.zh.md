@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-24-workspace-context.md) | 中文
-
 ## 问题
 
 `AGENTS.md` 等仓库指引应当进入编码会话的有效上下文，使项目约定、构建命令和评审规则无需由用户反复粘贴即可生效。stdio 与 ACP（Agent Client Protocol）产品需要具备相同行为，并按会话 cwd 隔离：全局系统提示词章节会把一个工作区的文件泄漏到另一个仍在运行的 ACP 会话中。

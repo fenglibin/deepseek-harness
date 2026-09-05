@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-23-cross-realm-cdp-inspector.md) | 中文
-
 ## Problem
 
 Host 诊断、浏览器 Client 观测和 JavaScript 调试来自不同 JavaScript realm。Host 主线程上的 debugger transport 无法在该线程暂停时投递 `Debugger.resume`；若每个 producer 直接生成 CDP，又会重复协议状态，并把应用观测逻辑绑到 Chrome 呈现协议。

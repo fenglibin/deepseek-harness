@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # `@deepseek-ai/dsh-acp-app`
 
-[English](README.md) | 中文
-
 ## 概述
 
 以 [`dsh-base`](../base/README.zh.md) 为基础的 automation-only ACP stdio 应用 `dsh` profile 组合包。它继承 base 默认禁用模块 HMR（热模块替换）的策略；其 patch 设置 coding agent（编程智能体）persona 与默认模型路由、挂载应用自有的零选项命令提供方，并且只在该提供方接受调用后启动 [`dsh-acp`](../../acp/acp/README.zh.md)。因此，`dsh --profile acp --help` 会写出 help 并退出，不会占用 stdin 或 stdout。

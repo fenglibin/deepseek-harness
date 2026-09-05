@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-home-paths
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-home-paths` 解析所有用户数据所在的统一 DeepSeek Harness 主目录，并把子路径拼接上去，让每个产品包都就文件存放位置达成一致。优先级是显式的：显式配置的路径优先，然后是 `$DSH_HOME`，最后是 `~/.dsh`；空或仅含空白的 `$DSH_HOME` 视为未设置。该包还针对操作系统主目录展开 `~`、`~/...` 与 `~\...` 前缀，并规范化监听目标，让原生文件系统 watcher 即使在最终路径段尚不存在时也能获得一种稳定的路径写法。它是一个零依赖库，由产品包直接导入；`cordis.yml` 无法加载它。

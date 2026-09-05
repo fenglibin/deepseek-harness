@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-12-open-ready-web-ui.md) | 中文
-
 ## Problem
 
 `dsh web` 会绑定 HTTP 服务器并打印规范本地 URL，但仍要求用户把 URL 复制到浏览器，尽管根 README 已把该命令描述为会打开 Web UI。浏览器交接也不能只以服务器绑定回调为时机：API 路由、浏览器插件名录和静态回退可能仍在挂载，第一次页面请求可能看到一个尚未完整且即将被进程判定为启动失败的应用。

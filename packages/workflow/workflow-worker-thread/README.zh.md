@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-workflow-worker-thread
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-workflow-worker-thread` 以每次运行一个 Node worker thread 的方式实现工作流引擎：编排脚本在一个全新 worker 内执行，其 `agent()` 调用通过带类型的宿主／worker 协议触达宿主 subagent。同步脚本循环不会阻塞 harness 事件循环，忽略取消的脚本可以连同其 worker 一起终止。这种隔离只是 containment（隔离），不是安全边界——由模型编写的脚本与模型已有的 bash 访问具有相同的信任前提，逃逸 `node:vm` 上下文即可重新取得 worker 的进程权限。挂载本引擎即为 `ctx.workflowEngine` 提供具体实现；与 `dsh-tool-workflow` 一起加载的组合会把 `workflow` 工具交给模型。

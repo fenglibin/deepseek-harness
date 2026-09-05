@@ -1,7 +1,5 @@
 # 对话 UX 打磨设计 — 六个面板级优化
 
-[English](chat-ux-polish.md) | 中文
-
 > Status: 草稿，待用户确认后实施
 > Audience: 维护者与决策者
 > Related request: 对话面六个用户可见的小打磨，全部仅限客户端、每个都可独立回滚、不改动 agent-loop 与 session 协议。

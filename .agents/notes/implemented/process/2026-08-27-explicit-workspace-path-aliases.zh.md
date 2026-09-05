@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-27-explicit-workspace-path-aliases.md) | 中文
-
 ## Problem
 
 `tsconfig.base.json` 是整个仓库的解析门面：每个包的 project 都 extends 它，两个聚合配置都读它，每个 Vitest 配置都把 `vite-tsconfig-paths` 指向它。其中两条别名按包**分组**而不是按包各写一条候选——`@deepseek-ai/dsh-*` 列了 49 个候选 glob，`@deepseek-ai/dsh-*/invariant` 列了 45 个。

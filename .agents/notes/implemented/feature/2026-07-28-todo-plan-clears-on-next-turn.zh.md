@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-28-todo-plan-clears-on-next-turn.md) | 中文
-
 ## 问题
 
 `todo_write` 在会话日志中存储完整列表快照，交互式宿主把最新列表渲染为计划条（web TodoPanel 经 `todos` 投影，TUI Plan 面板）。一个轮次结束后，该条仍留在下一用户轮次的屏幕上——上一任务已完成或已放弃的清单。读者把计划条理解为「本轮次正在做什么」，因此跨轮次的陈旧列表是错误的产品生命周期。[web todo 展示](2026-07-23-web-todo-display.zh.md)与 [`todo_write` 工具](2026-06-29-todo-write-tool.zh.md) Agent Note 仍拥有事件溯源与两个渲染面；它们把常驻计划描述为持续整段会话直至下一次写入。

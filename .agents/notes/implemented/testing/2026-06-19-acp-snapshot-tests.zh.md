@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-19-acp-snapshot-tests.md) | 中文
-
 ## 问题
 
 单元测试不会覆盖组装后的完整 agent（智能体）子进程及其 ACP（Agent Client Protocol）自动化协议格式，而真实 API 测试不具确定性且受密钥门控。因此，即使单元测试覆盖率检查通过，Loader 接线、后端行为和协议输出仍可能回归，[默认导出事故复盘（postmortem）](../../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)已经证明了这一点。

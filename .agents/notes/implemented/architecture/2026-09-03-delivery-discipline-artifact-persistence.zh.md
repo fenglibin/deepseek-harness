@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-delivery-discipline-artifact-persistence.md) | 中文
-
 ## 问题
 
 B1–B3 仅把变更/设计/spec 记录作为 durable 的 `delivery/change` 会话事件，设计文档「每个任务在项目工作目录留下变更记录」的目标（§2、§6.2）未达成，因为没有任何东西写 `.dsh/changes/` 与 `.dsh/design/` 文件。`record_change`/`record_design`/`record_spec` 工具因此从未在磁盘上产出用户可读的产物。

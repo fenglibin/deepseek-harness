@@ -20,7 +20,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import { DeliveryFloatCard } from './DeliveryFloatCard.tsx'
 import { DeliveryTaskPanel } from './DeliveryTaskPanel.tsx'
 import { deliveryTaskDefinition } from './delivery-definition.ts'
-import { en, zh, type DeliveryKey } from './locales.ts'
+import { zh, type DeliveryKey } from './locales.ts'
 
 export { DeliveryFloatCard, type DeliveryFloatCardProps } from './DeliveryFloatCard.tsx'
 export { DeliveryTaskPanel, type DeliveryTaskPanelProps } from './DeliveryTaskPanel.tsx'
@@ -48,7 +48,7 @@ export const inject = ['uiConversation', 'slots', 'locale']
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-delivery: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh }), 'ui-delivery: dictionaries')
   ctx.uiConversation.events.register(deliveryTaskDefinition)
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({
     name: 'conversation.chat.node',

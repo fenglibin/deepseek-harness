@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-09-conversational-schedule-delivery.md) | 中文
-
 ## 问题
 
 Schedule 已经通过将普通的 agent（智能体）后续轮次排入队列来交付到期提醒。第二条持久 Web 回执通过 Schedule 投影、持久化成功事件、Host 历史记录与 live 伴随数据、客户端同序号升级、通用事件视图 slot 和专用渲染器表示同一次提醒触发。这条路径把一项功能的确认 UI 分散到会话、持久化、Host、客户端运行时、对话 UI 和一个额外包中。

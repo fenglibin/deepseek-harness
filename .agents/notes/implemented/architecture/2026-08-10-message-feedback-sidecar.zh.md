@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-message-feedback-sidecar.md) | 中文
-
 ## 问题
 
 现有 `/feedback` 命令记录不可变的 Session 级 `feedback/record` 事件。在 `FEEDBACK_ONLY` 下，该事件可以释放待处理的遥测前缀，因此它不适合作为挂在单条 assistant 消息上的可编辑好评／差评与可选备注的权威来源。消息反馈需要独立的更新与删除语义，且不得进入权威 Session 日志、改变投影、到达模型上下文，或隐式表示遥测同意。

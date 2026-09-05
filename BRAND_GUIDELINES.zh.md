@@ -1,7 +1,5 @@
 # DeepSeek Harness 品牌素材使用规范
 
-[English](BRAND_GUIDELINES.md) | 中文
-
 为了维护 DeepSeek Harness 生态的长期健康发展，避免用户混淆，方便用户对相关资源进行检索和识别，我们特别制定本规范，希望大家共同遵守：
 
 - 在项目的描述性文字中，您可以使用“DeepSeek Harness”真实、准确地说明您的项目与 DeepSeek Harness 的关系，例如“基于 DeepSeek Harness 构建”或“兼容 DeepSeek Harness”等。这类说明符合许可证的要求，也有助于用户理解项目的定位。

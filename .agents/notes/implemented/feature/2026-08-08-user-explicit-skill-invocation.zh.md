@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-08-user-explicit-skill-invocation.md) | 中文
-
 ## 问题
 
 `disable-model-invocation: true` 的 skill（技能）在设计上就是仅限用户的：它绝不进入面向模型的目录，`skill` 工具也拒绝加载它。它唯一正当的入口是一次显式的用户手势——而 web 客户端此前没有这个入口。`skills/list` 过滤到模型与用户的交集（把仅限用户的 skill 挡在菜单之外），输入的 `/name` 一行以纯文本落入默认提示词 sink，而这行文本到达的模型又被禁止加载该 skill——于是退化为模型去 `read` 那份 SKILL.md 文件，或者干脆无视这次手势（issue #1470）。即使对普通 skill，纯文本引用也让用户调用只是模型可以忽略的协作线索，而不是保证。

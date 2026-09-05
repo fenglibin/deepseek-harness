@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-14-session-persistence.md) | 中文
-
 ## 问题
 
 会话此前仅存在于内存中。示例插件 `session-jsonl.ts`（在两个示例中逐字节重复）是只写的遥测：它缓冲 `session/event` 并追加 JSON 行，没有读取/回放路径，没有崩溃安全性（无 fsync、无原子写入、dispose（资源释放）时采用 fire-and-forget 方式排空），没有列表功能，也没有格式版本控制。没有任何机制能将磁盘上的历史会话重新注入到活跃的 agent（智能体）中，因此持久恢复、持久 fork 以及宿主侧的会话浏览都无法实现。

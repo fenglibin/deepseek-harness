@@ -23,29 +23,5 @@ export const zh = {
   'status.failed': '失败',
   'status.cancelled': '已取消',
   'status.interrupted': '已中断',
-}
-
-/** English dictionary (same key set). */
-export const en: Record<WorkflowRunKey, string> = {
-  'run.title': '{name}',
-  'run.members.one': '{count} member',
-  'run.members.other': '{count} members',
-  'run.empty': 'No members started',
-  'phase.unassigned': 'Unphased',
-  'phase.empty': 'Empty phase name',
-  'statusCount.running': 'Running {count}',
-  'statusCount.completed': 'Completed {count}',
-  'statusCount.failed': 'Failed {count}',
-  'statusCount.cancelled': 'Cancelled {count}',
-  'statusCount.interrupted': 'Interrupted {count}',
-  'member.empty': 'Empty member name',
-  'member.open': 'Open {name}',
-  'status.running': 'Running',
-  'status.completed': 'Completed',
-  'status.failed': 'Failed',
-  'status.cancelled': 'Cancelled',
-  'status.interrupted': 'Interrupted',
-}
-
-/** Union of this namespace's dictionary keys. */
+}/** Union of this namespace's dictionary keys. */
 export type WorkflowRunKey = keyof typeof zh

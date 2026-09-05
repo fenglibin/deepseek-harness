@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-12-production-dsh-excludes-product-subagent-providers.md) | 中文
-
 ## 问题
 
 `@deepseek-ai/dsh` 会获得 `@deepseek-ai/dsh-base` 的依赖闭包。如果 base 包含 Codex 与 Claude Code subagent 提供方，每次生产安装都会下载可选的产品集成代码与大型平台 CLI 载荷，即使用户并未使用任一集成。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-web-search-card.md) | 中文
-
 ## Problem
 
 `grep` 与 `glob` 工具声明了一个仅在结果阶段存在的 `card: 'search'` render intent（[search render card](2026-07-30-search-render-card.zh.md)）：`SearchMatchesResultView`（`shape: 'matches'`）携带 grep 按文件分组的匹配，或 `SearchPathsResultView`（`shape: 'paths'`）携带 glob 的扁平路径列表，两者都带 `truncated`/`total` 截断信号。该视图已经到达浏览器 —— host、connection、runtime 把它作为 `resultView` 投递到 `ConversationSnapshot` 上 —— 但 Web 客户端忽略了它：每个非终端、非 diff 的工具结果都落到 generic 卡片，渲染面向模型的文本。想把搜索结果渲染成可展开的按文件匹配分组、或可扫读的路径列表的 web 前端，只有那段预格式化文本。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-19-windows-atomic-write-dacl-preservation.md) | 中文
-
 ## 问题
 
 原子写入在 POSIX 上以 `0o700` 保护暂存目录、以 `0o600` 保护临时文件，但 Windows mode 位只呈现实际 DACL 的合成只读视图。在目标文件的父目录下创建暂存目录和临时文件，并且只依赖继承的 DACL，足以满足新建文件的需要，但无法安全替换显式或受保护 DACL 比父目录更严格的现有文件：内容会在权限更宽松的父目录 DACL 下写入，而重命名又会把这个暂存安全描述符带到替换后的文件上。

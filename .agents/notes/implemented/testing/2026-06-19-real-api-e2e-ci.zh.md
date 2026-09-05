@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-19-real-api-e2e-ci.md) | 中文
-
 ## 问题
 
 根据策略，harness 高度依赖真实 API 测试：[docs/testing.md](../../../../docs/testing.zh.md) 指出，无密钥套件证明的是管线，而非产品；[ACP（Agent Client Protocol）inject 事故复盘（postmortem）](../../../../docs/postmortem/0001-acp-default-export-drops-inject.zh.md)则是常设证据——178 项无密钥测试保持绿色时，真实 ACP 客户端会话却立即崩溃。真实 API e2e 套件（`pnpm run test:e2e`，即 `*.e2e.ts` 文件）的存在正是为了弥合这一缺口：它针对线上 DeepSeek API 驱动 agent（智能体）——真实模型调用、真实 bash 工具、多轮次、恢复、ACP-over-stdio。

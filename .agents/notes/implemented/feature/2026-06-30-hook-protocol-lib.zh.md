@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-30-hook-protocol-lib.md) | 中文
-
 ## 问题
 
 钩子子系统提供两个桥接插件：一个运行用户既有的 Claude Code（CC）钩子，另一个运行 Codex 钩子。参考实现（`~/repos/refs/claude-code`、`~/repos/refs/codex`）表明一个决定性事实：**Codex 有意重新实现了 CC 钩子协议的一个子集。** 它的引擎读取相同的 `hooks.json`，使用相同的 matcher-group 形状、相同的 exit-code/structured-stdout 输出约定，以及相同的命令钩子执行模型。Codex 的源码甚至以 Claude 的引擎命名，并在注释中标注了「有意偏离」之处。因此，如果不做抽取，两个桥接插件将大量重复协议逻辑。

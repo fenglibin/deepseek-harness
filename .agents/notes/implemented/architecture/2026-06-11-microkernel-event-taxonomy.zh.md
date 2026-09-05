@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-11-microkernel-event-taxonomy.md) | 中文
-
 ## 问题
 
 产品原则是「一切皆插件」：钩子、/goal、/loop、动态工作流、压缩（compaction）、沙箱、权限、UI、持久化、MCP、skill（技能）都必须能以插件形式编写，无需修改核心。

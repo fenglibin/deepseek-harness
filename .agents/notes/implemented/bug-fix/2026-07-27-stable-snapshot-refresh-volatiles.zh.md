@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-27-stable-snapshot-refresh-volatiles.md) | 中文
-
 ## 问题
 
 ACP（Agent Client Protocol）快照比较会归一化生成的 UUID、cwd 别名、spill locator、嵌入的事件时间和省略字节数，但刷新写回会持久化本次生成的原始值。因此，即使比较约定将两份日志视为相等，一次行为未发生变化的刷新仍会用新的随机值或宿主特有的路径写法改写 fixture（测试前置数据）。

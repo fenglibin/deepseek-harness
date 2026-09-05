@@ -2,11 +2,9 @@
 
 Status: implemented
 
-[English](2026-08-27-translation-pairing-merge-budget.md) | 中文
-
 ## 问题
 
-[`scripts/translation-pairing-merge.spec.ts`](../../../../scripts/translation-pairing-merge.spec.ts) 在 `describe` 层加了 `{ timeout: 15_000 }`。它的 23 个用例全部继承这个值，没有任何一个自带余量。
+`scripts/translation-pairing-merge.spec.ts` 在 `describe` 层加了 `{ timeout: 15_000 }`。它的 23 个用例全部继承这个值，没有任何一个自带余量。
 
 每个用例都会建一个临时仓库并通过 spawn 的 `git` 驱动它，因此这个套件受进程创建约束，而不是受它的断言约束。在自托管 Windows runner 上所有实例共用一个卷，而那里的进程创建表现为偶发的数秒尖峰，不是均匀变慢。在那种争抢下，这个套件曾在一个没有改动该文件的分支上报出 `Test timed out in 15000ms`，也就是说决定结果的是预算而不是被测改动。
 

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-english-compaction-checkpoints.md) | 中文
-
 ## 问题
 
 压缩（compaction）检查点会成为下一次模型请求中持久存在的前缀。当多语言对话使压缩器以对话语言保留叙述性材料时，检查点可能引入大量代码、工具输出和既有推理（reasoning）前缀中均未出现的语言内容。该语言随后会在后续压缩周期中持续存在，并影响对话模型的推理文体。

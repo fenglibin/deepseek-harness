@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-bounded-background-job-admission.md) | 中文
-
 ## 问题
 
 模型可以在不同工具调用和后续回合中启动后台 Bash、PowerShell、PTY 操作与一次性 subagent。agent loop 的 `maxParallelToolCalls` 只限制单个步骤中尚未返回的调用；每个后台生产方会立即返回 job id，因此反复启动会让仍存活的进程或子工作无限增长。

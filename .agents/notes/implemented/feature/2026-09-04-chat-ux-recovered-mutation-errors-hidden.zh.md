@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-04-chat-ux-recovered-mutation-errors-hidden.md) | 中文
-
 ## Problem
 
 一次受防护的 `edit` / `write` / `str_replace_editor` 调用以可恢复错误码（`FS_NOT_OBSERVED` / `FS_STALE_VERSION`）失败后，即使后续对同一文件的 mutation 已成功，transcript 里仍保留那次失败的错误行。model-retry 投影已经按 turn 终局隐藏了已恢复的请求重试链，但 tool-call 表面没有对应的机制：`edit requires reading … first — read the file, then retry` 这种失败在模型重新读取文件、重试成功后仍然可见——包括失败与成功之间夹了一次 `read` 的情况。

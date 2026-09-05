@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-anonymous-user-id
 
-[English](README.md) | 中文
-
 ## 概述
 
 每个 harness home 都会获得一个匿名 id，遥测、反馈与 DeepSeek 请求会把它附加到各自的记录上，让接收系统无需了解用户身份即可判断记录来自同一套安装。该 id 是存储在 `$DSH_HOME/.anonymous-user-id`（默认 `~/.dsh`）中的随机 UUID；它会在这些功能之一首次运行时自动出现，跨重启保持稳定，删除文件后会重新生成。不同 harness home 永远不会共享同一个 id，其中也不包含任何机器或账户信息。当你希望关联来自同一套安装、且不依赖账户的记录时使用它；它无法关联不同 home 之间的记录。

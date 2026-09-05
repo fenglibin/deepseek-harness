@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-remote-event-delivery.md) | 中文
-
 ## 问题
 
 [Typert Remote 方法调用](../../implemented/architecture/2026-08-02-typert-remote-method-calls.zh.md)最初只覆盖「一次请求一个结果」的定向调用，明确把 Session 事件流与有状态交互留在别处；Host 向消费端的事件需要一个不归 API Proxy 领域所有的投递机制。

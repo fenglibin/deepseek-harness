@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-12-scoped-layers-store.md) | 中文
-
 ## 问题
 
 agent（智能体）作用域机制（[决策](2026-07-08-agent-scope-contexts.zh.md)、[运行时设计](2026-07-12-agent-scope-runtime-design.zh.md)）让支持作用域的注册表反复呈现同一种形态：一个全局注册层，加上一个与具体 agent 精确对应的层。七个注册门面都采用这一形态：`tools.register`、`tools.restrict` 和 `tools.guard`（位于 `dsh-tools`）；`SystemPrompt.section`、`SystemPrompt.tools` 和 `SystemPrompt.variable`（位于 `dsh-system-prompt`）；以及 `CommandRuntime.register`（位于 `dsh-commands`）。

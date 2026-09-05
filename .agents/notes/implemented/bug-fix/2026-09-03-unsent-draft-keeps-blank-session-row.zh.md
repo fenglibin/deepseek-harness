@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-unsent-draft-keeps-blank-session-row.md) | 中文
-
 ## Problem
 
 Workspace 浏览器只在空白 Session 处于选中状态时列出它，因此临时**新会话**行的存活时间恰好等于读者停留其上的时间。在该行输入提示词后切换到另一个 Session，该行就会消失：输入的文本仍留在按 Session id 键控的草稿存储中，但没有任何一行能回到它，于是要继续这个念头只能记住该 id 或者重新来过。

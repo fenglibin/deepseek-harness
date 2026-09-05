@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-resolved-theme-color-metadata.md) | 中文
-
 ## 问题
 
 Web 客户端可以独立于操作系统偏好解析主题，因此 manifest（元数据清单）中单一的 `theme_color` 值或带媒体条件的静态元数据可能与显式选择的 Light 或 Dark 不一致。此时，无论是已安装页面还是普通页面，其周围的浏览器界面都未必与应用界面一致，尽管布局呈现器已经拥有解析后的 document 调色板。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-20-running-draft-primary-send.md) | 中文
-
 ## 问题
 
 普通 Web composer 在 Turn 运行期间仍可编辑，键盘提交也能把草稿送入 Queue 或 Steer。然而，其唯一的主指针控件会在整个 Turn 中一直保持 Stop。指针用户输入后续消息并激活该控件时，会停止当前 Turn，而不是提交眼前的草稿；该控件因而与 composer 的可编辑状态和用户当前内容相冲突。

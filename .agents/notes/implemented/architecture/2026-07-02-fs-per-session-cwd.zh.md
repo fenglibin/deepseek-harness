@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-02-fs-per-session-cwd.md) | 中文
-
 ## 问题
 
 ACP（Agent Client Protocol）桥接层为每个会话提供独立的工作区：`session/new` 将自动化客户端的项目目录记录为 `SessionHeader.cwd`，`dsh-tool-bash` 将每次 bash 调用的 `workdir` 默认设为调用方 agent（智能体）的 `session.header.cwd`（见 [ACP 包](../../../../packages/acp/acp) 与 `dsh-tool-bash` 中的 `resolveWorkdir`）。因此会话 A 中的 bash 命令在 A 的项目目录执行，会话 B 中的在 B 的项目目录执行——一个服务器进程，N 个工作区。

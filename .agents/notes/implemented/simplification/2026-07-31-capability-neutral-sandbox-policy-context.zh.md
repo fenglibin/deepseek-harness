@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-capability-neutral-sandbox-policy-context.md) | 中文
-
 ## 问题
 
 当前策略上下文最初通过受强制执行家族与可升权家族两个独立注册表来映射运行时组合。后端、工具与示例中的六个调用点会贡献 `filesystem`、`bash` 或 `terminal`；策略服务保留 token 集合，以便独立释放各项注册，对两个注册表的内容求交集并排序，在每次生命周期变化时使提示词组装失效，并且需要测试覆盖所有家族组合。

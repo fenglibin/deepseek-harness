@@ -2,8 +2,6 @@
 
 Status: rejected — 计划增加更多压缩后端，因此 Service Definition 包与 basic 提供方包继续分离。
 
-[English](2026-07-19-fold-compaction-package-split.md) | 中文
-
 ## 问题
 
 压缩（compaction）目前拆分在两个包中：`@deepseek-ai/dsh-compaction` 拥有一个含两个方法的抽象服务和共享类型，`@deepseek-ai/dsh-compaction-basic` 拥有唯一的完整提供方。交付配置只加载 basic 包，除了该提供方外，没有生产包独立消费 Service Definition 包。

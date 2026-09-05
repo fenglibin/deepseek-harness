@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-22-cross-platform-test-fixtures.md) | 中文
-
 ## 问题
 
 单元测试与覆盖率测试套件会在 Windows、macOS 和 Linux 上运行，但平台无关行为可能被平台特有的 fixture（测试前置数据）掩盖。字面 POSIX 路径在 Windows 上会变成相对于驱动器的路径；带主机名的 `file:` URI 在 Windows 上可能是有效的 UNC 路径；子进程管道关闭或事件循环调度在不同宿主上的稳定时点也不一致。FIFO、可执行模式位和目录搜索权限位等仅存在于 POSIX 的文件系统状态，在 Windows 上没有可直接构造的 fixture。

@@ -13,7 +13,7 @@ import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   ConversationEventRegistry, ConversationViewRegistry, type ConvViewOwnerProps,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { en as conversationEn, NS as CONVERSATION_NS, zh as conversationZh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
+import { NS as CONVERSATION_NS, zh as conversationZh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
 import { apply as applyChat, inject as injectChat } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { apply as applyTool, inject as injectTool } from '../src/client/apply.ts'
 import { toolChatSnapshot } from './tool-details-render.client.tsx'
@@ -122,7 +122,7 @@ async function bench(snapshot: ChatSnapshot) {
   new TestRemote(ctx, { session: { openWorkspacePath } })
   const locale = new LocaleRuntime(ctx)
   ctx.provide('locale', locale)
-  locale.register(CONVERSATION_NS, { zh: conversationZh, en: conversationEn })
+  locale.register(CONVERSATION_NS, { zh: conversationZh })
   runtime.slots.installLocale(locale)
 
   await runtime.root.declare(ROOT_CHILDREN, AppRoot)
@@ -148,7 +148,7 @@ describe('run_code sub-calls through the real chat machinery', () => {
     // Parent row: the code variant with the model-authored description.
     const codeRoot = view.container.querySelector('[data-variant="code"]')
     expect(codeRoot).not.toBeNull()
-    expect(view.getByText('Code')).toBeTruthy()
+    expect(view.getByText('代码')).toBeTruthy()
     expect(view.getByText('List the notes directory')).toBeTruthy()
 
     const nest = view.container.querySelector('[data-subcalls]')
@@ -156,7 +156,7 @@ describe('run_code sub-calls through the real chat machinery', () => {
     expect(nest!.querySelector('[data-sample="bash"]')).not.toBeNull()
     expect(view.getByText('Bash')).toBeTruthy()
     expect(view.getByText('List notes')).toBeTruthy()
-    expect(view.getByText('Tool call')).toBeTruthy()
+    expect(view.getByText('工具调用')).toBeTruthy()
   })
 
   it('renders Cordis sub-calls with lifecycle titles over the generic variants', async () => {
@@ -172,9 +172,9 @@ describe('run_code sub-calls through the real chat machinery', () => {
 
     // Each run-control verb names its act and shows the package id; without the
     // owned titles all three would read "Tool call · cordis_run · dyn-2".
-    expect(nest.querySelector('[data-tool="cordis_runtime_inspect"]')?.textContent).toContain('Inspect')
-    expect(nest.querySelector('[data-tool="cordis_run"]')?.textContent).toContain('Run Cordis Plugindyn-2')
-    expect(nest.querySelector('[data-tool="cordis_undefine"]')?.textContent).toContain('Remove Cordis Plugindyn-2')
+    expect(nest.querySelector('[data-tool="cordis_runtime_inspect"]')?.textContent).toContain('查看')
+    expect(nest.querySelector('[data-tool="cordis_run"]')?.textContent).toContain('运行 Cordis 插件dyn-2')
+    expect(nest.querySelector('[data-tool="cordis_undefine"]')?.textContent).toContain('移除 Cordis 插件dyn-2')
     // None of them is a code row: the program belongs to cordis_define, whose
     // own keyed card renders it (the next case covers the code row itself).
     expect(nest.querySelector('[data-variant="code"]')).toBeNull()

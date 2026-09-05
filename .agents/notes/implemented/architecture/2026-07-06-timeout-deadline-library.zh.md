@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-06-timeout-deadline-library.md) | 中文
-
 ## 问题
 
 超时处理在各个承载工具的能力之间逐渐分化，而且这种分化并非表面的：同一套逻辑被以三种方式重新实现，各自带有微妙的正确性负担。

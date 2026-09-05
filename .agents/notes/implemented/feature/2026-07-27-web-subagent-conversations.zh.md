@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-27-web-subagent-conversations.md) | 中文
-
 ## 问题
 
 由会话支撑的 subagent 具有持久化身份、持久化 transcript（文本记录）与直接 child 目录，但普通会话谱系无法将它们与 fork 区分开，也无法证明其描述符 mode 与继续执行授权。否则，绑定到 agent（智能体）的通用 Host 操作可能在其直接 parent 继续执行 owner 之外恢复或驱动 child。

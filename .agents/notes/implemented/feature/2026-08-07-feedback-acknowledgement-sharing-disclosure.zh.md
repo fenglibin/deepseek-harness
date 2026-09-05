@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-07-feedback-acknowledgement-sharing-disclosure.md) | 中文
-
 ## 问题
 
 `/feedback` 命令会记录一个仅写入日志的 `feedback/record` 事件并确认用户，但确认文本没有携带关于会话去向的持久信息：挂载了会话遥测（`FULL`、`FEEDBACK_ONLY` 或 `DISABLED`）的部署无法告知用户其反馈和会话是否离开了进程，确认文本也没有回显接收会话的 id。命令插件无法读取共享策略，因为遥测 seam 只暴露采集能力，而 OTel 模式枚举位于可选的后端包中。

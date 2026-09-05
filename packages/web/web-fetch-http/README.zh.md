@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-web-fetch-http
 
-[English](README.md) | 中文
-
 ## 概述
 
 有了 `dsh-web-fetch-http`，harness 可以通过 web 服务（`ctx.web`）抓取公共 HTTP(S) 页面，并在不发送凭据的情况下获得状态码与有界、解码后的内容。当组合需要 URL 校验、公开地址解析、连接固定、仅同源重定向、字节和字符上限及显式产品 `User-Agent` 时选择它。它把非 2xx 响应作为结果而非错误返回，并拒绝非公开目标、二进制数据与不受支持的内容类型。面向模型的 `web_fetch` 工具位于 `dsh-tool-web`，由它渲染本提供方的正文。

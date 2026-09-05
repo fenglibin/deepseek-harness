@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-cancelled-stream-prefix-finalize.md) | 中文
-
 ## Problem
 
 被取消的流可能留下客户端继续渲染的 `assistant/chunk` 事件，但如果没有 `assistant/message` 记录已送达前缀，`deriveMessages()` 就会排除这部分内容。后续的「第二点展开讲讲」之类追问会缺少用户已读到的文本，在该轮次上创建的分支也会继承这个缺口。

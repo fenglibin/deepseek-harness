@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-08-client-tool-presentation-ownership.md) | 中文
-
 ## 问题
 
 Client 运行时已经按 `callId` 配对工具调用/结果事件，并能从 Code Dispatch 事件恢复 root/subcall 拓扑，但 Chat view 曾同时拥有工具在对话流中的放置、递归调用树编排、按工具名称分发、Generic fallback、card model 和第一方工具 renderer。`ui-conversation` 因此必须解释每个业务工具名称；只移动单个 React 组件不会改变这层所有权，移走原子 renderer 后 subcall 的展示也会无人负责。

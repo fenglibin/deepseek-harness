@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-26-published-dependency-faces.md) | 中文
-
 ## 问题
 
 一个包可能同时包含浏览器 bundle、Host 入口、共享 TypeScript 声明和 Cordis 注入元数据。把这些关系全部编码成必需 npm peer 会使已发布 CLI 的安装代价过高：npm 会自动安装 peer，并沿深层、反复汇合的 peer 路径重复执行放置检查。修改版本范围或把 peer 标成 optional 都不会消除这类遍历。

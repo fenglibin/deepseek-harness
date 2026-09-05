@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-bash-sandbox
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-bash-sandbox` 是沙箱消费型 Bash 执行器：每条命令都以全新的 `bash -c` 进程运行，经 `ctx.sandbox` 能力隔离，而不是以 harness 进程的完整文件权限运行。每个已结算的结果都携带命令运行时的模式、沙箱是否拒绝了文件操作，以及所选 runner 对请求模式的强制执行完整度。当没有 runner 能强制执行受限模式时，调用按失败关闭原则抛结构化 `SANDBOX_UNAVAILABLE` 错误，绝不无隔离地运行。它是 `dsh-bash-local` 的受限兄弟包——共享其进程机制——工具层的升权字段也只在挂载它时才出现。

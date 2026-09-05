@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-15-replay-token-meter-service.md) | 中文
-
 ## 问题
 
 上下文压力并不只对压缩（compaction）有用。压缩后端、溢出保护或未来的请求策略插件都可能需要回答同一个问题：持久请求消耗了多少 token？如果把该折叠逻辑留在 `dsh-compaction-basic` 内部，就会重复实现回放逻辑，使未加载压缩的调用方无法使用计量，并诱使调用方复用陈旧的核算结果。

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-subagent
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-tool-subagent` 是面向模型的委派工具：它把一个已配置的 `ctx.subagents` 提供方变成 agent 可以调用来启动子 agent（智能体）的工具。更换提供方只会改变传输，不会改变执行约定，因此一个组合可以暴露多个委派工具，各自绑定不同的后端。`one-shot` 策略下，调用默认在前台等待子 agent；`continuable` 策略下，调用默认在后台启动工作，并返回模型之后可以发消息的持久化子 agent id。合适的实例还可让模型发现并选择子 agent 的 LLM 提供方、模型与推理等级。工具的描述会随子 agent 是否继承父级已完成轮次而调整，失败的运行以出错的工具结果呈现，而非部分成功。

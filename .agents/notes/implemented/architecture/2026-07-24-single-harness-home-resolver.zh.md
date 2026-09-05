@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-24-single-harness-home-resolver.md) | 中文
-
 ## 问题
 
 对于"DeepSeek Harness 用户数据存放在哪里"，harness 里存在两套互不一致的约定：

@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-code-runtime-python
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-code-runtime-python` 持有 [`dsh-code-runtime`](../code-runtime/README.zh.md) seam 的 Node host 与 CPython 子进程之间的无版本协议格式（wire protocol）：子进程 fd 3 上每行一个 JSON 对象，让 stdout/stderr 空出给程序自己的输出。本包提供 host 侧的帧编解码与敌意帧校验器（`src/protocol.ts`），以及同一套消息词汇的 Python 侧镜像（`py/protocol.py`），因此每个 wire 消费方都共享同一套词汇。它是 Python 后端的协议层——本包不含子进程执行路径，因此除跨语言镜像测试之外，没有任何地方会启动 `python3`。host 把每个入站帧都当作敌意输入，因为模型代码对 fd 3 有完全访问权、可通过它发送任意内容。

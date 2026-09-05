@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-str-replace-editor
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-tool-str-replace-editor` 提供基于 `ctx.fs` 的独立面向模型 `str_replace_editor` 工具：`view` 显示带行号的文件内容或浅层目录列表，`create` 创建新文件，`str_replace` 应用唯一的字面量替换，`insert` 在选定的边界处插入行。它可以与持久 Bash、一次性 Bash、沙箱 Bash 或其他终端接口组合。修改操作遵守与 fs 家族其余部分相同的编辑前读取策略与沙箱围栏，具体由所挂载的后端与策略插件强制执行。当部署需要 Claude Code 风格、使用绝对路径的单一编辑器工具时选择它；`dsh-tool-fs` 包提供替代的 `read`/`write`/`edit` 套件。

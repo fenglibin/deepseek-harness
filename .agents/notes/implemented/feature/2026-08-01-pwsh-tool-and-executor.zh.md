@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-01-pwsh-tool-and-executor.md) | 中文
-
 ## 问题
 
 harness 在每个平台只说一种 shell 方言：`bash`。Windows 主机只能通过 WSL 或 Git-Bash 垫片运行它，而交付的 `dsh-bash-local` 执行器仅限 POSIX（硬编码 `bash`，进程组语义是 POSIX 的）。Windows 路线图——让主机默认 `pwsh`，之后再做 pwsh TUI/GUI 渲染——没有执行基础：既没有 bash 执行器 seam 的 PowerShell 实现，也没有教模型 PowerShell 方言的面向模型工具。bash 工具也大于 Windows 优先画像的严格所需——尤其持久 PTY 孪生是 `pwsh` 工具至今仍不背负的 bash 形状表面。最初的最小画像也没有后台任务与沙箱升级：后台随 [parity 决策](2026-08-02-pwsh-tool-bash-parity.zh.md) 到来，沙箱面（拒绝渲染加 `sandbox_permissions` 升级）随 [Windows ACL sandbox 决策](2026-08-08-windows-acl-restricted-token-sandbox.zh.md) 到来——最小工具当初按 danger-full-access 的 Windows 姿态裁剪，这一前提在 sandbox PR（Pull Request）于 Windows 上重新启用隔离与审批时终结。

@@ -27,7 +27,7 @@ import type { ProviderRow } from './store.ts'
 import type { ProviderCardRenderSlot } from './slot-contract.ts'
 import type { ModelsOperations } from './operations.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
-import type { en } from './locales.ts'
+import type { zh } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
 /** Where the dialog stands: on the chooser, or inside one of the two cards. */
@@ -54,7 +54,7 @@ export interface AddModelDialogProps {
   /** The Host operations the cards write and interrogate through. */
   operations: ModelsOperations
   /** Section copy. */
-  t: (key: keyof typeof en) => string
+  t: (key: keyof typeof zh) => string
   /** Disable writes (read-only settings provider). */
   readOnly: boolean
   /** Child-slot dispatch for the provider-card area of a picked route's card. */

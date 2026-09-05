@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-plan
 
-[English](README.md) | 中文
-
 ## 概述
 
 本包在 Web GUI 中渲染 plan 模式状态徽章：当宿主计算的投影有效目标为 plan 模式时，composer 显示一个 warn 色「Plan ×」按钮，可关闭 plan 模式；否则该座位保持为空。plan 模式本身——`/plan` 命令、已提交的 `plan/mode` 状态、投影单元与 policy 段——归 `dsh-plan-mode` 所有；本包只渲染投影并发送用户同样可以手敲的内容。模型经稳定的 `exit_plan_mode` 工具退出 plan 模式；其 plan 评审走已组合的 Web question 通道。

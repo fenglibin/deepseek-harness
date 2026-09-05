@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-models-edit-dialog-and-card-width.md) | 中文
-
 ## Problem
 
 Models 设置页面上，同一个编辑器有两个不同的「家」。**添加模型**以弹窗覆盖在分区之上——这是[一个添加模型弹窗](2026-09-02-models-add-dialog-and-picker-defaults.zh.md)刻意做出的决定，目的是让新增提供方不再与行列表争夺纵向空间——而**编辑**则把同一个 `ProviderEditor` 展开在它所编辑的那一行*内部*。于是页面仍然会在操作者脚下生长，只是只剩编辑路径如此；而且卡片的布局取决于用户从哪扇门进来：同一条模型行在弹窗里是并排布局，在行内则会折行。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-26-question-drafts-survive-session-switch.md) | 中文
-
 ## Problem
 
 `conversation.composer` 是严格按 Session 划分 scope 的 slot，因此选择另一个 Session 会卸载其提问条目。通用 `QuestionFlow` 把当前题号、已选标签、自定义文本和跳过标记保存在 React 组件状态中。因此，即使待处理载体仍归 Session A 所有，一个仍在等待的请求经过 A → B → A 的 Session 切换后，也会以空答案重新出现。

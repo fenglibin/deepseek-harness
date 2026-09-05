@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-24-separate-context-injection-from-turn-execution.md) | 中文
-
 ## 问题
 
 agent（智能体） API 曾用三种相互重叠的方式表示面向模型的补充输入：调用方通过 `SendOptions.contexts` 附加 `HookContext[]`，拦截钩子和工具钩子返回 `additionalContexts`，插件则调用 `agent.inject()`。这些路径最终都把上下文写入同一份模型历史，但各自携带不同的放置、元数据、准入、队列和轮次生命周期规则。

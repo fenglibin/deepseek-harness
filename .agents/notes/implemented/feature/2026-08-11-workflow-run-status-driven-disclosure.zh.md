@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-workflow-run-status-driven-disclosure.md) | 中文
-
 ## 问题
 
 持久工作流 Chat 节点会在同一位置从运行前缀更新为终态记录。renderer 必须提示新工作、异常结果和正常完成，同时不能在普通更新中反复覆盖用户回收对话空间的选择。

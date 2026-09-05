@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-07-19-make-jsonrpc-directional.md) | 中文
-
 ## 问题
 
 JSON-RPC 桥接层把两个端点都建模为对称的对等端，但实际协议具有固定方向。共享传输层（现为 `dsh-sdk-protocol`，由服务端与 TypeScript SDK 客户端共用，后者行使出站请求/入站通知方向）仍实现着没有任何端点使用的两个半边：服务端发起的请求与客户端发起的通知。Python SDK 发送请求并接收响应或通知，却还会把来自服务端、但未使用的入站请求放入队列，并公开响应辅助方法。

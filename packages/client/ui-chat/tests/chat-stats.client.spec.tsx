@@ -6,15 +6,15 @@ import type {
   AssistantMessageNode, ChatSnapshot, LegacyConversationSlice, ToolResultNode,
 } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
+import { zh as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { StatsLine, deriveStats, formatDuration, type StatsLineProps } from '../src/client/chat/StatsLine.tsx'
 import { formatTokens } from '../src/client/chat/token-format.ts'
-import { en, zh } from '../src/client/locale.ts'
+import { zh } from '../src/client/locale.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
 
 const t: StatsLineProps['t'] = makeTranslate(zh, commonZh)
-const tEn: StatsLineProps['t'] = makeTranslate(en, commonEn)
+const tEn: StatsLineProps['t'] = makeTranslate(zh, commonEn)
 
 /** jsdom has no ResizeObserver; StatsLine watches its row for ellipsis truncation through one. */
 class ResizeObserverStub {

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-command-compact
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-command-compact` 为聊天 UI 添加 `/compact` 命令：输入它，对话就会按需压缩——即使尚未触发自动压力，较早历史也会被替换为一条摘要。该命令适用于任何压缩后端，且不消耗模型轮次；完成后你会看到压缩了多少历史项以及估算节省的 token 数。当 agent 正在轮次中或压缩已在运行时，它会告诉你压缩暂不可用。运行期间你发送的提示词会保持排队，并在压缩结束后才开始。

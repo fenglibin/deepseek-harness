@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-09-headless-direct-core-entry-point.md) | 中文
-
 ## 问题
 
 `headless` 的产品约定是一个本地任务：最终 assistant 文本写入 stdout，退出状态反映成功与否，不打开监听端口，并由 [headless 推理进度](../feature/2026-08-21-headless-reasoning-progress.zh.md)负责 stderr 推理投影。包含 Workspace Host 服务、浏览器 RPC、HTTP、Web 运行时或浏览器插件的组合违背这一约定，也使本地完成状态依赖无关的传输树。

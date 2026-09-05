@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-message-feedback
 
-[English](README.md) | 中文
-
 ## 概述
 
 本包为 Web GUI 增加逐消息反馈：一对 Like/Dislike 按钮加一个可选备注，作为已定稿助手消息动作条的 `feedback` 条目贡献。它渲染在每个轮次的收尾助手消息上——多步骤轮次中较早的步骤产出工具行而非可评分正文。每个 Session 一个控制器支撑该 Session 内所有消息的控件，因此一次列表读取即可填充整段对话。反馈是 sidecar：评分与备注绝不进入会话日志、模型上下文或遥测。

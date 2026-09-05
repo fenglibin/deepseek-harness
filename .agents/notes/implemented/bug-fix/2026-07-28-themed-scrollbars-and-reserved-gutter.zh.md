@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-28-themed-scrollbars-and-reserved-gutter.md) | 中文
-
 ## 问题
 
 `design-platform.css` 在亮色与暗色两套调色板中都声明了四个 `--dsw-alias-scrollbar-*` token（`bg-l1`、`bg-l2`、`hover-l1`、`hover-l2`），而客户端里没有任何一条规则读取它们。定义了却无人消费的 token 构不成主题：所有滚动区域渲染的都是浏览器自带的滚动条，它对调色板一无所知，因此暗色主题下暗色表面上出现的是一条亮色的原生滚动条。

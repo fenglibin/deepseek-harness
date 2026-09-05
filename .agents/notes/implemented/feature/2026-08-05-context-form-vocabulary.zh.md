@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-05-context-form-vocabulary.md) | 中文
-
 ## 问题
 
 每一条已记录的非用户 `user/message` 都通过同一个内容区渲染：把整条消息序列化成内联 JSON。读者展开一行，看到的是 `{ "content": [ { "type": "text", "text": "…\n\n…" } ], "source": { … } }`——转义把唯一值得读的东西（面向模型的散文）压成了一行，生产者字段也放在同一个 JSON 对象中。

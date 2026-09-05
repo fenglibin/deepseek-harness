@@ -32,25 +32,3 @@ export const zh = {
 
 /** The model namespace key union. */
 export type ModelKey = keyof typeof zh
-
-/** English dictionary, checked complete against the zh key set. */
-export const en = {
-  'command.description': 'Select the model for this conversation',
-  'option.loadError': 'Catalog failed to load: {message}',
-  'trigger.fallback': 'Select model',
-  'trigger.loading': 'Loading models…',
-  'trigger.selectAria': 'Select model',
-  'trigger.aria': 'Select model, current {model}',
-  'trigger.ariaEffort': 'Select model, current {model}, reasoning effort {effort}',
-  'menu.aria': 'Model and reasoning effort',
-  'menu.effort': 'Effort',
-  'menu.back': 'Back to models',
-  'effort.providerDefault': 'Default',
-  'status.loading': 'Refreshing model list…',
-  'error.action': 'Model operation failed: {message}',
-  'action.reload': 'Reload',
-  'warning.groupLoad': '{name} failed to load: {message}',
-  'empty.models': 'No models available.',
-  'blocked.composer': 'This model is unavailable — select one to continue',
-  'empty.efforts': 'This model provides no reasoning effort levels.',
-} satisfies Record<ModelKey, string>

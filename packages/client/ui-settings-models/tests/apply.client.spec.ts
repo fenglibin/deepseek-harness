@@ -130,21 +130,15 @@ describe('ui-settings-models apply', () => {
     const b = await bench()
     declare(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
-    b.locale.setLocale('en')
-    expect(resolveSlotLabel(b.slots.entries('settings.section')[0]!.options.label)).toBe('Models')
     const injected = b.slots.entries('settings.section')[0]!.inject as unknown as () => import('../src/client/ModelsSection.tsx').ModelsSectionInjected
-    expect(injected().t('deleteTitle')).toBe('Delete {provider}?')
-    b.locale.setLocale('zh')
     expect(resolveSlotLabel(b.slots.entries('settings.section')[0]!.options.label)).toBe('模型')
     expect(injected().t('deleteTitle')).toBe('删除 {provider}？')
   })
 
-  it('locale change while the slot is undeclared stays a no-op', async () => {
+  it('an undeclared slot stays empty', async () => {
     const b = await bench()
     await b.ctx.plugin({ inject: [...inject], apply }).await()
-    b.locale.setLocale('en')
     expect(b.slots.entries('settings.section')).toHaveLength(0)
-    b.locale.setLocale('zh')
   })
 
   it('re-registers after an HMR collapse re-declares the slot (stale disposer must not block)', async () => {
@@ -162,9 +156,7 @@ describe('ui-settings-models apply', () => {
     expect(b.slots.entries('settings.section')[0]!.component).toBe(ModelsSection)
     expect(b.slots.entries('settings.onboarding')).toHaveLength(2)
     // The locale path also recovers through the same ledger re-check.
-    b.locale.setLocale('en')
-    expect(resolveSlotLabel(b.slots.entries('settings.section')[0]!.options.label)).toBe('Models')
-    b.locale.setLocale('zh')
+    expect(resolveSlotLabel(b.slots.entries('settings.section')[0]!.options.label)).toBe('模型')
   })
 
   it('accepts extension entries under the declared seats and cascades them with the declarer', async () => {

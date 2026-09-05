@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-24-session-log-snapshot-corpus.md) | 中文
-
 ## Problem
 
 无密钥快照语料通过 ACP 控制许多场景，但这些场景断言的行为实际属于组装后的 Agent、工具、持久化或其他产品接口。这使自动化协议看似拥有后端行为，同时在受支持的 `dsh` 启动器之外保留了测试专用应用入口，并将录制会话分散在示例、SDK、Web 和脚本目录中。

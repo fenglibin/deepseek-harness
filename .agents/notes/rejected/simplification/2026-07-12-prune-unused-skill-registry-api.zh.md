@@ -2,8 +2,6 @@
 
 Status: rejected — 直接在运行时注册 skill 是为第三方插件保留的有意扩展路径。
 
-[English](2026-07-12-prune-unused-skill-registry-api.md) | 中文
-
 ## 问题
 
 skill（技能）服务的嵌入式运行时子系统中，`ctx.skills.register()` 没有任何生产调用方。它引入了一个保留的 `runtime` 提供方名称、一套运行时 map/rank/source、重复策略、缓存键中的第二个 revision、规范化逻辑、dispose（资源释放）函数以及相应测试——而所有已交付的 skill 都使用提供方约定。`SkillSummary.whenToUse` 和 candidate/definition 的 `path` 被解析和复制，但没有任何生产消费方读取它们：模型目录只渲染 name/description，资源加载使用 `resourceBase`，提供方自行管理其定位器。有意开放的 `metadata` 扩展点保留不动。

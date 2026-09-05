@@ -5,8 +5,6 @@ kind: "package-library"
 
 # `@deepseek-ai/dsh-experimental-webworker-runtime`
 
-[English](README.md) | 中文
-
 ## 概述
 
 浏览器 worker 宿主：整棵 harness 插件树跑在一个 dedicated Web Worker 里，用于预览部署与打包回归（[experimental 定位](../../../.agents/notes/implemented/architecture/2026-08-20-webworker-pack-lowering-and-preview.zh.md)）。worker 边下载边解压打包好的 VFS 镜像并挂载进内存，经 CommonJS 包装加载器装载模块，并通过一条讲纯 HTTP 的 postMessage 隧道服务页面。当预览需要在没有 Node 宿主的环境中运行已打包 harness 时，请使用它。

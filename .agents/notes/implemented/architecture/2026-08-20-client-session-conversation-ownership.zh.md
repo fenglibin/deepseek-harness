@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-20-client-session-conversation-ownership.md) | 中文
-
 ## 问题
 
 Web Client 曾由一个通用 Runtime 同时承载 Session 与 Workspace 对象、事件窗口、Conversation 组装、React hooks、Slot 注册表和 Store 引擎。协议状态、业务投影、React 绑定和页面呈现共享同一个依赖汇点，任何一层的变化都可能扩大到完整前端。

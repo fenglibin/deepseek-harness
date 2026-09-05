@@ -1,6 +1,0 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-04-delivery-timeline-and-float-card.md
-2026-09-04-delivery-timeline-and-float-card.md: 4c05228653faefd16abe42d50ec2317476489eb2
-2026-09-04-delivery-timeline-and-float-card.zh.md: 229fbf5242be91ce4140ec20f961676d17429cf5

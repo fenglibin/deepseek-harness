@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-fs-sandbox
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-fs-sandbox` 提供强制沙箱的 `ctx.fs` 后端：它扩展 [`fs-local`](../fs-local/README.zh.md)，完整保留全部文本存储行为，只为写入与编辑增加按调用的模式围栏，读取始终直接通过。`read-only` 下所有变更都会被拒绝；`workspace-write` 下只有当目标位于会话工作区或平台临时根目录之下时才允许变更；`danger-full-access` 下变更不加围栏。加载它来替代 `fs-local`，并同时加载共享的 `ctx.sandboxPolicy` 服务，即可完成替换——面向模型的工具与策略插件无需改动。拒绝是结构化 `FS_SANDBOX_DENIED` 错误，工具会把它渲染为熟悉的 `[sandbox: file access denied under <mode> mode]` 标记并附同轮次升级提示。当会话的文件变更必须限制在其工作区内时选择它。

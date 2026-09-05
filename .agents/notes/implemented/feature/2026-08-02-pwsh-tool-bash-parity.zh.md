@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-02-pwsh-tool-bash-parity.md) | 中文
-
 ## 问题
 
 首个 Windows 原生基础交付的 `dsh-tool-pwsh` 是刻意最小的画像——仅前台（每次调用都启动新进程；无持久 PTY 会话）、受管环境只有三个硬编码 `DSH_*` 键、以及一个未声明就偏离 bash 工具的 marker 故事（「恒打 `[exit code: N]`」）。模型可见约定曾与实现脱节：描述承诺了渲染器从未执行的 spill 路径报告，README 宣称了不存在的导出与工具未做的渲染，工具自己的测试还钉死了有损行为。最小画像还让 `DSH_*` contributor seam 因缺席而重复：向 `ctx.shellEnv` 贡献环境事实的插件对 pwsh 调用毫无作用。

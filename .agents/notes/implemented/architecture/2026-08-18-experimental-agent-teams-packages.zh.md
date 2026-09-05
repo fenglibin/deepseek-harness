@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-18-experimental-agent-teams-packages.md) | 中文
-
 ## 问题
 
 Agent Teams 的服务与工具约定仍在变化，但它需要使用真实 Session 日志、subagent 生命周期、工具、示例、快照和仓库检查。把这些包放在产品职责组会使其成为 dsh 发布系列成员，并获得与稳定包相同的发布预期。

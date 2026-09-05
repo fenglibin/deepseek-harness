@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-23-client-cross-package-value-dependencies.md) | 中文
-
 ## 问题
 
 [PR #2728](https://github.com/deepseek-ai/deepseek-harness/pull/2728) 与 [PR #2911](https://github.com/deepseek-ai/deepseek-harness/pull/2911) 拆分 Client 包后，功能插件 manifest 中还留有 15 条 `dsh.client.external` 请求。即使消费方只需要一个类型、一段小型纯转换或访问已经注入的 Cordis service，这些请求也会把普通值 import 变成同步模块表顺序约束。

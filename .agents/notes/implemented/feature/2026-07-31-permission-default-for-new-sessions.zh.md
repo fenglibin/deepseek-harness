@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-permission-default-for-new-sessions.md) | 中文
-
 ## 问题
 
 Web「通用」设置页将「权限」显示为禁用的骨架控件，尽管 `dsh-permission-presets` 已经拥有 preset 表和当前会话的切换路径。Settings seam 可以持久化由插件拥有的值，但 Web Settings API 只暴露可配置 LLM（大语言模型）提供方的 namespace。更重要的是，如果把用户偏好当成实时生效的全局权限，现有会话的执行策略就会在其持久日志之外发生变化。

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-session-reference
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-session-reference` 让一次对话可以引用其他会话：宿主把 `@label` mention 转换为规范 URI，服务则为模型准备每个被引用会话的有界、只读快照，作为持久、不受信任的背景上下文。候选发现按工作目录亲和度对其他会话排序，并用其最新标题作标签。快照在捕获后不可变，并带有固定警告，禁止遵循其中的指令、权限声明或工具请求。它是面向支持跨会话 mention 的宿主的可选服务；它消费 `ctx.sessionQuery`，不需要 SQLite FTS。

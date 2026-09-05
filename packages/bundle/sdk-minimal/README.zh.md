@@ -5,8 +5,6 @@ kind: "package-bundle"
 
 # `@deepseek-ai/dsh-sdk-minimal`
 
-[English](README.md) | 中文
-
 ## 概述
 
 当 SDK 客户端需要小型、显式的 coding agent 运行时时，请使用 `dsh --profile sdk-minimal`。该 profile 只公布按平台选择的持久 shell 与 `str_replace_editor`，把会话持久化为未压缩 JSONL，并从 SDK 初始化请求选择模型。它提供完整 Cordis 配置树，并刻意排除 `dsh-base`、Web、settings、托管凭据、遥测、compaction、workspace 指令、skills、jobs 与 subagent。其 danger-full-access 策略允许 shell 与编辑器修改进程可访问的任何路径，因此只能配合隔离 workspace 使用。

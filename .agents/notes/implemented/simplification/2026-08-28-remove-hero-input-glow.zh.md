@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-28-remove-hero-input-glow.md) | 中文
-
 ## Problem
 
 New Session 首页曾在输入卡片下方绘制一个装饰性背景椭圆(`HeroGlow`,figma 313:14109):一个模糊的蓝色渐变,尺寸为 hero 盒子的 `1051/776`,使其 `stdDeviation="50"` 模糊随卡片缩放。在实际交付的 token 表下,这个椭圆看起来是意外的蓝色沾染而非有意的装饰,并且它按构造就会溢出会话列,迫使列本身背上裁剪脚手架。

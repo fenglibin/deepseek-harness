@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-29-projected-token-usage-and-request-context.md) | 中文
-
 ## 问题
 
 Web 统计行原先从当前已加载的会话节点推导 token 总量。该窗口是分页的，因此滚动会改变总量；压缩（compaction）又会替换可见内容，而不保留其背后的计费用量。持久的提供方计费用量需要一个能同时经受这两者的数据源。

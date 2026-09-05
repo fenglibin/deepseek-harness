@@ -22,11 +22,11 @@ import type { CardFieldState, CardShell } from '../src/client/card-form.ts'
 import type { ConfigurablePluginsTabState } from '../src/client/tab-store.ts'
 import type { WebSearchCardState } from '../src/client/web-search-card-controller.ts'
 import type { SubagentModelSelectionCardState } from '../src/client/subagent-model-selection-card-controller.ts'
-import { en } from '../src/client/locales.ts'
+import { zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
-const t = (key: keyof typeof en) => en[key]
+const t = (key: keyof typeof zh) => zh[key]
 
 const settled: CardShell = {
   available: true,
@@ -116,17 +116,17 @@ describe('PluginsSettingsSection', () => {
   it('says so when no plugin contributed a tab', () => {
     renderSection([])
 
-    expect(screen.getByText(en.empty)).toBeTruthy()
+    expect(screen.getByText(zh.empty)).toBeTruthy()
     expect(screen.queryByRole('tab')).toBeNull()
   })
 
   it('defaults to the first ordered tab and mounts another only after selection', () => {
     renderSection([
-      { id: 'configurable', order: 0, label: en.configurableTab },
+      { id: 'configurable', order: 0, label: zh.configurableTab },
       { id: 'all', order: 10, label: 'Plugin list' },
     ])
 
-    const configurable = screen.getByRole('tab', { name: en.configurableTab })
+    const configurable = screen.getByRole('tab', { name: zh.configurableTab })
     const all = screen.getByRole('tab', { name: 'Plugin list' })
     expect(configurable.getAttribute('aria-selected')).toBe('true')
     expect(screen.getByText('configurable')).toBeTruthy()
@@ -143,20 +143,20 @@ describe('PluginsSettingsSection', () => {
   })
 
   it('leads with its own heading and intro', () => {
-    renderSection([{ id: 'configurable', order: 0, label: en.configurableTab }])
+    renderSection([{ id: 'configurable', order: 0, label: zh.configurableTab }])
 
-    expect(screen.getByRole('heading', { name: en.title })).toBeTruthy()
-    expect(screen.getByText(en.intro)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: zh.title })).toBeTruthy()
+    expect(screen.getByText(zh.intro)).toBeTruthy()
   })
 
   it('moves focus and selection with standard horizontal tab keys', () => {
     renderSection([
-      { id: 'configurable', order: 0, label: en.configurableTab },
+      { id: 'configurable', order: 0, label: zh.configurableTab },
       { id: 'all', order: 10, label: 'Plugin list' },
       { id: 'diagnostics', order: 20, label: 'Diagnostics' },
     ])
 
-    const configurable = screen.getByRole('tab', { name: en.configurableTab })
+    const configurable = screen.getByRole('tab', { name: zh.configurableTab })
     const all = screen.getByRole('tab', { name: 'Plugin list' })
     const diagnostics = screen.getByRole('tab', { name: 'Diagnostics' })
     expect(configurable.getAttribute('tabindex')).toBe('0')
@@ -186,7 +186,7 @@ describe('ConfigurablePluginsTab', () => {
   it('says so when no plugin contributed a card', () => {
     renderConfigurable([], { bash: 'shell' })
 
-    expect(screen.getByText(en.empty)).toBeTruthy()
+    expect(screen.getByText(zh.empty)).toBeTruthy()
     expect(screen.queryByText('shell')).toBeNull()
   })
 
@@ -195,14 +195,14 @@ describe('ConfigurablePluginsTab', () => {
     // no plugin; saying it anyway would flash a wrong answer on every open.
     renderConfigurable([], { bash: 'shell' }, false)
 
-    expect(screen.queryByText(en.empty)).toBeNull()
+    expect(screen.queryByText(zh.empty)).toBeNull()
   })
 
   it('dispatches one card per namespace, keyed by it', () => {
     renderConfigurable(['bash', 'agent-loop'], { bash: 'shell', 'agent-loop': 'loop' })
 
     expect(screen.getAllByRole('listitem').map(item => item.textContent)).toEqual(['shell', 'loop'])
-    expect(screen.queryByText(en.empty)).toBeNull()
+    expect(screen.queryByText(zh.empty)).toBeNull()
   })
 })
 
@@ -212,25 +212,25 @@ describe('BashCard', () => {
     renderBash({ available: false })
 
     expect(container.textContent).toBe('')
-    expect(screen.queryByText(en.bashTitle)).toBeNull()
+    expect(screen.queryByText(zh.bashTitle)).toBeNull()
   })
 
   it('shows the plugin and reveals its fields only once expanded', () => {
     renderBash()
-    expect(screen.getByText(en.bashTitle)).toBeTruthy()
-    expect(screen.queryByLabelText(en.bashTimeoutMs)).toBeNull()
+    expect(screen.getByText(zh.bashTitle)).toBeTruthy()
+    expect(screen.queryByLabelText(zh.bashTimeoutMs)).toBeNull()
 
-    fireEvent.click(screen.getByText(en.bashTitle))
+    fireEvent.click(screen.getByText(zh.bashTitle))
 
-    expect(screen.getByLabelText(en.bashTimeoutMs)).toBeTruthy()
-    expect(screen.getByLabelText(en.bashMaxOutputBytes)).toBeTruthy()
+    expect(screen.getByLabelText(zh.bashTimeoutMs)).toBeTruthy()
+    expect(screen.getByLabelText(zh.bashMaxOutputBytes)).toBeTruthy()
   })
 
   it('stages an edit instead of writing it', () => {
     const actions = renderBash()
-    fireEvent.click(screen.getByText(en.bashTitle))
+    fireEvent.click(screen.getByText(zh.bashTitle))
 
-    fireEvent.change(screen.getByLabelText(en.bashTimeoutMs), { target: { value: '9000' } })
+    fireEvent.change(screen.getByLabelText(zh.bashTimeoutMs), { target: { value: '9000' } })
 
     expect(actions.edit).toHaveBeenCalledWith('timeoutMs', '9000')
     expect(actions.save).not.toHaveBeenCalled()
@@ -238,21 +238,21 @@ describe('BashCard', () => {
 
   it('offers the reset for an overridden field only', () => {
     const actions = renderBash({ timeoutMs: field('9000', { overridden: true }) })
-    fireEvent.click(screen.getByText(en.bashTitle))
+    fireEvent.click(screen.getByText(zh.bashTitle))
 
     // One badge and one reset: the output cap is still inherited.
-    expect(screen.getAllByText(en.overridden)).toHaveLength(1)
-    fireEvent.click(screen.getByRole('button', { name: en.reset }))
+    expect(screen.getAllByText(zh.overridden)).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: zh.reset }))
 
     expect(actions.resetField).toHaveBeenCalledWith('timeoutMs')
   })
 
   it('addresses each of its two fields separately', () => {
     const actions = renderBash({ maxOutputBytes: field('64000', { overridden: true }) })
-    fireEvent.click(screen.getByText(en.bashTitle))
+    fireEvent.click(screen.getByText(zh.bashTitle))
 
-    fireEvent.change(screen.getByLabelText(en.bashMaxOutputBytes), { target: { value: '1024' } })
-    fireEvent.click(screen.getByRole('button', { name: en.reset }))
+    fireEvent.change(screen.getByLabelText(zh.bashMaxOutputBytes), { target: { value: '1024' } })
+    fireEvent.click(screen.getByRole('button', { name: zh.reset }))
 
     expect(actions.edit).toHaveBeenCalledWith('maxOutputBytes', '1024')
     expect(actions.resetField).toHaveBeenCalledWith('maxOutputBytes')
@@ -260,19 +260,19 @@ describe('BashCard', () => {
 
   it('keeps save and discard inert until something is staged', () => {
     renderBash()
-    fireEvent.click(screen.getByText(en.bashTitle))
+    fireEvent.click(screen.getByText(zh.bashTitle))
 
-    expect(screen.getByRole('button', { name: en.save })).toHaveProperty('disabled', true)
-    expect(screen.getByRole('button', { name: en.discard })).toHaveProperty('disabled', true)
-    expect(screen.queryByText(en.unsaved)).toBeNull()
+    expect(screen.getByRole('button', { name: zh.save })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: zh.discard })).toHaveProperty('disabled', true)
+    expect(screen.queryByText(zh.unsaved)).toBeNull()
   })
 
   it('writes the staged edits when saved, and drops them when discarded', () => {
     const actions = renderBash({ dirty: true, timeoutMs: field('9000', { overridden: true }) })
-    fireEvent.click(screen.getByText(en.bashTitle))
+    fireEvent.click(screen.getByText(zh.bashTitle))
 
-    fireEvent.click(screen.getByRole('button', { name: en.save }))
-    fireEvent.click(screen.getByRole('button', { name: en.discard }))
+    fireEvent.click(screen.getByRole('button', { name: zh.save }))
+    fireEvent.click(screen.getByRole('button', { name: zh.discard }))
 
     expect(actions.save).toHaveBeenCalledOnce()
     expect(actions.discard).toHaveBeenCalledOnce()
@@ -281,82 +281,82 @@ describe('BashCard', () => {
   it('marks a card holding unsaved edits, collapsed or not', () => {
     renderBash({ dirty: true })
 
-    expect(screen.getByText(en.unsaved)).toBeTruthy()
+    expect(screen.getByText(zh.unsaved)).toBeTruthy()
   })
 
   it('blocks the save while a draft is invalid, and says why', () => {
     renderBash({ dirty: true, invalid: true, timeoutMs: field('soon', { invalid: true }) })
-    fireEvent.click(screen.getByText(en.bashTitle))
+    fireEvent.click(screen.getByText(zh.bashTitle))
 
-    expect(screen.getByRole('button', { name: en.save })).toHaveProperty('disabled', true)
-    expect(screen.getByRole('button', { name: en.discard })).toHaveProperty('disabled', false)
-    expect(screen.getByText(en.invalidNumber)).toBeTruthy()
+    expect(screen.getByRole('button', { name: zh.save })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: zh.discard })).toHaveProperty('disabled', false)
+    expect(screen.getByText(zh.invalidNumber)).toBeTruthy()
   })
 
   it('reports a save in flight and refuses another', () => {
     renderBash({ dirty: true, saving: true })
-    fireEvent.click(screen.getByText(en.bashTitle))
+    fireEvent.click(screen.getByText(zh.bashTitle))
 
-    expect(screen.getByRole('button', { name: en.saving })).toHaveProperty('disabled', true)
-    expect(screen.getByRole('button', { name: en.discard })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: zh.saving })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: zh.discard })).toHaveProperty('disabled', true)
   })
 
   it('reports a save the deployment did not accept', () => {
     renderBash({ dirty: true, failed: true })
-    fireEvent.click(screen.getByText(en.bashTitle))
+    fireEvent.click(screen.getByText(zh.bashTitle))
 
-    expect(screen.getByText(en.saveFailed)).toBeTruthy()
+    expect(screen.getByText(zh.saveFailed)).toBeTruthy()
   })
 
   it('says the document is read-only and disables its controls', () => {
     renderBash({ writable: false })
-    fireEvent.click(screen.getByText(en.bashTitle))
+    fireEvent.click(screen.getByText(zh.bashTitle))
 
-    expect(screen.getByRole('status')).toHaveProperty('textContent', en.readOnly)
-    expect(screen.getByLabelText(en.bashTimeoutMs)).toHaveProperty('disabled', true)
+    expect(screen.getByRole('status')).toHaveProperty('textContent', zh.readOnly)
+    expect(screen.getByLabelText(zh.bashTimeoutMs)).toHaveProperty('disabled', true)
   })
 
   it('collapses again on a second click', () => {
     renderBash()
-    fireEvent.click(screen.getByText(en.bashTitle))
-    expect(screen.getByLabelText(en.bashTimeoutMs)).toBeTruthy()
+    fireEvent.click(screen.getByText(zh.bashTitle))
+    expect(screen.getByLabelText(zh.bashTimeoutMs)).toBeTruthy()
 
-    fireEvent.click(screen.getByText(en.bashTitle))
+    fireEvent.click(screen.getByText(zh.bashTitle))
 
-    expect(screen.queryByLabelText(en.bashTimeoutMs)).toBeNull()
+    expect(screen.queryByLabelText(zh.bashTimeoutMs)).toBeNull()
   })
 
   it('collapses after a successful save settles', () => {
     const { actions, store } = renderBashCard({ dirty: true })
-    fireEvent.click(screen.getByText(en.bashTitle))
-    fireEvent.click(screen.getByRole('button', { name: en.save }))
+    fireEvent.click(screen.getByText(zh.bashTitle))
+    fireEvent.click(screen.getByRole('button', { name: zh.save }))
     expect(actions.save).toHaveBeenCalledOnce()
 
     act(() => { store.set({ ...store.getSnapshot(), saving: true }) })
     act(() => { store.set({ ...store.getSnapshot(), dirty: false, saving: false }) })
 
-    expect(screen.queryByLabelText(en.bashTimeoutMs)).toBeNull()
+    expect(screen.queryByLabelText(zh.bashTimeoutMs)).toBeNull()
   })
 
   it('keeps a failed save open', () => {
     const { store } = renderBashCard({ dirty: true })
-    fireEvent.click(screen.getByText(en.bashTitle))
-    fireEvent.click(screen.getByRole('button', { name: en.save }))
+    fireEvent.click(screen.getByText(zh.bashTitle))
+    fireEvent.click(screen.getByRole('button', { name: zh.save }))
 
     act(() => { store.set({ ...store.getSnapshot(), saving: true }) })
     act(() => { store.set({ ...store.getSnapshot(), failed: true, saving: false }) })
 
-    expect(screen.getByLabelText(en.bashTimeoutMs)).toBeTruthy()
-    expect(screen.getByText(en.saveFailed)).toBeTruthy()
+    expect(screen.getByLabelText(zh.bashTimeoutMs)).toBeTruthy()
+    expect(screen.getByText(zh.saveFailed)).toBeTruthy()
   })
 })
 
 describe('SubagentModelSelectionCard', () => {
   it('renders the default-off preference in its staged plugin card', () => {
     const actions = renderSubagentModelSelection()
-    fireEvent.click(screen.getByText(en.subagentModelSelectionTitle))
+    fireEvent.click(screen.getByText(zh.subagentModelSelectionTitle))
 
-    const control = screen.getByRole('switch', { name: en.subagentModelSelectionToggle })
+    const control = screen.getByRole('switch', { name: zh.subagentModelSelectionToggle })
     expect(control.getAttribute('aria-checked')).toBe('false')
     fireEvent.click(control)
 
@@ -388,7 +388,7 @@ describe('SubagentModelSelectionCard', () => {
       ],
       catalogStatus: 'ready',
     })
-    fireEvent.click(screen.getByText(en.subagentModelSelectionTitle))
+    fireEvent.click(screen.getByText(zh.subagentModelSelectionTitle))
 
     expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('true')
     expect(screen.getByText('Alpha API', { exact: true })).toBeTruthy()
@@ -400,14 +400,14 @@ describe('SubagentModelSelectionCard', () => {
 
   it('renders directory progress, failures, unavailable routes, and validation', () => {
     renderSubagentModelSelection({ enabled: true, catalogStatus: 'loading', invalid: true })
-    fireEvent.click(screen.getByText(en.subagentModelSelectionTitle))
-    expect(screen.getByText(en.subagentModelSelectionLoading)).toBeTruthy()
-    expect(screen.getByText(en.subagentModelSelectionRequired)).toBeTruthy()
+    fireEvent.click(screen.getByText(zh.subagentModelSelectionTitle))
+    expect(screen.getByText(zh.subagentModelSelectionLoading)).toBeTruthy()
+    expect(screen.getByText(zh.subagentModelSelectionRequired)).toBeTruthy()
 
     cleanup()
     const errorActions = renderSubagentModelSelection({ enabled: true, catalogStatus: 'error' })
-    fireEvent.click(screen.getByText(en.subagentModelSelectionTitle))
-    fireEvent.click(screen.getByRole('button', { name: en.subagentModelSelectionRetry }))
+    fireEvent.click(screen.getByText(zh.subagentModelSelectionTitle))
+    fireEvent.click(screen.getByRole('button', { name: zh.subagentModelSelectionRetry }))
     expect(errorActions.retryCatalog).toHaveBeenCalledOnce()
 
     cleanup()
@@ -425,32 +425,32 @@ describe('SubagentModelSelectionCard', () => {
         selected: true,
       }],
     })
-    fireEvent.click(screen.getByText(en.subagentModelSelectionTitle))
-    expect(screen.getByText(en.subagentModelSelectionPartial)).toBeTruthy()
-    expect(screen.getByText(en.subagentModelSelectionUnavailable)).toBeTruthy()
-    expect(screen.getByText(en.subagentModelSelectionUnavailableGroup)).toBeTruthy()
+    fireEvent.click(screen.getByText(zh.subagentModelSelectionTitle))
+    expect(screen.getByText(zh.subagentModelSelectionPartial)).toBeTruthy()
+    expect(screen.getByText(zh.subagentModelSelectionUnavailable)).toBeTruthy()
+    expect(screen.getByText(zh.subagentModelSelectionUnavailableGroup)).toBeTruthy()
 
     cleanup()
     renderSubagentModelSelection({ enabled: true, catalogStatus: 'ready' })
-    fireEvent.click(screen.getByText(en.subagentModelSelectionTitle))
-    expect(screen.getByText(en.subagentModelSelectionEmpty)).toBeTruthy()
+    fireEvent.click(screen.getByText(zh.subagentModelSelectionTitle))
+    expect(screen.getByText(zh.subagentModelSelectionEmpty)).toBeTruthy()
   })
 
   it('distinguishes a stale draft from a rejected save', () => {
     renderSubagentModelSelection({ dirty: true, conflicted: true })
-    fireEvent.click(screen.getByText(en.subagentModelSelectionTitle))
+    fireEvent.click(screen.getByText(zh.subagentModelSelectionTitle))
 
-    expect(screen.getByText(en.subagentModelSelectionConflict)).toBeTruthy()
-    expect(screen.queryByText(en.saveFailed)).toBeNull()
+    expect(screen.getByText(zh.subagentModelSelectionConflict)).toBeTruthy()
+    expect(screen.queryByText(zh.saveFailed)).toBeNull()
   })
 
   it('stays hidden when unavailable and disables writes when read-only', () => {
     renderSubagentModelSelection({ available: false })
-    expect(screen.queryByText(en.subagentModelSelectionTitle)).toBeNull()
+    expect(screen.queryByText(zh.subagentModelSelectionTitle)).toBeNull()
 
     cleanup()
     const actions = renderSubagentModelSelection({ writable: false })
-    fireEvent.click(screen.getByText(en.subagentModelSelectionTitle))
+    fireEvent.click(screen.getByText(zh.subagentModelSelectionTitle))
     const control = screen.getByRole('switch') as HTMLButtonElement
     expect(control.disabled).toBe(true)
     fireEvent.click(control)
@@ -473,9 +473,9 @@ describe('AgentLoopCard', () => {
     } as unknown as AgentLoopCardProps
     render(<AgentLoopCard {...props} />)
 
-    fireEvent.click(screen.getByText(en.agentLoopTitle))
-    fireEvent.change(screen.getByLabelText(en.agentLoopMaxParallel), { target: { value: '2' } })
-    fireEvent.click(screen.getByRole('button', { name: en.save }))
+    fireEvent.click(screen.getByText(zh.agentLoopTitle))
+    fireEvent.change(screen.getByLabelText(zh.agentLoopMaxParallel), { target: { value: '2' } })
+    fireEvent.click(screen.getByRole('button', { name: zh.save }))
 
     expect(actions.edit).toHaveBeenCalledWith('maxParallelToolCalls', '2')
     expect(actions.save).toHaveBeenCalledOnce()
@@ -494,8 +494,8 @@ describe('AgentLoopCard', () => {
     } as unknown as AgentLoopCardProps
     render(<AgentLoopCard {...props} />)
 
-    fireEvent.click(screen.getByText(en.agentLoopTitle))
-    fireEvent.click(screen.getByRole('button', { name: en.reset }))
+    fireEvent.click(screen.getByText(zh.agentLoopTitle))
+    fireEvent.click(screen.getByRole('button', { name: zh.reset }))
 
     expect(actions.resetField).toHaveBeenCalledWith('maxParallelToolCalls')
   })
@@ -520,19 +520,19 @@ describe('WebSearchCard', () => {
 
   it('reports whether a key is configured without ever showing one', () => {
     renderWebSearch({ apiKeyConfigured: true })
-    fireEvent.click(screen.getByText(en.webSearchTitle))
+    fireEvent.click(screen.getByText(zh.webSearchTitle))
 
-    expect(screen.getByText(en.webSearchApiKeySet)).toBeTruthy()
-    expect(screen.getByLabelText(en.webSearchApiKey)).toHaveProperty('type', 'password')
+    expect(screen.getByText(zh.webSearchApiKeySet)).toBeTruthy()
+    expect(screen.getByLabelText(zh.webSearchApiKey)).toHaveProperty('type', 'password')
   })
 
   it('keeps the key control usable while the settings document is read-only', () => {
     const actions = renderWebSearch({ writable: false })
-    fireEvent.click(screen.getByText(en.webSearchTitle))
+    fireEvent.click(screen.getByText(zh.webSearchTitle))
 
-    const key = screen.getByLabelText(en.webSearchApiKey)
+    const key = screen.getByLabelText(zh.webSearchApiKey)
     expect(key).toHaveProperty('disabled', false)
-    expect(screen.getByLabelText(en.webSearchBaseUrl)).toHaveProperty('disabled', true)
+    expect(screen.getByLabelText(zh.webSearchBaseUrl)).toHaveProperty('disabled', true)
 
     fireEvent.change(key, { target: { value: 'ds-secret' } })
 
@@ -543,10 +543,10 @@ describe('WebSearchCard', () => {
     // A key coming from the process environment: the settings document is
     // writable, the credential is not.
     renderWebSearch({ apiKeyConfigured: true, apiKeyWritable: false })
-    fireEvent.click(screen.getByText(en.webSearchTitle))
+    fireEvent.click(screen.getByText(zh.webSearchTitle))
 
-    expect(screen.getByLabelText(en.webSearchApiKey)).toHaveProperty('disabled', true)
-    expect(screen.getByLabelText(en.webSearchBaseUrl)).toHaveProperty('disabled', false)
+    expect(screen.getByLabelText(zh.webSearchApiKey)).toHaveProperty('disabled', true)
+    expect(screen.getByLabelText(zh.webSearchBaseUrl)).toHaveProperty('disabled', false)
   })
 
   it('stages the endpoint, the search budget, and their resets', () => {
@@ -554,11 +554,11 @@ describe('WebSearchCard', () => {
       baseURL: field('https://search.test/v1', { overridden: true }),
       maxUses: field('3', { overridden: true }),
     })
-    fireEvent.click(screen.getByText(en.webSearchTitle))
+    fireEvent.click(screen.getByText(zh.webSearchTitle))
 
-    fireEvent.change(screen.getByLabelText(en.webSearchBaseUrl), { target: { value: 'https://other.test' } })
-    fireEvent.change(screen.getByLabelText(en.webSearchMaxUses), { target: { value: '4' } })
-    const resets = screen.getAllByRole('button', { name: en.reset })
+    fireEvent.change(screen.getByLabelText(zh.webSearchBaseUrl), { target: { value: 'https://other.test' } })
+    fireEvent.change(screen.getByLabelText(zh.webSearchMaxUses), { target: { value: '4' } })
+    const resets = screen.getAllByRole('button', { name: zh.reset })
     expect(resets).toHaveLength(2)
     for (const reset of resets) fireEvent.click(reset)
 

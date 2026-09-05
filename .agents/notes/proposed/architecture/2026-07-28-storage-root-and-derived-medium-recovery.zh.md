@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-07-28-storage-root-and-derived-medium-recovery.md) | 中文
-
 ## 问题
 
 持久投影缓存（[决策记录](2026-07-27-session-projection-and-command-log.zh.md)，已作为 `dsh-session-projection-cache` 落地）暴露了它所依托的存储基座的两个缺口。二者都是 domain-KV 栈（[设计](2026-07-24-domain-kv-storage-and-workspace.zh.md)）的属性而非缓存自身的问题，且都首先咬到缓存——因为它是这条栈上第一个*派生*介质。

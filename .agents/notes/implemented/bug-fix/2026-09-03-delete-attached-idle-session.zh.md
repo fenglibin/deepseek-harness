@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-delete-attached-idle-session.md) | 中文
-
 ## Problem
 
 `deleteSession` 会以 `RemoteError('session/live', …)` 拒绝任何 Host 仍持有驻留 Agent 的 Session。而 Agent 会在 Session 被打开的整个生命周期内保持驻留——follow 一个 Session 会在后台激活其 Agent，这正是每次打开会话时发生的提升（promotion）——因此一个用户仅仅打开过、且实际上没有运行任何东西的 Session 也无法被删除。"仍在运行"的拒绝依据是驻留状态，而不是正在执行的工作，它让用户去归档一个实际上处于空闲状态的会话。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-code-runtime-portable-identifier-seam.md) | 中文
-
 ## Problem
 
 code-runtime seam 承诺：在一个后端上有效的绑定命名空间列表，在每个后端上都有效，因此 PTC mode 消费方可以把同一组绑定交给任何已注册的运行时，而不必知道它的语言。首个后端 `dsh-code-runtime-worker-thread` 私自拥有了执行这项承诺一部分的标识符规则：一个允许 JS 专有 `$` 的 `IDENTIFIER` 正则、一个只含 ECMAScript 关键字的 `RESERVED_WORDS` 集合，以及一个含三个 JS `Error` 槽位的 `RESERVED_ERROR_PROPERTIES` 集合。这些规则描述的是 worker 自身的语言，而非 seam 的可移植性约定。

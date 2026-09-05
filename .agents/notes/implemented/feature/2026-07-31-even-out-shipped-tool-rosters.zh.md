@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-even-out-shipped-tool-rosters.md) | 中文
-
 ## 问题
 
 两个交付的 `dsh` surface 提供着不同的工具，而没有任何记录说明为什么。会话检查点、工具结果裁剪、goal 工具和 Ralph 在 `tui.cordis.yml`；`tool-todo` 以及后来的 web 搜索在 `web.cordis.yml`。两个 surface 都没有会话搜索、字符串替换编辑器和重复工具守卫，尽管这三者都已成包存在，且没有一个是 surface 专属的。

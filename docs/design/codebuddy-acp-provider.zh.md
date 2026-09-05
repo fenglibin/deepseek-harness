@@ -1,7 +1,5 @@
 # CodeBuddy ACP Provider
 
-[English](codebuddy-acp-provider.md) | 中文
-
 > 状态：分析与设计已完成，等待确认（暂缓实现）
 > 读者：维护者与决策者
 > 关联诉求：将本机安装的 CodeBuddy 通过 Agent Client Protocol（ACP）作为模型服务来源之一接入，与现有 DSH 模型体验对齐；增加一个开关控制是否开启 CodeBuddy 的 ACP 调用；文档说明配置方式，给用户最大控制权限。

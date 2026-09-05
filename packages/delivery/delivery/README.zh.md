@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-delivery
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-delivery` 为每个 agent 会话维护一个持久化的交付任务：任务的目标、规模分级（`l0` 小微修复、`l1` 增加设计、`l2` 增加 openspec 拆分）、生命周期阶段、以及已记录的变更数都存放在会话日志中，因此可跨会话恢复、fork 与进程重启存续。你可以创建、推进、记录变更、清除任务，且每次变更都是比较并设置，陈旧的视图不会覆盖更新的状态。任务只能沿其分级规定的阶段顺序前进——`created → designed → specified → implemented → verified → accepted`——跳过必需阶段会被拒绝。它是状态而非策略：服务强制阶段顺序，而模型侧的门禁强度（`stateful` / `advisory` / `off`）属于 `dsh-tool-delivery`。当一项具体工作应当产出变更记录并按纪律生命周期推进时选择它；常规单轮工作不要使用。

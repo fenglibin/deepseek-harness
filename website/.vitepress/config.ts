@@ -40,12 +40,12 @@ interface GuideModuleLink {
 }
 
 /**
- * Per-locale guide-module facts: the guide collection and the module links
- * appended to the guide sidebar.
+ * Guide-module facts: the guide collection and the module links appended to
+ * the guide sidebar.
  */
 interface GuideModules {
-  /** Guide sidebar collection for the locale. */
-  guide: 'zh-guide' | 'en-guide'
+  /** Guide sidebar collection. */
+  guide: 'zh-guide'
   /** Development module link. */
   develop: GuideModuleLink
   /** Reference module link. */
@@ -53,52 +53,42 @@ interface GuideModules {
 }
 
 /**
- * Guide-module facts keyed by locale, giving every module label and collection
- * one home shared by the navigation bar and the guide sidebar.
+ * Guide-module facts, giving every module label and collection one home shared
+ * by the navigation bar and the guide sidebar.
  */
 const guideModules = {
-  root: {
-    guide: localeCollections.root[0],
-    develop: { label: '开发', collection: localeCollections.root[1] },
-    reference: { label: '参考', collection: localeCollections.root[2] },
-  },
-  en: {
-    guide: localeCollections.en[0],
-    develop: { label: 'Development', collection: localeCollections.en[1] },
-    reference: { label: 'Reference', collection: localeCollections.en[2] },
-  },
-} satisfies Record<DocsLocale, GuideModules>
+  guide: localeCollections.root[0],
+  develop: { label: '开发', collection: localeCollections.root[1] },
+  reference: { label: '参考', collection: localeCollections.root[2] },
+} satisfies GuideModules
 
 /**
  * Guide sidebar with direct links into the first development and reference pages.
  *
- * @param locale - Route tree whose guide sidebar is being built.
  * @returns Guide groups followed by top-level links to the other documentation modules.
  */
-function guideSidebar(locale: DocsLocale): DefaultTheme.SidebarItem[] {
-  const { guide, develop, reference } = guideModules[locale]
+function guideSidebar(): DefaultTheme.SidebarItem[] {
+  const { guide, develop, reference } = guideModules
   return [
-    ...sidebar(locale, guide),
+    ...sidebar('root', guide),
     ...[develop, reference].map(({ label, collection }) => ({
       text: label,
-      link: landingLink(locale, collection),
+      link: landingLink('root', collection),
     })),
   ]
 }
 
 /**
  * Navigation-bar items for the modules the guide sidebar links into, reading
- * their labels and collections from the shared per-locale record.
+ * their labels and collections from the shared record.
  *
- * @param locale - Route tree the navigation items belong to.
- * @returns The module items for the locale's navigation bar.
+ * @returns The module items for the navigation bar.
  */
-function moduleNav(locale: DocsLocale): DefaultTheme.NavItem[] {
-  const { develop, reference } = guideModules[locale]
-  const routePrefix = locale === 'root' ? '' : '/en'
+function moduleNav(): DefaultTheme.NavItem[] {
+  const { develop, reference } = guideModules
   return [
-    { text: develop.label, link: landingLink(locale, develop.collection), activeMatch: `^${routePrefix}/develop/` },
-    { text: reference.label, link: landingLink(locale, reference.collection), activeMatch: `^${routePrefix}/reference/` },
+    { text: develop.label, link: landingLink('root', develop.collection), activeMatch: '^/develop/' },
+    { text: reference.label, link: landingLink('root', reference.collection), activeMatch: '^/reference/' },
   ]
 }
 
@@ -318,11 +308,11 @@ export default withMermaid({
       themeConfig: {
         siteTitle: siteTitle('技术预览'),
         nav: [
-          { text: '入门', link: landingLink('root', guideModules.root.guide), activeMatch: '^/guide/' },
-          ...moduleNav('root'),
+          { text: '入门', link: landingLink('root', guideModules.guide), activeMatch: '^/guide/' },
+          ...moduleNav(),
         ],
         sidebar: {
-          '/guide/': guideSidebar('root'),
+          '/guide/': guideSidebar(),
           '/develop/': sidebar('root', 'zh-develop'),
           '/reference/': sidebar('root', 'zh-reference'),
         },
@@ -335,34 +325,6 @@ export default withMermaid({
         returnToTopLabel: '返回顶部',
         langMenuLabel: '切换语言',
         skipToContentLabel: '跳至内容',
-      },
-    },
-    en: {
-      label: 'English',
-      lang: 'en-US',
-      link: '/en/',
-      themeConfig: {
-        siteTitle: siteTitle('Preview'),
-        nav: [
-          { text: 'Guide', link: landingLink('en', guideModules.en.guide), activeMatch: '^/en/guide/' },
-          ...moduleNav('en'),
-        ],
-        sidebar: {
-          '/en/guide/': guideSidebar('en'),
-          '/en/develop/': sidebar('en', 'en-develop'),
-          '/en/reference/': sidebar('en', 'en-reference'),
-        },
-        editLink: {
-          pattern: ({ frontmatter }: PageData) => {
-            const data: unknown = frontmatter
-            const editSource: unknown = typeof data === 'object' && data !== null ? Reflect.get(data, 'editSource') : undefined
-            if (typeof editSource !== 'string') throw new Error('Projected documentation page has no editSource frontmatter.')
-            return `https://github.com/deepseek-ai/deepseek-harness/edit/master/${editSource}`
-          },
-          text: 'Edit this page on GitHub',
-        },
-        outline: { label: 'On this page' },
-        docFooter: { prev: 'Previous', next: 'Next' },
       },
     },
   },

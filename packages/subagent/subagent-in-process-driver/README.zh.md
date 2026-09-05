@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-subagent-in-process-driver
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-subagent-in-process-driver` 是两个进程内 subagent 后端共用的运行驱动器：它通过宿主的 agent 工厂创建一个子 agent，应用按子 agent 的定制，把一项任务驱动到完成，并以单一完全停稳的 dispose（资源释放）路径返回子 agent 自身的最终输出。spawn 调用它时不传入会话初始内容；fork 调用它时传入父级已完成轮次的前缀。它是库而非独立功能：提供方后端调用 `startInProcessRun`，组合中没有任何东西配置它。阅读本页可理解两个进程内后端共享的运行生命周期。

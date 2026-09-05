@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-web-attachment-display-alignment.md) | 中文
-
 ## 问题
 
 Web 输入框的图片界面缺乏基本可用性（用户反馈，issue #2248）。删除按钮以 `top/right: -6px` 挂在 72px 缩略图外侧，被附件栏的 `overflow-x` 盒子裁切，点击经常落空；预览只能双击打开，除了 tooltip 没有任何提示这个操作；附件栏超出输入框宽度时在胶囊内部直接出现原生横向滚动条；图片接收被拒和发送失败（例如所选模型不支持图片输入时的 `attachment-error`）以常驻的内联红条显示在卡片上方。这些界面在 DeepSeek Chat 里都有用户熟悉的既定设计：单击预览、卡片内部悬停显示的删除按钮、隐藏滚动条的箭头翻页、顶部居中的短时 toast。

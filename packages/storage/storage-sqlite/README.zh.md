@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-storage-sqlite
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-storage-sqlite` 是一个存储后端：把每个已路由单元托管在同一个 SQLite 数据库文件中，每条记录按行存储一份 JSON 文档，注册为后端 `sqlite`。单条记录更新恰好触碰一行，这正是它适合高频定点写入的原因。当领域数据变动频繁、或部署偏好单一可查询数据库时选择它；当数据需要以纯文本文件形式可读时选择 JSON 后端。本后端只面向宿主侧：它不贡献提示词、工具或 schema，因此模型与 agent loop（智能体循环）永远不会看到它。

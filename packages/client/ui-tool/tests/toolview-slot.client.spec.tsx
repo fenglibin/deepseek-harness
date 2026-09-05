@@ -100,7 +100,7 @@ describe('keyed toolview hole through the real machinery', () => {
     expect(view.getByText('Bash')).toBeTruthy()
     expect(view.getByText('Build')).toBeTruthy()
     // mystery: no registration under that key → render-site fallback.
-    expect(view.getByText('Tool call')).toBeTruthy()
+    expect(view.getByText('工具调用')).toBeTruthy()
     await b.runtime.dispose()
   })
 
@@ -117,10 +117,10 @@ describe('keyed toolview hole through the real machinery', () => {
     // names its act and carries the package id rather than falling back to the
     // generic "Tool call · <name> · <id>" row.
     const rowText = (name: string) => view.container.querySelector(`[data-tool="${name}"]`)?.textContent
-    expect(rowText('cordis_runtime_inspect')).toContain('Inspect')
-    expect(rowText('cordis_run')).toContain('Run Cordis Plugindyn-2')
-    expect(rowText('cordis_stop')).toContain('Stop Cordis Plugindyn-2')
-    expect(rowText('cordis_undefine')).toContain('Remove Cordis Plugindyn-2')
+    expect(rowText('cordis_runtime_inspect')).toContain('查看')
+    expect(rowText('cordis_run')).toContain('运行 Cordis 插件dyn-2')
+    expect(rowText('cordis_stop')).toContain('停止 Cordis 插件dyn-2')
+    expect(rowText('cordis_undefine')).toContain('移除 Cordis 插件dyn-2')
     // No run-control verb is a code row; the program is cordis_define's, and its
     // own keyed card owns that rendering.
     expect(view.container.querySelector('[data-variant="code"]')).toBeNull()
@@ -150,7 +150,7 @@ describe('keyed toolview hole through the real machinery', () => {
   it('a live keyed registration takes over its tool row and unload reverts to the fallback', async () => {
     const b = await bench([toolResult(3, 'c2', 'mystery', '{"n":1}')])
     const view = b.runtime.renderRoot()
-    expect(view.getByText('Tool call')).toBeTruthy()
+    expect(view.getByText('工具调用')).toBeTruthy()
     let dispose = (): void => {}
     dispose = b.slots.register(
       { name: 'tool.call.toolview', key: 'mystery' },
@@ -158,11 +158,11 @@ describe('keyed toolview hole through the real machinery', () => {
     await b.runtime.flush()
     // Per-key version tick: the row flipped without a remount of the view.
     expect(view.getByTestId('mystery-row')).toBeTruthy()
-    expect(view.queryByText('Tool call')).toBeNull()
+    expect(view.queryByText('工具调用')).toBeNull()
     dispose()
     await b.runtime.flush()
     expect(view.queryByTestId('mystery-row')).toBeNull()
-    expect(view.getByText('Tool call')).toBeTruthy()
+    expect(view.getByText('工具调用')).toBeTruthy()
     await b.runtime.dispose()
   })
 

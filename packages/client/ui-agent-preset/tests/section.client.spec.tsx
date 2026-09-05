@@ -13,7 +13,7 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { AgentPresetSection } from '../src/client/AgentPresetSection.tsx'
 import type { AgentPresetSectionProps } from '../src/client/AgentPresetSection.tsx'
 import type { AgentPresetSectionState, CopyDraft } from '../src/client/section-store.ts'
-import { en } from '../src/client/locales.ts'
+import { zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
@@ -63,7 +63,7 @@ function renderSection(
   const props = {
     ...actions,
     useAgentPresetSection: bindSnapshotSelector(store),
-    t: (key: keyof typeof en) => en[key],
+    t: (key: keyof typeof zh) => zh[key],
   } as unknown as AgentPresetSectionProps
   render(<AgentPresetSection {...props} />)
   return actions
@@ -90,21 +90,21 @@ describe('the preset list', () => {
 
     // Display copy is what a picker reads; the id stays visible as the key the
     // composition and the session header actually carry.
-    expect(screen.getByText(en.presetStandardName)).toBeTruthy()
-    expect(screen.getByText(en.presetStandardDescription)).toBeTruthy()
+    expect(screen.getByText(zh.presetStandardName)).toBeTruthy()
+    expect(screen.getByText(zh.presetStandardDescription)).toBeTruthy()
     const mine = rowFor('mine')
     expect(within(mine).getAllByText('mine').length).toBeGreaterThan(0)
-    expect(within(mine).getByText(en.noDescription)).toBeTruthy()
+    expect(within(mine).getByText(zh.noDescription)).toBeTruthy()
   })
 
   it('marks trust and the one in use, and offers no "set default" on it', () => {
     renderSection()
 
     const standard = rowFor('standard')
-    expect(within(standard).getByText(en.builtIn)).toBeTruthy()
-    expect(within(standard).getByText(en.inUse)).toBeTruthy()
-    expect(within(standard).queryByText(en.setDefault)).toBeNull()
-    expect(within(rowFor('mine')).getByText(en.userTrust)).toBeTruthy()
+    expect(within(standard).getByText(zh.builtIn)).toBeTruthy()
+    expect(within(standard).getByText(zh.inUse)).toBeTruthy()
+    expect(within(standard).queryByText(zh.setDefault)).toBeNull()
+    expect(within(rowFor('mine')).getByText(zh.userTrust)).toBeTruthy()
   })
 
   it('separates built-in presets from custom ones', () => {
@@ -112,14 +112,14 @@ describe('the preset list', () => {
 
     // Two different things: one set ships with the deployment and is
     // read-only, the other is the user's own.
-    expect(screen.getByRole('heading', { name: en.builtInGroup })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: en.customGroup })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: zh.builtInGroup })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: zh.customGroup })).toBeTruthy()
   })
 
   it('shows no group heading for a set nobody has', () => {
     renderSection({ rows: [{ id: 'standard', trust: 'system', isDefault: true }] })
 
-    expect(screen.queryByRole('heading', { name: en.customGroup })).toBeNull()
+    expect(screen.queryByRole('heading', { name: zh.customGroup })).toBeNull()
   })
 
   it('leads with the two ways a preset is created', () => {
@@ -134,7 +134,7 @@ describe('the preset list', () => {
   it('picks a preset by clicking its card, and the one in use is inert', () => {
     const actions = renderSection()
 
-    const inUse = within(rowFor('standard')).getByRole('button', { name: `${en.inUse}: ${en.presetStandardName}` })
+    const inUse = within(rowFor('standard')).getByRole('button', { name: `${zh.inUse}: ${zh.presetStandardName}` })
     expect(inUse).toHaveProperty('disabled', true)
     fireEvent.click(inUse)
 
@@ -150,26 +150,26 @@ describe('the preset list', () => {
     // the point. A custom preset is edited in its files, so its row leads
     // there instead; there is no editor for either.
     const standard = rowFor('standard')
-    expect(within(standard).getByRole('button', { name: `${en.view}: ${en.presetStandardName}` })).toBeTruthy()
-    expect(within(standard).queryByRole('button', { name: `${en.openLocation}: ${en.presetStandardName}` })).toBeNull()
+    expect(within(standard).getByRole('button', { name: `${zh.view}: ${zh.presetStandardName}` })).toBeTruthy()
+    expect(within(standard).queryByRole('button', { name: `${zh.openLocation}: ${zh.presetStandardName}` })).toBeNull()
     const mine = rowFor('mine')
-    expect(within(mine).getByRole('button', { name: `${en.openLocation}: mine` })).toBeTruthy()
-    expect(within(mine).queryByRole('button', { name: `${en.view}: mine` })).toBeNull()
+    expect(within(mine).getByRole('button', { name: `${zh.openLocation}: mine` })).toBeTruthy()
+    expect(within(mine).queryByRole('button', { name: `${zh.view}: mine` })).toBeNull()
   })
 
   it('offers Delete only for a locally authored preset', () => {
     renderSection()
 
-    expect(within(rowFor('mine')).getByRole('button', { name: `${en.delete}: mine` })).toBeTruthy()
-    expect(within(rowFor('standard')).queryByRole('button', { name: `${en.delete}: ${en.presetStandardName}` })).toBeNull()
+    expect(within(rowFor('mine')).getByRole('button', { name: `${zh.delete}: mine` })).toBeTruthy()
+    expect(within(rowFor('standard')).queryByRole('button', { name: `${zh.delete}: ${zh.presetStandardName}` })).toBeNull()
   })
 
   it('disables duplication when nothing is writable, and says why', () => {
     renderSection({ authorable: false })
 
-    const duplicate = within(rowFor('standard')).getByRole('button', { name: `${en.duplicate}: ${en.presetStandardName}` })
+    const duplicate = within(rowFor('standard')).getByRole('button', { name: `${zh.duplicate}: ${zh.presetStandardName}` })
     expect(duplicate).toHaveProperty('disabled', true)
-    expect(duplicate.getAttribute('data-tip')).toBe(en.duplicateUnavailable)
+    expect(duplicate.getAttribute('data-tip')).toBe(zh.duplicateUnavailable)
   })
 
   it('marks a broken custom preset: unselectable, uncopyable, still deletable', () => {
@@ -186,8 +186,8 @@ describe('the preset list', () => {
     const ghost = rowFor('ghost')
     // The badge carries the reason for a pointer, and the body cannot pick
     // what cannot mount.
-    expect(within(ghost).getByText(en.brokenBadge).textContent)
-      .toBe(`${en.brokenBadge}the composition file agent.cordis.yml is missing`)
+    expect(within(ghost).getByText(zh.brokenBadge).textContent)
+      .toBe(`${zh.brokenBadge}the composition file agent.cordis.yml is missing`)
     // A picker card keeps showing what the preset is; a package specifier in
     // its place would tell a chooser nothing they can act on there.
     expect(within(ghost).getByText('我自己写的')).toBeTruthy()
@@ -197,18 +197,18 @@ describe('the preset list', () => {
     // `aria-disabled`, not `disabled`: the card stays in the tab order so a
     // keyboard reaches the reason the face no longer shows, and refuses the
     // pick itself rather than by being unreachable.
-    const body = within(ghost).getByRole('button', { name: `${en.brokenBadge}: 幽灵预设` })
+    const body = within(ghost).getByRole('button', { name: `${zh.brokenBadge}: 幽灵预设` })
     expect(body).toHaveProperty('disabled', false)
     expect(body.getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(body)
     expect(actions.makeDefault).not.toHaveBeenCalled()
     // Copying a broken preset would only mint another broken one; deleting
     // and the location remain — the files are where it gets fixed.
-    const duplicate = within(ghost).getByRole('button', { name: `${en.duplicate}: 幽灵预设` })
+    const duplicate = within(ghost).getByRole('button', { name: `${zh.duplicate}: 幽灵预设` })
     expect(duplicate).toHaveProperty('disabled', true)
-    expect(duplicate.getAttribute('data-tip')).toBe(en.brokenNoCopy)
-    expect(within(ghost).getByRole('button', { name: `${en.delete}: 幽灵预设` })).toBeTruthy()
-    expect(within(ghost).getByRole('button', { name: `${en.openLocation}: 幽灵预设` })).toBeTruthy()
+    expect(duplicate.getAttribute('data-tip')).toBe(zh.brokenNoCopy)
+    expect(within(ghost).getByRole('button', { name: `${zh.delete}: 幽灵预设` })).toBeTruthy()
+    expect(within(ghost).getByRole('button', { name: `${zh.openLocation}: 幽灵预设` })).toBeTruthy()
   })
 
   it('withholds the viewer on a broken shipped preset', () => {
@@ -219,14 +219,14 @@ describe('the preset list', () => {
     // There is no readable composition to offer; the reason on the card is
     // the whole story a shipped row can tell.
     const standard = rowFor('standard')
-    expect(within(standard).queryByRole('button', { name: `${en.view}: ${en.presetStandardName}` })).toBeNull()
+    expect(within(standard).queryByRole('button', { name: `${zh.view}: ${zh.presetStandardName}` })).toBeNull()
     expect(within(standard).getByRole('alert').textContent).toContain('not valid YAML')
   })
 
   it('labels the location by what it will do without a desktop', () => {
     renderSection({ hasDocument: false })
 
-    expect(within(rowFor('mine')).getByRole('button', { name: `${en.showLocation}: mine` })).toBeTruthy()
+    expect(within(rowFor('mine')).getByRole('button', { name: `${zh.showLocation}: mine` })).toBeTruthy()
   })
 
   it('shows a revealed directory on its row', () => {
@@ -234,19 +234,19 @@ describe('the preset list', () => {
 
     const mine = rowFor('mine')
     expect(within(mine).getByText('/home/user/.dsh/.agent-presets/mine')).toBeTruthy()
-    expect(within(mine).getByText(en.revealedPathLabel)).toBeTruthy()
+    expect(within(mine).getByText(zh.revealedPathLabel)).toBeTruthy()
     // The reveal belongs to its row alone.
-    expect(within(rowFor('standard')).queryByText(en.revealedPathLabel)).toBeNull()
+    expect(within(rowFor('standard')).queryByText(zh.revealedPathLabel)).toBeNull()
   })
 
   it('routes the row actions to the controller', () => {
     const actions = renderSection()
 
     // The card body is the control that picks a preset.
-    fireEvent.click(within(rowFor('mine')).getByRole('button', { name: `${en.setDefault}: mine` }))
-    fireEvent.click(within(rowFor('mine')).getByRole('button', { name: `${en.openLocation}: mine` }))
-    fireEvent.click(within(rowFor('mine')).getByRole('button', { name: `${en.duplicate}: mine` }))
-    fireEvent.click(within(rowFor('standard')).getByRole('button', { name: `${en.view}: ${en.presetStandardName}` }))
+    fireEvent.click(within(rowFor('mine')).getByRole('button', { name: `${zh.setDefault}: mine` }))
+    fireEvent.click(within(rowFor('mine')).getByRole('button', { name: `${zh.openLocation}: mine` }))
+    fireEvent.click(within(rowFor('mine')).getByRole('button', { name: `${zh.duplicate}: mine` }))
+    fireEvent.click(within(rowFor('standard')).getByRole('button', { name: `${zh.view}: ${zh.presetStandardName}` }))
 
     expect(actions.makeDefault).toHaveBeenCalledWith('mine')
     expect(actions.openLocation).toHaveBeenCalledWith('mine')
@@ -259,7 +259,7 @@ describe('the preset list', () => {
       rows: [...READY.rows, { id: 'cordis', trust: 'system', isDefault: false, name: '创造模式' }],
     })
 
-    fireEvent.click(screen.getByRole('button', { name: en.creatorDraft }))
+    fireEvent.click(screen.getByRole('button', { name: zh.creatorDraft }))
 
     expect(actions.startCreatorDraft).toHaveBeenCalledTimes(1)
     // Leaving settings is part of the gesture: the flow lands in the new
@@ -276,27 +276,27 @@ describe('the preset list', () => {
     })
 
     // No member yet, but the place where one's own preset will appear stays.
-    expect(screen.getByRole('heading', { name: en.customGroup })).toBeTruthy()
-    expect(screen.getByRole('button', { name: en.creatorDraft })).toBeTruthy()
-    expect(screen.queryByText(`· ${en.userTrust}`)).toBeNull()
+    expect(screen.getByRole('heading', { name: zh.customGroup })).toBeTruthy()
+    expect(screen.getByRole('button', { name: zh.creatorDraft })).toBeTruthy()
+    expect(screen.queryByText(`· ${zh.userTrust}`)).toBeNull()
   })
 
   it('hides the creator entry without the flow or the preset, disables it without a root', () => {
     renderSection()
-    expect(screen.queryByRole('button', { name: en.creatorDraft })).toBeNull()
+    expect(screen.queryByRole('button', { name: zh.creatorDraft })).toBeNull()
     cleanup()
 
     renderSection({
       rows: [...READY.rows, { id: 'cordis', trust: 'system', isDefault: false, name: '创造模式' }],
     }, { creator: false })
-    expect(screen.queryByRole('button', { name: en.creatorDraft })).toBeNull()
+    expect(screen.queryByRole('button', { name: zh.creatorDraft })).toBeNull()
     cleanup()
 
     const actions = renderSection({
       authorable: false,
       rows: [...READY.rows, { id: 'cordis', trust: 'system', isDefault: false, name: '创造模式' }],
     })
-    const disabled = screen.getByRole('button', { name: en.creatorDraft })
+    const disabled = screen.getByRole('button', { name: zh.creatorDraft })
     expect(disabled).toHaveProperty('disabled', true)
     fireEvent.click(disabled)
     expect(actions.startCreatorDraft).not.toHaveBeenCalled()
@@ -313,7 +313,7 @@ describe('the preset list', () => {
     const { container } = render(<AgentPresetSection {...({
       useAgentPresetSection: bindSnapshotSelector(
         createSnapshotStore<AgentPresetSectionState>({ ...READY, status: 'unavailable', rows: [] })),
-      t: (key: keyof typeof en) => en[key],
+      t: (key: keyof typeof zh) => zh[key],
       load: vi.fn(() => Promise.resolve()),
     } as unknown as AgentPresetSectionProps)} />)
 
@@ -324,7 +324,7 @@ describe('the preset list', () => {
     const actions = renderSection({ status: 'error', error: 'roster unavailable' })
 
     expect(screen.getByRole('alert').textContent).toContain('roster unavailable')
-    fireEvent.click(screen.getByText(en.retry))
+    fireEvent.click(screen.getByText(zh.retry))
 
     expect(actions.load).toHaveBeenCalledTimes(2)
   })
@@ -339,10 +339,10 @@ describe('the copy dialog', () => {
     const actions = renderSection({ copy: draft })
 
     const dialog = screen.getByRole('dialog')
-    expect(dialog.getAttribute('aria-label')).toBe(`${en.copyTitle} · ${en.copyOf} ${en.presetStandardName}`)
-    expect(within(dialog).getByText(en.copyIntro)).toBeTruthy()
-    fireEvent.change(within(dialog).getByPlaceholderText(en.presetIdPlaceholder), { target: { value: 'my-agent' } })
-    fireEvent.change(within(dialog).getByPlaceholderText(en.displayNamePlaceholder), { target: { value: '我的模式' } })
+    expect(dialog.getAttribute('aria-label')).toBe(`${zh.copyTitle} · ${zh.copyOf} ${zh.presetStandardName}`)
+    expect(within(dialog).getByText(zh.copyIntro)).toBeTruthy()
+    fireEvent.change(within(dialog).getByPlaceholderText(zh.presetIdPlaceholder), { target: { value: 'my-agent' } })
+    fireEvent.change(within(dialog).getByPlaceholderText(zh.displayNamePlaceholder), { target: { value: '我的模式' } })
 
     expect(actions.setCopyId).toHaveBeenCalledWith('my-agent')
     expect(actions.setCopyName).toHaveBeenCalledWith('我的模式')
@@ -355,8 +355,8 @@ describe('the copy dialog', () => {
     const actions = renderSection({ copy: { ...draft, id: 'my-agent' } })
 
     const dialog = screen.getByRole('dialog')
-    fireEvent.click(within(dialog).getByText(en.create))
-    fireEvent.click(within(dialog).getByText(en.cancel))
+    fireEvent.click(within(dialog).getByText(zh.create))
+    fireEvent.click(within(dialog).getByText(zh.cancel))
 
     expect(actions.confirmCopy).toHaveBeenCalledTimes(1)
     expect(actions.cancelCopy).toHaveBeenCalledTimes(1)
@@ -366,8 +366,8 @@ describe('the copy dialog', () => {
     const actions = renderSection({ copy: { ...draft, id: 'Upper Case' } })
 
     const dialog = screen.getByRole('dialog')
-    expect(within(dialog).getByRole('alert').textContent).toBe(en.idInvalid)
-    fireEvent.click(within(dialog).getByText(en.create))
+    expect(within(dialog).getByRole('alert').textContent).toBe(zh.idInvalid)
+    fireEvent.click(within(dialog).getByText(zh.create))
 
     // Disabled rather than round-tripping: the id is a directory name and the
     // rule is the host's own.
@@ -383,7 +383,7 @@ describe('the copy dialog', () => {
   it('reports a copy in flight and blocks a second click', () => {
     const actions = renderSection({ copy: { ...draft, id: 'my-agent', saving: true } })
 
-    fireEvent.click(within(screen.getByRole('dialog')).getByText(en.creating))
+    fireEvent.click(within(screen.getByRole('dialog')).getByText(zh.creating))
 
     expect(actions.confirmCopy).not.toHaveBeenCalled()
   })
@@ -402,21 +402,21 @@ describe('the read-only viewer', () => {
     renderSection({ view: { id: 'standard', title: '标准模式', content: '- id: tool-bash\n' } })
 
     const dialog = screen.getByRole('dialog')
-    expect(dialog.getAttribute('aria-label')).toBe(`${en.view} · ${en.presetStandardName}`)
-    expect(within(dialog).getByText(en.composition)).toBeTruthy()
+    expect(dialog.getAttribute('aria-label')).toBe(`${zh.view} · ${zh.presetStandardName}`)
+    expect(within(dialog).getByText(zh.composition)).toBeTruthy()
     expect(within(dialog).getByText(/tool-bash/).textContent).toBe('- id: tool-bash\n')
   })
 
   it('keeps the loaded title when the viewed row leaves the roster', () => {
     renderSection({ view: { id: 'retired', title: 'Retired mode', content: '- id: tool-bash\n' } })
 
-    expect(screen.getByRole('dialog').getAttribute('aria-label')).toBe(`${en.view} · Retired mode`)
+    expect(screen.getByRole('dialog').getAttribute('aria-label')).toBe(`${zh.view} · Retired mode`)
   })
 
   it('closes through the controller', () => {
     const actions = renderSection({ view: { id: 'standard', title: '标准模式', content: '- id: x\n' } })
 
-    fireEvent.click(within(screen.getByRole('dialog')).getByText(en.close))
+    fireEvent.click(within(screen.getByRole('dialog')).getByText(zh.close))
 
     expect(actions.closeView).toHaveBeenCalledTimes(1)
   })
@@ -434,7 +434,7 @@ describe('deleting a preset', () => {
   it('asks before deleting', () => {
     const actions = renderSection()
 
-    fireEvent.click(within(rowFor('mine')).getByRole('button', { name: `${en.delete}: mine` }))
+    fireEvent.click(within(rowFor('mine')).getByRole('button', { name: `${zh.delete}: mine` }))
 
     expect(actions.confirmDelete).toHaveBeenCalledWith('mine')
   })
@@ -443,8 +443,8 @@ describe('deleting a preset', () => {
     const actions = renderSection({ pendingDelete: 'mine' })
 
     const dialog = screen.getByRole('dialog')
-    fireEvent.click(within(dialog).getByText(en.deleteConfirm))
-    fireEvent.click(within(dialog).getByText(en.cancel))
+    fireEvent.click(within(dialog).getByText(zh.deleteConfirm))
+    fireEvent.click(within(dialog).getByText(zh.cancel))
 
     expect(actions.remove).toHaveBeenCalledTimes(1)
     expect(actions.confirmDelete).toHaveBeenLastCalledWith(null)
@@ -461,7 +461,7 @@ describe('deleting a preset', () => {
   it('reports a delete in flight', () => {
     const actions = renderSection({ pendingDelete: 'mine', deleting: true })
 
-    fireEvent.click(within(screen.getByRole('dialog')).getByText(en.deleting))
+    fireEvent.click(within(screen.getByRole('dialog')).getByText(zh.deleting))
 
     expect(actions.remove).not.toHaveBeenCalled()
   })

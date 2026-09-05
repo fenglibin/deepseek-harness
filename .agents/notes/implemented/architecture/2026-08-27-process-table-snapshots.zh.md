@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-27-process-table-snapshots.md) | 中文
-
 ## Problem
 
 一次终端就绪轮询要向平台问三个问题：shell 的子进程树、它的 POSIX 会话成员、以及每个被跟踪的子进程是否仍在运行。当每个问题各自去读一次进程表时，这次轮询的代价就随着当前命令派生出的子进程数量增长。

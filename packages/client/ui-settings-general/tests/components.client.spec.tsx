@@ -15,13 +15,13 @@ function derivedDocumentStore(remote: object) {
   const ctx = { remote } as never
   return new SettingsDocumentStore(ctx, new SettingsDescribeMirror(ctx))
 }
-import { en } from '../src/client/locales.ts'
+import { zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
 // The seat's key domain is settings ∪ common; the stub answers from the
 // package dictionary and falls back to the key like the real chain.
-const t: TriggerContentProps['t'] = key => (en as Record<string, string>)[key] ?? key
+const t: TriggerContentProps['t'] = key => (zh as Record<string, string>)[key] ?? key
 
 // Global standard kit stubs: none of these components consume the hooks.
 const unusedHook = (() => { throw new Error('unused by settings-general components') }) as never

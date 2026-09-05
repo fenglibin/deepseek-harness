@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-24-agent-loop-observable-state-machine.md) | 中文
-
 ## 问题
 
 agent loop（智能体循环）曾将其控制流暴露为大量 Cordis 事件。`pre-step` 和 `post-step` 两个独立检查点分列步骤前后，`session-prefix` 和 `step-result` 分别变换请求消息与响应消息，`request-error` 决定失败的请求是否在当前轮次内重试，`turn-continuation` 与 `turn-stop` 则组合相互竞争的继续执行决策。

@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-win32-process
 
-[English](README.md) | 中文
-
 ## 概述
 
 供 Windows ACL 沙箱消费的底层 Win32 进程库。它唯一拥有仓库中可复用 restricted-process、stdio 与 Job Object 操作的 Koffi 绑定表；它不是 Cordis 服务，也不决定沙箱策略或公共 child 行为。维护沙箱原生进程路径或检查 handle 生命周期限制时，请阅读本页。

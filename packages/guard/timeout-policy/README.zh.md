@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-call-timeout-policy
 
-[English](README.md) | 中文
-
 ## 概述
 
 工具调用可能会长时间挂起——缓慢的网页抓取、永不返回的搜索——没有上限时模型会无限期等待，拖住整个会话。`dsh-tool-call-timeout-policy` 为声明了限时的调用设置协作式截止时间：它通过 `exec.signal` 请求工具停止，再把已经完成的取消映射为清晰的 `Error: tool call timed out after <ms>ms` 结果。忽略或缓慢处理取消的工具会让调用方继续等待，直到自身完成；本插件绝不会硬性停止下游工作。限时来自每个工具自身的配置，因此插件本身零配置，并随 `dsh` base 组合默认启用。

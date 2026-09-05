@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-16-persistent-pty-sessions.md) | 中文
-
 ## 问题
 
 harness 可以运行前台与后台命令、编辑文件和委派工作，但无法跨工具调用延续一次交互式终端对话。每次 `bash` 前台运行都会启动一个新 shell，因此 shell 内的 cwd、导出变量、虚拟环境激活状态、函数、job control 状态和交互式子进程都会随本次调用结束。

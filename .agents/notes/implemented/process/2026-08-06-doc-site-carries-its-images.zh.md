@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-doc-site-carries-its-images.md) | 中文
-
 ## 问题
 
 `scripts/project-doc-site.ts` 会把发布 manifest（元数据清单）未收录的仓库相对目标一律改写成 GitHub 地址，对图片而言就是 `https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>`。站点构建不拷贝任何文件：`srcDir` 是用完即弃的 `.generated` 树，VitePress 没有设置 `publicDir`（其默认值 `<srcDir>/public` 恰好位于投影每次运行时删除的那棵树里），而写进去的只有 Markdown。

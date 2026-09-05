@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-agent-instructions
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-agent-instructions` 将兼容 `AGENTS.md` 的工作区指令文件加载到模型上下文：用户全局文件与项目指令链作为一条持久基线进入第一次请求，成功的 `read`、`write` 或 `edit` 调用会把新出现的嵌套文件、变更与移除带入后续请求。它随默认 `dsh-agent-spine-demo` 组合包发布并默认启用，可通过组合包配置禁用。一切内容都受字节预算约束：较宽泛的文件先被省略，最具体的文件最后被截断，空指令链不产生任何内容。没有文件 watcher——外部编辑会在下一次成功的文件系统 touch 时，或恢复后的会话对账其基线时变得可见。

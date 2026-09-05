@@ -34,17 +34,3 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     reference: ReferenceKey
   }
 }
-
-/** English dictionary, checked complete against the zh key set. */
-export const en = {
-  'section.files': 'Files & folders',
-  'section.sessions': 'Sessions',
-  'candidate.noCwd': '(no cwd)',
-  'crumb.root': 'Workspace',
-  'time.now': 'now',
-  'time.minutes': '{n}min',
-  'time.hours': '{n}h',
-  'time.days': '{n}d',
-  'time.months': '{n}mo',
-  'time.years': '{n}y',
-} satisfies Record<ReferenceKey, string>

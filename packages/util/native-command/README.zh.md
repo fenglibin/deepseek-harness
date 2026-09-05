@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-native-command
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-native-command` 无需 shell 即可运行 Host 可执行文件，并通过桌面打开 Host 文件系统路径。命令运行器捕获 utf8 输出、传播取消，并隐藏 Windows 瞬时控制台。路径打开器支持默认应用与文本编辑器意图、浏览器可渲染文档、WSL 转换与桌面可用性检查。它是库而非插件：没有 `ctx`、无状态、不发事件。

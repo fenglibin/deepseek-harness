@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-06-approval-seam.md) | 中文
-
 ## 问题
 
 两个调用方需要同一个封闭决策——「这个具体操作可以继续吗？」：`tools/pre-execute` 的 `ask` 决策（包括 Claude-Code 钩子桥的 `permissionDecision: ask`）以及[沙箱 Agent Note](2026-07-06-sandbox.zh.md) 中拒绝后的一次性升级重试。一个共享的 seam 使它们无需各自发明独立的结果词汇、通道路由、取消机制和审计轨迹，同时保证没有应答者的部署永远不会批准一个无法应答的请求。应答者可以是交互式宿主，也可以是自动化控制器。

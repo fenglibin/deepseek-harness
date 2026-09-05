@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-fork-children-stay-one-shot.md) | 中文
-
 ## 问题
 
 fork 与 spawn 的唯一区别是 child 的 Session 会以 parent 已完成轮次的前缀作为初始内容（见 [subagent-fork-in-process](../../../../packages/subagent/subagent-fork-in-process/README.zh.md)）。这份初始内容有实打实的 token 成本——继承的历史会在 child 的每次请求中重新发送——而它唯一确定的回报是提供方侧的前缀复用：在提供方与模型相同的前提下，起始字节与 parent 逐字节相同的 child 请求，无需为这段共享区间重新预填充。任何由 child 作用域添加在继承历史*之前*的内容都会消耗掉这份回报，因为复用在第一个不同字节处即告停止。

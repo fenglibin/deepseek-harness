@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-25-session-observations-and-projection-owned-client-state.md) | 中文
-
 ## 问题
 
 面向 Session 的多个消费方需要相同的逻辑数据，却各自完成解析。list、follow、page、附件／fork 读取和 subagent 检查分别在已挂载 Session、持久化元数据、prepared Session 与 projection cache 之间作选择。因此一次页面访问可能多次物化同一份冷日志，各自拼装的 header、事件、cursor 和 projection 值也可能来自不同的读取切面。

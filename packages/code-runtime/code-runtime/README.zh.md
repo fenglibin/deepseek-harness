@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-code-runtime
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-code-runtime` 定义代码运行时做什么：针对一组宿主提供的异步函数运行一段模型编写的程序，并报告 `{ value, logs, error? }`——不规定任何后端如何实现。在组合中与一个后端一起加载它，服务即可作为 `ctx.codeRuntime` 使用；随后 `dsh-tools` 中的 PTC mode 即可运行组合工具的模型程序。每次请求只运行一次，运行之间不保留状态；每个程序结果——包括失败——都以结果字段 resolve，而不是 reject。运行时不了解工具或会话：调用方只向它提供程序与具名绑定，所有与工具有关的内容都留在 Consumer。

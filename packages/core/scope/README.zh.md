@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-scope
 
-[English](README.md) | 中文
-
 ## 概述
 
 零依赖的 `dsh-scope` 库让注册拥有按 agent 归属的家。用 `createScope(ctx, key)` 创建带标签的上下文，通过它进行的每项注册只在一个作用域内可见，并随该作用域 dispose（资源释放）而撤销；用 `scopeOf(ctx)` 读取上下文的作用域标签；用 `scopeTarget(base, key)` 把带作用域的事件路由到键相同的监听器，同时让无标签监听器保持全局可见。键可以构成父链：子作用域看得见祖先的各层（近者遮蔽远者），标签为祖先的监听器能收到子孙键的事件——反向永不成立。该机制与键的具体含义无关：agent loop（智能体循环）为每个存活的 agent 创建一个作用域，agent preset 的常驻挂载则是其 agent 们的父作用域，但底层包无需依赖两者即可使用。构建必须按 agent 或按分组隔离贡献的注册表或事件表面时，请选择本包。

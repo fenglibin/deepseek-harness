@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-04-lightweight-model-routing.md) | 中文
-
 ## Problem
 
 会话标题来自截断兜底，而不是随发行版组合已经请求的 LLM 标题。抽查本地 12 个会话，每一个都记录了 `session/title-llm-request`，却没有一个记录 `provider` 来源的 `session/title`：辅助请求发起了、失败了，服务层于是保留「取前五个词」的兜底标题。

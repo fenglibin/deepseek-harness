@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-28-trigger-menu-stale-while-revalidate.md) | 中文
-
 ## Problem
 
 在已打开的 `@`/`/` 触发菜单里,每个按键都会发起一次新的候选请求。菜单 reducer 的 `hit` 分支过去会把各组重置为 pending-空,于是列表在 100–460ms 的请求往返期间塌缩成骨架屏,每输入一个字符就重绘一次——细化查询时肉眼可见的闪烁(#3234)。

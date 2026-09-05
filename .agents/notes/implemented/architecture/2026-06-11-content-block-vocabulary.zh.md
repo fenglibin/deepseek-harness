@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-11-content-block-vocabulary.md) | 中文
-
 ## 问题
 
 harness 需要一套统一的内部消息语言，供 agent loop（智能体循环）、会话日志和所有插件共同使用。

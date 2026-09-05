@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-provider-credential-lifecycle.md) | 中文
-
 ## 问题
 
 Models 编辑器横跨互相独立的 settings 与凭据 RPC 领域。之前它先提交提供方 settings，再存储 API 密钥，却一直保留卡片打开时的 revision 和原始子树。如果凭据写入失败，重试会用陈旧 revision 重放已提交的 settings 变更，并产生冲突，导致用户无法从同一张卡片完成第二个阶段。空的 pi-ai 密钥还会写入派生的 `apiKeyEnv`，却不写入凭据，从而阻止 pi-ai 使用提供方原生凭据发现。删除时则存在相反的残留问题：profile 消失了，页面存储的密钥却保留在 `.env` 中，并在重新添加提供方时静默地恢复作用。笼统的行操作与确认文案也没有标明要更改哪个提供方。

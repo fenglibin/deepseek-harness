@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-05-composer-context-meter-breakdown.md) | 中文
-
 ## 问题
 
 Web 聊天的统计行把上下文占用率作为一个行内数字（`Context N% of X`）挤在计费分组之间。它回答了「有多满」，却回答不了「被什么占满」：没有任何地方展示窗口在系统提示词、工具 schema 与对话之间如何分配，而单行统计行也容纳不下这种明细。可用的数字还分属两套口径——来自 `contextPressure` 的提供方精确计费的提示词规模，与 token-meter 的固定字符启发式——没有任何既有界面能在不混淆两者的前提下展示组成。

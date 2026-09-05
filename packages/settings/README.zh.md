@@ -5,8 +5,6 @@ kind: "package-group"
 
 # settings/：用户可编辑配置
 
-[English](README.md) | 中文
-
 ## 概述
 
 `settings/` 组让插件配置变为用户可编辑：插件用一个 schema 注册具名 namespace，用户在一份文档里覆盖值，无需改动 `cordis.yml`。用户覆盖优先于部署自身的配置与 schema 默认值，变更实时生效。两个包覆盖该能力：`settings/` 提供设置服务，`settings-file/` 把所有 namespace 存进一个用户可编辑的 YAML 或 JSON 文档。设置是可选的：没有挂载提供方时，配置保持组合原样。

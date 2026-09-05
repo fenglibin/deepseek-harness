@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-followup-enqueue-and-owned-runs.md) | 中文
-
 ## 问题
 
 `Agent.followup()` 会标识一条用户消息并将其排入队列，但单次 follow-up 并不拥有随后发生的活动。在 agent（智能体）下一次进入 idle 前，steering（中途引导）、注入的上下文、工具续行、恢复和后续排队消息都可能参与活动。因此，`MessageId` 可以证明消息已获 inbox 准入，但不能标识哪一条 assistant 消息或哪一个 `turn/end` 是该输入的结果。

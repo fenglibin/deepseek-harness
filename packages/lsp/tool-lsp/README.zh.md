@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-tool-lsp
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-tool-lsp` 通过 LSP seam 为模型提供单一的只读 `lsp` 工具，用于精确代码导航：转到符号的定义、查找其引用、跳转到其实现，或阅读悬停文档。该工具拥有模型看到的一切——名称、schema、提示词指引、结果格式化与 UI 呈现——并且绝不依赖哪个语言服务器应答查询。位置是从 1 开始的 UTF-16 光标坐标，工具会将其转换为 seam 从零开始的约定。结果是有边界的位置列表或规范化悬停文本，带有明确的空结果与截断标记。与 `dsh-lsp-stdio` 之类的提供方及 `dsh-lsp` seam 组合，即可启用导航。

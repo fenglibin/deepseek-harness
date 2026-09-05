@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-18-localized-bilingual-links.md) | 中文
-
 ## Problem
 
 GitHub 会直接解析仓库 Markdown 链接，不经过文档网站的 locale projector。若要求双语配对两侧保留相同的 `.md` 原始目标，即使已有经评审的 `.zh.md` 兄弟文件，中文源文件的读者也会被带到英文页面。文档网站会按当前 locale 路由普通链接，从而掩盖这个错误，导致仓库源码与发布网站产生不同的导航结果。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-background-job-completion-wakes-an-idle-owner.md) | 中文
-
 ## 问题
 
 `tool-jobs` 对模型承诺「任务完成时你会在会话内收到通知——不要忙轮询，也不要 sleep 等待」。这个承诺只在模型仍在工作时成立。完成经由 `agent.inject()` 交付，它只向 next-step inbox 追加而不预留 driver，因此在轮次结束之后才结算的任务会把通知搁在那里，直到某件无关的事情唤醒 agent。最常见的形态恰恰就是会失效的那一种：模型启动一条长命令，告诉用户已经启动，结束轮次，而命令完成后进入了一个无人领取的 inbox。提示词让模型不要轮询，然后什么也没到。

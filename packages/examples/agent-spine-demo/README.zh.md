@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-agent-spine-demo
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-agent-spine-demo` 用一个插件给你一个可工作的 agent（智能体）：挂载它、添加 LLM（大语言模型）适配器与执行器，即可运行完整的 agent 对话——带自动标题的内存会话、包含你的 persona 与工作区指令的系统提示词、bash、skill 与后台任务工具，以及带自动重试的运行轮次循环。你可以用用户术语配置它：persona、工具顺序、工作区上下文预算、预创建哪些 agent、可选持久目标与后台任务上限。它不附带 UI、执行器或持久化后端，且不添加任何自己的提示词或工具 schema——模型只看到你的配置产生的内容。当你构建无头、ACP（Agent Client Protocol）或 JSON-RPC agent、希望复用通用 agent 机制而不必自己搭建时使用它。阅读本包可了解开箱即得的内容，以及需要你自行提供的内容。

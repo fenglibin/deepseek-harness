@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-12-onboarding-reads-every-provider.md) | 中文
-
 ## Problem
 
 首次使用引导步骤与 Models 页都只向一个描述全部提供方的联接快照提出了同一个问题——`deepseek-official` 的凭据存了吗？两个缺陷由这一次读取而来。

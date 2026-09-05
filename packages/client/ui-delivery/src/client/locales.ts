@@ -29,30 +29,3 @@ export const zh = {
 
 /** The delivery namespace key union. */
 export type DeliveryKey = keyof typeof zh
-
-/** English dictionary, checked complete against the zh key set. */
-export const en = {
-  'level.l0': 'L0',
-  'level.l1': 'L1',
-  'level.l2': 'L2',
-  'phase.created': 'Created',
-  'phase.designed': 'Designed',
-  'phase.specified': 'Specified',
-  'phase.implemented': 'Implemented',
-  'phase.verified': 'Verified',
-  'phase.accepted': 'Accepted',
-  'artifacts.label': '{count} artifact(s)',
-  'gate.change': 'A change record is required next',
-  'gate.design': 'A design record is required next',
-  'gate.spec': 'A spec record is required next',
-  'task.title': 'Delivery task',
-  'task.summary': '{changeCount} change(s) · {designCount} design(s) · {specCount} spec(s)',
-  'task.status.accepted': 'Accepted',
-  'task.status.cleared': 'Cleared',
-  'event.create': 'Created task',
-  'event.advance': 'Advanced to {phase}',
-  'event.record-change': 'Recorded change',
-  'event.record-design': 'Recorded design',
-  'event.record-spec': 'Recorded spec',
-  'event.clear': 'Cleared task',
-} satisfies Record<DeliveryKey, string>

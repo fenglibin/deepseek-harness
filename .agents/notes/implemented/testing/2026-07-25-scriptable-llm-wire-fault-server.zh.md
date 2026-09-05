@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-25-scriptable-llm-wire-fault-server.md) | 中文
-
 ## 问题
 
 适配器单元测试使用本地 HTTP 服务器对各类提供方故障逐一分类，重试测试则使用进程内的脚本化 `LlmAdapter` 证明已关闭步骤的恢复能力。这两个边界都无法提供可复用的服务器，以便同时运行交付版本的 HTTP 适配器、agent loop（智能体循环）和重试策略；开发者也无法仅修改现有应用的 base URL 与 API key，就让应用连接到确定性的传输故障。

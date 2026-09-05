@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-20-agent-note-classification.md) | 中文
-
 ## 问题
 
 仅按生命周期组织的 Agent Note 目录树（`proposed/` / `implemented/` / `rejected/`）无法记录每个文件包含哪一*类*决策。读者浏览某个生命周期时，如果不逐一打开文件，就无法区分新功能、移除项或工具策略变更。

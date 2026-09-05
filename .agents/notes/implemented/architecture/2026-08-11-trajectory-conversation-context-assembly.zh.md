@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-trajectory-conversation-context-assembly.md) | 中文
-
 ## 问题
 
 Trajectory 曾维护独立的 Session History 数据源，并把完整的已加载 Event 窗口折叠为 Assistant、Tool、消息、Request header 和 Compaction 状态。Chat 已经通过注册式 Conversation Definition 组装相同的 Event 族。两条链路重复实现业务关联与分页行为；即使只改变一个业务对象，Trajectory 的结构更新仍会复制或重新扫描与原始 Event 数量成正比的数据。

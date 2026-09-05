@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-20-remove-stdio-and-echo-agents.md) | 中文
-
 ## 问题
 
 DeepSeek Harness 在 TUI 和 Headless coding agent 之外，还提供了两个重复的产品 agent（智能体）。面向行的 stdio agent 使用混合的提示符/输出协议，同时重复实现终端交互与非交互执行。Echo 则以无需联网的 mock 模型加一个教学工具重复实现 Headless，把测试 fixture（测试前置数据）变成面向用户的 agent 和默认快速上手路径。

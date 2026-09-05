@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-pwsh-persistent-pty.md) | 中文
-
 ## 问题
 
 harness 在 Windows 上没有持久 shell。持久 `bash` 栈按构造就是 POSIX-only：`@deepseek-ai/dsh-subprocess-local` 在终端分配时直接抛错（`createProcessInspector()` 拒绝 win32），`@deepseek-ai/dsh-terminal-bash` 是 bash 形态（`/bin/bash` 默认值、`PS1`/`PROMPT_COMMAND` 环境标记），`@deepseek-ai/dsh-tool-bash-persistent` 用 bash 语法包装命令，pty 测试全部在 win32 上 skip。一次性 `pwsh` 工具（`@deepseek-ai/dsh-tool-pwsh` + `@deepseek-ai/dsh-pwsh-local`）已经能在 Windows 运行，但每次调用都是全新的 `pwsh -Command` 进程：cwd、`$env:` 变量、函数和交互式子进程都随调用结束，其 README 把 "No persistent shell or PTY" 记为 deferred work。

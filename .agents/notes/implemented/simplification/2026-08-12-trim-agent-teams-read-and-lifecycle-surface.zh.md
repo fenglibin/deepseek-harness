@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-12-trim-agent-teams-read-and-lifecycle-surface.md) | 中文
-
 ## Problem
 
 Agent Teams 合理地拥有持久 roster、peer mailbox 与共享任务策略，subagent continuation manager 则拥有 continuable child Activation。但第一版仍在这两类角色之间重复了数据和生命周期机制。

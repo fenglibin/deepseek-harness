@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-23-installed-python-wheel-black-box-ci.md) | 中文
-
 ## Problem
 
 Python SDK 单元测试驱动 fake peer，而打包运行时工作流可以在两个 Python distribution 尚未生成时，用源码 SDK 驱动新构建的可执行文件。干净虚拟环境只覆盖默认与 MCP 场景，必需的拉取请求 CI 也只构建 Linux x64。因此，源码 checkout、editable install、不匹配的 SDK／运行时组合、损坏的原生 wheel 包、平台相关闭包或真实提供方集成都可能绕过阻止合并的证据。

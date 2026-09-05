@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-remove-sdk-project-toolchain.md) | 中文
-
 ## 问题
 
 仓库曾包含一套从未发布且没有消费方的开发者项目产品。`@deepseek-ai/create-sdk` 用于生成可编辑的 Cordis 项目；`@deepseek-ai/dsh-scripts` 提供 `dsh-sdk` 的开发、构建、启动、配置和插件安装命令；`@deepseek-ai/dsh-helper` 协调功能定义与多文件项目编辑；`@deepseek-ai/dsh-telemetry` 上报启动器活动。该设计旨在让生成的项目保持可编辑，并使项目创建与后续配置对依赖、Cordis 配置项、环境变量占位符和归属文件采用同一套定义。

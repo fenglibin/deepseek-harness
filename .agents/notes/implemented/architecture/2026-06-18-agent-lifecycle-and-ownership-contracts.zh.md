@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-18-agent-lifecycle-and-ownership-contracts.md) | 中文
-
 ## 问题
 
 ACP（Agent Client Protocol）与 tool-bash 的若干限制是同一个所有权约定缺失的症状：插件可以通过 `ctx.agents` 创建或恢复 agent（智能体），但无法独立拥有和 dispose（资源释放）单个 agent，而长时间运行的 bash 任务在执行器中也没有稳定的所有者。ACP 在断连时中止并等待 agent，却无法仅注销该会话的 agent；`session/cancel` 无法取消已入队但尚未开始的工作；`tool-bash` 将任务所有权保存在插件本地的 `Map` 中，因此一次 HMR（热模块替换）重载就可能让旧任务看起来无主。

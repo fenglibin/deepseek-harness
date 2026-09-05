@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-06-20-discover-package-inventory.md) | 中文
-
 ## 问题
 
 包与门禁清单在 TypeScript project references、包文档和 CI 描述中反复出现。大多数只是重述包布局、manifest（元数据清单）数据或聚合命令内容。因此每新增一个包都会产生本可避免的同步点。

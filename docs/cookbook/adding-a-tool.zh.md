@@ -1,7 +1,5 @@
 # 工具编写参考
 
-[English](adding-a-tool.md) | 中文
-
 面向模型的工具必须满足哪些约定，均以本文为准。如需按步骤构建第一个工具，请阅读[构建工具](../user/develop/basic/tool.zh.md)。`packages/shell/tool-bash` 是生产级的三包示例。
 
 ## 最小形态

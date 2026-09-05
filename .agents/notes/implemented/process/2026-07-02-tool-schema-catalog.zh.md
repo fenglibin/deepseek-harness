@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-02-tool-schema-catalog.md) | 中文
-
 ## 问题
 
 仓库此前没有一份统一的参考文档来记录实际暴露给模型的工具名称、描述与 JSON Schema。源码声明分散各处且在运行时组合，而既有的 Cordis 参考和子系统页面覆盖的是接线与词汇，而非工具。

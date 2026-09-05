@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-04-credentials-yaml-and-user-environment-layer.md) | 中文
-
 ## Problem
 
 `$DSH_HOME/.env` 同时承担了两件互不相容的工作。它是 [`credentials-local`](../../../../packages/credentials/credentials-local/README.zh.md) 的可写密钥存储，因此任何表层都不能把它提升进 `process.env`——一旦提升，每个已存密钥都会读作只读的启动时覆盖，从而阻断从 Models 页轮换密钥。但它的文件名和 dotenv 格式承诺的是一个环境文件，于是用户把非机密值放进去，而那些值哪儿也到不了：同一个文件里，一个能用的 `DEEPSEEK_API_KEY` 旁边的 `DEEPSEEK_BASE_URL` 会被静默忽略，因为只有凭据 provider 读这份文档，而它只寻址凭据引用。

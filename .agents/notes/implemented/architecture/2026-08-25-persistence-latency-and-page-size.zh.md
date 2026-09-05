@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-25-persistence-latency-and-page-size.md) | 中文
-
 ## 问题
 
 物理持久化优化需要减少保留存储，同时不能把不成比例的工作转移到完整写入、读取或会话 fork。原有的 105 会话语料显示，JSONL level-19 压缩会让完整写入与 fork 耗时增加一倍以上。此前的 SQLite page-size 实验早于共享字典行压缩，所得空间收益可以忽略，因此无法确定当前行分布的最佳 page size。

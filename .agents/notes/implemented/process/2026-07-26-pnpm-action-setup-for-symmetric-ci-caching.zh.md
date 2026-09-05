@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-26-pnpm-action-setup-for-symmetric-ci-caching.md) | 中文
-
 ## 问题
 
 除 `landlock-run.yml` 外，每个安装 pnpm 的工作流都曾用 `corepack enable` 手工提供 pnpm，其中五个还各自重复着一套手写（hand-rolled）的缓存设置——`pnpm store path --silent >> $GITHUB_OUTPUT`、再加上以 `pnpm-lock.yaml` 为缓存键的 `actions/cache@v4`：`e2e.yml`、`docs-pages.yml`、`pi-ai-provider-e2e.yml`、`build-exe-for-python-sdk.yml`，以及 `ci.yml` 的 node-compat、serial-linux 与 benchmark 作业。与之等价、由官方维护的做法——`pnpm/action-setup@v4`（从 package.json 读取 `packageManager`）加带 `cache: pnpm` 的 `actions/setup-node`——当时已在仓库内的 `landlock-run.yml` 中得到验证，而 corepack 被从较新 Node 发行版中移除，使每一处 `corepack enable` 都成了已知的未来失效点。

@@ -4,7 +4,7 @@
  * projection's sessionId (sessions are always agent-backed; the host
  * resolves cwd from the session header). A pick lands the literal `/name `
  * text and the prompt ships the same literal (plain-text-reference decision;
- * see .agents/notes/implemented/architecture/2026-07-25-web-input-machine-and-slash-pipeline.md);
+ * see .agents/notes/implemented/architecture/2026-07-25-web-input-machine-and-slash-pipeline.zh.md);
  * determinism
  * lives host-side — the pre-step boundary (`dsh-tool-skill`) recognizes a
  * leading `/name` naming a user-invocable skill and injects the rendered
@@ -40,7 +40,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the SlotRegistry service merge (ctx.slots).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { SkillRow } from './SkillRow.tsx'
-import { en, NS, zh, type SkillKey } from './locales.ts'
+import { NS, zh, type SkillKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -65,7 +65,7 @@ export const inject = ['inputTriggers', 'sessions', 'slots', 'locale', 'remote',
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-skill: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh }), 'ui-skill: dictionaries')
   ctx.slots.inject('tool.call.toolview', () => ctx.slots.register(
     { name: 'tool.call.toolview', key: 'skill', locale: NS },
     SkillRow,

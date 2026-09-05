@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-session-end-seed-log-boundary.md) | 中文
-
 ## 问题
 
 在会话日志中拥有独立开／闭括号的插件无法区分一个已死的标记和一个存活的标记。`compaction/start` … `compaction/end` 就是已发布的实例：当接手一份日志、而它最后的压缩（compaction）事件是一个未配对的 `compaction/start` 时，「上一个写入方在压缩中途死掉了」与「此刻正有一次压缩在运行」在存储历史中是逐字节相同的。该括号所有方只能二选一：拒绝压缩一份其实空闲的日志（把会话卡死），或者在一份确实繁忙的日志上继续压缩。

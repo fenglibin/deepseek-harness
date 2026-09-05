@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-bash-local
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-bash-local` 是 POSIX 上的默认 Bash 执行器：每条命令都以全新的非登录 `bash -c` 进程运行，不读取 rc 文件，因此调用之间不会残留任何 shell 状态。它会为每条命令应用已配置的预算——工作目录、超时、输出上限——对超时与取消进行分类，并在流溢出时返回有界输出与 spill 文件恢复。命令以 harness 进程自身的权限运行：本执行器不做任何隔离，需要沙箱能力时请组合 `dsh-bash-sandbox`。挂载后，面向模型的 `bash` 工具会与它对接。

@@ -5,8 +5,6 @@ kind: "package-group"
 
 # packages/sandbox
 
-[English](README.md) | 中文
-
 ## 概述
 
 `sandbox/` 组将子进程执行限制在文件效果策略之下：命令以 `read-only` 运行、只能写入会话工作区（`workspace-write`）或不受限制地运行（`danger-full-access`）。四个包交付该能力：隔离服务（`sandbox/`）、面向 Linux、macOS 与 Windows 的各平台后端（`sandbox-local/`）、共享策略解析器（`sandbox-policy/`）与 Windows 写入限制后端（`sandbox-windows-acl/`）。被策略拒绝的受限调用可以通过用户批准的一次性升权重试。隔离仅限同世界：它与宿主共享内核与文件系统，容器、microVM 与远程执行器会替换整个能力，而不是在此注册。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-13-python-minimal-model-visible-snapshot.md) | 中文
-
 ## 问题
 
 Python 通道需要精确记录独立极简 profile 实际展示给模型的内容。功能性工具断言可以证明执行，但无法发现新增系统分段、工具描述或 user 角色上下文消息；而进阶可执行文件快照会把每个请求头中已组装的系统提示词换成占位符，并把每个工具 schema 换成其名称。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-07-shared-feedback-telemetry-user-id.md) | 中文
-
 ## 问题
 
 OpenTelemetry 后端已在 `$DSH_HOME/.anonymous-user-id` 中持久化一个匿名 UUID。`/feedback` 需要同时报告接收反馈的会话 id 与用户 id，以便运维人员将确认文本与导出的记录相关联。复制该身份或单独生成身份会使报告的用户失去意义；从 `session-telemetry-otel` 导入身份则会让直接命令依赖导出后端，并在遥测侧挂载反馈导出时形成依赖环。

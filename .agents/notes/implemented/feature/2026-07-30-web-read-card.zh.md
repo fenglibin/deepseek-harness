@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-web-read-card.md) | 中文
-
 ## 问题
 
 `read` 工具返回规范化输出对象 `{ path, offset, lines: [{ number, text }], totalLines }`，但它的展示层把这个结构压平了。`presentCall` 声明为 `GenericCallView`（`kind: 'read'`，一个跟随定位），`presentResult` 返回 `GenericResultView`，其唯一内容是剥掉 `<path>…</path><type>file</type><content>…</content>` 信封后的面向模型文本。收到该视图的 UI 只看到一个压平的文本块：行号以 `N: ` 前缀烘焙进文本、文件语言未知、`totalLines` 丢失。有相应能力的客户端无法像渲染 diff 那样渲染一次 read——即带行号、语法高亮、行号栏与内容分离的代码视图。

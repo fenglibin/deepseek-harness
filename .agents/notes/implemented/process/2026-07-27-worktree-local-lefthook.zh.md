@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-27-worktree-local-lefthook.md) | 中文
-
 ## 问题
 
 每次运行 `pnpm install` 都会执行根目录的 [`postinstall`](../../../../package.json)，其中的 [`install-lefthook.mjs`](../../../../scripts/install-lefthook.mjs) 会调用 `lefthook install --force`。若无额外配置，关联的 Git worktree 共用同一仓库的默认钩子目录，因此在任一 worktree 中安装都可能改写其他所有 worktree 使用的钩子。

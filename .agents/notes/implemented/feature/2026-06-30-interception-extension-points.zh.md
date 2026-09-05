@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-30-interception-extension-points.md) | 中文
-
 ## 问题
 
 harness 需要一套钩子子系统：用户像 Claude Code（CC）和 Codex 那样在生命周期节点扩展或管控 agent（智能体）。驱动本设计的关键视角转换是：**「原生钩子」不是一个包**——原生钩子只是一个普通的 Cordis 插件，订阅规范的生命周期事件。因此真正的产品是一个*强大、类型完备的规范事件接口*；CC/Codex 桥接（`dsh-hooks-claude-code` / `dsh-hooks-codex` 包）只是将外部 shell 钩子协议映射到同一接口的翻译层。桥接能做的事，普通插件可以直接做——而且更强大（无序列化边界、完整 `ctx`、类型化返回值）。

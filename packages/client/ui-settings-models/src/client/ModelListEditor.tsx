@@ -26,7 +26,7 @@ import { Button, IconSearchOutline16, Modal } from '@deepseek-ai/dsh-client-ui-p
 import { formatCapacity, parseCapacity } from './DeepSeekModelsEditor.tsx'
 import type { ModelsOperations } from './operations.ts'
 import type { DeepSeekModelDraft } from './DeepSeekModelsEditor.tsx'
-import type { en } from './locales.ts'
+import type { zh } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
 /**
@@ -83,11 +83,11 @@ export interface ModelListEditorProps {
    * asking with a key the form has already refused spends a round trip to be
    * told what the field already says.
    */
-  probeBlocked?: keyof typeof en | undefined
+  probeBlocked?: keyof typeof zh | undefined
   /** The Host operations whose interrogation answers the fetch action. */
   operations: ModelsOperations
   /** Section copy. */
-  t: (key: keyof typeof en) => string
+  t: (key: keyof typeof zh) => string
   /** Disable every control (read-only deployment or a pending write). */
   disabled: boolean
 }

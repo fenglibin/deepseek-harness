@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-30-bash-stdin-env-trusted-plugin-api.md) | 中文
-
 ## 问题
 
 钩子子系统以 Claude Code 和 Codex 的方式运行外部钩子命令：钩子是一条 shell 命令，通过 **stdin 上的 JSON** 接收事件载荷，并从若干**环境变量**（`CLAUDE_PROJECT_DIR`、`CLAUDE_PLUGIN_ROOT`、`PLUGIN_ROOT`……）读取上下文。harness 已经在 `ctx.shell` 能力 seam 后面有一个完善的命令执行器（[dsh-shell](../../../../packages/shell/shell) → [dsh-bash-local](../../../../packages/shell/bash-local)），具备进程组终止、输出截断/spill 处理和凭证擦除功能。复用它来执行钩子意味着钩子桥接层无需重新实现子进程底层机制——但该 seam 此前无法写入 stdin 或设置额外 env。本次变更添加这两个输入。

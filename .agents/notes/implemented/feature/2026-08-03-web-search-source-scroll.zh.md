@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-03-web-search-source-scroll.md) | 中文
-
 ## 问题
 
 `web_search` 结果卡片（`WebBlock`，`packages/client/ui-primitives/src/WebBlock.tsx`）此前用首尾折叠渲染它的来源列表：超过 `maxSources` 数量（详情面板为 16，聊天行经由 `CHAT_WEB_MAX_SOURCES` 为 8）时，它画出前 `ceil(max/2)` 条来源、一个 `… 其余 N 条来源` 展开按钮，再画出末尾 `max - ceil(max/2)` 条，仿照 `TerminalBlock` 的输出上限机制。用户阅读该卡片时看到 `来源列表已截断`，会以为前端丢弃了它正持有的来源。

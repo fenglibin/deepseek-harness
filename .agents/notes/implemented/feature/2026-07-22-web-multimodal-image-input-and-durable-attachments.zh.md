@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-22-web-multimodal-image-input-and-durable-attachments.md) | 中文
-
 ## 问题
 
 在此变更之前，Web 输入区仅接受文本：`InputBar` 接收字符串草稿，`ConversationController.send()` 创建文本内容，宿主再把该内容转发给 agent（智能体）。用户无法粘贴图片、在发送前查看图片、提交仅含图片的提示词，也无法从历史记录中恢复已发送图片。

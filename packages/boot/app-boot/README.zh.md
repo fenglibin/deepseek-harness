@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-app-boot
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-app-boot` 是 `dsh` profile（包括 Python 运行时 wheel 所打包的 CLI）背后的共享 Loader 启动库。它加载环境层、组合 profile bundle 与 patch、启动每个插件，再返回运行中的应用，或指出失败插件与原因。产品应用使用 `dsh` launcher 而不发布单独 bin；直接配置 helper 只保留给低层嵌入方与测试。你还可以在启动前预览生效配置，按 profile 选择实时或仅启动时应用 patch，并让持有终端的应用在致命退出前恢复终端。

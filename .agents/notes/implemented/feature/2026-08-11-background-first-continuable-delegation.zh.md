@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-background-first-continuable-delegation.md) | 中文
-
 ## 问题
 
 可继续 child 已经具备持久化 id、独立轮次、后续消息以及由管理器负责的结算通知。如果把省略的 `run_in_background` 视为前台，模型就必须在每次调用时重复写出 `true`，才能得到这套生命周期。这样也会掩盖真正有用的调度判断：只有当 parent 的下一步动作需要 child 结果时，parent 才应等待。

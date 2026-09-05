@@ -5,8 +5,6 @@ kind: "package-group"
 
 # packages/test-support
 
-[English](README.md) | 中文
-
 ## 概述
 
 test-support 组为仓库测试提供确定性、无密钥地运行真实产品的方式。它包含 Loader 应用 harness、session-log 快照适配器、回放 LLM（大语言模型）插件和可编脚本的 OpenAI 兼容故障服务器。每个包都是支持层基础设施；当某个包获得产品约定与产品消费方时，它就会移出本组。

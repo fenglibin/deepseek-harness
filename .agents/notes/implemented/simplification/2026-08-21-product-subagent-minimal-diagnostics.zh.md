@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-21-product-subagent-minimal-diagnostics.md) | 中文
-
 ## Problem
 
 Claude Code 与 Codex 提供方会从彼此独立版本化的产品运行时接收结构化失败。如果把这些上游错误联合的每个成员都镜像进模型可见诊断，那么即使多个类别会让父 agent 采取同一种下一步动作，每次运行时升级仍会扩大提供方约定。

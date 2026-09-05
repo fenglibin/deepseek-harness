@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-client-locale-full-rollout.md) | 中文
-
 ## Problem
 
 typed locale 标准席位（`locale:` 注册声明 → 框架注入强类型 `t`）落地后，只有四个先行包接入；其余 client 包的文案仍是硬编码的中英混杂字面量。全量迁移需要几个先行包没有触及的机制：注册期文本（导航行、视图 tab 的 label）在语言切换时如何刷新，以及 zero-Cordis 的 ui-primitives 原子组件如何在不依赖运行时的情况下拿到文案。

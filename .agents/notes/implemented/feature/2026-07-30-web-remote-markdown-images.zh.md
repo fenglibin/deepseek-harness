@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-web-remote-markdown-images.md) | 中文
-
 ## 问题
 
 assistant Markdown 可以使用标准图片语法引用图表和截图，但 Web 渲染器会把每张图片替换为斜体替代文本。因此，即使目标地址是绝对 HTTP(S) URL，也无法获得普通的 Markdown 图片行为。

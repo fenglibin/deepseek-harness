@@ -1,6 +1,0 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-09-03-chat-ux-resize-menu-file-rows.md
-2026-09-03-chat-ux-resize-menu-file-rows.md: 2f61ae2612c0ce3bd7afde4c0607b83808bf8482
-2026-09-03-chat-ux-resize-menu-file-rows.zh.md: 36df8f5074784459bd2a59ab2a1984b9ec6c1a0a

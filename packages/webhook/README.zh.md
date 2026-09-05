@@ -5,8 +5,6 @@ kind: "package-group"
 
 # webhook/ — 从已验证外部事件到 DSH Session
 
-[English](README.md) | 中文
-
 ## 概述
 
 Webhook 系列接收通过身份验证的提供方事件，并运行受信任的程序化规则。规则可以在 Web Workspace 中创建普通根 Session。分发仅存在于进程内并采用 fire-and-forget，不拥有交付数据库、队列、重试、去重或 Agent 完成状态。

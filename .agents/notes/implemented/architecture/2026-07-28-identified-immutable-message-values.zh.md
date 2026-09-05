@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-28-identified-immutable-message-values.md) | 中文
-
 ## 问题
 
 harness 曾存在多种形似消息的表示，各自采用不同的标识规则。agent（智能体）输入只有在 agent loop 接受后才会取得 inbox 关联 id，而持久用户消息、assistant 消息、工具结果和模型请求消息都可能没有标识。因此，提示词准入介于创建消息与建立标识之间；等价内容会在实时事件、持久事件和模型请求之间复制，却没有一个值能在消息的整个生命周期中标识它。

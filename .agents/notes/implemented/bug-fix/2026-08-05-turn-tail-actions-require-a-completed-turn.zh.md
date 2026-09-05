@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-05-turn-tail-actions-require-a-completed-turn.md) | 中文
-
 ## 问题
 
 assistant IconActions 此前只从已定稿的 transcript（文本记录）推导：每个轮次中最后一条含内容文本的 assistant 拥有该行。这个量只有在轮次关闭后才稳定。轮次仍在产出步骤时，模型在工具调用前写下的叙述就是当时该轮次的最后一条内容 assistant，于是它在工具执行期间取得该行，等下一步的文本落定又把它交出去。读者会看到复制、分支和时钟出现在一句中间叙述下方，把流程推开一行 28px，然后消失。该行在这个状态下本身也是残缺的：分支控件已经通过 `turnEnds` 判定为禁用，`Ran for` 标签已经通过 `turnTimings` 判定为不显示，只有复制可用。

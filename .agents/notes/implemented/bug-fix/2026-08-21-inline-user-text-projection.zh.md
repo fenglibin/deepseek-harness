@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-21-inline-user-text-projection.md) | 中文
-
 ## 问题
 
 已发送用户文本存在两个显示缺口，都早于 Lexical composer。用户气泡装饰器（`projectUserText`，当时是 `MessageItem` 的私有函数）把一条消息切成普通片段与引用 chip，但每个普通片段都经块级的 `MessageText` div 渲染——被装饰的单行消息因此被拆成每段一行，两个相邻 token 之间的单个空格更是渲染成一整行空白。另一处，queue dock 的只读行原样打印 `row.preview`，携带 chip 的排队消息因此显示 wire 会话形式 `@[查看并分析图片](dsh-session:InNlc3Npb24t…)`——面向模型的文本，作为预览不可读。两处的持久模型文本都是正确的（已对照会话日志字节核实）；两个缺陷都纯属呈现层。

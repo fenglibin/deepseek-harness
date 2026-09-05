@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-user-questions
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-client-ui-user-questions` 是 Web 提问功能插件：其浏览器侧把 `question` 条目注册到会话拥有的 `conversation.composer` chain 中，因此当 agent 向用户提问时，编辑器会被提问 UI 接管。组件每次渲染一个问题，提供进度导航、单选与多选选项、推荐徽标与自定义答案，并为整个请求提交一批结构化答案。若某个请求的唯一问题声明了呈现意图，则改为渲染该意图自己的界面——最典型的是 `plan-review` 等待审批卡片，带 `Chat about it` / `Refuse` / `Approve`。其主机侧刻意为空：在那里挂载 `dsh-tool-ask-user` 会把工具放进注册表的全局层，并把它并入每一个 agent，无论它由哪个 preset 组装。

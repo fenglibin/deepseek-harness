@@ -20,7 +20,7 @@ import type { McpSectionInjected } from './McpSection.tsx'
 import { McpStore } from './mcp-store.ts'
 import { McpStatusStore } from './mcp-status-store.ts'
 import type { McpSettings } from './types.ts'
-import { en, zh, type McpKey } from './locales.ts'
+import { zh, type McpKey } from './locales.ts'
 
 export type { McpSectionInjected, McpSectionProps } from './McpSection.tsx'
 export type { McpServerEntry, McpHttpServer, McpSettings, McpStdioServer } from './types.ts'
@@ -48,7 +48,7 @@ export const inject = ['slots', 'locale', 'settingsScope', 'remote']
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-mcp: copy dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh }), 'ui-settings-mcp: copy dictionaries')
 
   const store = new McpStore(ctx.settingsScope.bind<McpSettings>({ namespace: MCP_SETTINGS_NAMESPACE }))
   ctx.effect(() => () => { store.dispose() }, 'ui-settings-mcp: server store')

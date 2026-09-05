@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-25-session-list-browsing-and-manual-order.md) | 中文
-
 ## 问题
 
 [Workspace UI 完整产品流](2026-07-25-workspace-ui-product-flow.zh.md)交付了分组 session 列表的首个形态，并把 Rename、拖拽排序等操作明确划出当期范围。设计稿（figma 239-10458 及关联画面）随后补齐了这些交互：列表要能切换成不分组的平铺视图、session 行悬停要出详情卡与操作菜单、workspace 要能改名、组内 session 要能手动排序。

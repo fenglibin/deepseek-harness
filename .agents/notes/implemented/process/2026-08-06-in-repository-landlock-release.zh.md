@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-in-repository-landlock-release.md) | 中文
-
 ## 问题
 
 `@deepseek-ai/node-addon-landlock-run` 源码已经与其 DeepSeek Harness 消费方一同位于 `native/landlock-run` 下，但此前仍保留独立的 pnpm workspace 和锁文件，并依赖一个独立仓库发布到 npm。Harness 包使用 npm 注册表中的固定版本，因此同一个 PR（Pull Request）可以同时修改启动器约定及其消费方，却无法一起测试这些改动。源码仓库的原生工作流可以演练打包流程，但不会发布它实际测试过的产物。

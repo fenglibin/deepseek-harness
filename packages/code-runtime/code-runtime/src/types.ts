@@ -90,7 +90,7 @@ export interface CodeRunRequest {
 
 /**
  * Why a run failed. The kinds are orthogonal outcomes reported independently
- * (per docs/defensive-patterns.md): a budget expiry is not an exception, an
+ * (per docs/defensive-patterns.zh.md): a budget expiry is not an exception, an
  * abort is not a timeout, and a substrate death is neither.
  *
  * - `'exception'` — the program threw or failed to parse/transform.

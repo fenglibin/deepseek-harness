@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-19-same-session-goal-round-driver.md) | 中文
-
 ## 问题
 
 目标领域可以保留目标，模型可见工具也可以变更其生命周期，但两者都不应决定下一个模型轮次何时开始。继续执行驱动器必须把活跃目标状态桥接到普通 agent loop（智能体循环），同时不能向 `dsh-agent-loop` 添加目标专用分支、创建第二段对话，也不能把每个人类轮次都视为自主迭代。

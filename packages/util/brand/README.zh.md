@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-brand
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-brand` 让结构相同的字符串在类型层面不可互换：即使 `SessionId` 与 `ToolCallId` 在运行时都是普通字符串，前者也无法传给期望后者的位置。`brandString<T>()` 为领域拥有的字符串应用名义品牌且不持有共享运行时状态，让能力包可以拥有自己的具体 id 类型，而无需导入不相关的能力。

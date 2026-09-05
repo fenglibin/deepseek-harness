@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-02-deployment-response-language.md) | 中文
-
 ## Problem
 
 在中文桌面上，Web 界面自身的文案早已是中文——自[客户端文案由 locale 拥有的决策](../architecture/2026-08-23-locale-owned-client-ui-copy.zh.md)起，`verify-client-ui-i18n` 与字典一致性检查就在强制这一点——但任务*执行过程中*页面展示的一切仍是英文。助手的正文、计划与总结，以及每一份子智能体汇报都是模型输出，而装配出的系统提示词从未提到任何语言。模型于是回退到其提示词所用语言，也就是英文，结果是中文用户得到的是一个中文外壳包着的英文智能体。

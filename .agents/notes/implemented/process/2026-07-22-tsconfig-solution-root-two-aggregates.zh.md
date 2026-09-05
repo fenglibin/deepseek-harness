@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-22-tsconfig-solution-root-two-aggregates.md) | 中文
-
 ## 问题
 
 GUI 拆分引入了第二个聚合 program（`tsconfig.client.json`，见[已归档的分层 RFC](../../archived/architecture/2026-07-19-gui-layering-and-rpc-protocol.md)），根 `tsconfig.json` 则继续兼任宿主侧聚合，`tsconfig.build.json` 还是第三份手工维护的全量 emit 图。三处账本并行，造成四个具体的不对称：

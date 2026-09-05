@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-web-queue-steer-all-gesture.md) | 中文
-
 ## 问题
 
 主会话运行时，用户用普通 Enter（或在 busy-Enter 偏好为 Queue 时）输入的消息会在 Web 队列里累积。把它们灌进当前轮次需要逐条点击「插话发送」按钮；而输入框草稿为空时没有任何键盘手势——输入机对空草稿直接拒绝，Enter 与 Cmd/Ctrl+Enter 都是空操作。排队消息一多，逐条插话是明显的多点摩擦，空草稿 + 加速 Enter 正是「全部插话」的自然位置。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-28-load-pre-identity-session-messages.md) | 中文
-
 ## 问题
 
 带标识的不可变消息变更将四种持久化事件载荷替换为完整消息值。现有的 v0 JSONL 和 SQLite 会话仍保留紧邻该变更之前的形状：用户事件和 steering（中途引导）事件直接携带 `content`/`source`，assistant 事件携带 `content`/`provenance`，工具结果则携带 `callId`/`content`/`isError`。这些会话的标头仍与 `SESSION_FORMAT_VERSION` 匹配，但当前形状验证会拒绝它们，导致恢复流程无法构造活跃的 `Session`。

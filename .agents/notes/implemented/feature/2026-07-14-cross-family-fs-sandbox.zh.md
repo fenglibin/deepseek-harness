@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-14-cross-family-fs-sandbox.md) | 中文
-
 ## 问题
 
 `SandboxMode` 所声明的语义涵盖文件系统效果，但最初只有 `ctx.shell` 强制执行该策略。fs 工具（`write`/`edit`）在进程内经由 `ctx.fs` 变更宿主文件系统，那里的 OS argv 包装在机制上毫无意义——[沙箱 Agent Note](2026-07-06-sandbox.zh.md) § 进程内工具记录了这一点，并把跨家族强制执行留作一个暂缓阶段，附带一个未决问题：进程内强制执行是各 seam 各自表达，还是变成一个统一的 harness 能力。本 Agent Note 就是那个阶段，并给出答案：一个共享的策略归属，在每个家族各自正确的层级上做 per-seam 强制执行。

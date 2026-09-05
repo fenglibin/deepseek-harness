@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-web-build-atomic-dist-swap.md) | 中文
-
 ## Problem
 
 `dsh web` 的 GUI 通过逐请求读取 `apps/web/dist` 来提供服务——`dsh-host-frontend-static` 有意不设内存缓存，这样 `pnpm run dev:web` 的 watch 重建能在下一次读取时生效。但 `pnpm run build` 的 `build:web` 阶段执行的是普通 `vite build`，其默认的 `emptyOutDir` 会在构建开始时清空整个 `dist` 目录。因此在 GUI 运行期间执行构建，会使 `dist/index.html` 在整个构建期间缺失，用户在此期间刷新页面会得到 `frontend-static` 为"缺失的配置索引"所定义的空 404——即空白页。watch 脚本早已用 `--no-emptyOutDir` 规避了这一问题，但一次性 build 没有。

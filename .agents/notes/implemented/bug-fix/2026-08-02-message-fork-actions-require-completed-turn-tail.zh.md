@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-02-message-fork-actions-require-completed-turn-tail.md) | 中文
-
 ## 问题
 
 Web 会话把分支操作挂到每个轮次中最后一个文本非空的 assistant 节点上。如果后面还有工具结果、被中断的推理（reasoning）节点或终态错误，这些行也不会接管操作，因为它们没有内容文本 IconActions。因此，分支图标可能出现在 assistant 响应下方，而同一轮次的更多行仍位于其后。Host 会正确地把该消息锚点扩展到其所在的 `turn/end`，但图标位置使操作看起来像在消息级截断，子会话又会明显继承同轮次的后缀。

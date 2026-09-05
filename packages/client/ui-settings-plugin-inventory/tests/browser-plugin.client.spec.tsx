@@ -81,8 +81,7 @@ describe('ui-settings-plugin-inventory browser plugin', () => {
 
     const stop = declare(b.slots)
     await vi.waitFor(() => { expect(b.slots.entries('settings.plugins.tab')).toHaveLength(1) })
-    b.locale.setLocale('en')
-    expect(resolveSlotLabel(b.slots.entries('settings.plugins.tab')[0]!.options.label)).toBe('Plugin list')
+    expect(resolveSlotLabel(b.slots.entries('settings.plugins.tab')[0]!.options.label)).toBe('插件列表')
 
     stop()
     expect(b.slots.entries('settings.plugins.tab')).toHaveLength(0)

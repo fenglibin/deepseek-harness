@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-23-portable-required-pull-request-ci.md) | 中文
-
 ## 问题
 
 分配到组织自有运行器标签的拉取请求必需作业，在 GitHub 无法为这些池分配运行器时会持续排队。工作流本身有效，GitHub 标准托管作业仍能通过，但 `all checks passed` 始终无法启动，原本健康的拉取请求因此无法满足分支保护要求。

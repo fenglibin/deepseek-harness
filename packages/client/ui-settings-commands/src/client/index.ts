@@ -14,7 +14,7 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { PromptCommandsController } from './controller.ts'
 import { PromptCommandsSection } from './PromptCommandsSection.tsx'
 import type { PromptCommandsSectionInjected } from './PromptCommandsSection.tsx'
-import { en, zh } from './locales.ts'
+import { zh } from './locales.ts'
 
 export type { PromptCommandsSectionInjected, PromptCommandsSectionProps } from './PromptCommandsSection.tsx'
 export type { PromptCommandEntry, PromptCommandsValue } from './controller.ts'
@@ -34,7 +34,7 @@ export const inject = ['slots', 'locale', 'remote', 'settingsScope']
  */
 export function apply(ctx: ClientContext): void {
   const t = ctx.locale.bind(NS)
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-commands: section dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh }), 'ui-settings-commands: section dictionaries')
 
   const controller = new PromptCommandsController(ctx.settingsScope.bind({ namespace: NAMESPACE }))
   ctx.slots.inject('settings.section', () => ctx.slots.register({

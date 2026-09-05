@@ -12,13 +12,3 @@ export const zh = {
 
 /** The session-changes namespace key union. */
 export type SessionChangesKey = keyof typeof zh
-
-/** English dictionary, checked complete against the zh key set. */
-export const en = {
-  'title': 'Changed files',
-  'summary': '{count} change(s)',
-  'accept': 'Accept',
-  'acceptAll': 'Accept all',
-  'operation.write': 'write',
-  'operation.edit': 'edit',
-} satisfies Record<SessionChangesKey, string>

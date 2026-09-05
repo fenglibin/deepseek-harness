@@ -2,8 +2,6 @@
 
 状态：已实现
 
-[English](2026-09-03-always-show-turn-usage-and-hover.md) | 中文
-
 ## 问题
 
 已完成的 Turn 尾部只有在 token-meter fold 能证明精确总量时才披露用量。`deriveTurnTokenUsage` 只有在用量样本带 `totalTokens`，或同时带 `cacheReadTokens` 与 `cacheWriteTokens` 时才关闭一次 attempt；DeepSeek 不回报 cache-write 分桶，且 adapter 开始产出 `totalTokens` 之前录制的会话都会导致 fold 失败。被中断（用户停止或系统中止）的 Turn，一旦某个 attempt 在没有用量样本时关闭，就会丢弃所有已计费 attempt，因此多 step 被中止的 Turn 只显示 `用时 …` 而没有 `用量 … tok` pill。另外两个统计弹层原本只能点击展开，缓存命中率也只有在每个 attempt 都回报 `cacheReadTokens` 时才出现，运行中的"深度求索"计时在 `turn/start` 不在加载窗口时会退回组件挂载时间，导致切换会话再切回来时计时重新开始。

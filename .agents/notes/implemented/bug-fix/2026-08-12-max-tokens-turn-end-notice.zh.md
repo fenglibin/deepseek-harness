@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-12-max-tokens-turn-end-notice.md) | 中文
-
 ## Problem
 
 agent loop 已把 `max-tokens` 记录为独立的 `turn/end` 原因，但没有任何用户表面消费它。Web 聊天流中只有 `reason.kind === 'error'` 会生成会话节点，unknown-surface 兜底又只接管 append-surface 事件，于是被提供方在输出上限处截断的轮次没有任何可见迹象：被截断的回答看起来和正常完成一样，用户无从得知运行为何停止（issue #1522）。

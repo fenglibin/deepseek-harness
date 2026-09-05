@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-vendor-package-rescope.md) | 中文
-
 ## 问题
 
 `vendor/` 下的九个包此前保留上游 npm 名（`cordis`、`cosmokit`、`schemastery`、`@cordisjs/plugin-*`）。这个前提在发布时不成立：每个 harness 包都把 `cordis` 声明成 peer dependency，装了 `@deepseek-ai/dsh-*` 的消费者必须能从 registry 解析到它，所以发布 harness 必然连带发布这一层框架。用上游名发布就是在 registry 上占用别人的名字；若该 registry 对 npmjs 做上游代理，本名条目还会遮蔽真正的上游包，把错误的框架装进无关项目。

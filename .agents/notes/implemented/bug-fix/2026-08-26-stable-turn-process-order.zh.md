@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-26-stable-turn-process-order.md) | 中文
-
 ## 问题
 
 Assistant 输出流式生成、成为最终正文，或因工具调用、Retry、后续步骤而失去正文资格时，轮次过程范围会变化。若既有 Chat Node 的排序依赖这段可变范围，首轮系统提示词和位于 User 之前的上下文会跨过开场 User，导致同一个逻辑行在轮次期间出现在不同位置。

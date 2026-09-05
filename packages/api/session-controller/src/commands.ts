@@ -316,7 +316,7 @@ export class SessionCommandController {
     // `session-controller`), and the context proxy's service walk is
     // ancestor-only, so a direct `ctx.sessionPersistence` read throws
     // "without inject" here. `ctx.get` reaches the same service through the
-    // global store; see docs/postmortem/0001-acp-default-export-drops-inject.md.
+    // global store; see docs/postmortem/0001-acp-default-export-drops-inject.zh.md.
     const persistence = this.ctx.get('sessionPersistence')
     if (persistence === undefined) {
       throw new RemoteError(

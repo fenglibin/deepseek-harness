@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-20-branded-ids.md) | 中文
-
 ## 问题
 
 harness 使用 `Branded<B> = string & { readonly [BRAND]: B }` 以及 `@deepseek-ai/dsh-brand` 中的无状态 `brandString<T>()` 构造函数，为 `ToolCallId`（`packages/llm/llm/src/brand.ts`）和 agent（智能体）/会话共享的 `SessionId`（`packages/core/session/src/types.ts`）做 brand 处理；该包位于 `packages/util/brand/`，见其 [README](../../../../packages/util/brand/README.zh.md)。`dsh-brand` 还声明了治理策略：*「Branding 用于跨包边界且可能被混淆的 id；不是每个 string 都需要 brand。」* 这条策略是正确的；问题在于它只落实了一半。两处缺口使得结构相同但语义错误的 string 仍能通过类型检查器。

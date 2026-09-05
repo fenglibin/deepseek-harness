@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-web-skill-tool-row.md) | 中文
-
 ## 问题
 
 Web transcript（文本记录）通过通用后备行渲染 `skill` 调用，使已加载的指令集看起来像一次未知工具调用，尽管 Skill（技能）已是产品中的一等概念。通用行还会在结果旁暴露 JSON 参数的外层结构，围绕用户真正需要的唯一标识增加了噪声：已加载的 skill 名称。

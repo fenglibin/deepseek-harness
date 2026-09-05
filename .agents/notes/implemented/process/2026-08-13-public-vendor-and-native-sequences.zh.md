@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-13-public-vendor-and-native-sequences.md) | 中文
-
 ## Problem
 
 [三条发布序列](2026-08-10-npm-release-sequences.zh.md)交付时带的是 `publishConfig.access: restricted`,因此发到 `@deepseek-ai` scope 的每个包只在组织内可见。五次排练发布都是这样跑的:`dsh@0.0.1-rc.5`、vendor 的 `*-rc.4`、`landlock-run@0.0.1`。

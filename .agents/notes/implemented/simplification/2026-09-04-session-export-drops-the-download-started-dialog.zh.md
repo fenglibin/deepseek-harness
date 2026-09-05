@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-04-session-export-drops-the-download-started-dialog.md) | 中文
-
 ## Problem
 
 点击 Session Header 中的 `Session 日志`，或执行 `/export`，都会为整次手势弹出一个弹窗：`HEAD` 预检期间是 `正在导出 Session`，随后是 `Session 导出已开始下载`，用户必须点 `关闭` 才能继续。第二个弹窗只是重复浏览器已经呈现的事实：`save()` 在同一次手势里就把 GET URL 交给了浏览器，因此在弹窗稳定之前下载已经开始。这一步确认让每次导出多一次点击，并在用户关闭之前于 controller 存储中留着一个按会话的 `success` 条目。

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-terminal-bash
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-terminal-bash` 在部署的沙箱策略下启动持久交互式 shell：会话跨工具调用存活，检测 shell 何时可以接收输入，并保留有界的逐行输出供读取。它提供 `shell` 后端类型，并通过 `shellDialect` 设置在 POSIX 上支持 bash、在 Windows 上支持 pwsh。通过已挂载的子进程提供方，同一个后端既可以与本地执行世界组合，也可以与远程执行世界组合。全屏终端应用不在其逐行约定的范围内。

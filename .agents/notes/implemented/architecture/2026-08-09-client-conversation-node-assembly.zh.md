@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-09-client-conversation-node-assembly.md) | 中文
-
 ## 问题
 
 Client Session 既维护传输窗口、连接状态和待处理交互，也在中心化 transcript fold 中解释 Assistant、Tool、消息、命令、压缩、重试及 turn tail 等业务事件。每增加一种业务节点，都要修改 Session 的 switch、历史 replay、索引、缓存和 React 分组；业务 identity、状态演进与最终展示没有独立所有者。

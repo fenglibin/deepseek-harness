@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-session-persistence-sqlite
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-session-persistence-sqlite` 是 `SessionPersistence` 服务的可选存储后端：它不按会话各留一个文件，而是把所有会话的持久事件日志统一保存在同一个 SQLite 数据库中。它与 JSONL 后端提供完全相同的逻辑 `SessionEvent` 流，因此选择它不会改变 agent loop、模型或回放的任何行为——打包、压缩与恢复都是存储内部细节。仅当单一可查询数据库适合你的部署时才选择它；任何已发布的组合都不会默认启用它。这是预发布提供方：它拒绝而非迁移不属于自己的数据库文件，而且其同步 Node SQLite 驱动会在读写时阻塞 JavaScript 线程。设置、容量评估与迁移指引在前；实现内部细节放在下方可折叠的开发者章节中。

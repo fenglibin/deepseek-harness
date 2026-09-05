@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-03-cli-signal-shutdown-escalation.md) | 中文
-
 ## 问题
 
 默认挂载遥测后，`dsh web` 与 headless 命令（现为 `dsh --profile headless`）新增了 SIGINT/SIGTERM 处理器，使进程退出时可以排空 Cordis 插件树，而不是丢弃排队中的遥测数据。每个处理器都使用单向布尔闩锁（latch），并且只有在 `ctx.fiber.dispose()` 结算后才退出。headless 正常完成时同样会无界等待整棵树执行 dispose（资源释放）。

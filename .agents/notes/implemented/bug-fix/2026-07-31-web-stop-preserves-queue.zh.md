@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-web-stop-preserves-queue.md) | 中文
-
 ## 问题
 
 Web 停止按钮调用 `session.cancel`，后者映射到广义 `agent.cancel({ kind: 'user' })`。在活动轮次期间，普通 composer 提交已经被接纳为可独立寻址的 Queue 入队项。用户只想停止当前生成时，广义取消却会丢弃所有入队项，混淆了轮次中断与 Queue 的显式删除操作。

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-attachment
 
-[English](README.md) | 中文
-
 ## 概述
 
 本包渲染对话 UI 在 Chat 与 Trajectory 中展示的持久图片，以及查看原图的灯箱。它是纯呈现层——附件数据、图片加载与回调都经声明槽位来自 conversation 包。需要 DeepSeek Chat 风格的图片体验时选择它；非图片文件在此没有任何表面。

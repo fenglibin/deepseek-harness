@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-29-ask-question-web-presentation.md) | 中文
-
 ## 问题
 
 Web GUI 已经可以通过 `QuestionComposer` 的输入区接管收集回答，但其周边的会话记录呈现在三个方面是错的。待回答的问题会渲染两次：一次是输入区接管，一次是早于接管存在的只读 `PendingCard` 占位卡片。已结算的 `ask_user_question` 调用渲染为通用 "Tool call" 行并直接倾倒原始 args JSON，因此两种输入区裁决 —— 用户放弃整组问题（`ASK_CANCELLED`）与问题待回答期间轮次被打断（`ASK_ABORTED`）—— 都显示为无名的红点失败。而且输入区自身的界面文案（分页、按钮、占位符、校验反馈）是硬编码中文，而周边客户端已通过 `dsh-client-locale` 实现双语。

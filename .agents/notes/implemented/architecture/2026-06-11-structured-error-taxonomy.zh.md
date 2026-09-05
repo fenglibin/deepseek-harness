@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-11-structured-error-taxonomy.md) | 中文
-
 ## 问题
 
 故障跨越 seam 时只是裸字符串。工具错误被扁平化为一个文本块（name、code 和 stack 全部丢失），导致未来的沙箱/重试插件无法区分 ENOENT 和 EACCES，模型也未能获得本可提供的更具可操作性的反馈。非 Error 的 throw 退化更严重：agent loop（智能体循环）将其包装为 `new Error(String(x))`，丢弃了所有 code。而 `LlmError` 是系统中唯一的类型化错误，没有共享基类，消费方无法对其进行通用的 `instanceof` 判断。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-20-generic-long-running-tool-runtime.md) | 中文
-
 ## 问题
 
 后台 bash 原本兼有两项职责：bash 执行器既运行进程，又管理 job id、所有权、增量读取、取消、完成监听器和面向模型的控制工具。新增后台 subagent 需要相同的生命周期与交互约定。如果每种长时间运行能力都独立实现该约定，就会重复隔离、清理、通知和提示词行为，还会让模型为每种生产方学习不同的收集与停止协议。

@@ -7,7 +7,7 @@ import type { SessionPendingInteractionSnapshot } from '@deepseek-ai/dsh-client-
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { TranscriptViewRow, type TranscriptViewRowProps } from '../src/client/settings/TranscriptViewRow.tsx'
-import { en } from '../src/client/locale.ts'
+import { zh } from '../src/client/locale.ts'
 
 afterEach(cleanup)
 
@@ -36,7 +36,7 @@ function mount(mode: 'normal' | 'compact' = 'compact') {
     useWorkspaces: emptyWorkspaces(),
     useTranscriptView: bindSnapshotSelector(source),
     setTranscriptView,
-    t: makeTranslate(en),
+    t: makeTranslate(zh),
   }
   render(<TranscriptViewRow {...props} />)
   return { setTranscriptView }

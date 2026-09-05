@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-delivery-persistence-catalog-and-gate.md) | 中文
-
 ## 问题
 
 对照[设计](../../../../docs/design/delivery-discipline-rationale.zh.md)对交付纪律子系统做第二次深度自检，发现领域、fold、投影、状态机、CAS、分级、post-hook 与客户端 dock 在端到端 probe 下均正确，但暴露了两处上一次自检遗漏的缺陷：

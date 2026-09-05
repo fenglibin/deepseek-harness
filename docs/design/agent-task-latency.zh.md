@@ -1,7 +1,5 @@
 # Agent 任务执行耗时优化
 
-[English](agent-task-latency.md) | 中文
-
 本文记录一次"删除会话报错"任务的执行耗时剖析、根因结论、分档改造方案与后续任务清单。测量数据取自 `~/Downloads/session.jsonl`（会话 `session-3e506d3f`，2026-09-02）与本机实测命令。结论指导 `docs/design/` 之外的执行顺序：A 档工作方式与编排脚本、B 档运行期配置、C 档工程完成度取舍。
 
 ## 一、问题

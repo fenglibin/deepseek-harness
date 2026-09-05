@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-schedule
 
-[English](README.md) | 中文
-
 ## 概述
 
 本包在 Web 会话头部渲染当前 Session 活动 Schedule 提醒的只读目录。它读取完整的 `schedule` projection，不发 RPC，也不执行 mutation。浏览器派生状态、本地时间、相对时间与排序，不把这些呈现值加入持久状态。随附 Web bundle 默认禁用该插件，只有显式 Schedule overlay 才会同时启用 Host Schedule 服务与此客户端 row。

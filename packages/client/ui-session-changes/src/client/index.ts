@@ -17,7 +17,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the Session standard useConversation seat.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import { SessionChangesDock } from './SessionChangesDock.tsx'
-import { en, zh, type SessionChangesKey } from './locales.ts'
+import { zh, type SessionChangesKey } from './locales.ts'
 
 export {
   SessionChangesDock, SessionChangesPanel, sessionChanges,
@@ -43,7 +43,7 @@ export const inject = ['slots', 'locale']
  * @param ctx - client root context.
  */
 export function apply(ctx: ClientContext): void {
-  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-session-changes: dictionaries')
+  ctx.effect(() => ctx.locale.register(NS, { zh }), 'ui-session-changes: dictionaries')
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
     name: 'conversation.input.dock',
     id: 'session-changes',

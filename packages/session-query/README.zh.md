@@ -5,8 +5,6 @@ kind: "package-group"
 
 # session-query/：会话检索能力家族
 
-[English](README.md) | 中文
-
 ## 概述
 
 `session-query/` 组提供对实时与持久会话历史的检索，且独立于压缩（compaction）：程序化调用方通过一个统一服务查询精确日志、过滤后的列表、关系追踪与全文搜索；SQLite 后端支撑搜索；模型获得五个经工作区授权的工具；Web 界面获得下载会话 ZIP 的 `/export` 命令。搜索结果与模型看到的对话历史一致。本页是组的映射；各包 README 负责各自的包级约定。

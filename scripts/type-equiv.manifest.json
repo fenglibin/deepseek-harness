@@ -2,137 +2,137 @@
   "comment": "Maps each primary ` ```ts type-equiv ` or ` ```ts public-api ` block (by doc + declared symbol + projection) to the source declaration and original JSDoc it must match. Paired `.zh.md` blocks are byte-identical derivatives checked through their unsuffixed sibling and have no duplicate entry. Omit projection for the complete declaration; use public-api with a ` ```ts public-api ` block for a body-stripped public class declaration. verify-type-equiv.ts enforces a 1:1 correspondence between primary blocks and entries. Add an entry when you add a primary source-equivalence block; remove it when you remove the block.",
   "entries": [
     {
-      "doc": "docs/subsystems/core.md",
+      "doc": "docs/subsystems/core.zh.md",
       "symbol": "Branded",
       "source": "packages/util/brand/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "AssistantProvenance",
       "source": "packages/llm/llm/src/message.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "Message",
       "source": "packages/llm/llm/src/message.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "MessageSourceMap",
       "source": "packages/llm/llm/src/message.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "ContextForm",
       "source": "packages/llm/llm/src/message.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "ContextSnapshotSection",
       "source": "packages/llm/llm/src/message.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "ContextFormed",
       "source": "packages/llm/llm/src/message.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "ImageAttachmentAccess",
       "source": "packages/llm/llm/src/content.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "FinishReasonMap",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "AdapterRegistrationHandle",
       "source": "packages/llm/llm/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmProviderInfo",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmModelInfo",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmModelDiscoveryRequest",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmDiscoveredModel",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmModelContext",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "ReasoningEffortId",
       "source": "packages/llm/llm/src/brand.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmReasoningEffortInfo",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmModelReasoningInfo",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmResolvedModelInfo",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "GenerateOptions",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "ToolSchema",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmCallConfig",
       "source": "packages/llm/llm/src/call-config.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmCallConfigAdapterDefaults",
       "source": "packages/llm/llm/src/call-config.ts"
     },
     {
-      "doc": "docs/subsystems/core.md",
+      "doc": "docs/subsystems/core.zh.md",
       "symbol": "InboxTarget",
       "source": "packages/core/agent/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/core.md",
+      "doc": "docs/subsystems/core.zh.md",
       "symbol": "CancelOptions",
       "source": "packages/core/agent/src/runtime-types.ts"
     },
     {
-      "doc": "docs/subsystems/core.md",
+      "doc": "docs/subsystems/core.zh.md",
       "symbol": "AgentCancelCause",
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/core.md",
+      "doc": "docs/subsystems/core.zh.md",
       "symbol": "Agent",
       "source": "packages/core/agent/src/types.ts",
       "augmentations": [
@@ -143,1871 +143,1871 @@
       ]
     },
     {
-      "doc": "docs/subsystems/core.md",
+      "doc": "docs/subsystems/core.zh.md",
       "symbol": "PreStepDecision",
       "source": "packages/core/agent/src/runtime-types.ts"
     },
     {
-      "doc": "docs/subsystems/core.md",
+      "doc": "docs/subsystems/core.zh.md",
       "symbol": "RequestErrorAction",
       "source": "packages/core/agent/src/runtime-types.ts"
     },
     {
-      "doc": "docs/subsystems/core.md",
+      "doc": "docs/subsystems/core.zh.md",
       "symbol": "SessionStartSource",
       "source": "packages/core/agent/src/runtime-types.ts"
     },
     {
-      "doc": "docs/subsystems/scope.md",
+      "doc": "docs/subsystems/scope.zh.md",
       "symbol": "ScopeKey",
       "source": "packages/core/scope/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/scope.md",
+      "doc": "docs/subsystems/scope.zh.md",
       "symbol": "Scoped",
       "source": "packages/core/scope/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/scope.md",
+      "doc": "docs/subsystems/scope.zh.md",
       "symbol": "Scope",
       "source": "packages/core/scope/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/scope.md",
+      "doc": "docs/subsystems/scope.zh.md",
       "symbol": "ScopeLayer",
       "source": "packages/core/scope/src/store.ts"
     },
     {
-      "doc": "docs/subsystems/goal.md",
+      "doc": "docs/subsystems/goal.zh.md",
       "symbol": "GoalRef",
       "source": "packages/goal/goal/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/goal.md",
+      "doc": "docs/subsystems/goal.zh.md",
       "symbol": "GoalPhase",
       "source": "packages/goal/goal/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/goal.md",
+      "doc": "docs/subsystems/goal.zh.md",
       "symbol": "GoalBlockReason",
       "source": "packages/goal/goal/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/goal.md",
+      "doc": "docs/subsystems/goal.zh.md",
       "symbol": "GoalSnapshot",
       "source": "packages/goal/goal/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/goal.md",
+      "doc": "docs/subsystems/goal.zh.md",
       "symbol": "GoalView",
       "source": "packages/goal/goal/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/goal.md",
+      "doc": "docs/subsystems/goal.zh.md",
       "symbol": "GoalSnapshotChangeMeta",
       "source": "packages/goal/goal/src/domain.ts"
     },
     {
-      "doc": "docs/subsystems/goal.md",
+      "doc": "docs/subsystems/goal.zh.md",
       "symbol": "GoalClearChangeMeta",
       "source": "packages/goal/goal/src/domain.ts"
     },
     {
-      "doc": "docs/subsystems/goal.md",
+      "doc": "docs/subsystems/goal.zh.md",
       "symbol": "GoalMessageSource",
       "source": "packages/goal/goal/src/domain.ts"
     },
     {
-      "doc": "docs/subsystems/goal.md",
+      "doc": "docs/subsystems/goal.zh.md",
       "symbol": "CreateGoalRequest",
       "source": "packages/goal/goal/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/goal.md",
+      "doc": "docs/subsystems/goal.zh.md",
       "symbol": "EditGoalRequest",
       "source": "packages/goal/goal/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/goal.md",
+      "doc": "docs/subsystems/goal.zh.md",
       "symbol": "GoalChanged",
       "source": "packages/goal/goal/src/domain.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "AfterScheduleRecord",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "AtScheduleRecord",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "EveryScheduleRecord",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "LocalAtInput",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "AtInput",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "OneShotScheduleRecord",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "ScheduleRecord",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "ScheduleCreateChange",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "ScheduleDeleteChange",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "OneShotScheduleDispatchChange",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "EveryScheduleDispatchChange",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "ScheduleDispatchChange",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "ScheduleChange",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "ScheduleState",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "ScheduleDeliveryMode",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/schedule.md",
+      "doc": "docs/subsystems/schedule.zh.md",
       "symbol": "ScheduleView",
       "source": "packages/schedule/schedule/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/agent-team.md",
+      "doc": "docs/subsystems/agent-team.zh.md",
       "symbol": "TeamMemberSnapshot",
       "source": "packages/experimental/agent-team/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/agent-team.md",
+      "doc": "docs/subsystems/agent-team.zh.md",
       "symbol": "TeamMessageSnapshot",
       "source": "packages/experimental/agent-team/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/agent-team.md",
+      "doc": "docs/subsystems/agent-team.zh.md",
       "symbol": "TeamMessageSource",
       "source": "packages/experimental/agent-team/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/agent-team.md",
+      "doc": "docs/subsystems/agent-team.zh.md",
       "symbol": "TeamTaskSnapshot",
       "source": "packages/experimental/agent-team/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/commands.md",
+      "doc": "docs/subsystems/commands.zh.md",
       "symbol": "CommandInputDescriptor",
       "source": "packages/interaction/commands/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/commands.md",
+      "doc": "docs/subsystems/commands.zh.md",
       "symbol": "CommandDefinition",
       "source": "packages/interaction/commands/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/commands.md",
+      "doc": "docs/subsystems/commands.zh.md",
       "symbol": "CommandInvocation",
       "source": "packages/interaction/commands/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/commands.md",
+      "doc": "docs/subsystems/commands.zh.md",
       "symbol": "CommandResult",
       "source": "packages/interaction/commands/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/commands.md",
+      "doc": "docs/subsystems/commands.zh.md",
       "symbol": "CommandDescriptor",
       "source": "packages/interaction/commands/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/commands.md",
+      "doc": "docs/subsystems/commands.zh.md",
       "symbol": "ParsedCommand",
       "source": "packages/interaction/commands/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/system-prompt.md",
+      "doc": "docs/subsystems/system-prompt.zh.md",
       "symbol": "AssembleContext",
       "source": "packages/core/system-prompt/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/system-prompt.md",
+      "doc": "docs/subsystems/system-prompt.zh.md",
       "symbol": "PromptContext",
       "source": "packages/core/system-prompt/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/system-prompt.md",
+      "doc": "docs/subsystems/system-prompt.zh.md",
       "symbol": "PromptSection",
       "source": "packages/core/system-prompt/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/system-prompt.md",
+      "doc": "docs/subsystems/system-prompt.zh.md",
       "symbol": "ToolProviderResult",
       "source": "packages/core/system-prompt/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "ReplayEnvelope",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "StreamChunk",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmFailure",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "TokenUsage",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmImageRequestPrice",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmImageRequestPricing",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "ContentBlockMap",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "AppIdentity",
       "source": "packages/llm/llm/src/attribution.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "BlockAssembler",
       "source": "packages/llm/llm/src/assembler.ts",
       "projection": "public-api"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "PreparedLlmCall",
       "source": "packages/llm/llm/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmAdapter",
       "source": "packages/llm/llm/src/index.ts",
       "projection": "public-api"
     },
     {
-      "doc": "docs/subsystems/token-meter.md",
+      "doc": "docs/subsystems/token-meter.zh.md",
       "symbol": "TokenMeasurement",
       "source": "packages/llm/token-meter/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/token-meter.md",
+      "doc": "docs/subsystems/token-meter.zh.md",
       "symbol": "TokenSurfaceNode",
       "source": "packages/llm/token-meter/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
+      "doc": "docs/subsystems/session.zh.md",
       "symbol": "UserMessage",
       "source": "packages/llm/llm/src/message.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
+      "doc": "docs/subsystems/session.zh.md",
       "symbol": "SessionEventMap",
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
+      "doc": "docs/subsystems/session.zh.md",
       "symbol": "EpochHeader",
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
+      "doc": "docs/subsystems/session.zh.md",
       "symbol": "RequestContext",
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/todo.md",
+      "doc": "docs/subsystems/todo.zh.md",
       "symbol": "TodoItem",
       "source": "packages/todo/tool-todo/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
+      "doc": "docs/subsystems/session.zh.md",
       "symbol": "SessionEvent",
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
+      "doc": "docs/subsystems/session.zh.md",
       "symbol": "TurnEndCancelCause",
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
+      "doc": "docs/subsystems/session.zh.md",
       "symbol": "TurnEndReasonMap",
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
+      "doc": "docs/subsystems/session.zh.md",
       "symbol": "SurfaceEventType",
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
+      "doc": "docs/subsystems/session.zh.md",
       "symbol": "SurfaceOp",
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
+      "doc": "docs/subsystems/session.zh.md",
       "symbol": "SurfaceIntent",
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
+      "doc": "docs/subsystems/session.zh.md",
       "symbol": "SessionSurface",
       "source": "packages/core/session/src/surface.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
+      "doc": "docs/subsystems/session.zh.md",
       "symbol": "SurfaceFoldReplacement",
       "source": "packages/core/session/src/surface.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
+      "doc": "docs/subsystems/session.zh.md",
       "symbol": "SurfaceFoldResult",
       "source": "packages/core/session/src/surface.ts"
     },
     {
-      "doc": "docs/subsystems/session.md",
+      "doc": "docs/subsystems/session.zh.md",
       "symbol": "Session",
       "source": "packages/core/session/src/index.ts",
       "projection": "public-api"
     },
     {
-      "doc": "docs/subsystems/persistence.md",
+      "doc": "docs/subsystems/persistence.zh.md",
       "symbol": "SessionHeader",
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/persistence.md",
+      "doc": "docs/subsystems/persistence.zh.md",
       "symbol": "CreateSessionOptions",
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/persistence.md",
+      "doc": "docs/subsystems/persistence.zh.md",
       "symbol": "RestoredSessionOptions",
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/persistence.md",
+      "doc": "docs/subsystems/persistence.zh.md",
       "symbol": "PrepareSessionOptions",
       "source": "packages/core/session/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/persistence.md",
+      "doc": "docs/subsystems/persistence.zh.md",
       "symbol": "SessionPreparationOptions",
       "source": "packages/core/session/src/preparation.ts"
     },
     {
-      "doc": "docs/subsystems/persistence.md",
+      "doc": "docs/subsystems/persistence.zh.md",
       "symbol": "SessionPreparation",
       "source": "packages/core/session/src/preparation.ts",
       "projection": "public-api"
     },
     {
-      "doc": "docs/subsystems/persistence.md",
+      "doc": "docs/subsystems/persistence.zh.md",
       "symbol": "SessionInspection",
       "source": "packages/session/session-persistence/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/persistence.md",
+      "doc": "docs/subsystems/persistence.zh.md",
       "symbol": "SessionLocation",
       "source": "packages/session/session-persistence/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/persistence.md",
+      "doc": "docs/subsystems/persistence.zh.md",
       "symbol": "SessionRawArtifact",
       "source": "packages/session/session-persistence/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionEventSurface",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionRecord",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionLogSnapshot",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionSurfaceSnapshot",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionTitleObservation",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionTitleObservationResult",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionEventRecord",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionLineageNode",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionLineageTrace",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionQueryErrorCode",
       "source": "packages/session-query/session-query/src/config.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionEventReadRequest",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionEventWindow",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionEventTraceRequest",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionEventTrace",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionEventTraceObservation",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-title.md",
+      "doc": "docs/subsystems/session-title.zh.md",
       "symbol": "SessionTitleProviderId",
       "source": "packages/session/session-title/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-title.md",
+      "doc": "docs/subsystems/session-title.zh.md",
       "symbol": "SessionTitleModelProvenance",
       "source": "packages/session/session-title/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-title.md",
+      "doc": "docs/subsystems/session-title.zh.md",
       "symbol": "SessionTitleSource",
       "source": "packages/session/session-title/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-title.md",
+      "doc": "docs/subsystems/session-title.zh.md",
       "symbol": "SessionTitleEventData",
       "source": "packages/session/session-title/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-title.md",
+      "doc": "docs/subsystems/session-title.zh.md",
       "symbol": "SessionTitleSnapshot",
       "source": "packages/session/session-title/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-title.md",
+      "doc": "docs/subsystems/session-title.zh.md",
       "symbol": "SessionTitleLlmRequestEventData",
       "source": "packages/session/session-title-llm/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/session-title.md",
+      "doc": "docs/subsystems/session-title.zh.md",
       "symbol": "SessionTitleUserMessage",
       "source": "packages/session/session-title/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-title.md",
+      "doc": "docs/subsystems/session-title.zh.md",
       "symbol": "SessionTitleAutomaticMode",
       "source": "packages/session/session-title/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/session-title.md",
+      "doc": "docs/subsystems/session-title.zh.md",
       "symbol": "SessionTitleProviderRequest",
       "source": "packages/session/session-title/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/session-title.md",
+      "doc": "docs/subsystems/session-title.zh.md",
       "symbol": "SessionTitleProviderResult",
       "source": "packages/session/session-title/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/session-title.md",
+      "doc": "docs/subsystems/session-title.zh.md",
       "symbol": "SessionTitleProvider",
       "source": "packages/session/session-title/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/session-reference.md",
+      "doc": "docs/subsystems/session-reference.zh.md",
       "symbol": "SessionReferenceInput",
       "source": "packages/context/session-reference/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-reference.md",
+      "doc": "docs/subsystems/session-reference.zh.md",
       "symbol": "FileReferenceCandidate",
       "source": "packages/context/file-reference/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-reference.md",
+      "doc": "docs/subsystems/session-reference.zh.md",
       "symbol": "SessionReferenceCandidate",
       "source": "packages/context/session-reference/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-reference.md",
+      "doc": "docs/subsystems/session-reference.zh.md",
       "symbol": "SessionReferenceMentionCandidate",
       "source": "packages/context/session-reference/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-reference.md",
+      "doc": "docs/subsystems/session-reference.zh.md",
       "symbol": "PreparedReferencedMessage",
       "source": "packages/context/session-reference/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-reference.md",
+      "doc": "docs/subsystems/session-reference.zh.md",
       "symbol": "SessionReferenceErrorCode",
       "source": "packages/context/session-reference/src/config.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ToolOutputDefinition",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ToolDefinition",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ValueSchemaSpec",
       "source": "packages/core/tools/src/schema.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ParameterPropertySpec",
       "source": "packages/core/tools/src/schema.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ParameterSchemaSpec",
       "source": "packages/core/tools/src/schema.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "InferValue",
       "source": "packages/core/tools/src/schema.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "InferArgs",
       "source": "packages/core/tools/src/schema.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ToolExecutionToken",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ToolExecutionInput",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ToolExecution",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ToolDispatchExecution",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ToolExecutionMode",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "PtcDispatchLog",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ToolRunContext",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ToolGuard",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ToolRestriction",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ToolFailure",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ToolExecutionSuccess",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ToolExecutionFailure",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ToolExecutionResult",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "PreToolDecision",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "PostToolDecision",
       "source": "packages/core/tools/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "JsonSchemaScalar",
       "source": "packages/core/tools/src/json-schema.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "JsonSchemaType",
       "source": "packages/core/tools/src/json-schema.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "JsonSchemaNode",
       "source": "packages/core/tools/src/json-schema.ts"
     },
     {
-      "doc": "docs/subsystems/tools.md",
+      "doc": "docs/subsystems/tools.zh.md",
       "symbol": "ObjectJsonSchema",
       "source": "packages/core/tools/src/json-schema.ts"
     },
     {
-      "doc": "docs/subsystems/user-questions.md",
+      "doc": "docs/subsystems/user-questions.zh.md",
       "symbol": "AskUserQuestionOption",
       "source": "packages/interaction/user-questions/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/user-questions.md",
+      "doc": "docs/subsystems/user-questions.zh.md",
       "symbol": "AskUserQuestionIntent",
       "source": "packages/interaction/user-questions/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/user-questions.md",
+      "doc": "docs/subsystems/user-questions.zh.md",
       "symbol": "AskUserQuestionItem",
       "source": "packages/interaction/user-questions/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/user-questions.md",
+      "doc": "docs/subsystems/user-questions.zh.md",
       "symbol": "AskUserQuestionRequest",
       "source": "packages/interaction/user-questions/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/user-questions.md",
+      "doc": "docs/subsystems/user-questions.zh.md",
       "symbol": "AskUserQuestionAnswerItem",
       "source": "packages/interaction/user-questions/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/user-questions.md",
+      "doc": "docs/subsystems/user-questions.zh.md",
       "symbol": "AskUserQuestionAnswer",
       "source": "packages/interaction/user-questions/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/user-questions.md",
+      "doc": "docs/subsystems/user-questions.zh.md",
       "symbol": "UserQuestionError",
       "source": "packages/interaction/user-questions/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/approval.md",
+      "doc": "docs/subsystems/approval.zh.md",
       "symbol": "ApprovalRequestId",
       "source": "packages/interaction/user-approval/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/approval.md",
+      "doc": "docs/subsystems/approval.zh.md",
       "symbol": "ApprovalOutcome",
       "source": "packages/interaction/user-approval/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/approval.md",
+      "doc": "docs/subsystems/approval.zh.md",
       "symbol": "ApprovalPolicy",
       "source": "packages/interaction/user-approval/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/approval.md",
+      "doc": "docs/subsystems/approval.zh.md",
       "symbol": "ApprovalRequest",
       "source": "packages/interaction/user-approval/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/attachment.md",
+      "doc": "docs/subsystems/attachment.zh.md",
       "symbol": "ImageMediaType",
       "source": "packages/attachment/attachment/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/attachment.md",
+      "doc": "docs/subsystems/attachment.zh.md",
       "symbol": "ImageAttachmentRef",
       "source": "packages/attachment/attachment/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/attachment.md",
+      "doc": "docs/subsystems/attachment.zh.md",
       "symbol": "ImageAttachmentLimits",
       "source": "packages/attachment/attachment/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/attachment.md",
+      "doc": "docs/subsystems/attachment.zh.md",
       "symbol": "EncodedImageAttachment",
       "source": "packages/attachment/attachment/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/attachment.md",
+      "doc": "docs/subsystems/attachment.zh.md",
       "symbol": "SaveImageAttachment",
       "source": "packages/attachment/attachment/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/attachment.md",
+      "doc": "docs/subsystems/attachment.zh.md",
       "symbol": "StoredImageAttachment",
       "source": "packages/attachment/attachment/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/attachment.md",
+      "doc": "docs/subsystems/attachment.zh.md",
       "symbol": "ImageRequestPolicy",
       "source": "packages/attachment/attachment/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/attachment.md",
+      "doc": "docs/subsystems/attachment.zh.md",
       "symbol": "RequestImageAttachment",
       "source": "packages/attachment/attachment/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/shell.md",
+      "doc": "docs/subsystems/shell.zh.md",
       "symbol": "ShellExecRequest",
       "source": "packages/shell/shell/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/shell.md",
+      "doc": "docs/subsystems/shell.zh.md",
       "symbol": "ShellExecSpec",
       "source": "packages/shell/shell/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/shell.md",
+      "doc": "docs/subsystems/shell.zh.md",
       "symbol": "ShellRunResult",
       "source": "packages/shell/shell/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/shell.md",
+      "doc": "docs/subsystems/shell.zh.md",
       "symbol": "ShellSandboxInfo",
       "source": "packages/shell/shell/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/shell.md",
+      "doc": "docs/subsystems/shell.zh.md",
       "symbol": "ShellProcess",
       "source": "packages/shell/shell/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/shell.md",
+      "doc": "docs/subsystems/shell.zh.md",
       "symbol": "ShellProcessRead",
       "source": "packages/shell/shell/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/jobs.md",
+      "doc": "docs/subsystems/jobs.zh.md",
       "symbol": "JobKindMap",
       "source": "packages/jobs/jobs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/jobs.md",
+      "doc": "docs/subsystems/jobs.zh.md",
       "symbol": "JobStart",
       "source": "packages/jobs/jobs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/jobs.md",
+      "doc": "docs/subsystems/jobs.zh.md",
       "symbol": "JobHooks",
       "source": "packages/jobs/jobs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/jobs.md",
+      "doc": "docs/subsystems/jobs.zh.md",
       "symbol": "JobOutcome",
       "source": "packages/jobs/jobs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/jobs.md",
+      "doc": "docs/subsystems/jobs.zh.md",
       "symbol": "JobSnapshot",
       "source": "packages/jobs/jobs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/jobs.md",
+      "doc": "docs/subsystems/jobs.zh.md",
       "symbol": "JobRead",
       "source": "packages/jobs/jobs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/terminal.md",
+      "doc": "docs/subsystems/terminal.zh.md",
       "symbol": "TerminalWaitReason",
       "source": "packages/terminal/terminal/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/terminal.md",
+      "doc": "docs/subsystems/terminal.zh.md",
       "symbol": "TerminalSessionStatus",
       "source": "packages/terminal/terminal/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/terminal.md",
+      "doc": "docs/subsystems/terminal.zh.md",
       "symbol": "TerminalBackend",
       "source": "packages/terminal/terminal/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/terminal.md",
+      "doc": "docs/subsystems/terminal.zh.md",
       "symbol": "TerminalBackendSession",
       "source": "packages/terminal/terminal/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/terminal.md",
+      "doc": "docs/subsystems/terminal.zh.md",
       "symbol": "TerminalSendOperation",
       "source": "packages/terminal/terminal/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/terminal.md",
+      "doc": "docs/subsystems/terminal.zh.md",
       "symbol": "TerminalSendResult",
       "source": "packages/terminal/terminal/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/sandbox.md",
+      "doc": "docs/subsystems/sandbox.zh.md",
       "symbol": "SandboxMode",
       "source": "packages/sandbox/sandbox/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/sandbox.md",
+      "doc": "docs/subsystems/sandbox.zh.md",
       "symbol": "ConfinedSandboxMode",
       "source": "packages/sandbox/sandbox/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/sandbox.md",
+      "doc": "docs/subsystems/sandbox.zh.md",
       "symbol": "SandboxExecutionPolicy",
       "source": "packages/sandbox/sandbox/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/sandbox.md",
+      "doc": "docs/subsystems/sandbox.zh.md",
       "symbol": "SandboxEnforcement",
       "source": "packages/sandbox/sandbox/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/sandbox.md",
+      "doc": "docs/subsystems/sandbox.zh.md",
       "symbol": "SandboxPolicy",
       "source": "packages/sandbox/sandbox/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/sandbox.md",
+      "doc": "docs/subsystems/sandbox.zh.md",
       "symbol": "SandboxPolicyRequest",
       "source": "packages/sandbox/sandbox-policy/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/sandbox.md",
+      "doc": "docs/subsystems/sandbox.zh.md",
       "symbol": "RunnerFailureRule",
       "source": "packages/sandbox/sandbox/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/sandbox.md",
+      "doc": "docs/subsystems/sandbox.zh.md",
       "symbol": "ConfinedArgv",
       "source": "packages/sandbox/sandbox/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/code-runtime.md",
+      "doc": "docs/subsystems/code-runtime.zh.md",
       "symbol": "CodeJsonValue",
       "source": "packages/code-runtime/code-runtime/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/code-runtime.md",
+      "doc": "docs/subsystems/code-runtime.zh.md",
       "symbol": "CodeRunRequest",
       "source": "packages/code-runtime/code-runtime/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/code-runtime.md",
+      "doc": "docs/subsystems/code-runtime.zh.md",
       "symbol": "CodeRunResult",
       "source": "packages/code-runtime/code-runtime/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/code-runtime.md",
+      "doc": "docs/subsystems/code-runtime.zh.md",
       "symbol": "CodeBindingNamespace",
       "source": "packages/code-runtime/code-runtime/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/code-runtime.md",
+      "doc": "docs/subsystems/code-runtime.zh.md",
       "symbol": "CodeBindingErrorClass",
       "source": "packages/code-runtime/code-runtime/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/code-runtime.md",
+      "doc": "docs/subsystems/code-runtime.zh.md",
       "symbol": "CodeBindingFunction",
       "source": "packages/code-runtime/code-runtime/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/code-runtime.md",
+      "doc": "docs/subsystems/code-runtime.zh.md",
       "symbol": "CodeRunFailure",
       "source": "packages/code-runtime/code-runtime/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/filesystem.md",
+      "doc": "docs/subsystems/filesystem.zh.md",
       "symbol": "FsTarget",
       "source": "packages/fs/fs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/filesystem.md",
+      "doc": "docs/subsystems/filesystem.zh.md",
       "symbol": "FsTargetKey",
       "source": "packages/fs/fs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/filesystem.md",
+      "doc": "docs/subsystems/filesystem.zh.md",
       "symbol": "FsVersion",
       "source": "packages/fs/fs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/filesystem.md",
+      "doc": "docs/subsystems/filesystem.zh.md",
       "symbol": "FsObservation",
       "source": "packages/fs/fs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/filesystem.md",
+      "doc": "docs/subsystems/filesystem.zh.md",
       "symbol": "FsInfo",
       "source": "packages/fs/fs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/filesystem.md",
+      "doc": "docs/subsystems/filesystem.zh.md",
       "symbol": "FsPathInfo",
       "source": "packages/fs/fs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/filesystem.md",
+      "doc": "docs/subsystems/filesystem.zh.md",
       "symbol": "FsDirEntry",
       "source": "packages/fs/fs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/filesystem.md",
+      "doc": "docs/subsystems/filesystem.zh.md",
       "symbol": "FsWriteIntent",
       "source": "packages/fs/fs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/filesystem.md",
+      "doc": "docs/subsystems/filesystem.zh.md",
       "symbol": "FsWriteOutcome",
       "source": "packages/fs/fs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/filesystem.md",
+      "doc": "docs/subsystems/filesystem.zh.md",
       "symbol": "FsEditRequest",
       "source": "packages/fs/fs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/filesystem.md",
+      "doc": "docs/subsystems/filesystem.zh.md",
       "symbol": "FsEditOutcome",
       "source": "packages/fs/fs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/filesystem.md",
+      "doc": "docs/subsystems/filesystem.zh.md",
       "symbol": "FsErrorCode",
       "source": "packages/fs/fs/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/filesystem.md",
+      "doc": "docs/subsystems/filesystem.zh.md",
       "symbol": "FsObservationActor",
       "source": "packages/fs/fs-observation-policy/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/filesystem.md",
+      "doc": "docs/subsystems/filesystem.zh.md",
       "symbol": "FileReadOutcome",
       "source": "packages/fs/tool-fs/src/read-render.ts"
     },
     {
-      "doc": "docs/subsystems/skills.md",
+      "doc": "docs/subsystems/skills.zh.md",
       "symbol": "SkillSource",
       "source": "packages/skill/skill/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/skills.md",
+      "doc": "docs/subsystems/skills.zh.md",
       "symbol": "SkillResourceBase",
       "source": "packages/skill/skill/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/skills.md",
+      "doc": "docs/subsystems/skills.zh.md",
       "symbol": "SkillInvocationPolicy",
       "source": "packages/skill/skill/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/skills.md",
+      "doc": "docs/subsystems/skills.zh.md",
       "symbol": "SkillSummary",
       "source": "packages/skill/skill/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/skills.md",
+      "doc": "docs/subsystems/skills.zh.md",
       "symbol": "SkillCatalogSnapshot",
       "source": "packages/skill/skill/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/skills.md",
+      "doc": "docs/subsystems/skills.zh.md",
       "symbol": "SkillCandidate",
       "source": "packages/skill/skill/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/skills.md",
+      "doc": "docs/subsystems/skills.zh.md",
       "symbol": "SkillDefinition",
       "source": "packages/skill/skill/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/skills.md",
+      "doc": "docs/subsystems/skills.zh.md",
       "symbol": "SkillRegistration",
       "source": "packages/skill/skill/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/skills.md",
+      "doc": "docs/subsystems/skills.zh.md",
       "symbol": "SkillLookupOptions",
       "source": "packages/skill/skill/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/skills.md",
+      "doc": "docs/subsystems/skills.zh.md",
       "symbol": "SkillViewOptions",
       "source": "packages/skill/skill/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/skills.md",
+      "doc": "docs/subsystems/skills.zh.md",
       "symbol": "SkillProviderObservation",
       "source": "packages/skill/skill/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/skills.md",
+      "doc": "docs/subsystems/skills.zh.md",
       "symbol": "SkillProvider",
       "source": "packages/skill/skill/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/skills.md",
+      "doc": "docs/subsystems/skills.zh.md",
       "symbol": "SkillProviderControl",
       "source": "packages/skill/skill/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/skills.md",
+      "doc": "docs/subsystems/skills.zh.md",
       "symbol": "Config",
       "source": "packages/skill/skill/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/compaction.md",
+      "doc": "docs/subsystems/compaction.zh.md",
       "symbol": "CompactionResult",
       "source": "packages/compaction/compaction/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/compaction.md",
+      "doc": "docs/subsystems/compaction.zh.md",
       "symbol": "CompactionTrigger",
       "source": "packages/compaction/compaction/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/compaction.md",
+      "doc": "docs/subsystems/compaction.zh.md",
       "symbol": "ManualCompactionErrorCode",
       "source": "packages/compaction/compaction/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/compaction.md",
+      "doc": "docs/subsystems/compaction.zh.md",
       "symbol": "PrunedEntry",
       "source": "packages/compaction/compaction-tool-result-pruner/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/compaction.md",
+      "doc": "docs/subsystems/compaction.zh.md",
       "symbol": "PruneResult",
       "source": "packages/compaction/compaction-tool-result-pruner/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "SubagentCapabilities",
       "source": "packages/subagent/subagent/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "SubagentStartRequest",
       "source": "packages/subagent/subagent/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "ResolvedSubagentStartRequest",
       "source": "packages/subagent/subagent/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "CoordinatorMessageSource",
       "source": "packages/subagent/subagent/src/continuation.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "SubagentReportMessageSource",
       "source": "packages/subagent/subagent/src/continuation.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "SubagentReportDelivery",
       "source": "packages/subagent/subagent/src/continuation.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "SubagentSettledMessageSource",
       "source": "packages/subagent/subagent/src/continuation.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "SubagentReportOptions",
       "source": "packages/subagent/subagent/src/continuation.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "SubagentFollowupOptions",
       "source": "packages/subagent/subagent/src/continuation.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "SubagentInterruptAuthority",
       "source": "packages/subagent/subagent/src/continuation.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "SubagentDescendantListEntry",
       "source": "packages/subagent/subagent/src/list-children.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "ContinuableStart",
       "source": "packages/subagent/subagent/src/continuation.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "ContinuableCreateRequest",
       "source": "packages/subagent/subagent/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "ContinuableCreateSpec",
       "source": "packages/subagent/subagent/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "SubagentResult",
       "source": "packages/subagent/subagent/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "SubagentStopReasonMap",
       "source": "packages/subagent/subagent/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "SubagentRun",
       "source": "packages/subagent/subagent/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subagent.md",
+      "doc": "docs/subsystems/subagent.zh.md",
       "symbol": "SubagentProvider",
       "source": "packages/subagent/subagent/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/web.md",
+      "doc": "docs/subsystems/web.zh.md",
       "symbol": "WebSearchRequest",
       "source": "packages/web/web/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/web.md",
+      "doc": "docs/subsystems/web.zh.md",
       "symbol": "WebSearchResult",
       "source": "packages/web/web/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/web.md",
+      "doc": "docs/subsystems/web.zh.md",
       "symbol": "WebSearchSource",
       "source": "packages/web/web/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/web.md",
+      "doc": "docs/subsystems/web.zh.md",
       "symbol": "WebFetchRequest",
       "source": "packages/web/web/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/web.md",
+      "doc": "docs/subsystems/web.zh.md",
       "symbol": "WebFetchResult",
       "source": "packages/web/web/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/web.md",
+      "doc": "docs/subsystems/web.zh.md",
       "symbol": "WebFetchBody",
       "source": "packages/web/web/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/spill.md",
+      "doc": "docs/subsystems/spill.zh.md",
       "symbol": "SaveTextSpill",
       "source": "packages/spill/spill/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/spill.md",
+      "doc": "docs/subsystems/spill.zh.md",
       "symbol": "SpillOwner",
       "source": "packages/spill/spill/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/spill.md",
+      "doc": "docs/subsystems/spill.zh.md",
       "symbol": "SpillSource",
       "source": "packages/spill/spill/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/spill.md",
+      "doc": "docs/subsystems/spill.zh.md",
       "symbol": "SpillRef",
       "source": "packages/spill/spill/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/spill.md",
+      "doc": "docs/subsystems/spill.zh.md",
       "symbol": "SpillLocator",
       "source": "packages/spill/spill/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/workflow.md",
+      "doc": "docs/subsystems/workflow.zh.md",
       "symbol": "WorkflowStartRequest",
       "source": "packages/workflow/workflow/src/runtime-types.ts"
     },
     {
-      "doc": "docs/subsystems/workflow.md",
+      "doc": "docs/subsystems/workflow.zh.md",
       "symbol": "WorkflowMeta",
       "source": "packages/workflow/workflow/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/workflow.md",
+      "doc": "docs/subsystems/workflow.zh.md",
       "symbol": "WorkflowResult",
       "source": "packages/workflow/workflow/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/workflow.md",
+      "doc": "docs/subsystems/workflow.zh.md",
       "symbol": "WorkflowRun",
       "source": "packages/workflow/workflow/src/runtime-types.ts"
     },
     {
-      "doc": "docs/subsystems/lsp.md",
+      "doc": "docs/subsystems/lsp.zh.md",
       "symbol": "LspOperation",
       "source": "packages/lsp/lsp/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/lsp.md",
+      "doc": "docs/subsystems/lsp.zh.md",
       "symbol": "LspPosition",
       "source": "packages/lsp/lsp/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/lsp.md",
+      "doc": "docs/subsystems/lsp.zh.md",
       "symbol": "LspRange",
       "source": "packages/lsp/lsp/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/lsp.md",
+      "doc": "docs/subsystems/lsp.zh.md",
       "symbol": "LspQueryRequest",
       "source": "packages/lsp/lsp/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/lsp.md",
+      "doc": "docs/subsystems/lsp.zh.md",
       "symbol": "LspProviderQuery",
       "source": "packages/lsp/lsp/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/lsp.md",
+      "doc": "docs/subsystems/lsp.zh.md",
       "symbol": "LspLocation",
       "source": "packages/lsp/lsp/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/lsp.md",
+      "doc": "docs/subsystems/lsp.zh.md",
       "symbol": "LspHover",
       "source": "packages/lsp/lsp/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/lsp.md",
+      "doc": "docs/subsystems/lsp.zh.md",
       "symbol": "LspQueryResult",
       "source": "packages/lsp/lsp/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/lsp.md",
+      "doc": "docs/subsystems/lsp.zh.md",
       "symbol": "LspProvider",
       "source": "packages/lsp/lsp/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/lsp.md",
+      "doc": "docs/subsystems/lsp.zh.md",
       "symbol": "LspService",
       "source": "packages/lsp/lsp/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/persistence.md",
+      "doc": "docs/subsystems/persistence.zh.md",
       "symbol": "SessionPersistenceRevision",
       "source": "packages/session/session-persistence/src/revision.ts"
     },
     {
-      "doc": "docs/subsystems/persistence.md",
+      "doc": "docs/subsystems/persistence.zh.md",
       "symbol": "SessionPersistenceSnapshot",
       "source": "packages/session/session-persistence/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionResultFilter",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionEventResultFilter",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionEventSearchDocument",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionSearchCursor",
       "source": "packages/session-query/session-query/src/cursor.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionSearchRequest",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionEventSearchRequest",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionSearchPage",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionEventSearchPage",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionEventSearchHit",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/session-query.md",
+      "doc": "docs/subsystems/session-query.zh.md",
       "symbol": "SessionSearchHit",
       "source": "packages/session-query/session-query/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subprocess.md",
+      "doc": "docs/subsystems/subprocess.zh.md",
       "symbol": "SubprocessSpawnSpec",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subprocess.md",
+      "doc": "docs/subsystems/subprocess.zh.md",
       "symbol": "SubprocessHandle",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subprocess.md",
+      "doc": "docs/subsystems/subprocess.zh.md",
       "symbol": "SubprocessOutputReader",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subprocess.md",
+      "doc": "docs/subsystems/subprocess.zh.md",
       "symbol": "SubprocessOutputRead",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subprocess.md",
+      "doc": "docs/subsystems/subprocess.zh.md",
       "symbol": "SubprocessOutcome",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subprocess.md",
+      "doc": "docs/subsystems/subprocess.zh.md",
       "symbol": "DshEnvironmentKey",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subprocess.md",
+      "doc": "docs/subsystems/subprocess.zh.md",
       "symbol": "DshEnvironment",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subprocess.md",
+      "doc": "docs/subsystems/subprocess.zh.md",
       "symbol": "CollectedOutput",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subprocess.md",
+      "doc": "docs/subsystems/subprocess.zh.md",
       "symbol": "SubprocessStdinMode",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subprocess.md",
+      "doc": "docs/subsystems/subprocess.zh.md",
       "symbol": "SubprocessCollect",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subprocess.md",
+      "doc": "docs/subsystems/subprocess.zh.md",
       "symbol": "SubprocessOutputMode",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subprocess.md",
+      "doc": "docs/subsystems/subprocess.zh.md",
       "symbol": "SubprocessStdio",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/subprocess.md",
+      "doc": "docs/subsystems/subprocess.zh.md",
       "symbol": "SubprocessCollectedOutputs",
       "source": "packages/subprocess/subprocess/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/settings.md",
+      "doc": "docs/subsystems/settings.zh.md",
       "symbol": "SettingsNamespace",
       "source": "packages/settings/settings/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/settings.md",
+      "doc": "docs/subsystems/settings.zh.md",
       "symbol": "SettingsRegisterOptions",
       "source": "packages/settings/settings/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/settings.md",
+      "doc": "docs/subsystems/settings.zh.md",
       "symbol": "SettingsApplies",
       "source": "packages/settings/settings/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/settings.md",
+      "doc": "docs/subsystems/settings.zh.md",
       "symbol": "SettingsScope",
       "source": "packages/settings/settings/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/settings.md",
+      "doc": "docs/subsystems/settings.zh.md",
       "symbol": "SettingsDescriptor",
       "source": "packages/settings/settings/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/settings.md",
+      "doc": "docs/subsystems/settings.zh.md",
       "symbol": "SettingsUpdateSource",
       "source": "packages/settings/settings/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/credentials.md",
+      "doc": "docs/subsystems/credentials.zh.md",
       "symbol": "ResolvedCredential",
       "source": "packages/credentials/credentials/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/credentials.md",
+      "doc": "docs/subsystems/credentials.zh.md",
       "symbol": "CredentialInfo",
       "source": "packages/credentials/credentials/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/settings.md",
+      "doc": "docs/subsystems/settings.zh.md",
       "symbol": "SettingsDescribeOptions",
       "source": "packages/settings/settings/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/llm-streaming.md",
+      "doc": "docs/subsystems/llm-streaming.zh.md",
       "symbol": "LlmConfigurableProvider",
       "source": "packages/llm/llm/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/settings.md",
+      "doc": "docs/subsystems/settings.zh.md",
       "symbol": "SettingsPathOp",
       "source": "packages/settings/settings/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/permission-presets.md",
+      "doc": "docs/subsystems/permission-presets.zh.md",
       "symbol": "Config",
       "source": "packages/interaction/permission-presets/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/permission-presets.md",
+      "doc": "docs/subsystems/permission-presets.zh.md",
       "symbol": "PresetOption",
       "source": "packages/interaction/permission-presets/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/plan.md",
+      "doc": "docs/subsystems/plan.zh.md",
       "symbol": "PlanModeConfig",
       "source": "packages/plan/plan-mode/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/invariants.md",
+      "doc": "docs/subsystems/invariants.zh.md",
       "symbol": "Config",
       "source": "packages/runtime-diagnostics/invariants/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/invariants.md",
+      "doc": "docs/subsystems/invariants.zh.md",
       "symbol": "InvariantFailure",
       "source": "packages/runtime-diagnostics/invariants/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/invariants.md",
+      "doc": "docs/subsystems/invariants.zh.md",
       "symbol": "InvariantInstaller",
       "source": "packages/runtime-diagnostics/invariants/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/web-server.md",
+      "doc": "docs/subsystems/web-server.zh.md",
       "symbol": "WebRouteKind",
       "source": "packages/host/webserver/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/web-server.md",
+      "doc": "docs/subsystems/web-server.zh.md",
       "symbol": "WebRoute",
       "source": "packages/host/webserver/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/web-server.md",
+      "doc": "docs/subsystems/web-server.zh.md",
       "symbol": "Config",
       "source": "packages/host/webserver/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/storage.md",
+      "doc": "docs/subsystems/storage.zh.md",
       "symbol": "StorageForms",
       "source": "packages/storage/storage/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/storage.md",
+      "doc": "docs/subsystems/storage.zh.md",
       "symbol": "StorageBackend",
       "source": "packages/storage/storage/src/backend.ts"
     },
     {
-      "doc": "docs/subsystems/storage.md",
+      "doc": "docs/subsystems/storage.zh.md",
       "symbol": "DomainSpec",
       "source": "packages/storage/storage-domain/src/spec.ts"
     },
     {
-      "doc": "docs/subsystems/storage.md",
+      "doc": "docs/subsystems/storage.zh.md",
       "symbol": "Domain",
       "source": "packages/storage/storage-domain/src/domain.ts"
     },
     {
-      "doc": "docs/subsystems/storage.md",
+      "doc": "docs/subsystems/storage.zh.md",
       "symbol": "DomainChangedBase",
       "source": "packages/storage/storage-domain/src/events.ts"
     },
     {
-      "doc": "docs/subsystems/storage.md",
+      "doc": "docs/subsystems/storage.zh.md",
       "symbol": "DomainChanged",
       "source": "packages/storage/storage-domain/src/events.ts"
     },
     {
-      "doc": "docs/subsystems/workspace.md",
+      "doc": "docs/subsystems/workspace.zh.md",
       "symbol": "WorkspaceId",
       "source": "packages/workspace/workspace/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/workspace.md",
+      "doc": "docs/subsystems/workspace.zh.md",
       "symbol": "Workspace",
       "source": "packages/workspace/workspace/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/client-modules.md",
+      "doc": "docs/subsystems/client-modules.zh.md",
       "symbol": "WebBootEntry",
       "source": "packages/client/modules/src/client/manifest.ts"
     },
     {
-      "doc": "docs/subsystems/client-modules.md",
+      "doc": "docs/subsystems/client-modules.zh.md",
       "symbol": "WebBootBatchPhase",
       "source": "packages/client/modules/src/client/manifest.ts"
     },
     {
-      "doc": "docs/subsystems/client-modules.md",
+      "doc": "docs/subsystems/client-modules.zh.md",
       "symbol": "WebBootBatch",
       "source": "packages/client/modules/src/client/manifest.ts"
     },
     {
-      "doc": "docs/subsystems/client-modules.md",
+      "doc": "docs/subsystems/client-modules.zh.md",
       "symbol": "WebBootGraph",
       "source": "packages/client/modules/src/client/manifest.ts"
     },
     {
-      "doc": "docs/subsystems/client-modules.md",
+      "doc": "docs/subsystems/client-modules.zh.md",
       "symbol": "ClientArtifactBaseline",
       "source": "packages/client/modules/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/session-telemetry.md",
+      "doc": "docs/subsystems/session-telemetry.zh.md",
       "symbol": "SessionTelemetrySharingStatus",
       "source": "packages/session/session-telemetry/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/session-telemetry.md",
+      "doc": "docs/subsystems/session-telemetry.zh.md",
       "symbol": "SessionTelemetrySeverity",
       "source": "packages/session/session-telemetry/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/session-telemetry.md",
+      "doc": "docs/subsystems/session-telemetry.zh.md",
       "symbol": "SessionTelemetryRecord",
       "source": "packages/session/session-telemetry/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/session-telemetry.md",
+      "doc": "docs/subsystems/session-telemetry.zh.md",
       "symbol": "SessionTelemetrySink",
       "source": "packages/session/session-telemetry/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/typert.md",
+      "doc": "docs/subsystems/typert.zh.md",
       "symbol": "TypertLookupMap",
       "source": "packages/typert/protocol/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/typert.md",
+      "doc": "docs/subsystems/typert.zh.md",
       "symbol": "TypertContextMap",
       "source": "packages/typert/protocol/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/typert.md",
+      "doc": "docs/subsystems/typert.zh.md",
       "symbol": "TypertLookupDefinition",
       "source": "packages/typert/protocol/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/typert.md",
+      "doc": "docs/subsystems/typert.zh.md",
       "symbol": "TypertCodec",
       "source": "packages/typert/protocol/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/typert.md",
+      "doc": "docs/subsystems/typert.zh.md",
       "symbol": "InvocationParameterDescriptor",
       "source": "packages/typert/protocol/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/typert.md",
+      "doc": "docs/subsystems/typert.zh.md",
       "symbol": "InvocationDescriptor",
       "source": "packages/typert/protocol/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/typert.md",
+      "doc": "docs/subsystems/typert.zh.md",
       "symbol": "TypertRegistryContract",
       "source": "packages/typert/protocol/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/typert.md",
+      "doc": "docs/subsystems/typert.zh.md",
       "symbol": "TypertRemoteNamespaceMap",
       "source": "packages/typert/protocol/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/typert.md",
+      "doc": "docs/subsystems/typert.zh.md",
       "symbol": "InvokeRemoteRequest",
       "source": "packages/api/gateway/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/typert.md",
+      "doc": "docs/subsystems/typert.zh.md",
       "symbol": "TypertGatewayErrorCode",
       "source": "packages/api/gateway/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/typert.md",
+      "doc": "docs/subsystems/typert.zh.md",
       "symbol": "TypertGateway",
       "source": "packages/api/gateway/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/typert.md",
+      "doc": "docs/subsystems/typert.zh.md",
       "symbol": "TypertClientRemote",
       "source": "packages/typert/protocol/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/credentials.md",
+      "doc": "docs/subsystems/credentials.zh.md",
       "symbol": "CredentialRef",
       "source": "packages/credentials/credentials/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/permission-presets.md",
+      "doc": "docs/subsystems/permission-presets.zh.md",
       "symbol": "PresetSpec",
       "source": "packages/interaction/permission-presets/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/session-projection.md",
+      "doc": "docs/subsystems/session-projection.zh.md",
       "symbol": "ProjectionDefinition",
       "source": "packages/session/session-projection/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/session-projection.md",
+      "doc": "docs/subsystems/session-projection.zh.md",
       "symbol": "ProjectionSnapshot",
       "source": "packages/session/session-projection/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/session-projection.md",
+      "doc": "docs/subsystems/session-projection.zh.md",
       "symbol": "ProjectionChangeListener",
       "source": "packages/session/session-projection/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/core.md",
+      "doc": "docs/subsystems/core.zh.md",
       "symbol": "AgentHandle",
       "source": "packages/core/agent/src/index.ts"
     },
     {
-      "doc": "docs/subsystems/core.md",
+      "doc": "docs/subsystems/core.zh.md",
       "symbol": "AgentStatus",
       "source": "packages/core/agent/src/runtime-types.ts"
     },
     {
-      "doc": "docs/subsystems/core.md",
+      "doc": "docs/subsystems/core.zh.md",
       "symbol": "AgentOptions",
       "source": "packages/core/agent/src/runtime-types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackVersion",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackRating",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackItem",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackListRequest",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackListValue",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackPutRequest",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackDeleteRequest",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackDeleteValue",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackSessionNotFound",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackTargetNotFound",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackVersionConflict",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackNoteBlank",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackNoteTooLarge",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackFailure",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackSuccess",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackRejected",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackListResult",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackPutResult",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "docs/subsystems/feedback.md",
+      "doc": "docs/subsystems/feedback.zh.md",
       "symbol": "MessageFeedbackDeleteResult",
       "source": "packages/feedback/message-feedback/src/types.ts"
     },
     {
-      "doc": "packages/client/ui-conversation/README.md",
+      "doc": "packages/client/ui-conversation/README.zh.md",
       "symbol": "ComposerChainProps",
       "source": "packages/client/ui-conversation/src/client/contract/slots.ts"
     }

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-28-windows-only-absent-probe-repair.md) | 中文
-
 ## Problem
 
 `JsonlSessionPersistence.exists` 把 ENOENT 视为「不存在」，并在返回 false 之前 stat 一次路径的父目录，好让「被普通文件挡住的会话目录」暴露成存储故障，而不是一个不存在的会话。Windows 需要这一步：它对 `regular-file/child` 报的是 ENOENT 而不是 ENOTDIR。POSIX 不需要——`open(2)` 规定路径前缀中有非目录组件时报 ENOTDIR，这一点该修复自己的守卫注释早已写明。

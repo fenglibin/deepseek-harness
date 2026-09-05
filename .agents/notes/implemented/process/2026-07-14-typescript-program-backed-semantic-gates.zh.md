@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-14-typescript-program-backed-semantic-gates.md) | 中文
-
 ## 问题
 
 仓库门禁有时需要判断 TypeScript 语法本身不携带的事实：接收者是否为 Cordis `Context`、哪些具体事件名会进入转发辅助函数、声明合并是否改变了事件签名。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-10-after-call-compaction-pressure-and-overflow-recovery.md) | 中文
-
 ## 问题
 
 `agent/pre-step` 运行在最终请求路由之前，也早于 assistant 输出、工具结果、缓冲上下文与 steering（中途引导）的产生。即使它接收已装配提示词与会话前缀，压力视图仍是临时的，因为 `agent/request` 还可以改变路由或调用配置，工具 schema 也没有与这些输入一同冻结。增加字段无法让调用前状态描述已完成调用，还会把通用扩展点与压缩（compaction）耦合。

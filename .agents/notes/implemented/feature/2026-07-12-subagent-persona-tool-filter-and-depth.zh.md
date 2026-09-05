@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-12-subagent-persona-tool-filter-and-depth.md) | 中文
-
 ## 问题
 
 一个可复用的 subagent 提供方解决的是「如何运行子 agent（智能体）」的问题，但不同的委派工具需要不同的子 agent 行为。某个部署可能需要评审者人设、仅限研究的工具集，或硬性递归上限，而不必为每种组合创建新的提供方。

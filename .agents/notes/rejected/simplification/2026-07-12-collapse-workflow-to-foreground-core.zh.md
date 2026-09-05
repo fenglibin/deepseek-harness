@@ -2,8 +2,6 @@
 
 Status: rejected — 工作流进度是有意设计的观测接口；应通过消费方使其发挥作用，而非删除它。
 
-[English](2026-07-12-collapse-workflow-to-foreground-core.md) | 中文
-
 ## 问题
 
 工作流能力在前台执行用于编排 subagent 的 JavaScript，但它同时携带了一套无人消费的进度观测系统。没有任何生产环境的监听器订阅六个 `workflow/*` 事件中的任何一个；监听器仅存在于工作流测试中。尽管如此，seam 定义了 run/phase/agent（智能体）outcome 载荷，worker 发送 phase/log/agent 生命周期协议消息，host 通过一个 `liveAgents` 配对账本转发它们，引擎维护 run id 仅仅是为了关联这些通知。

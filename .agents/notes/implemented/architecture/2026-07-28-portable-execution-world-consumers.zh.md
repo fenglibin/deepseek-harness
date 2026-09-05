@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-28-portable-execution-world-consumers.md) | 中文
-
 ## 问题
 
 文件系统与进程管理 seam 使文件访问和普通进程访问具备可替换性，但 PTY 和 LSP 仍直接调用宿主 Node API。因此，即使领域行为没有变化，远程执行提供方看起来仍需要独立的 PTY 与 LSP 包。这些包只会成为浅层适配器：每个包都仅为替换文件与进程操作而复制一个现有消费方。

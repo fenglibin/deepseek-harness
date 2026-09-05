@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-27-skill-catalog-hot-refresh.md) | 中文
-
 ## 问题
 
 skill（技能）摘要是模型的路由输入，但本地 skill 可在会话启动后新增、消失或重命名。IDE、Git 操作、shell 命令和其他进程都可以修改 `.agents/skills`，而不经过 harness 文件系统工具。仅在启动时构建目录，会让模型无法获知新 skill，并且仍能调用已删除的名称。反之，如果把每次指令正文编辑都视为目录修订，就会让渐进式加载与不必要的提示词频繁变化耦合。

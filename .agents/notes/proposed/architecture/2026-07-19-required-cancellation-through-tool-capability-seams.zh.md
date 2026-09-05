@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-07-19-required-cancellation-through-tool-capability-seams.md) | 中文
-
 ## 问题
 
 已经实现的[工具注册表取消约定](../../implemented/architecture/2026-07-19-cooperative-tool-cancellation.zh.md)让每个工具主体中的 `exec.signal` 成为必填值，但许多从这些工具主体可达的异步能力接口仍接受可选信号。因此，工具可以满足自身类型，却在下一次同进程调用时意外丢失取消。

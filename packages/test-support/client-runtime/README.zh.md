@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-client-test-runtime
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-client-test-runtime` 让浏览器功能测试拥有真实的 jsdom 测试台：它把 Cordis 上下文、渲染器拥有的 slot 注册表与生产 `UiSession` 适配器组装在带类型的 Session 和 Workspace Controller 替身周围。功能套件无需复制生产渲染器或适配器逻辑，即可检验声明、注册、作用域、store、注入、渲染、更新与销毁。套件通过带类型 fixture 发布 Session 生命周期状态、Workspace 状态、projection 值与 Conversation 事件，再使用局部 DOM 快照根、限定范围的 Testing Library 查询与自明的服务缺失检查。它不属于产品插件图（无 `dsh.client`）；feature 包仅以 `devDependencies` 依赖之。

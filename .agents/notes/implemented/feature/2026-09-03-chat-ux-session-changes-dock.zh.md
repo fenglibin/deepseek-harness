@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-chat-ux-session-changes-dock.md) | 中文
-
 ## Problem
 
 此前没有一个地方能集中看到本次会话里 agent 到底改了哪些文件。每个 turn 的产物行（`ui-deliverables`）只列出单个收尾 turn 的输出，没有跨 turn 汇总，也没有需求里要求的「接受」动作。

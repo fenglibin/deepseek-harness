@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-03-package-anchored-subsystem-pages.md) | 中文
-
 ## 问题
 
 [子系统目录](2026-06-20-core-data-structures-catalog.zh.md)最初用主干-vs-seam 规则界定首页范围：如果循环在每个轮次都持有、派生、流式传输或记录某个类型，它就是「核心」。该规则选择的是类型而非包，因此当目录增长到四十多页后，首页变成了跨包大杂烩：LLM（大语言模型）对话词汇排在 agent（智能体）约定之前，创建/所有权词汇（`AgentHandle`、`CreateAgentOptions`、`ResumeAgentOptions`、`AgentFactory`）在目录中无处记录（生成器把它们豁免给了某个包 README），读者无法根据类型所在位置预测哪一页记录它。与此同时，各包分组 README 没有统一形状——有的带分节表格、游离的设计短文，或本应属于子系统页面的尾部段落。

@@ -6,7 +6,7 @@ import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { InjectFace, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { WelcomeNoticeState, WelcomeNoticeStore } from './welcome-store.ts'
-import type { en } from './locales.ts'
+import type { zh } from './locales.ts'
 import { OnboardingModal } from './OnboardingModal.tsx'
 import css from './WelcomeNotice.module.css'
 
@@ -19,7 +19,7 @@ export interface WelcomeNoticeInjected {
   /** Welcome acknowledgement controller. */
   controller: WelcomeNoticeStore
   /** Onboarding copy. */
-  t: (key: keyof typeof en) => string
+  t: (key: keyof typeof zh) => string
 }
 
 /** Coordinator owner props plus this step's injected face. */

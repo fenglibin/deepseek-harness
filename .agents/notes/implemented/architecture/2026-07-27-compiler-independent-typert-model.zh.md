@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-27-compiler-independent-typert-model.md) | 中文
-
 ## Problem
 
 直接从 TypeScript AST 拼接 Zod 和反射文本，会把类型分析、业务语义识别与单个生成目标绑在一起。这样的生成器只能回答“这段语法能否生成”，无法提供包、face、公开导出、service、event、对象及其类型关系的标准表示，也无法供静态检查和后续生成目标复用。

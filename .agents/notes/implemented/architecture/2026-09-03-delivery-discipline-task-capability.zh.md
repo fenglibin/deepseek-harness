@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-delivery-discipline-task-capability.md) | 中文
-
 ## 问题
 
 harness 中的 agent 自由执行任务：它可以直接改代码并声称完成，却不产生任何变更记录、设计或任务拆分，也没有任何程序化手段阻止它跳过必需阶段。纯 prompt 约束（"请自检"）不可靠，因为模型可以口头应承而不实际执行。结果是工作不可追溯、不可验证、不可控，也没有可配置的强度来适配 token 充裕与匮乏的不同用户。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-09-remove-repository-plugin.md) | 中文
-
 ## 问题
 
 repository 插件路径与 profile 组合包路径重复实现了第三方包的安装和组合。它增加了 `.dsh-plugin` manifest（元数据清单）、生成的包装层、准备工作可执行文件、第二套 Git／包缓存、Loader 内置项，以及 repository 专用的 skill（技能）和 MCP 适配器。profile 组合包已经能通过 profile 包管理器安装 npm 或 Git 包说明符，保留正常的依赖与生命周期语义，并提供一个有序 `cordis.patch.yml` 层，其中可以挂载普通 Cordis 插件。

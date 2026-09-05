@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-19-projection-cache-per-session-files.md) | 中文
-
 ## Problem
 
 持久投影缓存曾是单个全局 `session_projcache.json`——存储根目录下一个文件里的 `sessions` 表。每次节流检查点都会重写包含所有会话行的整个文件，写放大随会话数量增长；且一个畸形文件会让整个缓存一起失效。

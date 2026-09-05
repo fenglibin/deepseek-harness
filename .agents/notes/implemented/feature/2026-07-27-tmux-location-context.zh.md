@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-27-tmux-location-context.md) | 中文
-
 ## 问题
 
 运行在 tmux 内的 agent（智能体）无法告诉模型自己身在何处：进程占据哪个 session、window、pane，以及 window 如何布局。当用户操作多个 pane 时，希望模型能对自身位置有所定位，从而让「下方的 pane」「这个 window」之类的指令得以解析。位置必须以持久、可重建的上下文形式送达模型，而非在原地被改写的系统提示值，并且当位置未变化时不产生任何成本。

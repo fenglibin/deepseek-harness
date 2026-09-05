@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-18-session-surface.md) | 中文
-
 ## 问题
 
 事件日志是权威数据源，但历史操纵此前没有持久化的共享机制。如果没有这样的机制，上下文压缩（context compaction）等插件会通过顺序敏感的监听器改写派生请求，却不记录每次替换使用了哪些事件。每次新增历史操纵时，还必须修改 `deriveMessages()`。

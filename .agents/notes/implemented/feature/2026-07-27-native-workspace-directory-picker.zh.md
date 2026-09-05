@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-27-native-workspace-directory-picker.md) | 中文
-
 ## 问题
 
 桌面端 GUI 在添加现有工作区时要求用户输入绝对路径。相比使用操作系统原生选择器选取目录，这种操作速度更慢，也更容易出错。GUI 由本地 Web 载体提供，因此打开原生对话框也会形成一条特权边界，普通远程请求不得越过这条边界。

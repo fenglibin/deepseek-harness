@@ -3,7 +3,7 @@
  * tools, so it shares no Cordis context and advertises no parent-enforced start capabilities;
  * the ONE thing it reads off `request.parent` is the session's workspace cwd (see
  * {@link resolveCwd}). This plugin uses named exports only; a default would hide its
- * loader metadata (see `docs/postmortem/0001-acp-default-export-drops-inject.md`).
+ * loader metadata (see `docs/postmortem/0001-acp-default-export-drops-inject.zh.md`).
  * @module @deepseek-ai/dsh-subagent-acp
  */
 

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-settings-mcp
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-client-ui-settings-mcp` 是 dsh Web 客户端的 **MCP** 设置分区：用户在此添加、编辑、删除并启用模型可以调用其工具的 MCP 服务器。这份列表是 Host 端 `dsh-mcp-manager` 插件所拥有的 `mcp` settings 命名空间中的一个 `servers` 数组，因此本包不注册自己的命名空间——它绑定该命名空间，并且每次变更都以一次受修订号栅栏保护的 mutation 整体重写这个数组。每一行展示服务器的名称、命令或 URL、一个实时状态圆点，以及 manager 当前为它报告的工具数量；新增或编辑只会打开一个弹窗，暂存单个条目、仅在保存时写入，而行内的开关则立即写入，因为启用是一个单一的可见决定。当 MCP 服务器应由用户在浏览器中管理时选择本包；每个条目最终挂载什么，只有 Host manager 说了算。

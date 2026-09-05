@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-18-product-subagent-named-instances.md) | 中文
-
 ## 问题
 
 Profile 可以用多个配置项挂载同一个 Cordis 插件包，但 Codex 与 Claude Code 产品提供方此前会把每个配置项都注册到一个固定产品名称下。因此，第二个配置项会在其独立模型、权限模式、环境或进程释放设置可用前因名称重复而失败。根据这些设置隐式派生名称会建立第二套身份规则，而在工具调用期间选择提供方会让模型输入决定部署权限。

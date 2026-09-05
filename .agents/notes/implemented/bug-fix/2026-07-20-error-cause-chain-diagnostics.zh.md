@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-20-error-cause-chain-diagnostics.md) | 中文
-
 ## 问题
 
 TUI 连接不可达的 DeepSeek 端点时，失败只显示一条 `fetch failed` 通知，没有任何进一步细节。两个独立缺口共同造成了这个死胡同：

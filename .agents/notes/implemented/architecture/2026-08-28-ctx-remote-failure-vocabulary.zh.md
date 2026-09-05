@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-28-ctx-remote-failure-vocabulary.md) | 中文
-
 ## Problem
 
 每个 Remote owner 包各自维护一套失败面：一个 `XxxErrorDetailsMap` 接口、由它派生的 `XxxError` union，以及一个出口映射函数，把域内错误类（`UnknownPresetError`、`PresetMountError`、`SessionTitleInvalidError` 等）翻译成 wire 失败值。`@deepseek-ai/dsh-typert-protocol` 同时携带两个失败类——owner 主动上报用 `TypertRemoteFailure`，lookup resolver 产生的用 `TypertLookupFailure`——而 `@deepseek-ai/dsh-client-connection` 又保留了第二份 typed 视图 `RpcErrorDetailsMap`，把 `agent-preset-not-found`、`session-not-found` 这类域码硬编码进载体层。

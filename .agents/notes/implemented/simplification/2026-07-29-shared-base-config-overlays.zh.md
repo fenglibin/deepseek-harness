@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-29-shared-base-config-overlays.md) | 中文
-
 ## 问题
 
 `dsh` 交付了两棵完整的配置树，其中有 43 个共享配置项。`apps/cli/cordis.yml` 以 74 个平铺配置项组合 web surface，而 TUI 启动的是 `examples/tui-agent/cordis.yml`——其中单独一行 `@deepseek-ai/dsh-tui-demo` 挂载了十二个插件，并把它们的配置重新声明为自己那份二十个键、仅作透传的 `Config`。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-same-basename-workspace-adoption.md) | 中文
-
 ## 问题
 
 Workspace 的身份由其稳定 id 和规范目录路径确定，标题则是可变的显示元数据。然而，只要新规范路径按 basename 派生出的标题与另一个 Workspace 相同，注册表就会拒绝该路径。因此，`/a/xx` 和 `/b/xx` 等常见目录布局无法同时出现在 Web UI 中，尽管[领域设计](../../proposed/architecture/2026-07-24-domain-kv-storage-and-workspace.zh.md)早已允许标题重复，而且每项客户端操作都通过 id 定位 Workspace。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-29-windows-atomic-replace-retry.md) | 中文
-
 ## 问题
 
 当另一个系统组件持有目标文件时，Windows 可能以 `EACCES`、`EBUSY` 或 `EPERM` 暂时拒绝替换已有文件的 rename。跨进程写锁能够排序应用内互相协作的写入方，却无法释放该外部句柄，因此把第一次错误当作永久失败会让本来有效的设置或凭据更新随机失败。

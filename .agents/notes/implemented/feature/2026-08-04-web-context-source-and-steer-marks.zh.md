@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-04-web-context-source-and-steer-marks.md) | 中文
-
 ## 问题
 
 生产方向模型侧对话补充的一切内容，进入 Web transcript（文本记录）后只剩两种匿名形态。每一条已记录的非用户 `user/message`——skill（技能）目录、运行时快照、经过对账的 `AGENTS.md` 指令、guard 提示、subagent 汇报、跨会话快照——都塌缩成同一行 `上下文注入`，读者不逐行展开去读原始 JSON 就无从知道究竟注入了什么。steering（中途引导）的情况更糟：它渲染成与开轮提示完全相同的气泡，于是 transcript 无法说明哪一条消息打断了正在运行的轮次。

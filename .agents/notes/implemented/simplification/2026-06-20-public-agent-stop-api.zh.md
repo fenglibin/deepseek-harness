@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-20-public-agent-stop-api.md) | 中文
-
 ## 问题
 
 公共 `Agent` handle 暴露了两种相互重叠的在途工作停止方式：仅针对步骤的 `abort()` 和感知队列的 `cancel()`。前者保留已排队输入，后者原本只暴露广义默认行为，该行为会清除已排队和 steering（中途引导）工作，同时中止活动轮次。`cancel(cause, { keepInbox: true })` 现在无需暴露私有轮次 holder 即可覆盖生产环境的 Web 停止策略；ACP（Agent Client Protocol）保留广义取消，生命周期拥有者则通过 `AgentHandle.dispose()` 拆除 agent（智能体）。没有生产调用方需要一个裸的、仅针对步骤的 abort。

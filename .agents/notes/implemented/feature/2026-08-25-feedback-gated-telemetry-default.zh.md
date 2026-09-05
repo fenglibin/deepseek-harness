@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-25-feedback-gated-telemetry-default.md) | 中文
-
 ## 问题
 
 诊断一条 `/feedback` 报告需要报告所描述的会话数据。共享基础配置把未设置的 `DSH_TELEMETRY_MODE` 解析为 `DISABLED`，因此默认安装发出的反馈到达接收方时不带任何会话数据，报告者在求助的那一刻也没有授权共享的途径；只有事先导出了 `DSH_TELEMETRY_MODE` 的部署才能交付可诊断的报告。

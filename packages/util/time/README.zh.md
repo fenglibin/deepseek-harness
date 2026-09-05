@@ -5,8 +5,6 @@ kind: "package-library"
 
 # dsh-util-time
 
-[English](README.md) | 中文
-
 ## 概述
 
 零依赖的时区词汇，供接收调用方时区的协议边界使用。`canonicalClientTimeZone` 只接受 `UTC` 或 IANA `Area/Location` 名称，并回答该名称在当前平台上的规范拼写，因此别名不会进入持久记录：时区标识会存在消息上、并由另一个进程稍后重新推导，别名在那里比不相等。本库只做校验与规范化——不格式化任何时间，也不持有失败词汇，因为每个边界抛自己的域码。

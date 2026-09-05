@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-chat-ux-resize-menu-file-rows.md) | 中文
-
 ## Problem
 
 日常使用 Chat 界面时收集到的三个问题，都与输入框及其周围的会话记录有关。

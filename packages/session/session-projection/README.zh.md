@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-session-projection
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-session-projection` 向客户端载体提供日志派生的逐会话状态的完整当前值——历史尾页与 `session/projection` 推送帧：一个注册表（`ctx.sessionProjections`）把每个已提交会话事件折叠到已注册投影单元并对外提供所得值。领域注册一个纯计算单元（初始状态、对事件的折叠与可选客户端视图）；框架负责订阅、驱动与变更通知，因此领域不持有任何订阅，客户端收到的是成品值，绝不自行折叠事件。每个被提供的值都是经 schema 校验的纯 JSON，逐单元 `stateVersion` 锚定持久缓存的失效。当客户端需要派生的逐会话状态——todo 清单、goal 快照、对话统计——而不想自己折叠原始日志时，选择本包。

@@ -39,7 +39,7 @@ import { renderToolsSdkPy } from './py-types.ts'
  * the flavor table is checked against too, so any of the three left out is a
  * typecheck failure. What no check reaches is the prose that names the values
  * instead of deriving them: the seam's `dsh-code-runtime` README pair, its
- * `CodeRuntime.language` JSDoc, and `docs/subsystems/code-runtime.md`
+ * `CodeRuntime.language` JSDoc, and `docs/subsystems/code-runtime.zh.md`
  * with its zh pair, plus this package's own README pair and the
  * {@link Config.mode} JSDoc.
  */
@@ -253,7 +253,7 @@ export interface ToolDefinition extends ToolSchema {
    * Opted-in executions must not mutate parent-owned state. Shared state must
    * tolerate concurrent dispatch; recorder races are permitted only when they
    * commute or fail closed. See the
-   * [parallel-tool-call Agent Note](../../../../.agents/notes/implemented/feature/2026-07-10-parallel-tool-call-execution.md)
+   * [parallel-tool-call Agent Note](../../../../.agents/notes/implemented/feature/2026-07-10-parallel-tool-call-execution.zh.md)
    * for the full contract.
    * @param args - parsed arguments; `defineTool` validates before calling.
    * @returns Whether this call may join a parallel group.
@@ -1005,7 +1005,7 @@ export class ToolRuntime extends Service {
    * language between them would hand a program written against one SDK to the
    * other. Binding it is deferred until a second backend ships (the first
    * point it is testable); rationale in the
-   * [language-dispatch note](../../../../.agents/notes/implemented/feature/2026-07-31-ptc-language-dispatch.md).
+   * [language-dispatch note](../../../../.agents/notes/implemented/feature/2026-07-31-ptc-language-dispatch.zh.md).
    */
   private requireCodeRuntime(mode: ToolPresentationMode): CodeRuntime {
     const runtime = this.ctx.get('codeRuntime')

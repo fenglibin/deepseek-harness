@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-15-product-subagent-noninteractive-permissions.md) | 中文
-
 ## Problem
 
 [Claude Code 与 Codex 产品提供方](2026-08-04-claude-code-and-codex-subagent-backends.zh.md)都在没有人工界面的情况下运行。因此，原生权限提示、用户对话或 MCP elicitation 不能等待人员响应，但依赖任一产品环境中的默认值仍可能选择交互模式。部署也需要选择更宽松的原生模式，同时不能让父模型或单次工具调用提升自身权限。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-23-client-derived-tool-presentation.md) | 中文
-
 ## Problem
 
 Session 历史是持久 journal 接口，工具卡片属于 Client 展示。在 `page`／`follow` 中计算卡片 view 会让历史读取依赖 Tools registry、Agent preset、恢复后的 scope、presenter 执行和临时 UI 类型。

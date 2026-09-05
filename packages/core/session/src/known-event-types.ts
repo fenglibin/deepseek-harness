@@ -17,7 +17,7 @@
  * compatibility mechanism; event-name registration was rejected because
  * it does not classify omission safety and would make reads
  * composition-dependent. The rationale is in
- * `.agents/notes/implemented/architecture/2026-08-30-retain-ignorable-external-session-events.md`.
+ * `.agents/notes/implemented/architecture/2026-08-30-retain-ignorable-external-session-events.zh.md`.
  */
 export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'agent-preset/selected',

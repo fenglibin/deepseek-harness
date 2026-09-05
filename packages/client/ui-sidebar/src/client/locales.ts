@@ -10,11 +10,3 @@ export const zh = {
 
 /** The sidebar namespace key union. */
 export type SidebarKey = keyof typeof zh
-
-/** English dictionary, checked complete against the zh key set. */
-export const en = {
-  'session.new': 'New Session',
-  'session.new.label': 'New session',
-  'toggle.open': 'Open sidebar',
-  'toggle.collapse': 'Collapse sidebar',
-} satisfies Record<SidebarKey, string>

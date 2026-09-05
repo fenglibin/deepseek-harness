@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-owned-run-finish-reason.md) | 中文
-
 ## 问题
 
 Python SDK 消费方需要简洁地判断自有活动区间如何进入 idle。要求每个消费方扫描原始 `turn/end` 事件会重复协议知识，而通用的成功状态会丢失 token 上限与模型错误之间的区别。

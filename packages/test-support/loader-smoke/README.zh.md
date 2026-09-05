@@ -5,8 +5,6 @@ kind: "package-library"
 
 # @deepseek-ai/dsh-loader-smoke
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-loader-smoke` 在隔离的临时目录中通过 Cordis Loader 运行真实的应用可执行文件及其 `cordis.yml`，捕获 stdout 与 stderr，使冒烟测试检验真实的组合路径——插件加载、服务接线与 agent loop（智能体循环）——而非手工搭建的测试上下文。`runFixtureTurn` 让一项任务通过组合中的唯一根 agent（智能体），并返回最终 assistant 文本与累计 token 用量。本包还为包内子进程 harness 提供共享的模式感知启动解析器（`src` 模式经 tsx，零构建开发路径；`lib` 模式经普通 Node 运行已构建产物，供 CI 使用）。它是支持层测试基础设施，而非产品 API。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-24-route-priced-image-request-pressure.md) | 中文
-
 ## Problem
 
 token 计量服务把 `ImageBlock` 按其持久引用的 JSON 结构计价，约四十个 token，而一张 DeepSeek 请求图片最多消耗 384 个视觉 token，因此图片密集的会话可能携带数十万个未计入估算的 token。provider usage 只锚定已完成的请求：首次多模态请求、锚点之后新增的图片、offload 集合的变化，都会让自动 compaction 拿到数量级错误的压力值，触发得过晚（上下文溢出）或在路由切换后过早。[版本一简化](../simplification/2026-07-29-simplify-web-image-input-v1.zh.md)曾有意否决 provider-neutral 的 tile 公式，把视觉定价推迟到 provider-aware 估算器出现具体消费方之时。

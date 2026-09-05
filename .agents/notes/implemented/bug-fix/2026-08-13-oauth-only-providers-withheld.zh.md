@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-13-oauth-only-providers-withheld.md) | 中文
-
 ## 问题
 
 模型设置页把 `openai-codex` 当作普通 pi-ai 路由提供出来，配的还是每个 pi-ai 提供方共用的那句占位文案：填入 API 密钥，或留空使用环境认证。照此配置后发送消息，本轮以 `Provider is not configured: openai-codex` 失败，并被适配器归入兜底的 `PI_AI_ERROR`。

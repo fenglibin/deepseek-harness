@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-jobs-local
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-jobs-local` 在 harness 进程内运行后台任务：工作会在 agent 继续推进的同时保持运行，拥有它的 agent 可以读取、等待、列出和取消它；同时挂载 `dsh-tool-jobs` 时，完成以会话内通知送达。它用内存记录实现 `dsh-jobs` 约定，并且只交出全新快照，从不交出实时状态。按所有者的并发上限（默认 10）约束一个 agent 同时处于运行或停止中的任务数量；任务会随 harness 进程终止而消失，无法跨重启持久。

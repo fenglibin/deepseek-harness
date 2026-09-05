@@ -17,7 +17,7 @@
  * catalog.
  *
  * Agent Note:
- * - .agents/notes/implemented/simplification/2026-07-22-plan-specific-collaboration-state.md
+ * - .agents/notes/implemented/simplification/2026-07-22-plan-specific-collaboration-state.zh.md
  *
  * @module @deepseek-ai/dsh-plan-mode
  */

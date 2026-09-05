@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-28-sdk-max-output-tokens.md) | 中文
-
 ## 问题
 
 Python 与 TypeScript SDK 可以选择提供方和模型，却无法限制对话模型输出。即使评测宿主要求固定输出预算，运行时仍会省略 `GenerateOptions.maxTokens`，由提供方默认值控制。`compaction-basic.maxTokens` 只限制压缩摘要调用，不能承担这一职责。

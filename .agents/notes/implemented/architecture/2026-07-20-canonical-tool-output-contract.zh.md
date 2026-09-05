@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-20-canonical-tool-output-contract.md) | 中文
-
 ## 问题
 
 工具主体过去直接编写面向模型的 `ContentBlock[]`，并可选择将其与不透明的 `meta` 包装在一起。因此，Native 模式的 Function Calling（函数调用）虽然拥有可供人阅读的投影，但程序化调用方没有稳定的领域值：PTC mode 会将内容块重新展平为字符串，动态工具会重复定义内容形态，策略也可以替换展示内容，却无法区分这项变更究竟是替换展示，还是替换操作结果。多个能力 seam 已经返回了信息更丰富的提供方值，却又在面向模型的工具边界丢弃这些值。

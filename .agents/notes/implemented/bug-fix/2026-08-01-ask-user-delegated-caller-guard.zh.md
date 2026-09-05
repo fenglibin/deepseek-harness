@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-01-ask-user-delegated-caller-guard.md) | 中文
-
 ## 问题
 
 一次性 subagent 调用 `ask_user_question` 时可能无限阻塞。该调用会等待人类回答，但子级没有由自身独立拥有的人类交互通道，因此子级无法完成，等待其完成的父级也会随之停滞。

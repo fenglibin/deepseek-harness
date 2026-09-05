@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-mcp-client
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-mcp-client` 把外部 MCP（Model Context Protocol）服务器挂载到 harness 上，让它们的工具像原生工具一样可用。每台服务器一条配置项，模型就能调用该服务器的工具——文件系统、GitHub、数据库或记忆服务器——名称稳定，例如 `mcp__github__create_issue`。当模型需要使用外部工具服务器时添加它；默认不启用任何服务器，因此由你开启。主要成本是这些工具定义给每次请求增加的 token，而且缓慢或崩溃的服务器可能延迟启动，或在恢复前让它的工具一直调用失败。只桥接工具能力：MCP resources 与 prompts 不受支持。

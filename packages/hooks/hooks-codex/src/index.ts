@@ -5,7 +5,7 @@
  * or command substitution, and no pre-tool approval or rewrite path; only
  * blocking decisions are honored. Shared execution and parsing live in
  * `dsh-hook-protocol`; see the
- * [hook-bridges Agent Note](../../../../.agents/notes/implemented/feature/2026-06-30-hook-bridges.md).
+ * [hook-bridges Agent Note](../../../../.agents/notes/implemented/feature/2026-06-30-hook-bridges.zh.md).
  * @module @deepseek-ai/dsh-hooks-codex
  */
 
@@ -101,7 +101,7 @@ export function apply(ctx: Context, config: Config): void {
 
   // SessionStart is the one emit-shaped (detached) point Codex has: track its
   // run chains so disposal aborts a still-running hook process and drains the
-  // continuation (docs/defensive-patterns.md: dispose must reach quiescence).
+  // continuation (docs/defensive-patterns.zh.md: dispose must reach quiescence).
   const detached = createDetachedRuns()
   ctx.effect(() => () => detached.drain(), 'hooks-codex: drain detached hook runs')
 

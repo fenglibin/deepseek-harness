@@ -1,7 +1,5 @@
 # 交付纪律自动触发方案
 
-[English](delivery-discipline-auto-trigger-rationale.md) | 中文
-
 > 状态：提案，待用户确认（尚未写任何代码）
 > 目标读者：维护者
 > 关联：[交付纪律方案](delivery-discipline-rationale.zh.md)，其 B1–B5 批次已交付任务域、阶段状态机、产物持久化、后置命令与客户端 UI。本文档补齐这些批次留下的唯一缺口：没有任何东西自动启动这套纪律。

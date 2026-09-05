@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-19-deepseek-reasoning-passback-every-turn.md) | 中文
-
 ## Problem
 
 `dsh-llm-deepseek` 只在同时携带工具调用的 assistant 轮次上，才把 `reasoning_content` 回放进历史。DeepSeek 思考模式文档在这类轮次上要求该字段，在其他轮次上会忽略它，因此在普通轮次上不回传能省下输入 token，对 `api.deepseek.com` 而言没有任何可观测的损失。

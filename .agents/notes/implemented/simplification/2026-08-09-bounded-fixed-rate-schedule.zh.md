@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-09-bounded-fixed-rate-schedule.md) | 中文
-
 ## 问题
 
 用户需要简单的重复提醒，但[持久、仅限 Session 内的提醒](../feature/2026-08-05-durable-web-schedule.zh.md)最初采用的周期层把固定间隔和日历表达式当成一个通用子系统。它增加了 Cron 语言与求值器、时区敏感的发生时点搜索、tzdata 回放规则、跨记录的 300 秒准入门控、持久化的门控证据、延迟交付字段，以及门控耗尽状态。即使所请求的行为只是“每 N 秒重复一次”，这些机制仍会扩大持久协议与 live owner。

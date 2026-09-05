@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-host-backed-web-preferences.md) | 中文
-
 ## 问题
 
 Web 的 Appearance、Language 和繁忙态 Enter 偏好原本存在浏览器 `localStorage` 中。浏览器存储以 origin 为作用域，因此换一个端口重新打开 `dsh web` 会选中另一个存储分区并丢失选择，即使两个进程使用同一个 DSH home。这些是用户级产品偏好；会话选择、草稿、折叠展开状态和其他瞬态浏览器状态仍保留在页面内。

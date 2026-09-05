@@ -15,16 +15,3 @@ export const zh = {
 
 /** The settings.theme namespace key union. */
 export type ThemeKey = keyof typeof zh
-
-/** English dictionary, checked complete against the zh key set. */
-export const en = {
-  'appearance.title': 'Appearance',
-  'appearance.light': 'Light',
-  'appearance.dark': 'Dark',
-  'appearance.system': 'System',
-  'fontSize.title': 'Font size',
-  'fontSize.description': 'Only affects conversation content',
-  'fontSize.unit': 'px',
-  'fontSize.increase': 'Increase font size',
-  'fontSize.decrease': 'Decrease font size',
-} satisfies Record<ThemeKey, string>

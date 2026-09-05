@@ -5,8 +5,6 @@ kind: "package-group"
 
 # code-runtime/——代码执行能力族
 
-[English](README.md) | 中文
-
 ## 概述
 
 `code-runtime/` 组提供程序执行能力：模型编写一个程序，把宿主提供的函数当作普通异步调用，运行时在隔离环境中执行它，只返回程序打印和返回的内容。一个包定义共享能力（`ctx.codeRuntime`），第二个包在全新的 Node Worker 线程中执行 TypeScript 程序，第三个包持有 Node host 与 CPython 子进程之间的 fd-3 协议格式（wire protocol），为 Python 后端服务。每次运行彼此独立——程序之间不保留任何状态——失败也会作为结果的一部分返回，调用方因此能知道程序为何失败，并把它反馈给模型。

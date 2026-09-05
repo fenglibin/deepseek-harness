@@ -31,7 +31,7 @@ import { ModelListEditor } from './ModelListEditor.tsx'
 import type { ModelDraft } from './ModelListEditor.tsx'
 import { deriveKeyRef } from './store.ts'
 import type { ModelsOperations } from './operations.ts'
-import type { en } from './locales.ts'
+import type { zh } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
 /** The settings namespace a hand-declared provider is written into. */
@@ -62,7 +62,7 @@ export interface CustomProviderCardProps {
   /** The Host operations this card writes and interrogates through. */
   operations: ModelsOperations
   /** Section copy. */
-  t: (key: keyof typeof en) => string
+  t: (key: keyof typeof zh) => string
   /** Disable writes (read-only settings provider). */
   readOnly: boolean
   /**

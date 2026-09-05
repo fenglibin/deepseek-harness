@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-09-explicit-schedule-time-zone.md) | 中文
-
 ## 问题
 
 隐式本地 `at` 输入把浏览器事实变成了共享产品状态。在 Session 创建时捕获默认时区，需要增加新的 Session header、create／resume／fork 冲突规则、JSONL metadata、SQLite migration、client 创建 plumbing、Host 比较，以及与 time-context 标记耦合的 Schedule 逻辑。随后，旅行、并发 tab、缺失 provenance 和旧 Session 都需要一套确认协议，仅仅为了判断省略字段是否安全。

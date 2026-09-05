@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-python-publication-workflow.md) | 中文
-
 ## 问题
 
 Python SDK 由一个平台无关的客户端 wheel 包和四个原生运行时 wheel 包组成，它们必须使用同一版本，并作为一组可安装。public PyPI 上传会立即公开包元数据和文件，无法替换已上传的同名文件；如果精确版本的运行时依赖尚未到达，还会产生暂时不可用的 SDK。私有仓库需要在不向外发布任何产物的情况下，执行完整的原生构建与验证流程。

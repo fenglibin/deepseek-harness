@@ -21,7 +21,7 @@ import {
   PermissionRow, type PermissionRowInjected,
 } from '../src/client/PermissionRow.tsx'
 import { apply, inject } from '../src/client/index.ts'
-import { accessEn, accessZh } from '../src/client/locales.ts'
+import { accessZh } from '../src/client/locales.ts'
 
 const sid = (k: string): SessionId => k as SessionId
 
@@ -38,7 +38,6 @@ async function bench() {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry)
   const locale = new LocaleRuntime(ctx)
-  locale.setLocale('en')
   ctx.provide('locale', locale)
   const settingsRemote = scriptedSettingsRemote()
   const remote = new TestRemote(ctx, { settings: settingsRemote.settings })
@@ -117,19 +116,10 @@ describe('ui-permission browser plugin', () => {
     const again = await c.ui.options(proj, new AbortController().signal)
     expect(again.find(option => option.id === 'workspace-write')?.active).toBe(true)
     expect(again.find(option => option.id === 'read-only')?.detail).toBe('Reads only.')
-    // English built-ins use product labels; other kebab-case names title-case.
-    expect(again.map(option => option.label)).toEqual(['Read Only', 'Workspace Write', 'Full access'])
+    // Built-in product labels render in the shipped Chinese locale; other
+    // kebab-case names title-case.
+    expect(again.map(option => option.label)).toEqual(['仅可查看', '可写入工作区', '完全权限'])
     expect(again.find(option => option.id === 'danger-full-access')?.confirmation).toEqual({
-      title: 'Enable Full access?',
-      description: accessEn['confirm.description'],
-      acknowledgeLabel: 'I understand the risks and want to continue',
-      cancelLabel: 'Cancel',
-      confirmLabel: 'Enable Full access',
-    })
-    b.locale.setLocale('zh')
-    const localized = await c.ui.options(proj, new AbortController().signal)
-    expect(localized.map(option => option.label)).toEqual(['仅可查看', '可写入工作区', '完全权限'])
-    expect(localized.find(option => option.id === 'danger-full-access')?.confirmation).toEqual({
       title: '确认启用完全权限？',
       description: accessZh['confirm.description'],
       acknowledgeLabel: '我已了解风险，并愿意继续',

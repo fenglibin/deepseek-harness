@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-06-11-architectural-conformance.md) | 中文
-
 ## 问题
 
 目前有两项架构保证仅存在于行文中：（1）没有任何组件依赖具体的 agent loop（智能体循环）包（[微内核承诺](../../implemented/architecture/2026-06-11-microkernel-event-taxonomy.zh.md)）；（2）每个 LlmAdapter 都正确遵循分片协议。二者都应由机制强制执行（[质量门禁原则](../../implemented/process/2026-06-11-quality-gates.zh.md)）。

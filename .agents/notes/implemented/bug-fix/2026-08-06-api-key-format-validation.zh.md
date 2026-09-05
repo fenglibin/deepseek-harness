@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-api-key-format-validation.md) | 中文
-
 ## 问题
 
 一个含有 HTTP header value 无法承载的字符的 API Key，曾被每个配置入口接受，直到构造请求时才失败——离引发它的那个字段已经很远。

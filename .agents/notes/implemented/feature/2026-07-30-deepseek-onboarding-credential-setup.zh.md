@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-deepseek-onboarding-credential-setup.md) | 中文
-
 ## 问题
 
 [web 配置平面](../architecture/2026-07-30-web-config-plane.zh.md)让提供方设置与凭据可以实时编辑，但首次使用的用户仍会进入空白对话 Hero；当随产品提供的 `deepseek-official` 路由缺少凭据时，界面没有给出可采取操作的说明。Models 页能修复该状态，但要求用户自行发现这个入口会削弱首次使用引导。界面不得混淆凭据缺失与适配器缺失：浏览器可以为现有凭据引用存入值，但无法动态挂载 `llm-deepseek` Cordis 插件。

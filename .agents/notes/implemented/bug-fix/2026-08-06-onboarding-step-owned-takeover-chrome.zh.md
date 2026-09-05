@@ -2,8 +2,6 @@
 
 状态：已实现
 
-[English](2026-08-06-onboarding-step-owned-takeover-chrome.md) | 中文
-
 ## 问题
 
 设置外壳在 `settings.onboarding` 有已注册且本地未完成的步骤时，就立即挂出首次使用引导的接管界面框架——portal 到 body 的浮层，带不透明的 `--dsw-alias-bg-layer-1` 展示层、模糊遮罩，并把 `#root` 置为 `inert`。而每个步骤都要先加载私有事实才能判定自己是否需要出场（WelcomeNotice：经其设置 join 读取确认位；DeepSeekOnboardingDialog：经 Models join 读取凭据就绪状态），判定期间渲染 `null`。渲染 `null` 无法抑制界面框架，因为不透明展示层是外壳画在 slot outlet 外面的，不属于步骤。

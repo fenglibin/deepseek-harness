@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-28-cross-workspace-resume.md) | 中文
-
 ## Problem
 
 `/resume` 只能触达在启动目录中创建的会话，因此要回到昨天在另一个项目里的工作，就得记住它的路径、退出 TUI、再到那里重新启动。造成这一限制的原因有两个，彼此独立，只修其中一个都不会有任何变化。

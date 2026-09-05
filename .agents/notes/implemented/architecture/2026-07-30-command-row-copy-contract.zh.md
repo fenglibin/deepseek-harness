@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-command-row-copy-contract.md) | 中文
-
 ## 问题
 
 Web 命令条目由一对落库的[命令生命周期事件](../../proposed/architecture/2026-07-27-session-projection-and-command-log.zh.md)渲染出 `标题 · 摘要`：标题是由 `command/run` 重建的分派命令行（`/permission workspace-write`），摘要是 `command/done` 的原样 `text`（`Permission preset: workspace-write.`）。两半各自成文、互不知情，于是一行里命令名出现两次、参数也出现两次——最糟的一例正是用户每次用 Access chip 切换权限时得到的那一行。

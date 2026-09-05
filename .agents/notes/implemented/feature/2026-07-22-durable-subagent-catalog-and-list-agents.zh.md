@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-22-durable-subagent-catalog-and-list-agents.md) | 中文
-
 ## 问题
 
 可继续的后台 subagent 会公开稳定的 child id，并将重建数据持久化在该 child 的会话中，因此 `send_message` 无需任何列表查询操作即可恢复已知 child。发现功能有两类需求不同的消费方：UI 可以同时展示一次性工作和可继续对话，而模型只应收到适合使用 `send_message` 的 child。[可继续 subagent](../../implemented/feature/2026-07-28-continuable-subagent-conversations.zh.md)负责持久化 Session 与 Activation 设计；本记录负责共享的持久化清单及面向模型的投影。

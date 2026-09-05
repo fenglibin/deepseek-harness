@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-23-webworker-vfs-watch-and-landlock.md) | 中文
-
 ## Problem
 
 Web Worker preview 启动与 Node host 相同的 Web profile 和 Agent preset。缺少 VFS 变更源时，拒绝 `node:fs.watchFile` 会让 `skill-filesystem` 返回不完整观测并在每次查询时重新扫描，而无事件的成功调用会让已有根永远等待 Chokidar 的 `ready`。Settings 和 credentials 同样需要真实的外部编辑事件，而不是包专用 fake。

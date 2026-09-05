@@ -2,8 +2,6 @@
 
 状态：已实现
 
-[English](2026-09-03-tool-output-and-thinking-read-body-font-size.md) | 中文
-
 ## 问题
 
 设置 → 通用设置 → 字号大小给出的只有一个数字，而读者都会把它理解成「会话的字号」。有两处内容没有跟随它。

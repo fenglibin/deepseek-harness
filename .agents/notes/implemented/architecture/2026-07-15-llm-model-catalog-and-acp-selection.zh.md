@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-15-llm-model-catalog-and-acp-selection.md) | 中文
-
 > Catalog 和 scoped selection 决策仍然有效。ACP selection 的暂时移除已由[标准 ACP v1 自动化控制](../feature/2026-08-22-standard-acp-automation-controls.zh.md)取代；后者通过标准会话配置公开 catalog，但不会恢复 UI 投影。
 
 ## 问题

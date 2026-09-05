@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-19-zstandard-jsonl-session-logs.md) | 中文
-
 ## 问题
 
 JSONL 持久化后端会逐字保留每个 `SessionEvent`，其中包括数量庞大的 `assistant/chunk` 记录。原始文本便于检查，但重复的 JSON 键和模型文本会增加存储与 I/O 开销。压缩编码必须保留既有的 append/fsync 提交边界、首次物化时的无冲突发布、崩溃修复以及仅元数据列举；如果每轮都重写整个压缩文件，就会失去这些属性。

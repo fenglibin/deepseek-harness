@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-21-serial-cross-platform-ci-reference.md) | 中文
-
 ## 问题
 
 拉取请求工作流将必需检查合并到专用的 Linux 和 Windows 作业中。这些作业仍不应成为唯一的完整性判定基准：如果其门禁清单或依赖图存在缺陷，即使必需聚合结果保持绿灯，也可能漏掉部分工作。

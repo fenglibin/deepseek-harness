@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-sandbox
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-sandbox` 将同世界子进程限制在文件效果策略之下：命令以 `read-only` 运行、只能写入会话工作区（`workspace-write`）或不受限制地运行（`danger-full-access`），每次受限执行都遵循一份逐调用策略。bash 与 pwsh 执行器直接消费它，因此命令及其派生的所有进程都在限制下运行，消费方无需知道背后是哪个平台 runner。无法强制执行所请求的模式时，调用以 `SANDBOX_UNAVAILABLE` 错误快速失败，绝不会不受限制地运行。被拒绝的调用可以请求一个由人类批准一次、严格更宽的模式。隔离仅限同世界——后端与宿主共享内核和文件系统，容器、microVM 与远程执行器会替换整个能力。

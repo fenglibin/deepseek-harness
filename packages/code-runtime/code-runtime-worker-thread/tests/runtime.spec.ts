@@ -6,7 +6,7 @@ import type { CodeBindingFunction, CodeBindingNamespace, CodeRunResult } from '@
 
 /**
  * Integration suite over REAL worker threads (no mocks — workers are cheap
- * and local, per docs/testing.md's real-over-mock policy). Each test builds
+ * and local, per docs/testing.zh.md's real-over-mock policy). Each test builds
  * a fresh context so budgets can be tuned per case.
  */
 async function setup(config: Config = {}) {

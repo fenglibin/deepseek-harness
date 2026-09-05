@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-23-locale-owned-client-ui-copy.md) | 中文
-
 ## Problem
 
 typed locale namespace 与双语字典对等性可以证明已注册字典完整，却无法证明展示代码使用了字典。JSX 文本、无障碍属性、格式化函数返回值和 zero-Cordis 原子组件默认值都可能绕过 `t`，而全部 locale 检查仍保持绿色。[最初的全量接入决策](2026-07-30-client-locale-full-rollout.zh.md)中缓做或假定为语言无关的例外逐渐形成混合语言 UI，trajectory 检查面和通用工具卡尤为明显。

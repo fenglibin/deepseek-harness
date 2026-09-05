@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-19-fresh-agent-ralph-workflow-tool.md) | 中文
-
 ## 问题
 
 同会话目标会保留对话，让一个 agent（智能体）持续完成持久目标；通用工作流工具则让模型编写扇出编排脚本。两者都不是 Ralph 模式：把同一目标反复交给全新的工作者，以共享工作区作为长期记忆，并且在各 Round 之间只传递一份小型显式交接，直到工作完成或触及限制。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-current-sandbox-policy-context.md) | 中文
-
 ## 问题
 
 沙箱策略已经强制执行并记录每个会话的文件操作模式，但新的模型请求并不包含这一状态。在 `read-only` 下的 Web 会话中，write 与 edit schema 仍然可见，因此模型会声称自己能够写入，直到一次被拒绝的调用后才发现事实并非如此。执行 `/permission danger-full-access` 后，下一个请求带有批准策略变更，却仍省略沙箱模式。因此，即使用户在任何操作前询问能力，拒绝结果也是模型可见的首个策略来源。

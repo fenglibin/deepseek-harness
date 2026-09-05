@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-web-search-exa
 
-[English](README.md) | 中文
-
 ## 概述
 
 有了 `dsh-web-search-exa`，harness 可以通过 Exa 搜索 web，获得带可移植 snippet 与发布日期的厂商原生结果。当部署持有 Exa API 密钥、并希望使用 Exa 的关键词或神经搜索时选择它。Exa 不返回生成答案，因此结果不携带 `content`——只产出可引用的来源。没有非空白高亮的来源会被丢弃，因此一次调用返回的来源可能少于请求数量。面向模型的 `web_search` 工具位于 `dsh-tool-web`。

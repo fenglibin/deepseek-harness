@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-08-automatic-translation-pairing-merges.md) | 中文
-
 ## 问题
 
 一份双语一致性记录包含两侧 Markdown 文件的精确 blob hash。因此，当两个分支分别更新同一已确认配对的不同部分时，即使 Git 能干净合并两侧 Markdown 文件，记录中的两行 hash 仍会发生冲突。选择任一侧都会留下陈旧 hash；手工重新生成记录则会重复执行一项确定性操作，并阻止本可自动完成的合并。

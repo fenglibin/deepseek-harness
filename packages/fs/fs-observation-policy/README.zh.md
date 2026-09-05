@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-fs-observation-policy
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-fs-observation-policy` 在 `ctx.fs` 文件系统约定（[`dsh-fs`](../fs/README.zh.md)）之上添加编辑前读取策略：它记录调用会话观察过哪些文件，并用该记录防护每一次写入与编辑——未见文件只能被创建，已观察文件只能在最后看到的版本上被替换，编辑则要求先读取。它只通过 `fs/*` 事件参与，因此不注册任何服务，也没有公开方法；移除它只会让工具回到裸提供方的无条件变更行为，而不会破坏工具。把它与后端（`fs-local`、`fs-sandbox`）和工具（`tool-fs`）一起加载，会让模型在读取文件之前无法成功编辑文件，并收到清晰的恢复提示。需要 agent（智能体）先读后改的部署请选择它。

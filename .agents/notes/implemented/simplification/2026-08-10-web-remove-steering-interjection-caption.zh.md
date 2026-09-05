@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-web-remove-steering-interjection-caption.md) | 中文
-
 ## 问题
 
 [上下文来源与 steer 标识决策](../feature/2026-08-04-web-context-source-and-steer-marks.zh.md)给每个持久与待处理的 steering 气泡加上了 `插话` / `Interjection` 标注，让 transcript（文本记录）能说明哪条右对齐气泡打断了正在运行的轮次。这个标注重复了消息流已经呈现的事实：steering 气泡位于轮次中途、夹在被它打断的助手内容之间，而开轮提示位于轮次边界。在每个 steer 气泡上方常驻一行三级文字，并没有让一个能看到位置的读者多读出任何信息，而且它是所有用户样式气泡中唯一带装饰的，还破坏了原本统一的右对齐节奏。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-29-oxlint-linter.md) | 中文
-
 ## 问题
 
 仓库的自有源码需要类型感知的 TypeScript 正确性规则、一致的格式，以及文件内重复逻辑检查。ESLint 通过 JavaScript 解析器、项目服务和多个插件提供这些检查，但在本地迁移基线上，一次无问题的 lint 运行约需 1 分钟，并且需要 8 GiB Node 堆、CI 结果缓存和单独调优的 ESLint 并发度。

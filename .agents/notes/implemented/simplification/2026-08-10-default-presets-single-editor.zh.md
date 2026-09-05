@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-default-presets-single-editor.md) | 中文
-
 ## 问题
 
 `standard`、`code` 和 `cordis` preset 同时提供 `read`/`write`/`edit` 文件系统工具与 `str_replace_editor`。两套接口在常规文件查看和编辑上重叠，导致每次请求都携带额外的工具 schema，却没有增加独立的默认能力。`minimal` preset 具有不同的组合约定：它固定的双工具清单有意在持久 `bash` 之外提供 `str_replace_editor`。

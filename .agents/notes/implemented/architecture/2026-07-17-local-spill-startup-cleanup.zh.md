@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-17-local-spill-startup-cleanup.md) | 中文
-
 ## 问题
 
 本地 spill 后端从不删除它写下的完整工具结果。每个超限结果都会新增一个文件，因此配置的根目录会无限增长，而每进程默认的 `dsh-spill-*` 根目录也会跨多次运行不断累积。立即删除是错误的，因为已持久化、已恢复和已 fork 的会话仍可能引用某个 locator。[工具输出 spill 策略](./2026-07-08-tool-output-spill-files.zh.md)需要一个有界的本地存储生命周期。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-05-image-understanding-at-admission.md) | 中文
-
 ## 问题
 
 当所选模型路由声明只接受文本输入时，每张图片都会被替换成 `[image omitted because this model accepts text only; attachment sha256:…]`，因此用户提交的截图、版面或表格对模型完全不可见，唯一的补救办法只有换模型。生成替身文字有两个候选落点，但循环和投影层都无法承担：`agent/pre-step` 在 `agent/request` 瀑布解析出真实路由之前就执行，而 `projectImagesForTextModel` 是作用在消息数组上的纯函数，无法调用模型。

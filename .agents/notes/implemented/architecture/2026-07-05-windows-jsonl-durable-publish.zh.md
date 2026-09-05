@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-05-windows-jsonl-durable-publish.md) | 中文
-
 ## 问题
 
 `dsh-session-persistence-jsonl` 在首次追加时延迟发布会话日志。POSIX 协议会写入临时文件，对其执行 fsync，将其链接至最终名称，对父目录执行 fsync，然后移除临时链接。对父目录执行 fsync 是持久性约定的一部分：命名空间变更后发生崩溃时，已经提交的最终名称不能丢失，否则调用方会误以为会话日志已经物化。

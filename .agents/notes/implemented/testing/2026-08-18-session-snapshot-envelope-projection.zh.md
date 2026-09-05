@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-18-session-snapshot-envelope-projection.md) | 中文
-
 ## 问题
 
 签入仓库的会话快照曾复制每一条正文记录的持久化 envelope。普通行的单调 `seq` 与墙钟 `time`，以及打包行的 `seq0` 与 `time0`，会让一次局部事件插入重新编号或计时后面的大段内容，即使其 payload 完全没有变化。这些字段是运行时持久日志所必需的，但在快照中反复出现会让评审 diff 主要描述存储机制，而不是行为变化。

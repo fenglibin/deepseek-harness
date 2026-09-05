@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-18-markdown-cross-link-lint.md) | 中文
-
 ## 问题
 
 本仓库的文档通过相对路径互相链接：`[topic](../implemented/2026-…-….md)`、`[the cookbook](adding-a-tool.md)`、`[architecture.md](../../architecture.md)`。此前没有任何机制验证这些目标是否存在。重命名或移动文件会静默破坏所有指向它的链接，且在读者点击之前不可见。[doc-sync（文档同步门禁）强制执行](../../archived/process/2026-06-11-doc-sync-enforcement.md)已经将两类文档漂移的检查自动化（无法编译的代码块、陈旧的事件分类体系表），[verify-md-wrap](../../archived/process/2026-06-11-doc-sync-enforcement.md) 覆盖了第三类（硬换行的段落），但死链是第四类同样可机械检查、却仍靠肉眼验证的问题。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-token-surface-unpriced-replace-compatibility.md) | 中文
-
 ## 问题
 
 `contextPressure` 与 `contextBreakdown` 两个投影只维护一份滚动累计的表层 token 总量，外加至多一条待结算的影子价格（shadow price）声明，因此其持久化检查点在会话整个生命周期内保持 O(1)。当前的替换生产方会紧贴在替换之前追加一条 `compaction/summary` 或 `compaction/prune` 计量事件；其 `shadowedTokenCount` 对被替换区间精确计价，`foldSurfaceProjection` 再把它换算成有符号增量。

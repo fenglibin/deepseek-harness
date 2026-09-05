@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-11-runtime-arg-validation.md) | 中文
-
 ## 问题
 
 `defineTool`（[统一 schema DSL](2026-07-20-unified-json-value-schema-dsl.zh.md)）为工具作者的 `execute(args)` 提供了经 `InferArgs<S>` 映射的类型化参数。但该类型只是对运行时值的编译期声明，而这个值实际上是模型生成的 JSON：没有任何机制强制模型遵守 schema，因此畸形调用（缺少必需键、声明为数字的位置传入字符串，或字面量超出声明的集合）会以「仅在名义上类型化」的状态到达 `execute`。工具函数体随后要么在处理结构错误的数据时崩溃，要么在不报错的情况下行为异常。

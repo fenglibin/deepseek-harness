@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-drop-user-message-edit-stub.md) | 中文
-
 ## 问题
 
 user 气泡的 IconActions 行在复制和分支旁边还有一个编辑按钮，但其背后什么都没有：该控件没有点击处理、没有 client 侧变更，也没有 host 侧重新发送已编辑消息的操作。用户找到它时，看到的是一个产品无法兑现的可供性。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-continuable-child-report-obligation.md) | 中文
-
 ## 问题
 
 可继续后台 child 拥有自己的 Session，因此它写在那里的任何内容都不会到达启动它的 agent。[report 工具](2026-07-30-continuable-subagent-report-tool.zh.md)为该 child 提供了一条返回通道，却把它呈现为若干选项之一：schema 里写着「可调用零次或多次」，child 的提示词中没有任何地方要求它调用该工具，而已采纳的默认调度（`quiet`）会把报告加入已停驻 parent 的下一次请求，却不唤醒它。

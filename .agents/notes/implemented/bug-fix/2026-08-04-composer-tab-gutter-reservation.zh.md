@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-04-composer-tab-gutter-reservation.md) | 中文
-
 ## 问题
 
 composer 座位在组件树中只有一个节点、一个位置，但它究竟对齐到哪条边，取决于当前展示的是哪个视图标签页。

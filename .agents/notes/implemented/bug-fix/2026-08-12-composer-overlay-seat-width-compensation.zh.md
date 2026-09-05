@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-12-composer-overlay-seat-width-compensation.md) | 中文
-
 ## 问题
 
 [composer 标签页滚动条槽预留](2026-08-04-composer-tab-gutter-reservation.zh.md) 让会话列滚动容器无条件预留一条滚动条槽，使 composer 座位在 Chat 与带 composer 覆盖的视图中测得相同宽度。代价由每个覆盖视图承担：视图内容列比列右边缘窄 8px，因为滚动容器为一条它从不绘制的滚动条预留了槽——trajectory 台账由视图内部自己的滚动容器滚动，外层盒子从不滚动。

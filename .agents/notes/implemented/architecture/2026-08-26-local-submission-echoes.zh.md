@@ -2,8 +2,6 @@
 
 状态：implemented
 
-[English](2026-08-26-local-submission-echoes.md) | 中文
-
 ## 问题
 
 多图 prompt 在客户端序列化加 host admission 上要花数秒，durable `user/message` 在此之前不存在，会话在此期间什么都不显示：composer 冻结为只读，消息在整条流水线结束后才出现，用户无法判断提交是否已经开始（#3003）。durable event 无法提前，Model-visible ⟺ logged 要求 `user/message` 只能在全部附件持久化后落盘，因此可见的提交必须与 durable 的提交解耦。

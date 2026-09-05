@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-21-documentation-site-tag-release.md) | 中文
-
 ## Problem
 
 本项目对外的每一个面都只在发布 tag 上前进。npm 序列从 `dsh-v*` tag 经人工审阅的手动 dispatch 发布，Python wheel 从 `python-v*` tag 发布，背后有发布仓库校验和两个受保护环境，公开源码仓库也只推进到每个发布 commit。文档网站却在每次触及 `docs/`、`website/`、投影器或锁文件的 master 推送上部署，既没有审阅人也没有版本校验。尽管仓库是私有的，该站点无需认证即可访问，因此一次合并会在几分钟内把文档发布到公网：其中包含描述尚无任何已发布产物承载的工作的页面，以及从领先于读者所能获取的一切的源码树生成的参考资料。

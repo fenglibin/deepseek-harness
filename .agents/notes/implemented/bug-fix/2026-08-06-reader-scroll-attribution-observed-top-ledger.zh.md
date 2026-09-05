@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-reader-scroll-attribution-observed-top-ledger.md) | 中文
-
 ## 问题
 
 ChatView 的贴底跟随此前只把滚轮／触控板手势识别为读者输入：钉在底部（floor）期间，一个没有对应滚轮位移的滚动事件会被视为程序化滚动并被拉回底部。因此触控平移、拖动原生滚动条与键盘翻页都无法离开流式 transcript（文本记录）的底部，在手机上尾部实际上被锁死。这种仅认滚轮的输入来源判定是 [sticky-composer 笔记](2026-07-29-sticky-composer-conversation-scroll.zh.md)中有意的暂缓：该笔记拒绝为「此次窄范围修复」建立通用输入状态机，把其余所有滚动来源都留在模型之外。

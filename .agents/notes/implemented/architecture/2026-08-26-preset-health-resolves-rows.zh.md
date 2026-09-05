@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-26-preset-health-resolves-rows.md) | 中文
-
 ## Problem
 
 名单列为健康的 preset，仍可能根本无法组装。发现过程的健康检查只证明组装能以加载器方言解析、由具名行组成，并刻意止步于此——它不解析任何插件名，也不应用任何配置。

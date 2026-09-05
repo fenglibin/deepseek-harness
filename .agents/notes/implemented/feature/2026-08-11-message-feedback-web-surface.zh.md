@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-message-feedback-web-surface.md) | 中文
-
 ## 问题
 
 [PR #2217](https://github.com/deepseek-harness/deepseek-harness/pull/2217) 交付了持久化的消息反馈 sidecar 及其三个 Host Remote 方法，但它明确只做后端：没有任何客户端包消费 `messageFeedback.list`、`put` 或 `delete`，因此 Web GUI 无法记录评价。它的 Agent Note 把「客户端 Remote aggregate 挂载与 UI」留给了另一个负责人。Issue #1326 要求的正是 Web 界面，却在该后端合并时被关闭，而用户可见的那一半并不存在。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-05-agent-teams.md) | 中文
-
 ## Problem
 
 subagent seam 已提供 fresh／fork provider、持久 child Session、FIFO follow-up 与可冷恢复 Activation。它的直接 parent control 不提供 peer 通讯、稳定具名 roster 或共享任务 owner。coordinator 可以创建多个 worker，但 worker 无法互相寻址；持久 follow-up 意图只存在于 target inbox；也没有公共 compare-and-set 任务板来阻止陈旧 assignment 更新。

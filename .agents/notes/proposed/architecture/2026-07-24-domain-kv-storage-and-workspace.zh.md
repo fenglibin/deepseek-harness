@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-07-24-domain-kv-storage-and-workspace.md) | 中文
-
 ## 问题
 
 host 侧唯一的持久化面是 session 事件日志（`packages/session/session-persistence`：仅追加、一 session 一文件）。凡是"不属于某个 session"的信息就没有落盘处，存在两个已交付需求：

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-29-drill-claim-precedes-the-drill-edit.md) | 中文
-
 ## Problem
 
 在 `@` 菜单里用指针进入目录不产生 breadcrumb,而用键盘进入同一个目录则会产生(#3310)。点击 crumb——breadcrumb 存在的意义所在——不但没有重新列出它所指的那一层,反而让整个 header 消失。指针进入的列表里,每一行还会重复 header 本应承担的父目录。

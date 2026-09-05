@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-15-max-token-replay-state-alignment.md) | 中文
-
 ## 问题
 
 pi-ai 为每个响应记录一个从提供方原生消息投影而来的不透明回放数据，而 `BlockAssembler.blocks()` 会另行从 `max-tokens` 响应中丢弃工具调用，因为被截断的调用不能安全执行。持久化的 assistant 消息因此把变换后的内容与描述未变换原生块清单的元数据存在一起。下一个请求在历史重建阶段以 `INVALID_REPLAY_STATE: block count does not match assistant content` 失败；由于不一致已经落盘，该会话之后的每个请求都以同样方式失败——会话被永久卡死。根因是结构性的：同一响应的两种表示在流水线的不同位置各自拍摄快照，其索引对齐只靠读取时的硬错误来维持。

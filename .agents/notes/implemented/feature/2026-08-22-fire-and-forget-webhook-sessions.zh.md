@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-22-fire-and-forget-webhook-sessions.md) | 中文
-
 ## Problem
 
 外部仓库事件需要启动普通 DSH 工作，同时不能让每个提供方适配器都理解 Agent preset、Workspace 附加、标题、权限与回调 teardown。GitHub pull request 变为 ready for review 是第一个用途：签名事件可以创建一个评审 Session，用户能在仓库 Workspace 下浏览它。

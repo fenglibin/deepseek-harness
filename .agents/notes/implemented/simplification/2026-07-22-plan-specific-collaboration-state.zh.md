@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-22-plan-specific-collaboration-state.md) | 中文
-
 ## 问题
 
 产品只交付了 `plan`，首个 plan mode 实现却引入了通用的具名模式注册表。`ModeConfig.modes`、定义名称校验、`ctx.modes.list()`、已退役定义的回退逻辑，以及测试中合成的 `review` 模式，都只为支持假想中的未来协作模式而存在。plan 引导、`/plan` 和 `exit_plan_mode` 这些生产专用行为仍位于同一个包内，因此通用 API 并未将可复用机制与 plan 策略隔离开来。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-adapter-owned-max-token-defaults.md) | 中文
-
 ## Problem
 
 LLM（大语言模型）适配器可以序列化显式的 `GenerateOptions.maxTokens`，但无法通过 Cordis 配置建立可重建的对话默认值。仅在提供方序列化中应用回退，会导致协议请求与持久 `request/header` 不一致；若将各提供方默认值都放进 agent loop（智能体循环），则会把部署与模型策略转移到提供方无关的驱动器中。

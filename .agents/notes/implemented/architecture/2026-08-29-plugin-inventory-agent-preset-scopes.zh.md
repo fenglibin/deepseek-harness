@@ -2,8 +2,6 @@
 
 状态：已实现
 
-[English](2026-08-29-plugin-inventory-agent-preset-scopes.md) | 中文
-
 ## 问题
 
 [按会话的 agent preset](2026-08-03-per-session-agent-presets.zh.md) 把所有模型侧行移到了 agent 平面，而设置页的插件列表仍只投影 `ctx.loader.entries()`。这个表面因此看不见会话实际运行的插件——直接 plug 的预设子树从不出现在 Loader 条目里——还对其余部分构成误导：web overlay 刻意的 `disabled: true` 墓碑（`tool-bash`、`tool-fs`、`plan-mode`……）渲染成二十多行看似单纯"已停用"的条目，而同名模块在每个标准模式会话里运行。旁边，通用设置还有一个默认预设下拉，与名单分区自己的设为默认动作写同一个 `agent-presets.default` 字段——同一事实两个编辑器，其中一个还看不见它在选择的名单。

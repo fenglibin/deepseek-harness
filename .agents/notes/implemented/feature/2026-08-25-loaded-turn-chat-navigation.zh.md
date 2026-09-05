@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-25-loaded-turn-chat-navigation.md) | 中文
-
 ## 问题
 
 较长的 Chat transcript 需要反复滚动才能回看更早的 Turn。Session 历史采用分页加载，因此浏览器可能只持有会话后缀，首个已加载 Turn 也可能从用户消息之后开始。如果导航暗示自己知道未加载的 Turn，或者按当前数组位置给刻度设置 key，Session Controller 前插上一页 event 后，导航就会产生误导或变得不稳定。

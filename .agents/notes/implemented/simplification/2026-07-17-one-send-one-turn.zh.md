@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-17-one-send-one-turn.md) | 中文
-
 ## 问题
 
 假设调用方连续两次调用 `Agent.send()`，先提交消息 A，再提交消息 B。隐式批处理可能只因为驱动器读取队列时两条消息都在等待，就把 A、B 放进同一个轮次。调用方明明调用了两次，agent loop（智能体循环）却悄悄把它们变成一个工作单元。

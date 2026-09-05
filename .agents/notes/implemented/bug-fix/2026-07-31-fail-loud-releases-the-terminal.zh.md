@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-fail-loud-releases-the-terminal.md) | 中文
-
 ## 问题
 
 配置校验失败的 `dsh` 启动会打印诊断信息，然后把用户丢回一个损坏的 shell：输入不可见，下一条命令还会被残留文本弄乱：

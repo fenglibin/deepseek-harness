@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-26-composer-gesture-editable-gate.md) | 中文
-
 ## 问题
 
 composer 变为 Lexical `contenteditable` `<div>` 后，两个 Playwright 手势语义悄然改变，且都只在 CI 高负载下咬人。输入机在裁决或发送一次提交期间——以及所有 locked 状态下——composer 通过把同一元素的 `contenteditable` 翻成 `"false"` 呈现只读。在该元素上 `fill()` 立即抛错（`Element is not an <input>, <textarea> or [contenteditable] element`）而不再经 actionability 等待；`expect.poll(() => input.isEnabled())` 则是无效护栏：Playwright 的 enablement 检查对 `<div>` 同时无视 `aria-disabled` 与 `contenteditable`，整个只读窗口内一律报 `true`。暴露的竞态只有几帧宽——permission-policy 场景绿了数周，直到 subagent 控制 Remote 化把提交 settle 拉长，CI 才落进窗口。

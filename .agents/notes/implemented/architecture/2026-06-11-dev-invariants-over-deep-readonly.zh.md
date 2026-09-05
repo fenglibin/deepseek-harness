@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-11-dev-invariants-over-deep-readonly.md) | 中文
-
 ## 问题
 
 会话日志需要两种不同的保护：对每条已存储事实的不可变所有权，以及对跨时间和服务约定的事实之间关系的检查。如果将二者混为一个可选的开发插件，生产环境的历史记录将失去保护；如果试图通过 TypeScript readonly 类型同时表达两者，既无法建立运行时边界，也无法描述关系规则。

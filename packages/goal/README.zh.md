@@ -5,8 +5,6 @@ kind: "package-group"
 
 # packages/goal
 
-[English](README.md) | 中文
-
 ## 概述
 
 goal 组为 agent 会话提供一个持久的完成目标，在重启、resume（恢复）与 fork 后依然存在：goal 服务持久保存状态与生命周期，模型工具让 agent 创建和更新 goal，`/goal` 命令让用户无需模型轮次即可直接控制 goal，续行驱动器则把 active 的 goal 变成连续多轮的自动工作。goal 状态保存在会话日志中，组内没有任何独立存储。同一时刻只有一个当前 goal；goal 是状态而非调度器——自动续行是需要你刻意挂载的可选消费方。

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-goal
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-goal` 为每个 agent 会话保留一个持久的完成目标：目标的文本、phase、Round 数量与 revision 历史都保存在会话日志中，因此会话 resume（恢复）、fork 与进程重启后依然存在。你可以 create、edit、pause、resume、complete、block 和 clear 一个 goal，且每次变更都是比较并设置，陈旧的视图不会覆盖更新的状态。goal 带有 Round 上限（默认 256）以约束自动续行，被阻塞的 goal 会保留稳定的策略代码和面向人的说明。它是状态而非调度器：服务不决定工作何时继续，续行权限是进程本地的且绝不持久化。当单个长期目标需要横跨多轮时选择它；常规单轮工作不要使用。

@@ -9,7 +9,7 @@ import { useId } from 'react'
 import type { ReactNode } from 'react'
 import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { LightweightModelState } from './lightweight-model-store.ts'
-import type { en } from './locales.ts'
+import type { zh } from './locales.ts'
 import styles from './LightweightModelCard.module.css'
 
 /** Props of {@link LightweightModelCard}: one card state plus its actions. */
@@ -17,7 +17,7 @@ export interface LightweightModelCardProps {
   /** Current card snapshot. */
   state: LightweightModelState
   /** Models-page copy. */
-  t: (key: keyof typeof en) => string
+  t: (key: keyof typeof zh) => string
   /** Stage one catalog route by its opaque key. */
   onSelect: (key: string) => void
   /** Stage the absence of a route. */

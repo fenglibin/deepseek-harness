@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-ptc-language-dispatch.md) | 中文
-
 ## 问题
 
 PTC mode 只生成一种 SDK 形态：TypeScript。`ToolRuntime` 为 `tools:sdk` 段硬编码了 `renderToolsSdk`，且 `requireCodeRuntime` 会拒绝任何 `ctx.codeRuntime.language !== 'typescript'`。引入 CPython 后端后，程序的源语言不再固定：同一个可见工具注册表在加载 Python 运行时时必须投射出 Python SDK，而面向模型的 `run_code` schema 字符串（"Execute a Python program …"）也必须与 SDK 段的语言一致，模型才不会在 Python 运行时下看到 TypeScript 指令。

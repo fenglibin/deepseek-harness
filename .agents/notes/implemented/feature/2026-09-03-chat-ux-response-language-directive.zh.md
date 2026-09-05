@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-chat-ux-response-language-directive.md) | 中文
-
 ## Problem
 
 用户在「设置 → 通用设置 → 语言」里选了「中文」，Web 界面文案也确实切到了中文，但模型输出仍大量是英文——尤其思考过程基本是英文。之前对语言设置的那次改动「没有起到效果」：界面语言和模型输出语言是两条不同的通道，只有前者在动。

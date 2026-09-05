@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-client-ui-agent-preset
 
-[English](README.md) | 中文
-
 ## 概述
 
 本包提供 Web GUI 的 agent preset 表面：新建会话界面的一枚 chip，选择下一个会话的 preset；会话标题旁的一个只读标签；以及一个设置分区，用于管理名单——复制、删除、默认值，以及通往 preset 自身文件的入口。会话的 preset 在创建时即固定，因此选择作用于此后开启的会话，运行中的会话保持它们开始时的组装；默认 preset 在能看到名单的设置分区里编辑，通用设置不再为同一字段保留重复控件。当部署未组装任何 preset 时，三个表面都不渲染任何内容，每个会话共用宿主组装。

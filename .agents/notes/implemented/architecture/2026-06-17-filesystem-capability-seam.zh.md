@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-17-filesystem-capability-seam.md) | 中文
-
 ## 问题
 
 harness 已有一个具体的 `bash` 能力 seam（`dsh-shell` / `dsh-bash-local` / `dsh-tool-bash`），但文件系统操作当时即将作为面向模型的工具落地，却没有等价的 seam。如果 `read`、`write` 和 `edit` 直接使用 `node:fs`，面向模型的工具包就会同时承担文件系统执行策略、本地路径解析、原子写入行为、文本解码、符号链接行为和编辑语义。

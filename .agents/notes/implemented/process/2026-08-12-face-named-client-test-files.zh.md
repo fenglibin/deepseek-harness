@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-12-face-named-client-test-files.md) | 中文
-
 ## 问题
 
 `packages/client/*/tests/` 同时存放两个编译面的测试。多数覆盖某个 Client 包的浏览器半边，属于 `tsconfig.client.json`；少数覆盖拆分包的 Host 半边——载体的 node 半边 spec——只能在 `tsconfig.host.json` 里类型检查，因为触及 Host 源码的 Host 面 spec 需要那些文件所在的 Host 工程。

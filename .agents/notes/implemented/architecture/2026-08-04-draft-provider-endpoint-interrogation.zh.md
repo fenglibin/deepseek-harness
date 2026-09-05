@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-04-draft-provider-endpoint-interrogation.md) | 中文
-
 ## Problem
 
 当 pi-ai 路由变成[一份声明而非 catalog 查表](2026-08-03-pi-ai-declared-provider-catalog.zh.md)之后，要接入一个 OpenAI 兼容网关的人，必须先知道它的模型 id 才能完成配置。适配器不再把人限制在已安装 catalog 里——这正是那次改动的目的——但也意味着没有任何东西告诉用户该端点究竟服务什么，而这类端点大多在 `GET /models` 上公布了这份列表。

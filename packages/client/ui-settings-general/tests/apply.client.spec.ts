@@ -130,14 +130,11 @@ describe('ui-settings-general apply', () => {
     expect(b.locale.bind('settings')('connection.error')).toBe('连接异常')
     expect(b.locale.bind('settings')('connection.connecting')).toBe('连接中')
     expect(b.locale.bind('settings')('connection.connected')).toBe('连接成功')
-    b.locale.setLocale('en')
-    expect(b.locale.bind('settings')('close')).toBe('Close')
-    expect(b.locale.bind('settings')('connection.reconnect')).toBe('Disconnected, reconnect now')
-    b.locale.setLocale('zh')
+    expect(b.locale.bind('settings')('close')).toBe('关闭')
+    expect(b.locale.bind('settings')('connection.reconnect')).toBe('连接异常，点击立即重连')
     await fiber.dispose()
-    // The (ns, locale) seats are free again — the dictionary disposer ran.
+    // The (ns, locale) seat is free again — the dictionary disposer ran.
     expect(() => b.locale.register('settings', 'zh', {})).not.toThrow()
-    expect(() => b.locale.register('settings', 'en', {})).not.toThrow()
   })
 
   it('the nav label thunk follows the active locale without re-registration', async () => {
@@ -145,15 +142,12 @@ describe('ui-settings-general apply', () => {
     declare(b.slots)
     await b.ctx.plugin({ inject: [...inject], apply }).await()
     const zhVersions = SEATS.map(([name]) => b.slots.getVersion(name))
-    b.locale.setLocale('en')
     // No ledger churn: freshness rides the thunk (and the renderer's locale
     // subscription), not re-registration.
     SEATS.forEach(([name], i) => {
       expect(b.slots.getVersion(name)).toBe(zhVersions[i]!)
       expect(b.slots.entries(name)).toHaveLength(1)
     })
-    expect(resolveSlotLabel(generalEntry(b.slots)!.options.label)).toBe('General')
-    b.locale.setLocale('zh')
     expect(resolveSlotLabel(generalEntry(b.slots)!.options.label)).toBe('通用设置')
   })
 
@@ -200,9 +194,7 @@ describe('ui-settings-general apply', () => {
     expect(b.slots.entries('settings.general.item')).toEqual([])
     expect(b.slots.spec('settings.general.item')).toEqual({ kind: 'list', scope: 'root' })
     // The recovered registrations still ride the locale path.
-    b.locale.setLocale('en')
-    expect(resolveSlotLabel(generalEntry(b.slots)!.options.label)).toBe('General')
-    b.locale.setLocale('zh')
+    expect(resolveSlotLabel(generalEntry(b.slots)!.options.label)).toBe('通用设置')
   })
 
   it('removes every seat and the item declaration on teardown', async () => {

@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-credentials-local
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-credentials-local` 是产品默认的本机凭据存储：harness home 下的一个私有文件，存放 API 密钥与其他机密，可由配置界面写入，你自己编辑该文件时也会自动重载。该文件是带版本的文档，含一个存放密钥值的 `refs` 分节和一个存放持久化按插件记录的 `records` 分节，因此授权 grant 或提供方环境值能与密钥一起跨重启保留。密钥来自四个位置，顺序固定：你启动时的环境优先，其次是存储文件，再次是项目和主目录的 `.env` 文件。你保存的密钥会立即生效，即使某个 `.env` 里还留着更旧的密钥。只有你的 OS 用户能读取该文件，而且产品绝不把文件路径交给 agent（智能体）。

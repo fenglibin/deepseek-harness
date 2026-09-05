@@ -16,7 +16,7 @@ import { AgentPresetSeat } from '../src/client/AgentPresetSeat.tsx'
 import type { AgentPresetSeatProps } from '../src/client/AgentPresetSeat.tsx'
 import type { AgentPresetSettingsState } from '../src/client/settings-store.ts'
 import type { AgentPresetSeatState } from '../src/client/seat-store.ts'
-import { en } from '../src/client/locales.ts'
+import { zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
@@ -38,8 +38,8 @@ const SEAT_READY: AgentPresetSeatState = {
 }
 
 /** The runtime's own `{name}` substitution, so a test reads the shown text. */
-function translate(key: keyof typeof en, params?: Record<string, unknown>): string {
-  const template = en[key]
+function translate(key: keyof typeof zh, params?: Record<string, unknown>): string {
+  const template = zh[key]
   return params === undefined
     ? template
     : template.replace(/\{(\w+)\}/g, (match, name: string) => name in params ? String(params[name]) : match)
@@ -74,7 +74,7 @@ function renderLabel(
     sessionId: 's1',
     useSessions: bindSnapshotSelector(sessions),
     useAgentPresets: bindSnapshotSelector(store),
-    t: (key: keyof typeof en) => en[key],
+    t: (key: keyof typeof zh) => zh[key],
   } as unknown as AgentPresetLabelProps)} />)
   return { load, view }
 }
@@ -84,8 +84,8 @@ describe('the new-session chip', () => {
     const actions = renderSeat()
 
     await waitFor(() => { expect(actions.load).toHaveBeenCalledTimes(1) })
-    expect(screen.getByRole('button').textContent).toContain(en.presetStandardName)
-    expect(screen.getByRole('button').getAttribute('title')).toBe(en.seatHint)
+    expect(screen.getByRole('button').textContent).toContain(zh.presetStandardName)
+    expect(screen.getByRole('button').getAttribute('title')).toBe(zh.seatHint)
   })
 
   it('offers each preset with what it is for', () => {
@@ -95,10 +95,10 @@ describe('the new-session chip', () => {
 
     // The id alone never said what a preset does; the description is the
     // whole reason a preset can publish metadata at all.
-    expect(screen.getByText(en.presetStandardDescription)).toBeTruthy()
+    expect(screen.getByText(zh.presetStandardDescription)).toBeTruthy()
     // A preset that published none still reads as a row, with its id standing
     // in for the name.
-    expect(screen.getByText(en.noDescription)).toBeTruthy()
+    expect(screen.getByText(zh.noDescription)).toBeTruthy()
     expect(screen.getByText('mine')).toBeTruthy()
   })
 
@@ -293,13 +293,13 @@ describe('the session-header label', () => {
     await waitFor(() => { expect(load).toHaveBeenCalledTimes(1) })
     // A control here would promise a switch the host refuses outright.
     expect(screen.queryByRole('button')).toBeNull()
-    expect(screen.getByTitle(en.presetStandardDescription).textContent).toBe(en.presetStandardName)
+    expect(screen.getByTitle(zh.presetStandardDescription).textContent).toBe(zh.presetStandardName)
   })
 
   it('falls back to the id, and to the generic hint, when metadata is absent', () => {
     renderLabel({ blank: true, projectionValues: { agentPreset: 'mine' } })
 
-    expect(screen.getByTitle(en.headerHint).textContent).toBe('mine')
+    expect(screen.getByTitle(zh.headerHint).textContent).toBe('mine')
   })
 
   it('shows the id until the roster resolves it', () => {
@@ -310,7 +310,7 @@ describe('the session-header label', () => {
 
     // The session's own summary is the authority on which preset it runs; the
     // roster only supplies the display name, and its arrival is a later frame.
-    expect(screen.getByTitle(en.headerHint).textContent).toBe('standard')
+    expect(screen.getByTitle(zh.headerHint).textContent).toBe('standard')
   })
 
   it('renders nothing, and reads no roster, when the session records no preset', async () => {

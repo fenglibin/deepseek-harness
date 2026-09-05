@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-05-chat-paging-pick-settle.md) | 中文
-
 ## Problem
 
 `ChatView`（`packages/client/ui-chat/src/client/chat/ChatView.tsx`）为两类读者分页加载更早的历史：滚到列表顶部的读者，以及从用户消息抽屉里挑一条的读者。若被挑中的轮次不在已加载窗口内，视图会记下一个待定跳转并持续翻页，直到那一轮的行渲染出来。两个缺陷让读者停在原地。

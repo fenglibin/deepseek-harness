@@ -2,8 +2,6 @@
 
 状态：已实施
 
-[English](2026-08-20-webworker-node-face.md) | 中文
-
 ## 问题
 
 worker 逐字节运行 web profile 的 Cordis 配置——没有 worker 专属行——因此浏览器缺失的平台必须在模块层被替换：被代理的模块保持身份、更换实现。这覆盖三条战线：树所 import 的 Node builtin、这些 builtin 背后应答的文件系统，以及 bash 工具的进程层。如果 `node:child_process` 只是结构桩，工具仍会照常挂载并向模型自我宣告，但每次调用都会失败。

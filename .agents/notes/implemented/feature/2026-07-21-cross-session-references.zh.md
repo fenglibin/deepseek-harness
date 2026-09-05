@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-21-cross-session-references.md) | 中文
-
 ## 问题
 
 Web 用户需要把另一场对话中的相关工作带入一条新消息，但不恢复、不 fork，也不让源 transcript（文本记录）对当前会话拥有权威性。harness 已经提供准确的会话枚举与原始事件检查，但若每个宿主都独立解析日志，就会重复实现压缩（compaction）折叠、来源过滤、大小限制、错误行为和持久化。把宿主标记直接编码进 agent（智能体）消息约定，还会让核心循环绑定某一种 UI 语法。

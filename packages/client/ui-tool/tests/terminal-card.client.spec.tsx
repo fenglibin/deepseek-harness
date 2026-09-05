@@ -12,7 +12,7 @@ import type {
 import type { SessionListState } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
+import { zh as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import {
   localizeTerminalCardModel, terminalCardModel, terminalFailed,
@@ -22,13 +22,13 @@ import { GenericToolCard, type GenericToolCardProps } from '../src/client/tool/t
 import { DetailsPanel } from '@deepseek-ai/dsh-client-ui-chat/src/client/details/DetailsPanel.tsx'
 import { BashRow } from '../src/client/tool/toolviews/bash-sample.tsx'
 import { renderToolDetails, toolChatSnapshot, useEmptyTrajectory } from './tool-details-render.client.tsx'
-import { en, zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
+import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
 import { zh as chatZh } from '@deepseek-ai/dsh-client-ui-chat/src/client/locale.ts'
 
 type BashRowProps = Parameters<typeof BashRow>[0]
 
 const t: GenericToolCardProps['t'] = makeTranslate(zh, commonZh)
-const enT: GenericToolCardProps['t'] = makeTranslate(en, commonEn)
+const enT: GenericToolCardProps['t'] = makeTranslate(zh, commonEn)
 const chatT = makeTranslate(chatZh, commonZh)
 
 afterEach(cleanup)
@@ -347,7 +347,7 @@ describe('chat row terminal body', () => {
 
   it.each([
     { locale: 'zh', translate: t, description: '终端 pty-3', command: '（发送输入）' },
-    { locale: 'en', translate: enT, description: 'Terminal pty-3', command: '(send input)' },
+    { locale: 'zh', translate: enT, description: 'Terminal pty-3', command: '(send input)' },
   ])('renders terminal_send copy through the $locale locale', ({ translate, description, command }) => {
     const block = running({
       name: 'terminal_send',

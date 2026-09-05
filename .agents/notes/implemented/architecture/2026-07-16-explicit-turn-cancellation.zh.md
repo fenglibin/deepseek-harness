@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-16-explicit-turn-cancellation.md) | 中文
-
 ## 问题
 
 取消是一种生命周期短于 Agent（智能体）驱动器的控制能力。自由文本字符串无法完整区分所有调用方，步骤级控制器也无法中断提示词提交、提示词组装、继续决策或轮次终止策略。持久化 `Error`、`AbortSignal.reason` 或后端私有对象还会向持久化回放暴露不稳定的运行时细节。

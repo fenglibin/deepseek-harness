@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-session-log-export-defaults-to-current-session.md) | 中文
-
 ## Problem
 
 Session Header 的 `Session 日志` 按钮导出的内容超出了用户正在查看的那个会话。

@@ -5,8 +5,6 @@ kind: "package-group"
 
 # bundle/：profile 插件组合包
 
-[English](README.md) | 中文
-
 ## 概述
 
 本组列出 `dsh --profile` 使用的可安装 patch 层。每个包都声明 `dsh.bundle.patch`；启动器会叠放这些 patch 文档来组装具名 profile。`web`、`headless`、`acp` 与 `sdk` profile 以 `dsh-base` 为基础，`sdk-minimal` 则由一个 bundle 提供完整配置树。领域包也可以在本目录之外声明附加层。

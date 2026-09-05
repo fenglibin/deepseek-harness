@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-04-delivery-timeline-and-float-card.md) | 中文
-
 ## 问题
 
 B5 的 `DeliveryDock` 把交付任务作为只读条带展示在 composer 上方的 `conversation.input.dock`。这带来两个缺陷。其一，该位置与设计 §6.6 不符：任务应作为持久卡片出现在会话时间线中，并作为悬浮卡片固定在正文左边缘，而不是 composer 的 dock。其二，dock 只展示当前快照，阶段推进后读起来仍是静态的——用户看到"已创建 → 已拆分"间隔了一个小时，因为没有按变更逐条的时间线可循。

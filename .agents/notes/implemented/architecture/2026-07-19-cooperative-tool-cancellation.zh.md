@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-19-cooperative-tool-cancellation.md) | 中文
-
 ## 问题
 
 每次类型化工具调用都需要一个由调用方持有的取消信号。可选的 `ToolExecutionInput.signal` 允许直接调用方不承担所有权，使每个工具主体中的 `exec.signal` 都成为可选值，也会诱使注册表提供无法表达真实调用方生命周期的后备信号。

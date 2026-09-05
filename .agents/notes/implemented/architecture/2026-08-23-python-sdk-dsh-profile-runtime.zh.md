@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-23-python-sdk-dsh-profile-runtime.md) | 中文
-
 ## 问题
 
 Python SDK 分发一个私有 Node 应用，直接启动完整外部 `cordis.yml`；其他所有受支持应用都从 `dsh` profile 进入。该例外重复了环境加载、配置所有权、插件解析、关闭流程、产物命名与测试路径。它还把 SDK 自定义变成全量替换应用树：只想替换一个插件的调用方也必须拥有 JSON-RPC server 和所有无关 deployment 配置项。

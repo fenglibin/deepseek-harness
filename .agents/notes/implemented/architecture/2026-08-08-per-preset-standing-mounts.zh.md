@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-08-per-preset-standing-mounts.md) | 中文
-
 ## 问题
 
 按会话挂载 preset 让面向模型的注册视图变成按 agent 的，而三个独立的宿主读取方仍然假设它是静态的：冷读 `session.history` 找不到 presenter（每张卡都静默退化成通用渲染器——与「工具本无 presenter」无法区分）、投影块丢掉 preset 注册的键（客户端把缺失键当作能力不存在并**清掉**该行）、Typert 网关在宿主根上解析 `goals`（`service-unavailable`）。逐个读取方打补丁只是拿一种静默降级换另一种：为拿到 presenter 而 resume，会把投影折叠从 detached 翻到 live，token 计数随之被抹掉。

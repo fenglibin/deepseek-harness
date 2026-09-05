@@ -2,8 +2,6 @@
 
 Status: rejected — `step/end` 是模型步骤已完成的持久信号；保留对称的 `step/start` / `step/end` 对，比从相邻的步骤级事件推断完成状态更便于理解崩溃修复、不变式与 transcript（文本记录）检查。
 
-[English](2026-06-20-drop-durable-step-boundaries.md) | 中文
-
 ## 问题
 
 会话日志存储了 `step/start` 和 `step/end` 事件，尽管每个步骤级事件本身已经携带 `{ turn, step }`：assistant 分片、assistant 消息、工具调用、工具结果、用量和错误。`deriveMessages()` 忽略步骤边界，ACP（Agent Client Protocol）在 UI 层面也忽略它们，主要消费方是不变式检查、测试、快照预期输出和崩溃恢复。

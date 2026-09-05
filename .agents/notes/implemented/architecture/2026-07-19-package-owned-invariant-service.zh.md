@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-19-package-owned-invariant-service.md) | 中文
-
 ## 问题
 
 运行时不变式检查跨越会话轨迹、agent（智能体）状态、作用域 dispatch 和请求重建。如果所有检查都放在一个诊断包中，该包就必须导入彼此无关的产品领域词汇，测试也会离开真正的所有者；任何产品包新增或移除检查时，都要修改中央包。

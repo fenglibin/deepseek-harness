@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-05-slot-declaration-injection.md) | 中文
-
 ## 问题
 
 客户端插件可能在声明某个 slot 的插件之前或之后向该 slot 贡献内容。Cordis 服务注入无法表达这种依赖：服务只能作为间接的顺序信号；客户端 manifest（元数据清单）的依赖项不会规定激活顺序；即使所有相关服务始终挂载，slot 仍可能消失后重新出现。因此，立即注册会与尚未声明的 slot 形成竞态，而等待无关服务则会耦合本可独立重载的功能。

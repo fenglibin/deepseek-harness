@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-05-tool-result-image-description.md) | 中文
-
 ## 问题
 
 准入期为网关入口路径（`session/prompt`、`session/updateQueue`）的图片生成描述，但工具在准入之后可能产出图片——截图、渲染出的图表。这类图片承载在 `tool/result` 事件里，从不经过网关 inbox，因此纯文本路由把它投影为 `[image omitted because this model accepts text only; attachment sha256:…]`。工具结果内容本来就流经具体 loop，但在持久化结果落盘之前没有环节去描述它。

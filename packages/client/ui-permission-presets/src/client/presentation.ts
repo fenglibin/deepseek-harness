@@ -1,4 +1,4 @@
-import { en } from './locales.ts'
+import { zh } from './locales.ts'
 
 /** Machine value of the preset that requires an explicit GUI risk gate. */
 export const FULL_ACCESS_PRESET = 'danger-full-access'
@@ -16,9 +16,9 @@ const PRESET_LABEL_KEYS = new Map<string, PermissionPresetLabelKey>([
 ])
 
 const DEFAULT_PRESET_LABELS: Record<PermissionPresetLabelKey, string> = {
-  'preset.readOnly': en['preset.readOnly'],
-  'preset.workspaceWrite': en['preset.workspaceWrite'],
-  'preset.fullAccess': en['preset.fullAccess'],
+  'preset.readOnly': zh['preset.readOnly'],
+  'preset.workspaceWrite': zh['preset.workspaceWrite'],
+  'preset.fullAccess': zh['preset.fullAccess'],
 }
 
 /**

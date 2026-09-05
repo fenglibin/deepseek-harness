@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-12-resolve-store-pwsh-aliases.md) | 中文
-
 ## 问题
 
 `resolvePwshPath` 声称 Store 安装经 PATH 解析，但它的存在性探测用的是 `existsSync`，会对候选做 stat、从而跟随重解析点。Store 的 `%LOCALAPPDATA%\Microsoft\WindowsApps\pwsh.exe` 是 app execution alias，其目标目录的 ACL 拒绝 stat（EACCES），于是 `existsSync` 看不到它，解析静默落到 Windows PowerShell 5.1——在这类「唯一的 PowerShell 7 是 Store 安装」的机器上就用了错误的 shell。

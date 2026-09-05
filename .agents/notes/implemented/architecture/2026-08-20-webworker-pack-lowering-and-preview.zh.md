@@ -2,8 +2,6 @@
 
 状态：已实施
 
-[English](2026-08-20-webworker-pack-lowering-and-preview.md) | 中文
-
 ## 问题
 
 浏览器 worker 既不能在装载期编译模块，也不能由产品 webserver 提供页面：每个模块体必须以可直接运行的形态到达，页面必须是静态产物。两个面早期都发生过漂移。装载器曾携带一个兜底编译器，于是收集器的缺口表现为「启动变慢」而不是「镜像坏了」——而且 `acorn` 经包 barrel 混进了 `lib/worker.js`，一个只包装预 lowered 模块体的运行时根本不需要解析器。preview 曾是服务页面旁的第二份 HTML 模板，一个 served index 可以悄悄漂离的页面。

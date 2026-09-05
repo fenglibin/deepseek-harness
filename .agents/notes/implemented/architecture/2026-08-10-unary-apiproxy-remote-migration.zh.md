@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-10-unary-apiproxy-remote-migration.md) | 中文
-
 ## 问题
 
 Host API Proxy 曾在业务 Service、API Proxy interface、Zod schema、路由表、Client stub 与 Client 调用方之间重复定义简单一元操作。[Typert Remote 调用](2026-08-02-typert-remote-method-calls.zh.md)已经允许业务包持有这类调用，但如果迁移 endpoint 时没有一并保留生命周期与投影策略，就会改变可观察行为。

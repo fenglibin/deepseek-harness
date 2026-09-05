@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-chat-ux-retry-recovered-errors-hidden.md) | 中文
-
 ## Problem
 
 当一次模型请求失败、被重试、且重试成功时，transcript 里仍然展示那次已经被恢复的失败。`model-retry` 节点只要 `attempts.length > 0` 就物化，`ModelRetryItem` 把失败详情（`node.failure.message`）放进一个 `<details>`，在 turn 干净关闭后仍留在 transcript 里。已经拿到答案的用户仍然看到那次转瞬即逝、后来再也不是问题的失败所留下的「报错」。

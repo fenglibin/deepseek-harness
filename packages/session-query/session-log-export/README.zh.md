@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-session-log-export
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-session-log-export` 让 Web 界面可以下载会话的历史：Session Header 中的 `Session log` 按钮与 `/export` 斜杠命令都会把当前会话自身的日志及其附件作为 ZIP 交给浏览器下载。按钮的范围菜单可以把单次下载扩大到整棵会话树——当前会话加上每一个 subagent 后代，以及这些日志引用的媒体。本包拥有 Host 归档流、经过认证的 Fetch 路由以及浏览器控制和反馈。下载目标位置由浏览器选择。设置与用法在前，随后说明实现细节。

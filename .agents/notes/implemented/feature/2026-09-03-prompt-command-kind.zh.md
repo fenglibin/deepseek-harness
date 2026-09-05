@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-03-prompt-command-kind.md) | 中文
-
 ## Problem
 
 斜杠命令此前只有一种形态：由代码持有的 `handler` 直接对接收 agent 执行，不产生模型消息。用户还想要轻量、可复用的提示词快捷方式——以 `/name` 调用的常用指令，它确实会提交给模型，但不带完整 `SKILL.md` 技能的仪式感（frontmatter、`<skill_content>` 包裹、catalog 注入）。这两种需求共享 `/` 菜单和生命周期日志，但「执行」的含义不同；而提示词快捷方式列表还必须能在不改代码的前提下由用户编辑。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-29-package-regrouping.md) | 中文
-
 ## 问题
 
 两级 `packages/<group>/<pkg>` 层级结构（[原始决策](../../archived/architecture/2026-06-20-package-hierarchy.md)）自 6 月以来已经漂移：167 个包彼时坐落在 42 个组里，若干组边界已经对不上这些包的实际聚类。

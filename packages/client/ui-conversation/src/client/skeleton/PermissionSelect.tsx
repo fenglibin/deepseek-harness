@@ -5,7 +5,7 @@ import type { PermissionSelect as PermissionSelectValue } from '@deepseek-ai/dsh
 import { IconChevronDownOutline14, Menu, RiskConfirmation } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ComposerBarProps } from '../contract/slots.ts'
-import { en } from '../locales.ts'
+import { zh } from '../locales.ts'
 import css from './PermissionSelect.module.css'
 
 const FULL_ACCESS = 'danger-full-access'
@@ -56,9 +56,9 @@ function displayName(name: string): string {
 }
 
 const BUILT_IN_PERMISSION_NAMES = new Map<string, string>([
-  ['read-only', en['access.preset.readOnly']],
-  ['workspace-write', en['access.preset.workspaceWrite']],
-  [FULL_ACCESS, en['access.preset.fullAccess']],
+  ['read-only', zh['access.preset.readOnly']],
+  ['workspace-write', zh['access.preset.workspaceWrite']],
+  [FULL_ACCESS, zh['access.preset.fullAccess']],
 ])
 
 function permissionLabel(

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-20-multiline-question-answer-field.md) | 中文
-
 ## Problem
 
 `ask_user_question`在模型给出的选项旁提供一个自由文本答案。在带选项的问题上，该答案曾是单行 `<input>`：长句子在 24px 的一行内横向滚动，Shift+Enter 毫无作用，带结构的答案——两条要求、一个短列表、一段话——根本无法输入。无选项问题虽已使用 textarea，但那是固定 64–140px 的框，既不跟随草稿，也无法展开。

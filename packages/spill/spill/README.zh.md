@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-spill
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-spill` 让任何插件或工具都能通过 `ctx.spillStore` 保存过大的文本，并拿到一个不透明定位信息、精确的字节数与模型可以直接依据的取回指引。它定义 spill 后端做什么，而不规定如何存储——部署需要挂载 `dsh-spill-local` 之类的后端才能真正持久化，由 `dsh-spill-policy` 插件决定工具结果何时过大。当部署必须在不让模型上下文泛滥的前提下保留超大工具输出时，选择它。该服务只负责存储：没有保留策略、没有工具结果替换，也没有取回或搜索 API。真实存储故障会以拒绝结束，由调用方决定如何降级。

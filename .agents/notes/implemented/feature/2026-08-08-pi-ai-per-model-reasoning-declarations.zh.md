@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-08-pi-ai-per-model-reasoning-declarations.md) | 中文
-
 ## 问题
 
 在声明式提供方 catalog（[[2026-08-03-pi-ai-declared-provider-catalog]]，它刻意把推理排除在可配置字段之外）之下，手工声明的 pi-ai 路由，其模型物化出来就带着 `reasoning: false`，于是 `getSupportedThinkingLevels` 短路成 `["off"]`：输入框不为它们提供档位选择器，而路由级的 `reasoning` 默认值——当时 profile 仅有的推理旋钮——让发往这类模型的每个请求都在网络 I/O 之前以 `UNSUPPORTED_REASONING_EFFORT` 失败。同一个路由级旋钮对 catalog 路由来说也放错了层级：同一提供方下各模型接受的档位并不一致（deepseek 自带 `[off, high, max]`，旁边就是带 `xhigh` 的 catalog 模型），单个路由级档位怎么设都会弄坏路由的一部分——这正是模型页彻底停写它的原因（#1860），而 `settings.yaml` 也因此没有了任何按模型对齐档位的办法。

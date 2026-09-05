@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-26-web-trigger-menu-presentation-polish.md) | 中文
-
 ## Problem
 
 Web composer 的 `/` 与 `@` 触发菜单存在多处呈现缺陷，使引用流程更难阅读和操作。候选行用本地化文字前缀标注类型（`Folder · name/`、`Session · label`），既与 section 标题重复又把名称挤向右侧。指针悬停用 CSS `:hover` 着色，而键盘导航驱动 reducer 持有的高亮，两行可能同时呈现焦点态。可下钻文件夹的操作标记是裸文本 `›`，与 composer 中其他 chevron 不一致，且没有任何提示告诉用户 Tab 可以下钻高亮的文件夹。来源加载中状态是一行"正在加载…"文字。下钻留下的可编辑 `@dir/` 文本在 `@` 前渲染文件夹图标，对一个并非 settled chip 的 token 形成视觉双重标记。composer 的 placeholder 从未提及 `/` 和 `@` 的存在（[#3080](https://github.com/deepseek-harness/deepseek-harness/issues/3080)）。

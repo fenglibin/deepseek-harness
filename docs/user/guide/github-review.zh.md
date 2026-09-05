@@ -1,7 +1,5 @@
 # 通过 GitHub Webhook 创建评审会话
 
-[English](github-review.md) | 中文
-
 此可选 overlay 会为 `dsh web` 增加一个签名 GitHub 端点。当已配置仓库中的 pull request 从 draft 变为 ready for review 时，规则会在该仓库的 Web Workspace 下创建带标题的根 Session，并启动只读评审提示词。
 
 ## 前置条件

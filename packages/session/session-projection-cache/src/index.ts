@@ -12,7 +12,7 @@
  * write path is fail-soft (a lost write costs a longer tail replay on the
  * next cold read) and a `ver` mismatch discards the row instead of migrating
  * it. Design authority: the session-projection RFC
- * (.agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.md).
+ * (.agents/notes/proposed/architecture/2026-07-27-session-projection-and-command-log.zh.md).
  * @module @deepseek-ai/dsh-session-projection-cache
  */
 

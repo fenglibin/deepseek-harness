@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-gui-full-access-confirmation.md) | 中文
-
 ## 问题
 
 在 Web 客户端的权限选择器中切换到 `danger-full-access` 只需一次点击，且预设以 Title Case 机器名 `Danger Full Access` 展示。Full access 会减少确认步骤，允许 agent（智能体）执行敏感操作、修改文件或运行外部命令，误点即在毫无刻意确认环节的情况下启用了最危险的预设。

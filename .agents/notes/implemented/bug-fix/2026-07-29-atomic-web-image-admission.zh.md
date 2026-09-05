@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-29-atomic-web-image-admission.md) | 中文
-
 ## 问题
 
 包含图片的提示词准入与 `session.selectModel` 都会跨越异步模型查询和附件查询。没有统一的排序点时，包含图片的提示词可能在支持图片的目标上通过校验，并发选择却设置了纯文本目标。选择也可能在准入已经开始、持久消息事件尚未发布时改变路由。

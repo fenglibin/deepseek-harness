@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-command-prompt-config
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-command-prompt-config` 将一组经过校验的提示词命令条目注册为 `kind: 'prompt'` 斜杠命令。新增一个可复用的提示词快捷方式——例如常用的代码审查或总结指令——无需编写任何代码，只需修改配置。每个条目包含命令名、可选的中文显示名、发现描述，以及调用时作为一条用户消息提交给模型的提示词文本。当你想要轻量、由配置承载的提示词快捷方式，而不是代码承载的命令处理器或完整的 `SKILL.md` 技能时，选择它。

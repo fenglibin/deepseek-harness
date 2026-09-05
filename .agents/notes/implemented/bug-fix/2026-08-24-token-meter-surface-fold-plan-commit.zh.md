@@ -2,8 +2,6 @@
 
 状态：已实现
 
-[English](2026-08-24-token-meter-surface-fold-plan-commit.md) | 中文
-
 ## 问题
 
 `foldSurfaceTokens` 在每个 surface 事件上重建计价 surface：append 分配 `[...nodes, node]`，replacement 先整表复制再 splice。这次复制只为一个性质而存在——抛错必须让调用方的 `ReplayState` 保持原样，使同一条畸形事件在每次重试时以完全相同的方式失败——但它让每条**合法**事件都为此付出 O(surface)。针对该 fold 的基准显示复制占 append 成本的约 99.9%（surface 为 5 万节点时每次 100µs，而估价本身仅 0.1µs），且连续 append 在会话生命周期内累计 O(S²)，恰好集中在用户反馈卡顿的长会话上。token meter 在同步的 `session/event` 发布路径内折叠，这笔成本直接落在 agent loop 的流式 append 上。

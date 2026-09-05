@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-07-ptc-executor-collapse.md) | 中文
-
 ## 问题
 
 `mode: 'ptc'` 只塌缩了通告面，没有塌缩执行面。`wireSchemas()` 只向模型发送一个工具——`run_code`——但执行器通过 `get()` 解析所有调用，而 `get()` 返回完整的可见工具表外加保留的传输工具。模型一旦发出原生工具名（`write`、`read`、`bash`、`subagent` 等），就能完全绕过 `run_code`：调用照常走完整流水线并执行成功，尽管它的 schema 从未被通告过。模型提供方不拦截未通告的工具名，因此不发 schema 等于没有约束。

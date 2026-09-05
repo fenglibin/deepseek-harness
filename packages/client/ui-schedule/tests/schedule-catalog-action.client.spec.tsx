@@ -14,7 +14,7 @@ import {
   ScheduleCatalogAction,
   type ScheduleCatalogActionProps,
 } from '../src/client/ScheduleCatalogAction.tsx'
-import { en, zh } from '../src/client/locales.ts'
+import { zh } from '../src/client/locales.ts'
 
 const SESSION = 'schedule-session' as SessionId
 const START = Date.parse('2026-08-25T12:00:00.000Z')
@@ -22,7 +22,7 @@ const START = Date.parse('2026-08-25T12:00:00.000Z')
 beforeEach(() => {
   vi.useFakeTimers()
   vi.setSystemTime(START)
-  document.documentElement.lang = 'en'
+  document.documentElement.lang = 'zh'
 })
 
 afterEach(() => {
@@ -70,7 +70,7 @@ function sessionSnapshot(openState: SessionSnapshot['openState']): SessionSnapsh
 function props(
   records: readonly ScheduleRecord[] | undefined,
   openState: SessionSnapshot['openState'] = 'open',
-  dictionary: typeof zh | typeof en = en,
+  dictionary: typeof zh = zh,
 ): ScheduleCatalogActionProps {
   const snapshot = sessionSnapshot(openState)
   const useSession = <T,>(select: (value: SessionSnapshot) => T): T => select(snapshot)
@@ -87,7 +87,7 @@ function props(
 }
 
 function prompts(): string[] {
-  return within(screen.getByRole('list', { name: en['list.aria'] }))
+  return within(screen.getByRole('list', { name: zh['list.aria'] }))
     .getAllByRole('listitem')
     .map(item => item.querySelector('[class*="prompt"]')?.textContent ?? '')
 }
@@ -115,7 +115,7 @@ describe('ScheduleCatalogAction visibility', () => {
     const trigger = screen.getByRole('button', { name: '1 reminder' })
     fireEvent.click(trigger)
     trigger.focus()
-    expect(screen.getByRole('list', { name: en['list.aria'] })).toBeDefined()
+    expect(screen.getByRole('list', { name: zh['list.aria'] })).toBeDefined()
 
     view.rerender(<><button type="button">Neighbor</button><ScheduleCatalogAction {...props([])} /></>)
     expect(screen.queryByRole('button', { name: '1 reminder' })).toBeNull()
@@ -143,7 +143,7 @@ describe('ScheduleCatalogAction rows', () => {
     expect(rows[1]?.textContent).toContain('in 5 minutes')
     expect(rows[2]?.textContent).toContain('Once')
     expect(rows[2]?.textContent).toContain('in 1 hour')
-    expect(rows[2]?.textContent).toContain(formatScheduleLocalTime(at.scheduledAt, 'en'))
+    expect(rows[2]?.textContent).toContain(formatScheduleLocalTime(at.scheduledAt, 'zh'))
     expect(document.querySelector('img')).toBeNull()
     const text = screen.getByRole('list').textContent ?? ''
     expect(text).not.toContain('hidden-id')
@@ -154,7 +154,7 @@ describe('ScheduleCatalogAction rows', () => {
   })
 
   it('renders exact recurring units without rounding and localizes both dictionaries', () => {
-    const tEn = makeTranslate(en)
+    const tEn = makeTranslate(zh)
     const tZh = makeTranslate(zh)
     const samples = [
       [86_400, 'Every 1 day', '1天一次'],
@@ -185,7 +185,7 @@ describe('ScheduleCatalogAction rows', () => {
   })
 
   it('derives relative seconds, minutes, hours, days, and the exact due boundary', () => {
-    const t = makeTranslate(en)
+    const t = makeTranslate(zh)
     expect(formatScheduleRelative(new Date(START).toISOString(), START, t)).toBe('Due now')
     expect(formatScheduleRelative(new Date(START + 500).toISOString(), START, t)).toBe('in 1 second')
     expect(formatScheduleRelative(new Date(START + 61_000).toISOString(), START, t)).toBe('in 2 minutes')
@@ -222,7 +222,7 @@ describe('ScheduleCatalogAction dismissal', () => {
     const trigger = screen.getByRole('button', { name: '1 reminder' })
     fireEvent.click(trigger)
     expect(trigger.getAttribute('aria-expanded')).toBe('true')
-    fireEvent.keyDown(screen.getByRole('list', { name: en['list.aria'] }), { key: 'Escape' })
+    fireEvent.keyDown(screen.getByRole('list', { name: zh['list.aria'] }), { key: 'Escape' })
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
     expect(document.activeElement).toBe(trigger)
   })
@@ -242,7 +242,7 @@ describe('ScheduleCatalogAction dismissal', () => {
     render(<ScheduleCatalogAction {...props(active)} />)
     const trigger = screen.getByRole('button')
     fireEvent.click(trigger)
-    fireEvent.pointerDown(screen.getByRole('list', { name: en['list.aria'] }))
+    fireEvent.pointerDown(screen.getByRole('list', { name: zh['list.aria'] }))
     expect(trigger.getAttribute('aria-expanded')).toBe('true')
     fireEvent.pointerDown(document.body)
     expect(trigger.getAttribute('aria-expanded')).toBe('false')

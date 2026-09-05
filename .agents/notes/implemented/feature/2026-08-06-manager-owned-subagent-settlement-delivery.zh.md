@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-manager-owned-subagent-settlement-delivery.md) | 中文
-
 ## 问题
 
 可继续后台委派是模型唯一一种能够发起、却无法抵达终点的异步操作。其他每一种形态都有取回原语或返回值：后台 bash 命令与一次性后台 subagent 都通过 Task 结算，`job_output(wait: true)` 可以阻塞等待；workflow 与前台 subagent 会把结果返回给调用方。可继续后台 child 只返回它持久化的 id，而父级既没有可等待的对象，也不会被交付任何东西。

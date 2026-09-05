@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-03-opt-in-reasoning-chunk-browser-stress.md) | 中文
-
 ## 问题
 
 长推理流会连续产生大量 `assistant/chunk`。这些原始事件必须逐个完成排序、日志记录和 `PartialAccumulator` 折叠，以保持重放保真度和最终内容完整；但 React 只需要看到当前累计结果，不需要观察同一浏览器帧内的每个中间态。

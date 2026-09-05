@@ -2,8 +2,6 @@
 
 Status: proposed
 
-[English](2026-06-16-typed-event-schemas.md) | 中文
-
 ## 问题
 
 harness 将其核心词汇——内容块、消息来源、结束原因、轮次触发器、轮次结束原因与会话事件——建模为 **merge-extensible map**：一个 TypeScript `interface`（如 `SessionEventMap`、`ContentBlockMap`），插件通过声明合并对其扩展，公开联合类型则以 `Map[keyof Map]` 派生。这是本仓库的通用扩展模式，记录在 [docs/architecture.md](../../../../docs/architecture.zh.md) 中（「The same merge-extensible-map pattern is used for `MessageSource`, `FinishReason`, `TurnTrigger`, and `TurnEndReason`」），`defineTool` 的 `InferArgs` DSL 和 `assertNever` 穷举约定都依赖于它。

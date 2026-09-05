@@ -2,8 +2,6 @@
 
 Status: rejected — 下列每一项替换在证据上都未达到净简化门槛；记录在案，以免这轮普查日后从零重来
 
-[English](2026-07-26-dependency-swaps-rejected-by-nih-audit.md) | 中文
-
 ## 问题
 
 一次仓库级的「Not Invented Here（非我发明）」审计（2026-07-26，十路并行普查，覆盖每个包分组、scripts/、native/、vendor/ 边界、python/、测试基础设施与 CI）对每一处手写接口面追问同一个问题：在[依赖政策](../../implemented/process/2026-07-26-dependencies-over-hand-rolling.zh.md)之下，是否有持续维护的外部包或 Node 内置能力能以净收益把它删除？得出肯定结论的发现已各自写成独立的提案 Agent Note。否定裁定的价值不相上下——每一条都点名了一个看似可行、实则手写形态在承重的替换——但否则它们只会留存在某个 PR（Pull Request）正文里。本 Agent Note 将它们固化在案。

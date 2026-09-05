@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-06-tool-result-retention-library.md) | 中文
-
 ## 问题
 
 多个面向模型的工具已经限制其返回的上下文量，但每个工具都拥有不同的局部机制和词汇：bash 保留尾部并提供 spill 文件；web search 限制来源列表；web fetch 限制正文内容；`glob`／`grep` 发现工具需要在行内提供第一页，同时为完整结果集保留精确的省略元数据。单一的 `truncate(text)` 辅助函数无法覆盖这些情况：条目型工具需要条目计数，并在原语之外分组；文本型工具则需要字节预算和 UTF-8 安全的首尾裁切。

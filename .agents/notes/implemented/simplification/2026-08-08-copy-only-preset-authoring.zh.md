@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-08-copy-only-preset-authoring.md) | 中文
-
 ## 问题
 
 agent-preset 设置页带着一个网页 YAML 编辑器：`agentPreset.write` 接收任意组装文本，页面是一个没有补全、高亮或 diff 的文本域，形状检查依赖 Loader 自己的 `entryListSchema`——其方言含 `!!js`，所以「过了形状检查的文本」在下一次挂载时仍是任意代码。作为编辑器很弱，作为能力很宽，还是该分区不得不防御的「编辑器 vs 名单」竞态的来源。

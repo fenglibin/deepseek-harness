@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-code-runtime-worker-thread
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-code-runtime-worker-thread` 为 [`dsh-code-runtime`](../code-runtime/README.zh.md) seam 执行 TypeScript 程序：每个程序都在一个全新的 Node Worker 线程中运行，宿主提供的绑定可作为普通异步函数调用，运行返回 `{ value, logs, error? }`。它是 `dsh-tools` 中 PTC mode 的已发布后端，因此挂载它正是让模型编写的 TypeScript 执行在组合中生效的方式。运行时「包含」程序，但不隔离它：信任立场与 bash 等价，并带有空环境、堆上限、实测忙碌时间与墙钟预算，以及强制终止。程序每次请求只运行一次，运行之间不保留状态；每个失败——语法错误、预算到期、中止、OOM 退出或输出溢出——都以结果字段返回。

@@ -9,13 +9,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import type { SidebarRootComponentProps, SidebarSectionOwnerProps } from '../src/client/contract/slots.ts'
 import { SidebarRoot } from '../src/client/SidebarRoot.tsx'
-import { en } from '../src/client/locales.ts'
+import { zh } from '../src/client/locales.ts'
 
 /** Pinned column box; the shell compares pointer coordinates against it. */
 const COLUMN_WIDTH = 280
 const COLUMN_HEIGHT = 600
 
-const t: SidebarRootComponentProps['t'] = key => (en as Record<string, string>)[key] ?? key
+const t: SidebarRootComponentProps['t'] = key => (zh as Record<string, string>)[key] ?? key
 /** The shell never reads the global hooks; the props share carries them regardless. */
 const neverHook = (() => { throw new Error('shell must not read global hooks') }) as never
 type AttentionSnapshot = Parameters<Parameters<SidebarRootComponentProps['useSessionPendingInteraction']>[0]>[0]

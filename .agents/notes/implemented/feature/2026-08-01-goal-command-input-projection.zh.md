@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-01-goal-command-input-projection.md) | 中文
-
 ## 问题
 
 面向用户的命令在模型轮次之外执行，并持久化为 `command/run` 与 `command/done`。Web transcript（文本记录）此前只渲染结果行。因此，在新会话中，`/goal` 会清空编辑器并成功完成，但页面仍停留在空白 Hero；只有后续对话内容激活 Chat 后，结果才会显示。若处理器追加普通 `user/message`，将改变模型可见历史与命令语义。

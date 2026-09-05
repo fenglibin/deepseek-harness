@@ -2,8 +2,6 @@
 
 状态：已实现
 
-[English](2026-08-22-standard-acp-automation-controls.md) | 中文
-
 > 本说明仅取代 [ACP 作为纯自动化协议](../simplification/2026-07-23-acp-automation-only-protocol.zh.md) 中仅支持提示词的协议清单。该决策关于禁止 ACP 成为第二套产品 UI 的规定仍具权威性。
 
 ## 问题

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-web-read-card-frontend.md) | 中文
-
 ## Problem
 
 [读取后端](2026-07-30-web-read-card.zh.md)给 `ToolResultView` 增加了第四种渲染意图卡片 `card: 'read'`：一次已结算的读取现在会把 `{ path, lines: [{ number, text }], totalLines, lang? }` 作为 `resultView` 带到会话快照上。这份数据能到达浏览器，但 Web 客户端没有消费者。每个读取行都仅从参数派生，详情面板把结果的 content block 摊平进一个 `<pre>`，于是读取显示为带 `N: text` 前缀的纯文本，没有行号栏、没有语法高亮，也没有窗口读取的"显示 N / M"提示。[web 终端卡片](2026-07-28-web-terminal-card.zh.md)确立了消费一个结构化卡片的模式；读取卡片沿用它，只在结果侧。

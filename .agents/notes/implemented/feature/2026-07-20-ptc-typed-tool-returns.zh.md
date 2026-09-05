@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-20-ptc-typed-tool-returns.md) | 中文
-
 ## 问题
 
 PTC mode 过去会把每个嵌套工具的结果从 `ContentBlock[]` 重新投影为一个字符串。这样虽然保留了适合人类阅读的 Native 呈现，却丢失了工具已经生成的规范结果：程序只能从自然语言中提取 job id 和动态挂载 id；结构化搜索与工作流结果失去原有形态；非文本块则变为占位符。生成的 SDK 可以描述参数，却无论工具实际输出为何都只能承诺 `Promise<string>`。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-11-minimal-profiles-bare-two-tool-runtime.md) | 中文
-
 ## 问题
 
 Web `minimal` preset 与独立 JSON-RPC minimal 组合对外提供持久 `bash` 和 `str_replace_editor`，但支撑服务与目标训练运行时不一致。两者都挂载上下文压缩，而 Web preset 继承宿主的沙箱文件系统，JSON-RPC 组合则挂载 `fs-sandbox` 和文件系统策略。因此，长会话可能替换历史记录，编辑器也会宣告并实施裸本地参考运行时并不具备的文件系统策略。

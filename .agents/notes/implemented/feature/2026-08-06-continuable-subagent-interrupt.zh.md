@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-continuable-subagent-interrupt.md) | 中文
-
 ## 问题
 
 一个正在运行的 continuable subagent 无法在不销毁它的前提下被停止。继续执行管理器只在整个 Activation 拆除（结算、drain、scoped drain）内部取消子 Agent，`send_message`／`subagent.prompt` 只能增加工作，而 Web composer 的 Stop 按钮被刻意限制在普通会话。用户看到 continuable child 在错误路径上持续消耗 token 时，除了终止整个 parent 树别无手段；当直接 parent Agent 离线时，即使 child 的 Activation 仍然在线，也完全无法对其进行控制。一次性运行有持有方拥有的 disposal 和 task-kill；continuable child 没有对应的当前轮次控制。

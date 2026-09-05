@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-19-require-agent-notes-for-non-trivial-changes.md) | 中文
-
 ## 问题
 
 如果只在决策被认为持久、有争议且出人意料时才记录 Agent Note，实质性变更就可能在没有保存决策依据的情况下落地。代码和测试能展示改动内容，却无法稳定保留某种方案胜出的原因、被放弃的备选方案，以及维护者接受的成本。

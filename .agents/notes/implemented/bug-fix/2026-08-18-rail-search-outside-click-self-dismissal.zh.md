@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-18-rail-search-outside-click-self-dismissal.md) | 中文
-
 ## 问题
 
 收起侧边栏的轨道搜索按钮会置位轨道手势标志（`searchOnExpand`）、展开搜索控件（`searchExpanded`）并请求侧边栏展开——设计意图是列滑开后让用户直接落在已聚焦的搜索输入框里。但在真实浏览器中这个手势从未完成：侧边栏展开了，搜索框却保持关闭且未聚焦。

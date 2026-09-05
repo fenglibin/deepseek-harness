@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-29-sticky-composer-conversation-scroll.md) | 中文
-
 ## 问题
 
 活跃会话列把滚动拆成两段：聊天（以及 trajectory）视图自有 `overflow-y: auto`，编辑器栈则作为该滚动容器的兄弟节点坐在下方。指针落在统计行或输入区上时，滚轮打在不可滚动区域上因而毫无效果——只有指针在消息列表上时 transcript 才会移动。草稿变长时更糟：textarea 本身也是滚动容器，编辑器上的滚轮可能被截在那里。会话标题栏必须以普通 chrome 占据列顶（不能在滚动容器内 `position: sticky`），而编辑器必须与 transcript 贴在同一滚动容器底部，使页脚上的滚轮能带动内容流动。

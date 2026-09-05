@@ -1,6 +1,0 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-03-delivery-discipline-spec-tiering.md
-2026-09-03-delivery-discipline-spec-tiering.md: b8473abba2c4ca8923bfc3ab1df857b017de85b7
-2026-09-03-delivery-discipline-spec-tiering.zh.md: 04be86c2b6482594f3fa29fccfdffb56ad7b4697

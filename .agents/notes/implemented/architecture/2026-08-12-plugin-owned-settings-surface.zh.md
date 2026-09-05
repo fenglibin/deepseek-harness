@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-12-plugin-owned-settings-surface.md) | 中文
-
 ## Problem
 
 注册了 settings 命名空间的插件到不了浏览器配置页，而拦住它的两道门都在本仓库里。

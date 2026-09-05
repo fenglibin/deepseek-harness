@@ -109,7 +109,7 @@ export class Session implements SessionFace {
 
   /**
    * Per-session projection value store (push model; see the session-projection
-   * subsystem page, docs/subsystems/session-projection.md): finished whole
+   * subsystem page, docs/subsystems/session-projection.zh.md): finished whole
    * values computed on the Host, seeded by the tail page's
    * projections block and updated by Session Controller control frames under the
    * one higher-seq-wins rule. Keys are read via `projections.faceOf(key)`

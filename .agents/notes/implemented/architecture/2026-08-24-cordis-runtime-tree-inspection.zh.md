@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-24-cordis-runtime-tree-inspection.md) | 中文
-
 ## Problem
 
 Inspector 需要在 Chrome DevTools Elements 中把每个 Host 和 Client Cordis 运行时呈现为一棵树。在 Elements 中选中的 Cordis Context 或 Fiber 也必须表现为实时 Runtime 对象，而 Console 中打印出的 Cordis 对象必须能定位回同一个语义节点。CDP id 不能成为源模型：`NodeId`、`BackendNodeId` 与 `RemoteObjectId` 的 owner 和生命周期不同，并且未来面向模型的运行时查询必须使用同一份 Cordis 数据，而不是再反向解析 CDP。

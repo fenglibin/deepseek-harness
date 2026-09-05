@@ -1,7 +1,5 @@
 # Python SDK 入门
 
-[English](python-sdk.md) | 中文
-
 本教程安装已发布的 Python SDK，运行随附的独立极简 profile，并说明如何从自己的程序自定义同一个 `dsh` profile。
 
 ## 前置条件

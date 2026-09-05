@@ -2,8 +2,6 @@
 
 状态：已实现
 
-[English](2026-08-20-preview-cloudflare-pages-deploy.md) | 中文
-
 ## 问题
 
 浏览器 worker 预览的存在意义是观察某个 pull request 的前端与 host 代码运行态，因此需要一个外人无法访问的、按 pull request 隔离的静态托管。GitHub Pages 的私有发布只在 GitHub Enterprise Cloud 上可用，而本组织尚未定夺；且一个仓库一个 Pages 站点无法隔离多个 pull request。首次部署运行还暴露了一个打包缺陷：干净 checkout 上 `pnpm install` 永远不会创建 `dsh-pack-vfs-image` 的 bin 链接，`build:preview` 在任何「install 不是在 build 之后跑的」工作树上都以 `command not found` 失败。

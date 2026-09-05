@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-session-persistence
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-session-persistence` 通过每个持久化后端都实现的一个后端无关服务（`ctx.sessionPersistence`）持久存储会话的事件日志、在恢复时重新加载并列出已存储会话。持久化单元就是现有 `SessionEvent` 日志——不存在另一套并行的存储消息类型——不可回放的元数据（格式版本、工作目录、血缘、种子边界）作为 `SessionHeader` 单独传输。后端拥有自己的存储，服务拥有语义：仅追加日志、连续序列号、保留中断轮次而非截断的崩溃恢复，以及只在批次安全后才返回的持久写入。选一个后端（按会话存储文件的 `session-persistence-jsonl`，或单库的 `session-persistence-sqlite`），挂载它，会话就会持久化并在恢复时还原，loop 与模型无需知道下面是哪个后端。

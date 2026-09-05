@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-09-md-fragment-anchor-gate.md) | 中文
-
 ## 问题
 
 `verify-md-links` 只证明相对链接的目标文件存在，从不检查 `#fragment`，文档标准以一条人工规则补偿：重命名标题前自己 grep 锚点。一次语料扫描发现 15 条链接的 fragment 在目标中没有对应锚点——三种衰变模式：链接写下后标题被改写（`#security-and-authority-are-explicit-non-goals` 对 note 现在的 `Security and authority are non-goals`）、约定搬迁到另一份属主文档（`tool-fs` 链到 seam README，而无超时规则现居 group README）、zh 侧链接其中文标题永远不会生成的英文 slug（`#deferred-work` 对 `## 推迟工作`）。这些都不触发任何 gate，且每条都把读者悄悄丢在目标页顶部。

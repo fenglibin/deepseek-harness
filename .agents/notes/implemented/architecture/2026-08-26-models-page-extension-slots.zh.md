@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-26-models-page-extension-slots.md) | 中文
-
 ## Problem
 
 出于提供方服务条款的考虑，pi-ai catalog 的提供方登录（GitHub Copilot、OpenAI 账号）正从产品中移出，改由一个可选的仓库外插件承担。该插件需要把登录按钮与登录过程 UI 放进 Models 页的提供方卡片——用户与提供方相遇的界面——但 `ui-settings-models` 的卡片由封闭代码渲染：唯一的集成途径是修改本包，外部插件做不到；页面仅有的开放缝隙（`settings.section`）只能新增一整个独立页面。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-04-claude-code-and-codex-subagent-backends.md) | 中文
-
 ## 问题
 
 命名的 [`ctx.subagents`](2026-06-21-subagent-capability-seam.zh.md) 注册表让父 agent（智能体）无需了解子 agent 的运行方式即可委派工作，但 harness 需要通往真实 Codex 与 Claude Code 产品的第一方路径。每条路径都必须向产品交付一项自包含任务，让它在父会话的工作区中执行，返回最终回答或明确的失败或取消结果，并且不留下任何受管的产品进程。

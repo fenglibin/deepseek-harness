@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-05-skill-system.md) | 中文
-
 ## 问题
 
 agent（智能体）产品已趋同于一种 skill（技能）模式：保持请求提示词精简，仅列出可用的指令包，当模型判定某任务匹配时再加载完整正文。Codex、Claude Code、OpenCode 与 Kimi Code 在细节上各有不同，但都将发现元数据与完整指令分离，使工作区能承载可复用的行为而无需在每个轮次支付全量提示词开销。

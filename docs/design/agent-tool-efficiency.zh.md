@@ -1,7 +1,5 @@
 # 代理工具使用效率：bash 的运行时提示
 
-[English](agent-tool-efficiency.md) | 中文
-
 本文档规定向 `bash` 结果追加的三条窄触发运行时提示，用于把模型导向 harness 已提供的专门工具与事件驱动等待。数据来自 `~/Downloads/session.jsonl`（会话 `session-68379efa`，2 个 turn、389 个 step、112.9 分钟墙钟）。另一会话的剖析见 [agent-task-latency.zh.md](agent-task-latency.zh.md)。
 
 ## 1. 问题

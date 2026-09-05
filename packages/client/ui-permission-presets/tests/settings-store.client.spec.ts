@@ -12,7 +12,7 @@ const SCHEMA = {
   uid: 6,
   refs: {
     1: { type: 'const', value: 'read-only' },
-    2: { type: 'const', meta: { description: 'Workspace' }, value: 'workspace-write' },
+    2: { type: 'const', meta: { description: '可写入工作区' }, value: 'workspace-write' },
     3: { type: 'union', list: [1, 2] },
     6: { type: 'object', dict: { defaultPreset: 3 } },
   },
@@ -53,8 +53,8 @@ describe('permission settings store', () => {
     expect(resolveDefault(view('read-only'))).toEqual({
       currentValue: 'read-only',
       options: [
-        { id: 'read-only', label: 'Read Only' },
-        { id: 'workspace-write', label: 'Workspace' },
+        { id: 'read-only', label: '仅可查看' },
+        { id: 'workspace-write', label: '可写入工作区' },
       ],
     })
     const single = {
@@ -66,7 +66,7 @@ describe('permission settings store', () => {
     }
     expect(resolveDefault(view('read-only', 0, single))).toEqual({
       currentValue: 'read-only',
-      options: [{ id: 'read-only', label: 'Read Only' }],
+      options: [{ id: 'read-only', label: '仅可查看' }],
     })
     const undescribed = {
       uid: 2,
@@ -76,7 +76,7 @@ describe('permission settings store', () => {
       },
     }
     expect(resolveDefault(view('read-only', 0, undescribed)).options)
-      .toEqual([{ id: 'read-only', label: 'Read Only' }])
+      .toEqual([{ id: 'read-only', label: '仅可查看' }])
   })
 
   it('rejects malformed values and dynamic enums at the wire boundary', () => {

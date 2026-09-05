@@ -2,8 +2,6 @@
 
 状态：已实现
 
-[English](2026-08-18-settings-font-size-control.md) | 中文
-
 ## 问题
 
 会话正文字号是固定的（markdown 阶梯按 0.875 重缩放后为 14px）。用户需要一个设置项：在 General → Appearance 下加一行「字号大小」，用步进器交互，范围 12–17，默认 14，同时调整转录正文与 composer 输入框的文字大小。

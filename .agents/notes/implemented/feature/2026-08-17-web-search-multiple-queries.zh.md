@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-17-web-search-multiple-queries.md) | 中文
-
 ## 问题
 
 面向模型的 `web_search` 工具原来只接受单个 `query`。在同时把内部搜索后端以 MCP 方式暴露的部署中，模型更倾向于使用 MCP 搜索工具，因为它能一次传入多个关键词；模型也常常在调用原生 `web_search` 后觉得结果不够，再补一次 MCP 搜索。

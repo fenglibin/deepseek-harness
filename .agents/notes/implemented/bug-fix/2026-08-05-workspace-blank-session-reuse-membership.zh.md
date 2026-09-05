@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-05-workspace-blank-session-reuse-membership.md) | 中文
-
 ## 问题
 
 在侧边栏某个工作区分组的 `+` 上创建会话时，有时会进入一个新会话，但侧边栏把它显示在「未分组」而不是点击的那个工作区下——「进入了新会话，但工作区没有被选中」。故障只出现在注册在 CLI（命令行界面）运行目录（即 `defaults.cwd = process.cwd()`，实际场景里就是 harness 检出目录本身）上的工作区，并且一旦该目录下存在 CLI 创建的空白会话就会出现。

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-30-plan-review-presentation-intent.md) | 中文
-
 ## 问题
 
 `exit_plan_mode` 通过 `ctx.userQuestions.ask()` 把写好的计划交给用户审阅，而这正是 `ask_user_question` 使用的同一个 seam。在 Web GUI 上，这导致计划审阅渲染为[ask-question Web 呈现](2026-07-29-ask-question-web-presentation.zh.md)里的通用问题流程：一个 `1 / 1` 分页器、计划作为问题的补充说明、两个裁决作为带描述的编号单选行、一行「其他，请填写自定义答案」，以及底部的 `跳过本题` / `提交`。

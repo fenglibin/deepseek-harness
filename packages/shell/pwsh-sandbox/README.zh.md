@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-pwsh-sandbox
 
-[English](README.md) | 中文
-
 ## 概述
 
 `dsh-pwsh-sandbox` 是沙箱消费型 PowerShell 执行器：每条命令都以全新的 `pwsh -Command` 进程运行，经 `ctx.sandbox` 能力隔离，并在每个已结算的结果上标记所选模式、强制执行完整度与拒绝事实。在 Windows 上，sandbox seam 解析到 ACL 受限令牌 runner 链；在 Linux 与 macOS 上则使用 bwrap、Landlock 或 Seatbelt。当没有 runner 能强制执行受限模式时，调用按失败关闭原则抛结构化 `SANDBOX_UNAVAILABLE` 错误，绝不无隔离地运行。它是 `dsh-bash-sandbox` 的 pwsh 孪生，逐调用镜像。

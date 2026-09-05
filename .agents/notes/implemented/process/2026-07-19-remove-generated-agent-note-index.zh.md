@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-19-remove-generated-agent-note-index.md) | 中文
-
 ## 问题
 
 提交到仓库的 Agent Note 索引，会重复记录每个文件的生命周期／类别路径、文件名日期和 H1 已经编码的事实。任何分支只要添加、移动或重命名彼此无关的 Agent Note，都会重写同一个生成文件，因此该产物会成为可预见的合并冲突热点。

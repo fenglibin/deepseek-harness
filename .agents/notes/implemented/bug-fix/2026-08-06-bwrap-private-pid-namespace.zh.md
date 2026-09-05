@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-06-bwrap-private-pid-namespace.md) | 中文
-
 ## 问题
 
 bwrap 后端挂载了全新的 `/proc`，但保留宿主 PID 命名空间。因此，受约束命令可以看到宿主进程，并沿 `/proc/<pid>/root`、`/proc/<pid>/fd`、`/proc/<pid>/cwd` 等 procfs 魔法链接进入宿主进程的挂载视图。当访问控制允许跟随其中某条链接时，该路径便可越过 profile 对宿主根目录的只读绑定挂载，以及 `workspace-write` 的 allow-list。宿主的 ptrace 限制有时会阻断该路径，但这类取决于部署环境的权限并不构成约束边界。

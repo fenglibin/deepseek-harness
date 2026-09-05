@@ -5,8 +5,6 @@ kind: "package-reference"
 
 # @deepseek-ai/dsh-session-log-deepseek
 
-[English](README.md) | 中文
-
 ## 概述
 
 用于 DeepSeek 官方 LLM API 请求的增量权威会话日志上传。该函数插件注入 `ctx.sessions` 与 `ctx.deepseekLlmApiExtensions`，并拥有 `dsh_session_log` 请求字段以及用于派生接受水位的持久 `session-log-deepseek/delivery-accepted` 事件。仅当官方 API 需要接收 Session 日志后缀时才启用它。

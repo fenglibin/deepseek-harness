@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-06-20-unify-agent-and-session-id.md) | 中文
-
 ## 问题
 
 一个存活的 agent（智能体）/会话对需要使用同一 identity 完成注册表路由、事件溯源和持久化。让 factory 接受相互独立的 `agentId` 和 `sessionId` 输入，会允许任何生产路径都无法使用的配对，同时迫使每个消费方为同一生命周期在两个名称之间选择或转换。

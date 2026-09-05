@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-07-31-browser-derived-initial-locale.md) | 中文
-
 ## Problem
 
 设置里的语言行在每一次首访时都以中文开场：`LocaleRuntime` 从 localStorage 读取 `dsh.locale`，读不到就直接回落到 `zh`。浏览器本已声明其使用者阅读哪些语言——`navigator.languages` 就是这份声明——而应用对此视而不见，于是英文读者迎面撞上一个中文产品，还得先找到一行中文标签的设置项才能脱身。回落值当时同时承担两份职责：既是无法解析出 locale 时的最后兜底，也是所有从未做过选择的用户拿到的答案。

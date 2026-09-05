@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-09-02-standard-mode-flow-row-disclosure.md) | 中文
-
 ## Problem
 
 Chat 视图——即 `packages/client/ui-chat/src/client/apply.ts` 以 `id: 'chat'`、`order: 0` 注册的 `conversation.view` 条目，产品称之为标准模式——把四件行内本已知晓的事情留给了读者去推断。

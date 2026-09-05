@@ -4,8 +4,6 @@ kind: "package-reference"
 ---
 # @deepseek-ai/dsh-client-ui-approval
 
-[English](README.md) | 中文
-
 ## 概述
 
 基于 Agent-scoped Remote Event waterfall 的浏览器审批界面。插件通过 `ctx.uiSession` 发布每个待处理请求、接管 Conversation composer、按需渲染关联的 Tool 详情，并将用户决定返回给等待中的 Host 请求。当浏览器必须为等待中的 Host 操作收集批准时，请使用它。

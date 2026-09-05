@@ -2,8 +2,6 @@
 
 状态：已实现
 
-[English](2026-08-06-agent-teams-web.md) | 中文
-
 ## 问题
 
 持久 Agent Teams runtime 负责 roster、mailbox 与 task 状态，但只提供模型工具和 Host service method。Web 用户需要查看 teammate 活动、按同样的 compare-and-set 规则管理共享任务，并打开 teammate 会话。Agent Teams 仍处于实验阶段，因此这些能力不能向稳定 API Proxy、Session Controller、Client UI package 或 Web bundle 增加 Team 专用 contract 或依赖。

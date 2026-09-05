@@ -97,8 +97,6 @@ describe('ui-theme apply', () => {
     await before.ctx.plugin({ inject: [...inject], apply }).await()
     expect(before.locale.bind(SETTINGS_NS)('appearance.title')).toBe('外观')
     expect(before.locale.bind(SETTINGS_NS)('fontSize.title')).toBe('字号大小')
-    before.locale.setLocale('en')
-    expect(before.locale.bind(SETTINGS_NS)('appearance.title')).toBe('Appearance')
     const entry = before.slots.entries(SLOT).find(e => e.component === AppearanceRow)!
     expect(entry.options).toMatchObject({ id: 'appearance', order: 10 })
     const fontEntry = before.slots.entries(SLOT).find(e => e.component === FontSizeRow)!

@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-23-win32-utf16-nul-truncation.md) | 中文
-
 ## 问题
 
 `packages/host/directory-picker-native/src/win32-dialog-bindings.ts` 的 `readUtf16` 用 `bytes[end] !== 0` 扫描 `IFileOpenDialog` 结果缓冲区来寻找零字节。UTF-16LE 真正的 NUL 是两个零字节，因此任何低字节为 0 的 BMP 码元——U+XX00，例如「开」(U+5F00)——都会提前结束扫描。选择 `C:\Users\XIAOPAN\Desktop\安卓开发` 这类目录会得到 `C:\Users\XIAOPAN\Desktop\安卓`，随后创建工作区的调用以 `workspace-invalid-path ... ENOENT` 失败。

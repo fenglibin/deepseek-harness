@@ -2,8 +2,6 @@
 
 Status: implemented
 
-[English](2026-08-28-ci-test-reliability-skill.md) | 中文
-
 ## 问题
 
 DeepSeek Harness 会在并发的 Vitest 文件、worker 进程、仓库 gate 与 Actions job 中运行测试。进程隔离不会隔离宿主机端口、可预测路径、外部命名空间或继承的子进程，而进程全局状态变更与未完成的 teardown 可能污染后续测试。即使测试选择了正确层级，也可能只在独占运行时通过。
