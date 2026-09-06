@@ -76,10 +76,13 @@ export function imageUnderstandingKey(route: ImageUnderstandingRoute): string {
 }
 
 /**
- * Flatten the model catalog into selectable rows, keeping the routes it no
- * longer advertises so a stored choice stays visible and removable.
+ * Flatten the model catalog into selectable vision routes: only a model that
+ * declares image input can describe images, so text-only and undeclared models
+ * are dropped. A retained route the catalog no longer advertises — or that no
+ * longer declares image input — stays listed so a stored choice remains
+ * visible and removable.
  * @param groups - current model catalog grouped by provider.
- * @param retained - routes to keep selectable when absent from the catalog.
+ * @param retained - routes to keep selectable when absent from the vision set.
  * @returns candidate rows in catalog order, retained leftovers last.
  */
 export function imageUnderstandingCandidates(
@@ -87,11 +90,14 @@ export function imageUnderstandingCandidates(
   retained: readonly ImageUnderstandingRoute[],
 ): ImageUnderstandingCandidate[] {
   const pending = new Map(retained.map(route => [imageUnderstandingKey(route), route]))
-  const candidates = groups.flatMap(group => group.models.map((model): ImageUnderstandingCandidate => {
+  const candidates = groups.flatMap(group => group.models.flatMap((model): ImageUnderstandingCandidate[] => {
+    // Only a model that declares image input can describe images; a text-only
+    // or undeclared model is never a selectable describer.
+    if (model.inputModalities?.includes('image') !== true) return []
     const route: ImageUnderstandingRoute = { provider: group.id, model: model.id }
     const key = imageUnderstandingKey(route)
     pending.delete(key)
-    return { ...route, key, providerName: group.name, modelName: model.name }
+    return [{ ...route, key, providerName: group.name, modelName: model.name }]
   }))
   for (const route of pending.values()) {
     const key = imageUnderstandingKey(route)

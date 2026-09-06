@@ -49,8 +49,15 @@ const CATALOG: ModelCatalog = {
   default: { provider: 'deepseek-official', model: 'deepseek-chat' },
   routableProviders: ['deepseek-official', 'openai'],
   groups: [
-    { id: 'deepseek-official', name: 'DeepSeek', models: [{ id: 'deepseek-vl', name: 'DeepSeek VL' }] },
-    { id: 'openai', name: 'OpenAI', models: [{ id: 'gpt-4o', name: 'GPT-4o' }] },
+    {
+      id: 'deepseek-official',
+      name: 'DeepSeek',
+      models: [
+        { id: 'deepseek-vl', name: 'DeepSeek VL', inputModalities: ['text', 'image'] },
+        { id: 'deepseek-chat', name: 'DeepSeek Chat', inputModalities: ['text'] },
+      ],
+    },
+    { id: 'openai', name: 'OpenAI', models: [{ id: 'gpt-4o', name: 'GPT-4o', inputModalities: ['text', 'image'] }] },
   ],
   failures: [],
 }
@@ -101,6 +108,13 @@ describe('imageUnderstandingCandidates', () => {
       ...GHOST, key: imageUnderstandingKey(GHOST), providerName: 'ghost', modelName: 'ghost-vl',
     })
     expect(candidates[1]).toMatchObject({ providerName: 'OpenAI', modelName: 'GPT-4o' })
+  })
+
+  it('drops text-only and undeclared catalog models but keeps a retained route', () => {
+    const candidates = imageUnderstandingCandidates(CATALOG.groups, [])
+    expect(candidates.map(candidate => candidate.model)).toEqual(['deepseek-vl', 'gpt-4o'])
+    const retained = imageUnderstandingCandidates(CATALOG.groups, [{ provider: 'deepseek-official', model: 'deepseek-chat' }])
+    expect(retained.map(candidate => candidate.model)).toEqual(['deepseek-vl', 'gpt-4o', 'deepseek-chat'])
   })
 })
 
