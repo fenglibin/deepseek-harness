@@ -23,7 +23,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-打开设置中的 **MCP**，即可看到每个已配置的服务器、它的传输方式、实时连接状态，以及它注册了多少工具。**添加服务器**打开一个用于新建条目的弹窗，**编辑**在已有条目上重新打开该弹窗，**删除**在确认后移除条目，行内开关启用或禁用它，**刷新**则强制一个正在运行的服务器重连。
+打开设置中的 **MCP**，即可看到每个已配置的服务器、它的传输方式、实时连接状态，以及它注册了多少工具。**添加服务器**打开一个用于新建条目的弹窗，**编辑**在已有条目上重新打开该弹窗，**删除**在确认后移除条目，行内开关启用或禁用它，**刷新**则强制一个正在运行的服务器重连，**配置MCP** 在原生编辑器中打开独立的 `mcp.json`（跨厂商 `mcpServers` 结构）供手动编辑。
 
 ### 何时选择它
 
@@ -55,7 +55,7 @@ kind: "package-reference"
 <details>
 <summary>实现细节——点击展开</summary>
 
-本分区是一次 slot 贡献，建立在三个注入的服务之上：绑定到 Host 拥有的 settings 命名空间的服务器列表 store、位于 Host `mcp` Remote 命名空间之上的状态 store，以及承载其文案的 locale 词典。
+本分区是一次 slot 贡献，建立在四个注入的服务之上：绑定到 Host 拥有的 settings 命名空间的服务器列表 store、位于 Host `mcp` Remote 命名空间之上的状态 store、打开独立 `mcp.json` 的配置文档 store，以及承载其文案的 locale 词典。
 
 ### 分区注册
 
@@ -68,6 +68,10 @@ kind: "package-reference"
 ### 状态叠加层
 
 状态 store 按需拉取 manager 的 `list` Remote 方法，并订阅推送来的 `mcp/status` 事件以重新拉取。已在飞行中的拉取绝不会叠加：期间到达的推送事件会置起一个重载标志，由飞行中的那次拉取在落定时兑现。`refresh(name)` 请求 manager 丢弃该服务器当前的 mcp-client 实例并挂载一个新的，然后重新拉取，使行内显示新的连接状态与工具名。
+
+### 配置文档动作
+
+**配置MCP** 按钮由配置文档 store 驱动：它以 loopback 事实推导可用性（远程部署没有本地文件），并在可打开时调用 Host `mcp` Remote 命名空间的 `openMcpDocument()`，把独立于 settings 文档的 `mcp.json` 交给原生编辑器。文档缺失时 Host 会先播种一份；编辑后的变更由 manager 单向同步回 `mcp` 命名空间，而不经过本分区。store 维护 `opening` 与失败诊断，因此并发点击与打开失败都被就地处理。
 
 </details>
 

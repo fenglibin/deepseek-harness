@@ -78,4 +78,22 @@ describe('ImageChip', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close original image preview' }))
     expect(screen.queryByRole('dialog')).toBeNull()
   })
+
+  it('shows a hover preview on pointer enter and hides it on leave', () => {
+    render(<ImageChip {...props()} />)
+    const thumb = screen.getByRole('button', { name: 'Original image preview' })
+    fireEvent.mouseEnter(thumb)
+    expect(screen.getAllByAltText('shot.png')).toHaveLength(2)
+    fireEvent.mouseLeave(thumb)
+    expect(screen.getAllByAltText('shot.png')).toHaveLength(1)
+  })
+
+  it('shows the hover preview on focus and hides it on blur', () => {
+    render(<ImageChip {...props()} />)
+    const thumb = screen.getByRole('button', { name: 'Original image preview' })
+    fireEvent.focus(thumb)
+    expect(screen.getAllByAltText('shot.png')).toHaveLength(2)
+    fireEvent.blur(thumb)
+    expect(screen.getAllByAltText('shot.png')).toHaveLength(1)
+  })
 })

@@ -17,6 +17,10 @@ import {
   LIGHTWEIGHT_MODEL_SETTINGS_NS, LightweightModelStore, lightweightModelKey,
 } from '../src/client/lightweight-model-store.ts'
 import type { LightweightModelSettings } from '../src/client/lightweight-model-store.ts'
+import {
+  IMAGE_UNDERSTANDING_SETTINGS_NS, ImageUnderstandingModelStore,
+} from '../src/client/image-understanding-model-store.ts'
+import type { ImageUnderstandingSettings } from '../src/client/image-understanding-model-store.ts'
 import { providerCopy, providerTargetLabel } from '../src/client/provider-identity.ts'
 import { pathOps } from '../src/client/ProviderEditor.tsx'
 import {
@@ -324,6 +328,23 @@ async function lightweightStore(
   return store
 }
 
+async function imageUnderstandingStore(
+  ctx: PageContext,
+  mirror: SettingsDescribeMirror,
+  persistence: 'host' | 'memory' = 'memory',
+): Promise<ImageUnderstandingModelStore> {
+  const scope = new SettingsScopeController<ImageUnderstandingSettings>(
+    ctx,
+    { namespace: IMAGE_UNDERSTANDING_SETTINGS_NS },
+    mirror,
+    persistence,
+    new SettingsSchemaService(new Context()),
+  )
+  const store = new ImageUnderstandingModelStore(scope, ctx)
+  if (persistence === 'host') await mirror.load()
+  return store
+}
+
 async function mountFace(
   scripted: ReturnType<typeof scriptedFace>,
   persistence: 'host' | 'memory' = 'memory',
@@ -334,19 +355,24 @@ async function mountFace(
   const controller = new ModelsSettingsStore(ctx, settingsSchema, mirror)
   await controller.load()
   const lightweight = await lightweightStore(ctx, mirror, persistence)
+  const imageUnderstanding = await imageUnderstandingStore(ctx, mirror, persistence)
   const renderSlot = stubRenderSlot()
   const injected: ModelsSectionProps = {
     controller,
     lightweight,
+    imageUnderstanding,
     useSnapshot: bindSnapshotSelector(controller.store),
     useLightweight: bindSnapshotSelector(lightweight.store),
+    useImageUnderstanding: bindSnapshotSelector(imageUnderstanding.store),
     operations: operationsWith(face),
     schema: settingsSchema,
     t,
     renderSlot: renderSlot as unknown as ModelsSectionProps['renderSlot'],
   }
   const view = render(<ModelsSection {...injected} />)
-  return { view, ctx, face, update, mutate, set, unset, controller, lightweight, mirror, renderSlot }
+  return {
+    view, ctx, face, update, mutate, set, unset, controller, lightweight, imageUnderstanding, mirror, renderSlot,
+  }
 }
 
 async function mountSection(overrides: Parameters<typeof scriptedFace>[0] = {}) {
@@ -354,16 +380,24 @@ async function mountSection(overrides: Parameters<typeof scriptedFace>[0] = {}) 
 }
 
 /**
- * The lightweight-model props a direct render needs. These mounts script the
- * provider directory, not the model catalog, so they take the remote-browser
- * posture: the card renders locked and reaches no wire of its own.
+ * The lightweight-model and image-understanding props a direct render needs.
+ * These mounts script the provider directory, not the model catalog, so they
+ * take the remote-browser posture: each card renders locked and reaches no
+ * wire of its own.
  * @param face - the scripted wire face the page context is built from.
- * @returns the two props ModelsSection reads for the card.
+ * @returns the store/hook props ModelsSection reads for the two preference cards.
  */
 async function lockedLightweight(face: object) {
   const ctx = ctxWith(face)
-  const lightweight = await lightweightStore(ctx, new SettingsDescribeMirror(ctx))
-  return { lightweight, useLightweight: bindSnapshotSelector(lightweight.store) }
+  const mirror = new SettingsDescribeMirror(ctx)
+  const lightweight = await lightweightStore(ctx, mirror)
+  const imageUnderstanding = await imageUnderstandingStore(ctx, mirror)
+  return {
+    lightweight,
+    useLightweight: bindSnapshotSelector(lightweight.store),
+    imageUnderstanding,
+    useImageUnderstanding: bindSnapshotSelector(imageUnderstanding.store),
+  }
 }
 
 /** Open the add dialog on the chooser. */
@@ -1743,12 +1777,19 @@ async function mountLightweight(script?: (face: ReturnType<typeof scriptedFace>[
   return mounted
 }
 
+/** The container element of the preference card owning `label`, for scoped queries. */
+function cardOf(label: string): HTMLElement {
+  const card = screen.getByLabelText(label).closest('[class*="card"]')
+  if (card === null) throw new Error(`no card owns label "${label}"`)
+  return card as HTMLElement
+}
+
 describe('lightweight model card', () => {
   it('disables the picker and says so when the browser cannot write', async () => {
     await mountSection()
     expect(screen.getByText(zh.lightweightModelReadOnly)).toBeTruthy()
     expect(screen.getByLabelText<HTMLSelectElement>(zh.lightweightModel).disabled).toBe(true)
-    const save = screen.getByText(zh.lightweightModelSave).closest('button')
+    const save = within(cardOf(zh.lightweightModel)).getByText(zh.lightweightModelSave).closest('button')
     expect(save?.disabled).toBe(true)
   })
 
@@ -1764,7 +1805,7 @@ describe('lightweight model card', () => {
     ])
     fireEvent.change(select, { target: { value: LW_OPENAI } })
     await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(true) })
-    fireEvent.click(screen.getByText(zh.lightweightModelSave))
+    fireEvent.click(within(cardOf(zh.lightweightModel)).getByText(zh.lightweightModelSave))
     await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(false) })
     expect(face.settings.mutate.mock.calls[0]?.[0]).toBe('lightweight-model')
   })
@@ -1784,7 +1825,7 @@ describe('lightweight model card', () => {
     expect(screen.getByText('ghost / ghost-1')).toBeTruthy()
     fireEvent.change(screen.getByLabelText(zh.lightweightModel), { target: { value: '' } })
     await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(true) })
-    fireEvent.click(screen.getByText(zh.lightweightModelSave))
+    fireEvent.click(within(cardOf(zh.lightweightModel)).getByText(zh.lightweightModelSave))
     await waitFor(() => { expect(lightweight.store.getSnapshot().selected).toBeUndefined() })
     expect(scripted.face.settings.mutate.mock.calls[0]?.[1]).toEqual([
       { op: 'set', path: ['provider'], value: '' },
@@ -1797,7 +1838,7 @@ describe('lightweight model card', () => {
     const select = screen.getByLabelText<HTMLSelectElement>(zh.lightweightModel)
     fireEvent.change(select, { target: { value: LW_DEEPSEEK } })
     await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(true) })
-    fireEvent.click(screen.getByText(zh.lightweightModelDiscard))
+    fireEvent.click(within(cardOf(zh.lightweightModel)).getByText(zh.lightweightModelDiscard))
     await waitFor(() => { expect(lightweight.store.getSnapshot().dirty).toBe(false) })
     select.value = LW_DEEPSEEK
     expect(face.settings.mutate.mock.calls).toHaveLength(0)
@@ -1836,9 +1877,9 @@ describe('lightweight model card', () => {
       wire.settings.mutate = vi.fn(() => gate.then(() => lightweightAnswer({ provider: 'deepseek-official', model: 'deepseek-chat' })))
     })
     fireEvent.change(screen.getByLabelText(zh.lightweightModel), { target: { value: LW_DEEPSEEK } })
-    fireEvent.click(screen.getByText(zh.lightweightModelSave))
-    await waitFor(() => { expect(screen.getByText(zh.lightweightModelSaving)).toBeTruthy() })
-    expect(screen.getByText(zh.lightweightModelSaving).closest('button')?.disabled).toBe(true)
+    fireEvent.click(within(cardOf(zh.lightweightModel)).getByText(zh.lightweightModelSave))
+    await waitFor(() => { expect(within(cardOf(zh.lightweightModel)).getByText(zh.lightweightModelSaving)).toBeTruthy() })
+    expect(within(cardOf(zh.lightweightModel)).getByText(zh.lightweightModelSaving).closest('button')?.disabled).toBe(true)
     expect(screen.getByLabelText<HTMLSelectElement>(zh.lightweightModel).disabled).toBe(true)
     release?.()
     await waitFor(() => { expect(lightweight.store.getSnapshot().saving).toBe(false) })
@@ -1849,7 +1890,7 @@ describe('lightweight model card', () => {
       wire.settings.mutate = vi.fn(() => Promise.resolve(lightweightAnswer({ provider: '', model: '' })))
     })
     fireEvent.change(screen.getByLabelText(zh.lightweightModel), { target: { value: LW_DEEPSEEK } })
-    fireEvent.click(screen.getByText(zh.lightweightModelSave))
+    fireEvent.click(within(cardOf(zh.lightweightModel)).getByText(zh.lightweightModelSave))
     await waitFor(() => { expect(screen.getByText(zh.lightweightModelFailed)).toBeTruthy() })
     expect(lightweight.store.getSnapshot()).toMatchObject({ failed: true, dirty: true })
   })

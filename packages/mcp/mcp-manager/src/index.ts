@@ -10,11 +10,13 @@
 
 export { MCP_SETTINGS_NAMESPACE, MCP_SETTINGS_SCHEMA, SERVER_NAME_PATTERN, validateServers } from './config.ts'
 export type { McpHttpServer, McpServerEntry, McpSettings, McpStdioServer } from './config.ts'
+export { MCP_JSON_FILENAME, mcpJsonToSettings, parseMcpJson, renderMcpJson, settingsToMcpJson } from './mcp-json.ts'
+export type { McpJson, McpJsonServer } from './mcp-json.ts'
 export { reconcile, serversEqual } from './reconcile.ts'
 export type { ReconcileAction } from './reconcile.ts'
 export { McpManager } from './manager.ts'
 export type { McpServerStatus } from './manager.ts'
-export type { McpServerStatusKind, McpServerStatusView } from './status.ts'
+export type { McpDocumentOpenValue, McpServerStatusKind, McpServerStatusView } from './status.ts'
 
 import { McpManager } from './manager.ts'
 export default McpManager

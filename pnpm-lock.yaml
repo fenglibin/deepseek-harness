@@ -6878,6 +6878,9 @@ importers:
       '@deepseek-ai/dsh-llm':
         specifier: workspace:^
         version: link:../llm
+      '@deepseek-ai/dsh-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
 
   packages/llm/llm:
     dependencies:
@@ -7328,6 +7331,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
+      chokidar:
+        specifier: ^4.0.3
+        version: 4.0.3
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -7341,6 +7347,9 @@ importers:
       '@deepseek-ai/dsh-mcp-client':
         specifier: workspace:^
         version: link:../mcp-client
+      '@deepseek-ai/dsh-native-command':
+        specifier: workspace:^
+        version: link:../../util/native-command
       '@deepseek-ai/dsh-settings':
         specifier: workspace:^
         version: link:../../settings/settings

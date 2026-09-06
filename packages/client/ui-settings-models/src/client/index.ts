@@ -26,6 +26,10 @@ import {
   LIGHTWEIGHT_MODEL_SETTINGS_NS, LightweightModelStore,
 } from './lightweight-model-store.ts'
 import type { LightweightModelSettings } from './lightweight-model-store.ts'
+import {
+  IMAGE_UNDERSTANDING_SETTINGS_NS, ImageUnderstandingModelStore,
+} from './image-understanding-model-store.ts'
+import type { ImageUnderstandingSettings } from './image-understanding-model-store.ts'
 import { ModelsSettingsStore } from './store.ts'
 import { createModelsOperations } from './operations.ts'
 import { createSettingsSchemaOperations } from './schema-operations.ts'
@@ -90,7 +94,12 @@ export function apply(ctx: ClientContext): void {
   const injected = (): ModelsSectionInjected => ({
     controller,
     lightweight,
-    hooks: { snapshot: controller.store, lightweight: lightweight.store },
+    imageUnderstanding,
+    hooks: {
+      snapshot: controller.store,
+      lightweight: lightweight.store,
+      imageUnderstanding: imageUnderstanding.store,
+    },
     operations,
     schema,
     t,
@@ -106,6 +115,10 @@ export function apply(ctx: ClientContext): void {
   // so neither store needs an isLoopback branch of its own.
   const lightweight = new LightweightModelStore(
     ctx.settingsScope.bind<LightweightModelSettings>({ namespace: LIGHTWEIGHT_MODEL_SETTINGS_NS }),
+    ctx,
+  )
+  const imageUnderstanding = new ImageUnderstandingModelStore(
+    ctx.settingsScope.bind<ImageUnderstandingSettings>({ namespace: IMAGE_UNDERSTANDING_SETTINGS_NS }),
     ctx,
   )
   const welcomeController = new WelcomeNoticeStore(ctx.settingsScope.bind({
@@ -139,6 +152,7 @@ export function apply(ctx: ClientContext): void {
     ]
     return () => {
       lightweight.dispose()
+      imageUnderstanding.dispose()
       welcomeController.dispose()
       for (const dispose of disposers) dispose()
     }

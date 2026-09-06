@@ -284,6 +284,5 @@ describe('ImageGallery', () => {
     const view = render(<MessageImages {...props} />)
     await waitFor(() => { expect(view.getByAltText('history.png')).toBeTruthy() })
     expect(view.getByRole('button', { name: 'history.png，点击查看原图' })).toBeTruthy()
-    expect(view.container.querySelector('[data-align="end"]')).not.toBeNull()
   })
 })

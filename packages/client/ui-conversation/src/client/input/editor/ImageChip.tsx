@@ -6,10 +6,31 @@
  * seat, so the node carries them like ReferenceChipNode carries its label.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { DraftAttachmentId } from '../../contract/input.ts'
 import css from './ImageChip.module.css'
+
+/** Vertical clearance the hover preview needs plus its drop gap. */
+const HOVER_PREVIEW_SPACE = 264
+
+/**
+ * Fixed-position style floating the hover preview above the chip, or below it
+ * when the viewport top has no room. The anchor is measured at pointer-enter
+ * time, so the preview holds still while it is shown.
+ * @param anchor - the chip element the preview floats near, or null while unmounted.
+ * @returns the fixed-offset style, or a hidden fallback without an anchor.
+ */
+function hoverPreviewStyle(anchor: HTMLElement | null): CSSProperties {
+  if (anchor === null) return { display: 'none' }
+  const rect = anchor.getBoundingClientRect()
+  const gap = 8
+  const showAbove = rect.top > HOVER_PREVIEW_SPACE || rect.top > window.innerHeight - rect.bottom
+  return showAbove
+    ? { left: rect.left + rect.width / 2, top: rect.top - gap, transform: 'translate(-50%, -100%)' }
+    : { left: rect.left + rect.width / 2, top: rect.bottom + gap, transform: 'translate(-50%, 0)' }
+}
 
 /** Display inputs of one image chip (the node's cached owner projections). */
 export interface ImageChipProps {
@@ -45,6 +66,8 @@ export function ImageChip({
   removeLabel, pendingAlt, lightboxDialog, lightboxClose, onRemove,
 }: ImageChipProps) {
   const [open, setOpen] = useState(false)
+  const [hovering, setHovering] = useState(false)
+  const chipRef = useRef<HTMLSpanElement | null>(null)
   const close = useCallback(() => { setOpen(false) }, [])
   const closeRef = useRef<HTMLButtonElement | null>(null)
   const restoreRef = useRef<HTMLElement | null>(null)
@@ -66,12 +89,16 @@ export function ImageChip({
   const alt = name === '' ? pendingAlt : name
   return (
     <>
-      <span className={css.chip}>
+      <span ref={chipRef} className={css.chip}>
         <button
           type="button"
           className={css.thumb}
           aria-label={lightboxDialog}
           onClick={() => { setOpen(true) }}
+          onMouseEnter={() => { setHovering(true) }}
+          onMouseLeave={() => { setHovering(false) }}
+          onFocus={() => { setHovering(true) }}
+          onBlur={() => { setHovering(false) }}
         >
           <img
             className={css.img}
@@ -89,6 +116,12 @@ export function ImageChip({
           <IconCloseOutline16 size={12} />
         </button>
       </span>
+      {hovering && createPortal(
+        <div className={css.hoverPreview} aria-hidden="true" style={hoverPreviewStyle(chipRef.current)}>
+          <img className={css.hoverPreviewImg} src={previewUrl} alt={alt} />
+        </div>,
+        document.body,
+      )}
       {open && createPortal(
         <div className={css.backdrop} role="dialog" aria-modal="true" aria-label={lightboxDialog}>
           <div className={css.mask} aria-hidden="true" onMouseDown={close} />

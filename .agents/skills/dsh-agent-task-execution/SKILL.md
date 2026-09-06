@@ -1,6 +1,6 @@
 ---
 name: dsh-agent-task-execution
-description: Use when working a multi-step coding task in this repository, to spend model round trips on the change instead of on ceremony — finish code and unit tests before touching documentation, close out bilingual docs and the Agent Note in one pass, persist diagnosis as structured findings before a turn ends, and verify only the affected package scope.
+description: Use when working a multi-step coding task in this repository, to spend model round trips on the change instead of on ceremony — finish code and unit tests before touching documentation, close out documentation and the Agent Note in one pass, persist diagnosis as structured findings before a turn ends, and verify only the affected package scope.
 ---
 
 # DSH Agent Task Execution
@@ -12,16 +12,16 @@ A measured task in this repository — 189 lines across 12 files, one package �
 | Diagnosing the fault | 27% | 26 |
 | Re-locating code the previous turn already found | 26% | 11 |
 | Writing the change and its tests | 9% | 9 |
-| README bilingual copy, i18n sidecar, pairing gate | 12% | 10 |
-| Agent Note bilingual copy, format gate, final verification | 27% | 19 |
+| README copy and its gates | 12% | 10 |
+| Agent Note copy, format gate, final verification | 27% | 19 |
 
-Two facts drive this skill. Ceremony — bilingual documentation, i18n sidecars, Agent Notes, and their gates — cost 38%, more than writing the code. Re-locating files an earlier turn had already found cost another 26%. Both are round-trip costs, not thinking costs, and both are avoidable by ordering the work differently.
+Two facts drive this skill. Ceremony — documentation, Agent Notes, and their gates — cost 38%, more than writing the code. Re-locating files an earlier turn had already found cost another 26%. Both are round-trip costs, not thinking costs, and both are avoidable by ordering the work differently.
 
 ## Work in three phases
 
 Interleaving is what makes the bill grow. Finish one phase before starting the next:
 
-1. **Locate and change.** Read, search, and edit until the behavior is right and the owning unit tests pass. Do not touch documentation, Agent Notes, or sidecars in this phase, even when the file you are editing sits next to one.
+1. **Locate and change.** Read, search, and edit until the behavior is right and the owning unit tests pass. Do not touch documentation or Agent Notes in this phase, even when the file you are editing sits next to one.
 2. **Verify.** Run only the affected scope, as described below.
 3. **Close out.** Write every documentation and Agent Note artifact in one pass, then run their gates once.
 
@@ -37,7 +37,7 @@ Keep dependent calls in separate steps. A search whose pattern depends on what a
 
 In the closing phase, write all of these together rather than as each file reminds you:
 
-- the package or subsystem README in English, then its Chinese counterpart, then `verify-translation-pairing --write` once
+- the package or subsystem README
 - the Agent Note, compact or full per the criteria below
 - any generated catalog the change invalidates
 

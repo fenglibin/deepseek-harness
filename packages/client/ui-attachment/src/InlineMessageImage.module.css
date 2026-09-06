@@ -1,0 +1,58 @@
+/* Inline message image: a small thumbnail that sits inside a user message's
+   text line, plus a transient hover preview floated above it. */
+
+.frame {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  margin: 0 2px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: 8px;
+  background: var(--dsw-alias-interactive-bg-hover);
+  cursor: zoom-in;
+  vertical-align: middle;
+}
+
+.frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.loading,
+.error {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.error {
+  display: inline-block;
+  vertical-align: middle;
+  padding: 4px 8px;
+  border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: 8px;
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+  cursor: pointer;
+}
+
+.hoverPreview {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--dsw-specific-input-major);
+  box-shadow: var(--dsw-shadow-lv3);
+}
+
+.hoverPreviewImg {
+  display: block;
+  max-width: 240px;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 6px;
+}

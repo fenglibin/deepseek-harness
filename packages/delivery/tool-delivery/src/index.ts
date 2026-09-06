@@ -6,11 +6,13 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import { DeliveryTaskId, nextDeliveryPhase } from '@deepseek-ai/dsh-delivery'
 import type { DeliveryLevel, DeliveryPhase, DeliveryTaskRef, DeliveryView } from '@deepseek-ai/dsh-delivery'
 import type {} from '@deepseek-ai/dsh-fs'
 import { createUserMessage, HarnessError } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import type { UserMessage } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-shell'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -51,6 +53,8 @@ export interface Config {
   requireOpenspecForBugs?: boolean
   /** Post-execution commands run before a task may reach accepted. */
   postHooks?: string[]
+  /** Auto-create a task at pre-step when a direct human request meets the size proxy. */
+  autoDetect?: boolean
 }
 
 /** Schemastery config for the delivery-tool policy. */
@@ -68,6 +72,7 @@ export const Config: z<Config> = z.object({
   }).default({ todoCount: 15, descriptionChars: 1200 }),
   requireOpenspecForBugs: z.boolean().default(true),
   postHooks: z.array(z.string()).default([]),
+  autoDetect: z.boolean().default(true),
 })
 
 /** Fully materialized tool policy. */
@@ -81,6 +86,7 @@ interface ResolvedConfig {
   readonly specChars: number
   readonly requireOpenspecForBugs: boolean
   readonly postHooks: readonly string[]
+  readonly autoDetect: boolean
 }
 
 const PHASES: readonly DeliveryPhase[] = [
@@ -166,18 +172,48 @@ function deliveryValue(task: DeliveryView | undefined): DeliveryToolValue {
   }
 }
 
+/** Size-classification signals the model uses to choose a delivery level. */
+const SIZE_RUBRIC =
+  'Choose the level from these size signals. Any one strong signal makes the task non-small: '
+  + 'it introduces or changes a structure contract (a capability seam, a session event, a persisted '
+  + 'schema or projection, a public API or protocol, or a cross-version data format) (l2); it is a '
+  + 'non-small bug fix or a change to data format, protocol, compatibility, or security (l2); it spans '
+  + 'host and client or at least three packages, or changes a widely-referenced public symbol (l1); it '
+  + 'adds a whole feature or capability, or performs a large-scale refactor or migration (l1). Two or '
+  + 'more weak signals also make it l1: at least two design decisions that need weighing, decomposable '
+  + 'into at least three independent verifiable subtasks, or multi-role coordination. Otherwise it is '
+  + 'an l0 small fix.'
+
+/** Visible text of one user message. */
+function messageText(message: UserMessage): string {
+  return message.content
+    .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')
+    .map(block => block.text)
+    .join(' ')
+}
+
+/** Direct human request text from a claimed step batch, joined across messages. */
+function directHumanText(messages: readonly UserMessage[]): string {
+  return messages
+    .filter(message => message.source.kind === 'user')
+    .map(messageText)
+    .join('\n')
+    .trim()
+}
+
 /** Render the delivery-discipline policy guidance for the model. */
 function guidance(): string {
   return 'Use the delivery tools to run larger pieces of work under the delivery discipline. '
-    + 'create_delivery_task takes an objective and an optional level: l0 for a small fix, l1 to add a '
-    + 'design, l2 to add an openspec split; omit level and it is inferred from the objective length and '
-    + 'any todo_count/touched_files estimates. Before advancing to designed, record at least one design '
-    + 'with record_design (writes .dsh/design/<task-id>.md); before specified, record a spec with '
-    + 'record_spec (writes openspec/changes/<task-id>/spec.md); before implemented, record at least one '
-    + 'change with record_change (writes .dsh/changes/<task-id>.md). Call get_delivery_task first and copy '
-    + 'its exact task_id and revision into every record and advance call. Use todo_write only for '
-    + 'lightweight multi-step tracking; use the delivery tools when the work must leave a design or '
-    + 'change record on disk.'
+    + 'Classify the request size first: a non-small task (l1/l2) needs a design or a split, an l0 is a '
+    + 'small fix; see create_delivery_task for the size signals. create_delivery_task takes an objective '
+    + 'and an optional level: l0 for a small fix, l1 to add a design, l2 to add an openspec split; omit '
+    + 'level and it is inferred from the objective length and any todo_count/touched_files estimates. '
+    + 'Before advancing to designed, record at least one design with record_design (writes '
+    + '.dsh/design/<task-id>.md); before specified, record a spec with record_spec (writes '
+    + 'openspec/changes/<task-id>/spec.md); before implemented, record at least one change with '
+    + 'record_change (writes .dsh/changes/<task-id>.md). Call get_delivery_task first and copy its exact '
+    + 'task_id and revision into every record and advance call. Use todo_write only for lightweight '
+    + 'multi-step tracking; use the delivery tools when the work must leave a design or change record on disk.'
 }
 
 /** Generic, args-only pending presentation shared by the delivery tools. */
@@ -245,6 +281,7 @@ function resolveConfig(config: Config): ResolvedConfig {
     specChars,
     requireOpenspecForBugs: config.requireOpenspecForBugs ?? true,
     postHooks,
+    autoDetect: config.autoDetect ?? true,
   }
 }
 
@@ -332,6 +369,25 @@ export function apply(ctx: Context, config: Config): void {
     text: guidance(),
   })
 
+  if (resolved.autoDetect) {
+    ctx.on('agent/pre-step', async ({ agent, messages, signal }, next): Promise<PreStepDecision> => {
+      if (signal.aborted) return next()
+      try {
+        if (ctx.delivery.get(agent) === undefined) {
+          const objective = directHumanText(messages)
+          if (objective.length >= resolved.designChars) {
+            const level = inferLevel(objective, { todoCount: 0, touchedFiles: 0, isBug: false }, resolved)
+            ctx.delivery.create(agent, { objective, level })
+          }
+        }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error)
+        ctx.logger.warn(`delivery auto-detect failed: ${message}; continuing the turn`)
+      }
+      return next()
+    })
+  }
+
   ctx.tools.register(defineTool({
     name: 'get_delivery_task',
     description: 'Read the current delivery task, including its exact id/revision, objective, phase, '
@@ -351,9 +407,8 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'create_delivery_task',
     description: 'Create one delivery task in the created phase. Use it for a concrete piece of work '
-      + 'that should produce a change record; level selects the discipline path (l0 small fix, l1 adds '
-      + 'a design, l2 adds an openspec split). When level is omitted it is inferred from the objective '
-      + 'length plus optional todo_count and touched_files estimates. An accepted task may be replaced.',
+      + 'that should produce a change record. ' + SIZE_RUBRIC + ' When level is omitted it is inferred '
+      + 'from the objective length plus optional todo_count and touched_files estimates. An accepted task may be replaced.',
     parameters: {
       objective: { type: 'string', required: true, description: 'The concrete task objective.' },
       level: { type: 'string', enum: ['l0', 'l1', 'l2'], description: 'Task-size class; inferred when omitted.' },
@@ -456,6 +511,7 @@ export function apply(ctx: Context, config: Config): void {
       task_id: { type: 'string', required: true, description: 'Exact id returned by get_delivery_task.' },
       revision: { type: 'number', required: true, description: 'Exact positive revision returned by get_delivery_task.' },
       phase: { type: 'string', required: true, enum: PHASES, description: 'The target next phase.' },
+      coverage_confirmation: { type: 'string', description: 'Required when advancing to accepted on a task with design or spec records: state that every recorded design/spec is implemented.' },
     },
     output: {
       schema: DELIVERY_OUTPUT_SCHEMA,
@@ -463,7 +519,7 @@ export function apply(ctx: Context, config: Config): void {
     },
     async execute(args, exec) {
       const agent = deliveryAgent(ctx, exec)
-      const ref = deliveryRef(args.task_id, args.revision)
+      let ref = deliveryRef(args.task_id, args.revision)
       const current = ctx.delivery.get(agent)
       const gate = gateAdvance(current, args.phase)
       if (gate !== undefined) {
@@ -472,6 +528,21 @@ export function apply(ctx: Context, config: Config): void {
         }
         exec.deferContext(createUserMessage({
           content: [{ type: 'text', text: `Delivery reminder: ${gate}` }],
+          source: { kind: 'plugin', plugin: 'tool-delivery', form: 'notice', summary: 'delivery gate' },
+        }))
+      }
+      const needsCoverage = args.phase === 'accepted' && current !== undefined
+        && (current.designCount > 0 || current.specCount > 0)
+      const confirmation = needsCoverage
+        ? (typeof args.coverage_confirmation === 'string' ? args.coverage_confirmation.trim() : '')
+        : ''
+      if (needsCoverage && confirmation.length === 0) {
+        const message = 'at least one design or spec record is unconfirmed; provide coverage_confirmation stating each was implemented'
+        if (resolved.enforcement === 'stateful') {
+          throw new HarnessError(message, 'DELIVERY_GATE_BLOCKED')
+        }
+        exec.deferContext(createUserMessage({
+          content: [{ type: 'text', text: `Delivery reminder: ${message}` }],
           source: { kind: 'plugin', plugin: 'tool-delivery', form: 'notice', summary: 'delivery gate' },
         }))
       }
@@ -485,6 +556,19 @@ export function apply(ctx: Context, config: Config): void {
             content: [{ type: 'text', text: `Delivery reminder: ${failure}` }],
             source: { kind: 'plugin', plugin: 'tool-delivery', form: 'notice', summary: 'delivery post-hook' },
           }))
+        }
+      }
+      if (args.phase === 'accepted' && current !== undefined) {
+        if (confirmation.length > 0) {
+          const view = ctx.delivery.recordChange(agent, ref, `coverage confirmation: ${confirmation}`)
+          await appendArtifact(ctx, agent, `.dsh/changes/${view.id}.md`, `- [revision ${view.revision}] coverage confirmation: ${confirmation}\n`)
+          ref = { id: view.id, revision: view.revision }
+        }
+        const latest = ctx.delivery.get(agent)
+        if (latest !== undefined && latest.changeCount === 0) {
+          const view = ctx.delivery.recordChange(agent, ref, `task accepted: ${latest.objective}`)
+          await appendArtifact(ctx, agent, `.dsh/changes/${view.id}.md`, `- [revision ${view.revision}] task accepted: ${latest.objective}\n`)
+          ref = { id: view.id, revision: view.revision }
         }
       }
       return deliveryValue(ctx.delivery.advance(agent, ref, args.phase))

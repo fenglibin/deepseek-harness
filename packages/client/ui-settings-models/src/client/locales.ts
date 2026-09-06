@@ -114,6 +114,16 @@ export const zh = {
   lightweightModelFailed: '轻量模型保存失败。',
   lightweightModelEmpty: '暂无可选模型。',
   lightweightModelRetrying: '正在加载模型目录…',
+  imageUnderstanding: '图片理解模型',
+  imageUnderstandingHint: '当会话模型不支持图片输入时，使用该视觉模型提取图片内容并转成文字。',
+  imageUnderstandingUnset: '不指定——自动选择首个支持图片的模型',
+  imageUnderstandingReadOnly: '当前浏览器无法修改图片理解模型。',
+  imageUnderstandingSave: '保存',
+  imageUnderstandingDiscard: '放弃',
+  imageUnderstandingSaving: '保存中…',
+  imageUnderstandingFailed: '图片理解模型保存失败。',
+  imageUnderstandingEmpty: '暂无可选模型。',
+  imageUnderstandingRetrying: '正在加载模型目录…',
 } satisfies Record<string, string>
 
 /** The settings.models namespace key union. */

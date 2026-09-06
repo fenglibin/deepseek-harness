@@ -14,6 +14,7 @@ import type {
   ContentBlock, GenerateOptions, ImageDescription, LlmModelInfo, Message,
 } from '@deepseek-ai/dsh-llm'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+import type {} from '@deepseek-ai/dsh-settings'
 import { deadline, MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { deepFreeze } from '@deepseek-ai/dsh-util-values'
 import type { ImageDescriptionResult, ImageDescriberRoute } from './types.ts'
@@ -38,6 +39,23 @@ export const DEFAULT_INSTRUCTION = 'Describe what this image shows for a reader 
 
 /** Code stamped on the timeout that aborts one understanding call. */
 export const IMAGE_UNDERSTANDING_TIMEOUT_CODE = 'IMAGE_UNDERSTANDING_TIMEOUT'
+
+/** Settings namespace carrying the user-chosen describer route. */
+export const IMAGE_UNDERSTANDING_SETTINGS_NAMESPACE = 'image-understanding'
+
+/** Stored route. Both fields empty means the user set no describer, so discovery picks one. */
+export interface ImageUnderstandingSettings {
+  /** Registered provider route, empty when unset. */
+  provider: string
+  /** Provider-owned model id, empty when unset. */
+  model: string
+}
+
+/** Schema of the image-understanding settings section. */
+export const IMAGE_UNDERSTANDING_SETTINGS_SCHEMA: z<ImageUnderstandingSettings> = z.object({
+  provider: z.string().default(''),
+  model: z.string().default(''),
+})
 
 /**
  * Generated descriptions for durable images. Implementations answer one route
@@ -73,9 +91,9 @@ export abstract class ImageUnderstanding extends Service {
 
 /** Vision route and bounds for one understanding deployment. */
 export interface Config {
-  /** Provider route; empty selects the first registered model that accepts images. */
+  /** Default provider route; the user's settings selection wins, and empty with no selection discovers the first model that accepts images. */
   provider?: string
-  /** Model id interpreted by `provider`; set together with `provider`. */
+  /** Default model id interpreted by `provider`; set together with `provider`. */
   model?: string
   /** Instruction sent with each image. */
   instruction?: string
@@ -144,6 +162,7 @@ export class LlmImageUnderstanding extends ImageUnderstanding {
   private readonly config: Required<Config>
   private resolved: ImageDescriberRoute | undefined
   private readonly cache = new Map<string, ImageDescription>()
+  private source: () => ImageUnderstandingSettings
 
   constructor(ctx: Context, config: Config = {}) {
     super(ctx)
@@ -169,14 +188,36 @@ export class LlmImageUnderstanding extends ImageUnderstanding {
     assertPositiveInteger('requestImageMaxBytes', resolvedConfig.requestImageMaxBytes)
     assertPositiveInteger('maxCacheEntries', resolvedConfig.maxCacheEntries)
     this.config = resolvedConfig
+    const entry: ImageUnderstandingSettings = { provider: resolvedConfig.provider, model: resolvedConfig.model }
+    this.source = () => entry
+    ctx.inject(['settings'], (settingsCtx) => {
+      settingsCtx.settings.installSection(ctx, IMAGE_UNDERSTANDING_SETTINGS_NAMESPACE, IMAGE_UNDERSTANDING_SETTINGS_SCHEMA, entry, {
+        setSource: (current) => { this.source = current },
+        // A changed user selection invalidates the memoized route so the next
+        // describe call re-resolves against the new describer.
+        onChange: () => { this.resolved = undefined },
+        validate: assertPaired,
+      })
+    })
+  }
+
+  /**
+   * Read the user-chosen describer route.
+   * @returns a detached provider and model, or `undefined` when none is set.
+   */
+  currentSelection(): { provider: string; model: string } | undefined {
+    const { provider, model } = this.source()
+    if (provider.length === 0 || model.length === 0) return undefined
+    return { provider, model }
   }
 
   /** @inheritdoc */
   override async resolveRoute(signal?: AbortSignal): Promise<ImageDescriberRoute | undefined> {
     if (this.resolved !== undefined) return this.resolved
-    const route = this.config.provider.length === 0
+    const selection = this.currentSelection()
+    const route = selection === undefined
       ? await this.discoverRoute()
-      : await this.validateRoute(this.config.provider, this.config.model, signal)
+      : await this.validateRoute(selection.provider, selection.model, signal)
     if (route === undefined) return undefined
     this.resolved = route
     return route

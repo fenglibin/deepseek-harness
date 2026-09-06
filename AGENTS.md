@@ -54,7 +54,7 @@ native/  @deepseek-ai/node-addon-landlock-run 的源记录（见 native/README.m
 .agents/  Agent 工作流与 Agent Notes（`notes/`）
 docs/    架构、生成目录、事后复盘、cookbook（见 docs/AGENTS.md）
 scripts/  仓库 gate 与生成器
-website/  选定双语 docs/ 源的 VitePress 投影
+website/  docs/ 源的 VitePress 投影
 ```
 
 Package 分组：[packages/README.md](packages/README.zh.md)。
@@ -144,7 +144,7 @@ pnpm run demo:ptc -- "task"  # headless PTC 模式运行（需要 key）
 
 注释与文档陈述的是完整契约与上下文，而不是推理过程记录。使用直接、具体的措辞，不使用隐喻。在写 `contract`、`boundary` 或 `shape` 之前，先问是否有更精确的词能命名该主题：写 `response fields`、`JSON validation` 或 `ESM exports`，而不是 `response shape`、`validation boundary` 或 `module shape`。`contract` 只用于前置条件、后置条件、不变式、兼容性承诺，以及其他调用方、被调方、实现者、提供方、生产者或消费者所依赖的义务。`boundary` 只用于字面意义上的进程、wire、安全、事务或生命周期边界。不要叙述控制流或测试过程、保留评审历史，或复述代码。保留关于行为、失败、时序、归属与安全使用的实事，并链接到其依据。决策时使用 [dsh-prose-standard](.agents/skills/dsh-prose-standard/SKILL.md)。把可机械检查的不变式接入一个被执行的最顶层 gate，并证明每条被改动的验收路径都会拒绝非法用例。使用狭窄且有依据的例外，而不是全局禁用某条规则。
 
-每个代码变更都伴随文档：同步更新受影响的 README 与 JSDoc 契约。常规双语工作遵循 [docs/AGENTS.md](docs/AGENTS.md)；只有用户显式调用才能运行 `dsh-translate-docs`。当前态行文、每段一个物理行、每项实事只有一个归属、以及词数预算，都在该文件中定义。
+每个代码变更都伴随文档：同步更新受影响的 README 与 JSDoc 契约。当前态行文、每段一个物理行、每项实事只有一个归属、以及词数预算，都在 [docs/AGENTS.md](docs/AGENTS.md) 中定义。
 
 ## 编辑这些指令
 

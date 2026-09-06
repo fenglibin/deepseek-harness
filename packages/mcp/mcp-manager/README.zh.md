@@ -69,6 +69,10 @@ mcp:
 
 manager 为配置界面导出一个 `mcp` Remote 命名空间。`list()` 为每个已配置服务器返回一行——它的连接状态、当前注册的工具名，以及存在失败时的最新失败文本；`refresh(name)` 通过丢弃并重新挂载实例来强制某个服务器重连。manager 还在每次状态迁移时发出一个不携带载荷的 `mcp/status` 事件，因此界面只需重新拉取，无需轮询。
 
+### mcp.json 文档
+
+manager 把一份 `mcp.json`（与其它主流 MCP 平台相同的跨厂商 `mcpServers` 结构）放在 settings 文档旁边，作为 MCP 的手动编辑入口。文件变化时，manager 先校验 JSON 格式，再把每个条目转换成 `servers` 数组，只在全部有效时才整体覆盖 `mcp` 命名空间；格式或条目非法时跳过同步并告警，settings 保留最后一份好文档。`disabled` 映射为 `enabled` 的取反，有 `command` 判为 stdio，有 `url` 判为 HTTP，`timeout` 与 `transportType` 被忽略。超出 `[A-Za-z0-9_-]{1,32}` 契约的服务器名会被哈希成稳定的 `mcp-<hex>` 名字，因此任何输入都能同步而不被拒绝。这份同步是单向且整节的：`mcp.json` 是手动编辑源，结构化表单的写入会在下一次 `mcp.json` 变化时被覆盖。
+
 -----
 
 <a id="understand-the-implementation"></a>
@@ -90,6 +94,10 @@ manager 是建在两条 seam 上的一个服务：一条是它拥有的 settings
 ### 状态 sink
 
 该服务提供 `mcpStatusSink`——每个挂载的 mcp-client 实例所读取的 sink，并按 `serverName` 记录每次上报。它自己的拆除信号并不是一种连接状态，因此 `disposed` 上报会被丢弃，而状态会在 manager 丢弃某个服务器时被清除。一次上报还会发出 `mcp/status`；由于 manager 会收容并记录 sink 失败，抛错的监听器无法破坏它只是旁观的那个重连循环。
+
+### mcp.json 同步
+
+当 settings provider 是文件类型时，manager 解析出 `mcp.json` 的路径（settings 文档同目录），先播种缺失的文档，再用 chokidar 监听它的变化。每次变化走一条单向路径：`readFile` → `parseMcpJson`（JSON 语法与 `mcpServers` 结构校验）→ `mcpJsonToSettings`（`mcpServers` map 到 `servers` 数组，`disabled` 取反、`command`/`url` 判别传输）→ `SettingsScope.replace`。任一步失败都会被记录并跳过，绝不会把半成品写进 settings；转换本身是纯函数，集中在 `mcp-json.ts`。文档缺失时，`bootstrapMcpJson` 从当前 `scope.get()` 反向渲染一份 `mcp.json`，因此首次手动编辑从 settings 已有的内容开始。
 
 </details>
 

@@ -1,13 +1,13 @@
 ---
 name: dsh-doc
-description: Create, restructure, review, audit, or migrate DeepSeek Harness Markdown documentation, package READMEs, and the documentation website using audience-first hierarchy, kind-mapped YAML metadata, bilingual line alignment, summary/contents navigation, progressive user-to-developer detail, executed-operation fact-checking, and repository validation. Use for new or revised DSH docs, docs-tree organization, documentation-quality audits and budgets, website page publishing, and bilingual documentation structure changes.
+description: Create, restructure, review, audit, or migrate DeepSeek Harness Markdown documentation, package READMEs, and the documentation website using audience-first hierarchy, kind-mapped YAML metadata, summary/contents navigation, progressive user-to-developer detail, executed-operation fact-checking, and repository validation. Use for new or revised DSH docs, docs-tree organization, documentation-quality audits and budgets, and website page publishing.
 ---
 
 # DeepSeek Harness documentation
 
 ## Summary
 
-The DeepSeek Harness documentation standard: make every page searchable, newcomer-readable, and exact enough for agents and maintainers, and keep the documentation website a tested projection of repository Markdown. Apply repository `AGENTS.md` files and executed gates first, then this workflow for kind-mapped metadata, progressive detail, line-aligned bilingual pages, corpus audits, and website publication. Preserve one owner per fact: source, tests, generated catalogs, package READMEs, guides, Agent Notes, and scratch each keep their own kind of truth. The `session-persistence-sqlite` README pair is the reference example of the format.
+The DeepSeek Harness documentation standard: make every page searchable, newcomer-readable, and exact enough for agents and maintainers, and keep the documentation website a tested projection of repository Markdown. Apply repository `AGENTS.md` files and executed gates first, then this workflow for kind-mapped metadata, progressive detail, corpus audits, and website publication. Preserve one owner per fact: source, tests, generated catalogs, package READMEs, guides, Agent Notes, and scratch each keep their own kind of truth. The `session-persistence-sqlite` README is the reference example of the format.
 
 ## Table of Contents
 
@@ -27,14 +27,13 @@ The DeepSeek Harness documentation standard: make every page searchable, newcome
 
 Follow this sequence for each requested scope. Keep the common reader path brief, but do not delete failures, ownership, limitations, or other required contracts merely to reduce words.
 
-1. Read root and more-specific `AGENTS.md`, [the documentation standard](../../../docs/AGENTS.md), the target page, its source/tests, navigation owner, and bilingual record.
+1. Read root and more-specific `AGENTS.md`, [the documentation standard](../../../docs/AGENTS.md), the target page, its source/tests, and navigation owner.
 2. Classify the page by one primary job and reader: product quick start, user task guide, contributor tutorial, architecture overview, package/subsystem reference, generated reference, agent instruction, decision record, or scratch.
 3. Place the page at its nearest owner. Keep package contracts beside package code; use `docs/` for cross-package learning, user, developer, architecture, discussion, and expiring scratch material.
 4. Define the reader's starting state, observable outcome, likely failure, recovery path, and next useful depth before writing details.
 5. Add or revise YAML metadata — assign the `kind` that maps to the template for this document's job — then write `Summary`, `Table of Contents`, user-facing content, developer-facing content, optional `Further Exploration`, and final `Dev Note` in that order where the document type permits.
-6. Update the bilingual counterpart in the same pass. Keep headings, lists, tables, code, links, frontmatter layout, and physical line count aligned.
-7. Verify every claim against code, tests, generators, package metadata, or a current decision owner — and run the operations the page instructs, per the fact-check procedure below. Update the owner before any derivative artifact.
-8. Run focused checks, then `pnpm run test:docs`, `pnpm run doc-sync`, `pnpm run lint`, and `git diff --check`; re-read the complete diff for correctness and then for brevity and repository fit.
+6. Verify every claim against code, tests, generators, package metadata, or a current decision owner — and run the operations the page instructs, per the fact-check procedure below. Update the owner before any derivative artifact.
+7. Run focused checks, then `pnpm run test:docs`, `pnpm run doc-sync`, `pnpm run lint`, and `git diff --check`; re-read the complete diff for correctness and then for brevity and repository fit.
 
 ## Fact-check procedure: test, do not assume
 
@@ -43,8 +42,7 @@ Documentation states how the product behaves today, and the only admissible evid
 1. **Classify the subject before writing install guidance.** Read the facts, never the folder name: `package.json` for a `dsh.bundle.patch` declaration, and the entry file for the plugin shape (`apply` export or a default service export is a plugin; a plain module API is a library). A bundle installs with `dsh plugin --profile <name> add <package>` and is the only package shape for which that command activates a profile layer; a plugin mounts as a `cordis.yml` row; a library is a dependency with no install path of its own. Packages with special status (libraries, bundles) get their own README template — never a plugin README with install guidance that does not apply.
 2. **Run every claimed operation against the current checkout.** Execute each CLI command, config snippet, and profile or patch example exactly as the document will show it; write down only what you observed, including the exact output, warnings, and failure modes. If a claim depends on a key or a network you do not have, say so and name the verification owner instead of asserting the behavior.
 3. **Delete what you could not reproduce.** Never carry a command, field, default value, or behavior from memory, analogy, or a neighboring package's README. When a claim fails to reproduce, fix the claim — not the test.
-4. **Check old docs against latest master.** Before revising pre-existing pages, `git fetch origin` and compare the section against `origin/master`; the pairing sidecar recovers the last-confirmed text of either side. A stale statement on master is still wrong: correct it against the code, not against the old prose.
-5. **Re-record the pair after every edit.** Each paired edit re-runs `pnpm run verify-translation-pairing --write <pair>` so the sidecar tracks the confirmed pair.
+4. **Check old docs against latest master.** Before revising pre-existing pages, `git fetch origin` and compare the section against `origin/master`. A stale statement on master is still wrong: correct it against the code, not against the old prose.
 
 ## Kind system and templates
 
@@ -94,13 +92,13 @@ After the structural pass, hunt the slop checklist with the cheapest probes firs
 
 ## Website publication
 
-The website is a tested projection, never a second copy: [website/docs.ts](../../../website/docs.ts) is the explicit public allowlist mapping canonical `docs/` sources into route trees, [scripts/project-doc-site.ts](../../../scripts/project-doc-site.ts) rewrites them into the disposable `website/.generated/` tree, and VitePress builds that tree. Repository Markdown stays the only editable content source; translations stay sibling pairs (`foo.md`, `foo.zh.md`, `foo.i18n.yaml`), never locale directories. Edit an already published page in its canonical source only; add one manifest entry for a new page; update source, manifest entry, and inbound links atomically for a move or removal; never edit `website/.generated/`, `website/.cache/`, or `website/.dist/`. Set every `DocsPage` field deliberately and honor the projector's link rules; see [references/website-sync.md](references/website-sync.md) for the fields, sidebar collections, and preview commands. Synchronizing content into the build does not publish it: deployment stays a separate, explicitly requested step.
+The website is a tested projection, never a second copy: [website/docs.ts](../../../website/docs.ts) is the explicit public allowlist mapping canonical `docs/` sources into route trees, [scripts/project-doc-site.ts](../../../scripts/project-doc-site.ts) rewrites them into the disposable `website/.generated/` tree, and VitePress builds that tree. Repository Markdown stays the only editable content source. Edit an already published page in its canonical source only; add one manifest entry for a new page; update source, manifest entry, and inbound links atomically for a move or removal; never edit `website/.generated/`, `website/.cache/`, or `website/.dist/`. Set every `DocsPage` field deliberately and honor the projector's link rules; see [references/website-sync.md](references/website-sync.md) for the fields, sidebar collections, and preview commands. Synchronizing content into the build does not publish it: deployment stays a separate, explicitly requested step.
 
 ## Detailed references
 
 Load only the reference needed for the task. Each reference links directly from this file so the skill has no deep reference chain.
 
-- [Metadata, links, and bilingual pairs](references/metadata-links-i18n.md): README frontmatter, the kind system and its derivation, description semantics, repository paths, line alignment, and the sidecar record.
+- [Metadata and links](references/metadata-links-i18n.md): README frontmatter, the kind system and its derivation, description semantics, and repository paths.
 - [Page structure and hierarchy](references/structure-hierarchy.md): mandatory section order, section summaries, user-to-developer progression, docs tree placement, small rule files, Further Exploration, and Dev Note ownership.
 - [Page style](references/style.md): short Summary, `-----` section separators, foldable content sections, and emphasis discipline.
 - [Review criteria](references/review.md): newcomer test, evidence checks, package README review, the reference example, and verification commands.
@@ -108,20 +106,19 @@ Load only the reference needed for the task. Each reference links directly from 
 
 The four README templates in [`templates/`](templates/) are the working skeletons for the four `kind` labels; open the one your document's kind names before writing.
 
-Use [dsh-prose-standard](../dsh-prose-standard/SKILL.md) for sentence-level contract coverage and editorial judgment. The `session-persistence-sqlite` README pair ([English](../../../packages/session/session-persistence-sqlite/README.zh.md), [Chinese](../../../packages/session/session-persistence-sqlite/README.zh.md)) is the reference example: searchable YAML, Summary and Table of Contents, user-to-developer progression with a folded developer section, Further Exploration, canonical Model Experience and Known Limitations sections, and a final Dev Note.
+Use [dsh-prose-standard](../dsh-prose-standard/SKILL.md) for sentence-level contract coverage and editorial judgment. The [`session-persistence-sqlite` README](../../../packages/session/session-persistence-sqlite/README.zh.md) is the reference example: searchable YAML, Summary and Table of Contents, user-to-developer progression with a folded developer section, Further Exploration, canonical Model Experience and Known Limitations sections, and a final Dev Note.
 
 ## Validation
 
 Validate the affected format, not merely Markdown syntax. A strong promise needs a focused valid fixture and an invalid fixture that proves the top-level gate can fail.
 
-- README metadata: parse YAML, map `kind` to its template and document standard, reject `name`, `audience`, ungoverned `tags`, and README-local `i18n` metadata, and reject missing or advertisement-style descriptions.
-- Bilingual pages: verify structure, exact line count, terminology, link parity, and the sidecar record.
+- README metadata: parse YAML, map `kind` to its template and document standard, reject `name`, `audience`, and ungoverned `tags`, and reject missing or advertisement-style descriptions.
 - Tutorials: exercise the documented entry path or name an explicit manual verification owner.
 - Generated references: run the deterministic freshness check and report retrieval-size measures.
 - Package READMEs: run model-experience and limitation checks, then package-focused tests when behavior claims changed; re-run every command the README instructs before merging a claim about it.
 - Skills: run the repository's skill-invocation metadata check.
 
-Run `pnpm run test:docs` for the quick comprehensive documentation checks (pairing, wrap, links, README gates, budgets, skill metadata, Agent Note gates) before the full `pnpm run doc-sync`.
+Run `pnpm run test:docs` for the quick comprehensive documentation checks (wrap, links, README gates, budgets, skill metadata, Agent Note gates) before the full `pnpm run doc-sync`.
 
 ## Dev Note
 

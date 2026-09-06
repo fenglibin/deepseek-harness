@@ -7,10 +7,10 @@
   align-items: center;
   gap: 4px;
   max-width: 160px;
-  padding: 1px 4px 1px 1px;
+  padding: 2px 4px 2px 2px;
   border-radius: 6px;
   vertical-align: bottom;
-  height: 22px;
+  height: 44px;
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
   user-select: none;
@@ -27,12 +27,30 @@
 
 .img {
   display: block;
-  max-width: 120px;
-  max-height: 20px;
-  width: auto;
-  height: auto;
-  border-radius: 4px;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+/* Hover preview: a transient enlarged view floating above the chip, so a
+   pointer over a thumbnail shows the image without opening the lightbox. */
+.hoverPreview {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--dsw-specific-input-major);
+  box-shadow: var(--dsw-shadow-lv3);
+}
+
+.hoverPreviewImg {
+  display: block;
+  max-width: 240px;
+  max-height: 240px;
   object-fit: contain;
+  border-radius: 6px;
 }
 
 .remove {

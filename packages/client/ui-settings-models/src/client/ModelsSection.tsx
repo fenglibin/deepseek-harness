@@ -22,10 +22,12 @@ import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-sl
 import type {} from './slot-contract.ts'
 import { AddModelDialog } from './AddModelDialog.tsx'
 import { EditProviderDialog } from './EditProviderDialog.tsx'
+import { ImageUnderstandingModelCard } from './ImageUnderstandingModelCard.tsx'
 import { LightweightModelCard } from './LightweightModelCard.tsx'
 import { deriveKeyRef, keyConfiguredOf, protocolChoices, providerUsable } from './store.ts'
 import type { ModelsSettingsStore, ProviderRow } from './store.ts'
 import type { LightweightModelStore } from './lightweight-model-store.ts'
+import type { ImageUnderstandingModelStore } from './image-understanding-model-store.ts'
 import type { ModelsOperations } from './operations.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
 import { providerCopy } from './provider-identity.ts'
@@ -39,11 +41,15 @@ export interface ModelsSectionInjected {
   controller: ModelsSettingsStore
   /** The lightweight-model preference store (one staged route over the catalog). */
   lightweight: LightweightModelStore
+  /** The image-understanding preference store (one staged vision route). */
+  imageUnderstanding: ImageUnderstandingModelStore
   hooks: {
     /** Page snapshot bound by the UI renderer as useSnapshot. */
     snapshot: ModelsSettingsStore['store']
     /** Lightweight-model snapshot bound by the UI renderer as useLightweight. */
     lightweight: LightweightModelStore['store']
+    /** Image-understanding snapshot bound by the UI renderer as useImageUnderstanding. */
+    imageUnderstanding: ImageUnderstandingModelStore['store']
   }
   /** The Host operations the section and its cards invoke. */
   operations: ModelsOperations
@@ -150,24 +156,31 @@ function targetOf(row: ProviderRow): EditorTarget {
  * @returns the section, or null while the shell has not injected yet.
  */
 export function ModelsSection(props: ModelsSectionProps): ReactNode {
-  const { controller, lightweight, useSnapshot, useLightweight, operations, schema, t, renderSlot } = props
+  const {
+    controller, lightweight, imageUnderstanding, useSnapshot, useLightweight,
+    useImageUnderstanding, operations, schema, t, renderSlot,
+  } = props
   if (
-    controller === undefined || lightweight === undefined || useSnapshot === undefined
-    || useLightweight === undefined || operations === undefined
-    || schema === undefined || t === undefined
+    controller === undefined || lightweight === undefined || imageUnderstanding === undefined
+    || useSnapshot === undefined || useLightweight === undefined || useImageUnderstanding === undefined
+    || operations === undefined || schema === undefined || t === undefined
   ) return null
   return (
     <Loaded
-      injected={{ controller, lightweight, useSnapshot, useLightweight, operations, schema, t }}
+      injected={{
+        controller, lightweight, imageUnderstanding, useSnapshot, useLightweight,
+        useImageUnderstanding, operations, schema, t,
+      }}
       renderSlot={renderSlot}
     />
   )
 }
 
 function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderSlot: ModelsRenderSlot }): ReactNode {
-  const { controller, lightweight, operations, schema, t } = injected
+  const { controller, lightweight, imageUnderstanding, operations, schema, t } = injected
   const state = injected.useSnapshot(snapshot => snapshot)
   const lightweightState = injected.useLightweight(snapshot => snapshot)
+  const imageUnderstandingState = injected.useImageUnderstanding(snapshot => snapshot)
   const [editing, setEditing] = useState<EditorTarget | undefined>(undefined)
   const [adding, setAdding] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<EditorTarget | undefined>(undefined)
@@ -228,6 +241,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
   // The card asks for its catalog only once the namespace it writes answers:
   // an unopened Models page owes the wire nothing.
   if (lightweightState.available) void lightweight.load()
+  if (imageUnderstandingState.available) void imageUnderstanding.load()
   if (state.status === 'error') {
     /* v8 ignore next -- an error status always carries text; the fallback satisfies the nullable type */
     const errorText = state.error ?? ''
@@ -403,6 +417,15 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
         onSave={() => { void lightweight.save() }}
         onDiscard={() => { lightweight.discard() }}
         onRetry={() => { lightweight.retry() }}
+      />
+      <ImageUnderstandingModelCard
+        state={imageUnderstandingState}
+        t={t}
+        onSelect={(key) => { imageUnderstanding.select(key) }}
+        onClear={() => { imageUnderstanding.clear() }}
+        onSave={() => { void imageUnderstanding.save() }}
+        onDiscard={() => { imageUnderstanding.discard() }}
+        onRetry={() => { imageUnderstanding.retry() }}
       />
       <div className={styles['addBlock']}>
         {/* One entry point for the two ways to gain a provider — adopt one the

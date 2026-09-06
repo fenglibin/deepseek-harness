@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from 'react'
+import { Fragment, memo, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PendingSubmission, PendingSubmissionPart } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { MessageImageSource } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -254,9 +254,13 @@ function UserStyleBubble({
       data-actions-reveal={reveal}
     >
       <div className={css.userStack}>
-        {runs.map((run, index) => run.kind === 'text'
-          ? <div key={`text${index}`} className={css.bubble}>{projectUserText(run.text, referenceLabels)}</div>
-          : renderMessageImages({ images: run.images, align: 'end' }))}
+        {runs.length > 0 && (
+          <div className={css.bubble}>
+            {runs.map((run, index) => run.kind === 'text'
+              ? <Fragment key={`text${index}`}>{projectUserText(run.text, referenceLabels)}</Fragment>
+              : <Fragment key={`img${index}`}>{renderMessageImages({ images: run.images, align: 'end' })}</Fragment>)}
+          </div>
+        )}
         {showTail && <div className={css.bubble}>
           {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
         </div>}

@@ -18,6 +18,10 @@ import {
   LIGHTWEIGHT_MODEL_SETTINGS_NS, LightweightModelStore,
 } from '../src/client/lightweight-model-store.ts'
 import type { LightweightModelSettings } from '../src/client/lightweight-model-store.ts'
+import {
+  IMAGE_UNDERSTANDING_SETTINGS_NS, ImageUnderstandingModelStore,
+} from '../src/client/image-understanding-model-store.ts'
+import type { ImageUnderstandingSettings } from '../src/client/image-understanding-model-store.ts'
 import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import { ModelsSettingsStore, deriveKeyRef, protocolChoices } from '../src/client/store.ts'
 import { createModelsOperations } from '../src/client/operations.ts'
@@ -227,6 +231,20 @@ function lockedLightweight(face: object) {
   return { lightweight, useLightweight: bindSnapshotSelector(lightweight.store) }
 }
 
+/** The image-understanding props a section mount needs, in the same locked posture. */
+function lockedImageUnderstanding(face: object) {
+  const ctx = ctxWith(face)
+  const scope = new SettingsScopeController<ImageUnderstandingSettings>(
+    ctx,
+    { namespace: IMAGE_UNDERSTANDING_SETTINGS_NS },
+    new SettingsDescribeMirror(ctx, 'memory'),
+    'memory',
+    new SettingsSchemaService(new Context()),
+  )
+  const imageUnderstanding = new ImageUnderstandingModelStore(scope, ctx)
+  return { imageUnderstanding, useImageUnderstanding: bindSnapshotSelector(imageUnderstanding.store) }
+}
+
 async function mountSection(options: Parameters<typeof scriptedFace>[0] = {}) {
   const scripted = scriptedFace(options)
   const controller = new ModelsSettingsStore(
@@ -235,6 +253,7 @@ async function mountSection(options: Parameters<typeof scriptedFace>[0] = {}) {
   const injected: ModelsSectionProps = {
     controller,
     ...lockedLightweight(scripted.face),
+    ...lockedImageUnderstanding(scripted.face),
     useSnapshot: bindSnapshotSelector(controller.store),
     operations: operationsWith(scripted.face),
     schema: settingsSchema,

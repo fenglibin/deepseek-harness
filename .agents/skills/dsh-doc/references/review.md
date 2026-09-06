@@ -2,7 +2,7 @@
 
 ## Summary
 
-Review documentation by whether a reader completes an outcome, not by whether every template heading exists. Verify prose against code and tests, preserve exact contracts, and keep package READMEs useful to consumers while exposing enough implementation detail for maintainers. Run current repository gates; the `session-persistence-sqlite` README pair is the reference example of the format.
+Review documentation by whether a reader completes an outcome, not by whether every template heading exists. Verify prose against code and tests, preserve exact contracts, and keep package READMEs useful to consumers while exposing enough implementation detail for maintainers. Run current repository gates; the `session-persistence-sqlite` README is the reference example of the format.
 
 ## Table of Contents
 
@@ -46,7 +46,7 @@ Do not restate JSDoc or generated catalogs. Link the owner and explain only the 
 
 ## Reference example
 
-The `session-persistence-sqlite` README pair ([English](../../../../packages/session/session-persistence-sqlite/README.zh.md), [Chinese](../../../../packages/session/session-persistence-sqlite/README.zh.md)) demonstrates the format in production: searchable YAML whose `kind` selects this package-reference standard, a five-sentence Summary, a linked Table of Contents, a user-facing use section (choice, sizing, configuration, migration, safe operation) separated by horizontal rules and followed by a GitHub-native `<details>` fold under the developer section title (design philosophy, source map, schema tables, write path, read and recovery), Further Exploration, canonical Model Experience and Known Limitations sections, and a final folded Dev Note holding non-authoritative working context such as the annotated benchmark artifact and undecided future directions. Use its structure, evidence standards, and bilingual alignment as the model for package READMEs and cross-package pages; ground every claim the way it grounds the benchmark numbers in the Agent Note.
+The [`session-persistence-sqlite` README](../../../../packages/session/session-persistence-sqlite/README.zh.md) demonstrates the format in production: searchable YAML whose `kind` selects this package-reference standard, a five-sentence Summary, a linked Table of Contents, a user-facing use section (choice, sizing, configuration, migration, safe operation) separated by horizontal rules and followed by a GitHub-native `<details>` fold under the developer section title (design philosophy, source map, schema tables, write path, read and recovery), Further Exploration, canonical Model Experience and Known Limitations sections, and a final folded Dev Note holding non-authoritative working context such as the annotated benchmark artifact and undecided future directions. Use its structure and evidence standards as the model for package READMEs and cross-package pages; ground every claim the way it grounds the benchmark numbers in the Agent Note.
 
 ## Verification
 
@@ -54,13 +54,12 @@ Run the smallest focused checks while iterating, then the standing documentation
 
 ```sh
 pnpm run test:docs
-pnpm run verify-translation-pairing --write <pair>
 pnpm run doc-sync
 pnpm run lint
 git diff --check
 ```
 
-Also run the repository's skill-invocation metadata check for skill changes and compare English/Chinese physical line counts for a line-aligned pair. Re-read the final diff once for factual completeness and once for brevity, navigation, and ownership.
+Also run the repository's skill-invocation metadata check for skill changes. Re-read the final diff once for factual completeness and once for brevity, navigation, and ownership.
 
 ## Dev Note
 

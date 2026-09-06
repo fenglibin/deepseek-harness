@@ -11,12 +11,13 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button, IconPlusOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type { McpServerStatusView } from '@deepseek-ai/dsh-api-remotes/client'
 import { McpServerDialog } from './McpServerDialog.tsx'
 import type { McpServerEntry } from './types.ts'
 import type { McpStore } from './mcp-store.ts'
 import type { McpStatusStore } from './mcp-status-store.ts'
+import type { McpDocumentState, McpDocumentStore } from './mcp-document-store.ts'
 import type { McpKey } from './locales.ts'
 import styles from './McpSection.module.css'
 
@@ -26,11 +27,15 @@ export interface McpSectionInjected {
   store: McpStore
   /** The live-status store over the Host `mcp` Remote namespace. */
   status: McpStatusStore
+  /** The configure-document controller; reports `unavailable` when the provider has no local document. */
+  document: McpDocumentStore
   hooks: {
     /** Server-list snapshot bound by the UI renderer as useMcp. */
     mcp: McpStore['store']
     /** Live-status snapshot bound by the UI renderer as useStatus. */
     status: McpStatusStore['store']
+    /** Configure-document snapshot bound by the UI renderer as useDocument. */
+    document: McpDocumentStore['store']
   }
   /** Section copy. */
   t: (key: McpKey) => string
@@ -57,18 +62,54 @@ function statusDot(server: McpServerEntry, view: McpServerStatusView | undefined
 }
 
 /**
+ * Render the "configure" action: opens the file-backed settings document that
+ * carries the `mcp` namespace for manual editing. Mounted only where the
+ * controller exists, so the selector hook is always bound when this runs.
+ */
+function ConfigureMcpAction({ document, useDocument, t }: {
+  document: McpDocumentStore
+  useDocument: SnapshotSelectorHook<McpDocumentState>
+  t: (key: McpKey) => string
+}): ReactNode {
+  const doc = useDocument(snapshot => snapshot)
+
+  useEffect(() => {
+    void document.load()
+  }, [document])
+
+  if (doc.status !== 'ready') return null
+
+  return (
+    <div className={styles['configure']}>
+      {doc.error === null
+        ? null
+        : <span className={styles['configureError']} role="alert">{t('configure.error')}</span>}
+      <button
+        type="button"
+        className={styles['configureButton']}
+        disabled={doc.opening}
+        onClick={() => { void document.open() }}
+      >
+        {t('configure')}
+      </button>
+    </div>
+  )
+}
+
+/**
  * Render the MCP servers section content column.
  * @param props - slot-delivered injected dependencies.
  * @returns the section, or null while the shell has not injected yet.
  */
 export function McpSection(props: McpSectionProps): ReactNode {
-  const { store, status, useMcp, useStatus, t } = props
+  const { store, status, useMcp, useStatus, t, document, useDocument } = props
   if (store === undefined || status === undefined || useMcp === undefined || useStatus === undefined || t === undefined) return null
-  return <Loaded injected={{ store, status, useMcp, useStatus, t }} />
+  if (document === undefined || useDocument === undefined) return null
+  return <Loaded injected={{ store, status, useMcp, useStatus, t, document, useDocument }} />
 }
 
 function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
-  const { store, status, useMcp, useStatus, t } = injected
+  const { store, status, useMcp, useStatus, t, document, useDocument } = injected
   const state = useMcp(snapshot => snapshot)
   const statusState = useStatus(snapshot => snapshot)
   const [editing, setEditing] = useState<McpServerEntry | undefined>(undefined)
@@ -141,7 +182,12 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
 
   return (
     <div className={styles['section']}>
-      <h2 className={styles['title']}>{t('title')}</h2>
+      <div className={styles['head']}>
+        <h2 className={styles['title']}>{t('title')}</h2>
+        {/* Renders null while the provider owns no local document, so the
+            configure action appears only where it can actually open the file. */}
+        <ConfigureMcpAction document={document} useDocument={useDocument} t={t} />
+      </div>
       <p className={styles['intro']}>{t('intro')}</p>
       {!state.writable && state.available ? <p className={styles['notice']}>{t('readOnly')}</p> : null}
       {savedName === undefined

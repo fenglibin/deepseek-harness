@@ -27,6 +27,9 @@
       "path": "../../typert/protocol"
     },
     {
+      "path": "../../util/native-command"
+    },
+    {
       "path": "../../runtime-diagnostics/invariants"
     }
   ]

@@ -20,6 +20,11 @@ export interface McpServerStatusView {
   error?: string
 }
 
+/** Confirmation that the `mcp.json` document was handed to the native editor. */
+export interface McpDocumentOpenValue {
+  readonly opened: true
+}
+
 declare module '@deepseek-ai/cordis' {
   interface Events {
     /**

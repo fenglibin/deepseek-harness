@@ -19,6 +19,7 @@ import { McpSection } from './McpSection.tsx'
 import type { McpSectionInjected } from './McpSection.tsx'
 import { McpStore } from './mcp-store.ts'
 import { McpStatusStore } from './mcp-status-store.ts'
+import { McpDocumentStore } from './mcp-document-store.ts'
 import type { McpSettings } from './types.ts'
 import { zh, type McpKey } from './locales.ts'
 
@@ -40,7 +41,7 @@ const NS = 'settings.mcp'
 const MCP_SETTINGS_NAMESPACE = 'mcp'
 
 /** Required services (cordis fiber inject). */
-export const inject = ['slots', 'locale', 'settingsScope', 'remote']
+export const inject = ['slots', 'locale', 'settingsScope', 'remote', 'remote.mcp']
 
 /**
  * Register the MCP servers section once the `settings.section` declaration is
@@ -56,11 +57,18 @@ export function apply(ctx: ClientContext): void {
   const status = new McpStatusStore(ctx)
   ctx.effect(() => () => { status.dispose() }, 'ui-settings-mcp: status store')
 
+  // The configure action opens the user-editable `mcp.json` beside the
+  // settings document. The Host seeds it on first open; availability is just
+  // the loopback fact, so a remote deployment hides the button.
+  const document = new McpDocumentStore(ctx)
+  ctx.effect(() => () => { document.dispose() }, 'ui-settings-mcp: configure document store')
+
   const t = ctx.locale.bind(NS) as McpSectionInjected['t']
   const injected = (): McpSectionInjected => ({
     store,
     status,
-    hooks: { mcp: store.store, status: status.store },
+    document,
+    hooks: { mcp: store.store, status: status.store, document: document.store },
     t,
   })
 

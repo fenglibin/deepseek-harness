@@ -3,12 +3,12 @@ import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
-import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { Inbox, agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import DeliveryService from '@deepseek-ai/dsh-delivery'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
-import { ToolCallId } from '@deepseek-ai/dsh-llm'
-import { Session, SessionId, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
+import { ToolCallId, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { Session, SessionId, SESSION_FORMAT_VERSION, type UserMessage } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { ShellExecutor } from '@deepseek-ai/dsh-shell'
 import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult } from '@deepseek-ai/dsh-shell'
@@ -86,6 +86,16 @@ async function harness(config: toolDelivery.Config = {}, shellOutcome: Partial<S
   const agent = stubAgent(`delivery-tool-${Math.random()}`)
   ctx.agents.register(agent)
   return { ctx, fiber, agent, cwd }
+}
+
+/** Dispatch one pre-step boundary for the delivery auto-detect listener. */
+async function preStep(ctx: Context, agent: Agent, messages: UserMessage[]): Promise<void> {
+  const signal = new AbortController().signal
+  await agentEvents(ctx, agent).waterfall(
+    'agent/pre-step',
+    { messages, turn: 1, step: 1, signal },
+    () => Promise.resolve({ kind: 'enter' as const, messages }),
+  )
 }
 
 /** Execute one registered delivery tool, optionally without a calling agent. */
@@ -640,5 +650,125 @@ describe('tool-delivery post-hooks', () => {
       task_id: verified['id'], revision: verified['revision'], phase: 'accepted',
     }, agent))
     expect(accepted).toMatchObject({ phase: 'accepted' })
+  })
+})
+
+describe('tool-delivery auto-detect', () => {
+  it('creates an l1 task at pre-step for a long direct human request', async () => {
+    const { ctx, agent } = await harness()
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'x'.repeat(400) }],
+      source: { kind: 'user' },
+    })])
+    const view = ctx.delivery.get(agent)
+    expect(view).toBeDefined()
+    expect(view?.level).toBe('l1')
+  })
+
+  it('does not create a task for a short request', async () => {
+    const { ctx, agent } = await harness()
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'fix the typo' }],
+      source: { kind: 'user' },
+    })])
+    expect(ctx.delivery.get(agent)).toBeUndefined()
+  })
+
+  it('does not create a second task when one already exists', async () => {
+    const { ctx, agent } = await harness()
+    const existing = ctx.delivery.create(agent, { objective: 'existing task', level: 'l1' })
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'x'.repeat(400) }],
+      source: { kind: 'user' },
+    })])
+    expect(ctx.delivery.get(agent)?.id).toBe(existing.id)
+  })
+
+  it('ignores messages that are not a direct human request', async () => {
+    const { ctx, agent } = await harness()
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'x'.repeat(400) }],
+      source: { kind: 'plugin', plugin: 'test', form: 'notice', summary: 'test notice' },
+    })])
+    expect(ctx.delivery.get(agent)).toBeUndefined()
+  })
+
+  it('does not auto-create when autoDetect is disabled', async () => {
+    const { ctx, agent } = await harness({ autoDetect: false })
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'x'.repeat(400) }],
+      source: { kind: 'user' },
+    })])
+    expect(ctx.delivery.get(agent)).toBeUndefined()
+  })
+})
+
+describe('tool-delivery acceptance gate', () => {
+  /** Walk an l0 task to verified. */
+  async function advanceL0ToVerified(ctx: Context, agent: Agent): Promise<Record<string, unknown>> {
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l0 task', level: 'l0' }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'verified' }, agent))
+    return task
+  }
+
+  /** Walk an l1 task (with a design record) to verified. */
+  async function advanceL1ToVerified(ctx: Context, agent: Agent): Promise<Record<string, unknown>> {
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l1 task', level: 'l1' }, agent))
+    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'verified' }, agent))
+    return task
+  }
+
+  it('accepts an l0 task without coverage confirmation', async () => {
+    const { ctx, agent } = await harness()
+    const verified = await advanceL0ToVerified(ctx, agent)
+    const accepted = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: verified['id'], revision: verified['revision'], phase: 'accepted',
+    }, agent))
+    expect(accepted).toMatchObject({ phase: 'accepted' })
+  })
+
+  it('blocks accepting an l1 task without coverage confirmation under stateful', async () => {
+    const { ctx, agent } = await harness()
+    const verified = await advanceL1ToVerified(ctx, agent)
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: verified['id'], revision: verified['revision'], phase: 'accepted',
+    }, agent)
+    expect(result.isError).toBe(true)
+  })
+
+  it('accepts an l1 task with coverage confirmation and records it', async () => {
+    const { ctx, agent } = await harness()
+    const verified = await advanceL1ToVerified(ctx, agent)
+    const accepted = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: verified['id'], revision: verified['revision'], phase: 'accepted',
+      coverage_confirmation: 'the design is implemented',
+    }, agent))
+    expect(accepted).toMatchObject({ phase: 'accepted', changeCount: 2 })
+  })
+
+  it('accepts an l1 task without coverage confirmation under advisory', async () => {
+    const { ctx, agent } = await harness({ enforcement: 'advisory' })
+    const verified = await advanceL1ToVerified(ctx, agent)
+    const accepted = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: verified['id'], revision: verified['revision'], phase: 'accepted',
+    }, agent))
+    expect(accepted).toMatchObject({ phase: 'accepted' })
+  })
+
+  it('auto-records a change when accepting a task with no change record under advisory', async () => {
+    const { ctx, agent } = await harness({ enforcement: 'advisory' })
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'no change', level: 'l0' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'verified' }, agent))
+    const accepted = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'accepted',
+    }, agent))
+    expect(accepted).toMatchObject({ phase: 'accepted', changeCount: 1 })
   })
 })

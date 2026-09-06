@@ -3,6 +3,8 @@ export const zh = {
   nav: 'MCP',
   title: 'MCP 服务器',
   intro: '管理模型可以调用工具的 MCP 服务器。',
+  configure: '配置MCP',
+  'configure.error': '无法打开 MCP 配置文件',
   add: '添加服务器',
   edit: '编辑',
   remove: '删除',
