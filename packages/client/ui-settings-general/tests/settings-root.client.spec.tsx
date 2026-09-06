@@ -152,7 +152,7 @@ describe('SettingsRoot trigger', () => {
 
     mounted.setConnectionState('connecting')
     expect(screen.getByRole('button', { name: '连接中，点击立即重连' }).textContent)
-      .toContain('Connecting...')
+      .toContain('连接中...')
 
     mounted.setConnectionState('connected')
     expect(screen.getByRole('status', { name: '连接成功' })).toBeTruthy()
@@ -250,7 +250,7 @@ describe('SettingsPanel navigation', () => {
         { id: 'general', order: 0, label: '通用设置' },
         { id: 'models', order: 10, label: '模型' },
         { id: 'agent-presets', order: 20, label: 'Agent 预设' },
-        { id: '个', order: 30, label: '插件' },
+        { id: 'plugins', order: 30, label: '插件' },
         { id: 'contributed', order: 40, label: 'Contributed' },
       ],
     })

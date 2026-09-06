@@ -198,7 +198,7 @@ describe('terminalCardModel', () => {
       content: [{ type: 'text', text: 'failed\n[exit code: 3]' }],
     }))).toMatchObject({
       copy: { kind: 'shell', command: 'ls -la', description: 'List files' },
-      card: { output: '已失败', exitCode: 3, running: false },
+      card: { output: 'failed', exitCode: 3, running: false },
     })
   })
 
@@ -487,7 +487,7 @@ describe('BashRow terminal card', () => {
   // the reader sees on one line.
   it('agrees with the summary row about the run state', () => {
     const runningView = render(<BashRow {...rowProps(running())} />)
-    expect(runningView.container.querySelector('[data-variant="bash"]')?.getAttribute('data-state')).toBe('运行中')
+    expect(runningView.container.querySelector('[data-variant="bash"]')?.getAttribute('data-state')).toBe('running')
     // A running row is already open, so its card reads without a click.
     expect(runStateOf(runningView.container)).toBe('ongoing')
     cleanup()
@@ -808,7 +808,7 @@ describe('DetailsPanel Output section', () => {
     const empty = mount(snapshot({
       nodes: [settled({
         content: [], isError: true,
-        error: { name: 'ToolError', code: '已中断' },
+        error: { name: 'ToolError', code: 'interrupted' },
       })],
     }), target)
     expect(empty.getByText('ToolError: interrupted')).toBeTruthy()

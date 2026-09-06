@@ -416,6 +416,18 @@ async function addProvider(provider: string): Promise<HTMLElement> {
 }
 
 /**
+ * The apply button of the open editor card. The section behind the card carries
+ * 保存 buttons of its own (lightweight model, image understanding), so the
+ * lookup stays scoped to the dialog.
+ */
+function applyButton(): HTMLButtonElement {
+  const dialog = screen.getByRole('dialog')
+  const found = [...dialog.querySelectorAll('button')].find(button => button.textContent === zh.apply)
+  if (found === undefined) throw new Error('no apply button in the open card')
+  return found
+}
+
+/**
  * Mount for a user who cannot reach any provider yet: no credential is stored
  * anywhere, so the whole-section DeepSeek route opens its card by itself.
  */
@@ -609,7 +621,7 @@ describe('ModelsSection', () => {
   it('uses one stable provider identity in action copy', () => {
     const target = { provider: 'deepseek-official', displayName: 'DeepSeek' }
     expect(providerTargetLabel(target)).toBe('DeepSeek (deepseek-official)')
-    expect(providerCopy(zh.deleteTitle, target)).toBe('Delete DeepSeek (deepseek-official)?')
+    expect(providerCopy(zh.deleteTitle, target)).toBe('删除 DeepSeek (deepseek-official)？')
     expect(providerTargetLabel(OPENAI_TARGET)).toBe('openai')
   })
 
@@ -626,7 +638,7 @@ describe('ModelsSection', () => {
     const { set, mutate, face } = await mountFirstRun()
     const key = screen.getByLabelText<HTMLInputElement>(zh.keyInput)
     fireEvent.change(key, { target: { value: '  sk-live  ' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await waitFor(() => { expect(set).toHaveBeenCalledWith('DEEPSEEK_API_KEY', 'sk-live') })
     expect(mutate).not.toHaveBeenCalled()
     // The saved key re-loads the join; the settings answer rides the shared
@@ -709,7 +721,7 @@ describe('ModelsSection', () => {
     // effective value (which may reflect a launch-environment override).
     expect(baseURL.placeholder).toBe('https://api.deepseek.com')
     fireEvent.change(baseURL, { target: { value: 'https://next2' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     // Only the field that actually changed: reasoningEffort was already
     // 'high' in the loaded profile, so it produces no op.
@@ -737,7 +749,7 @@ describe('ModelsSection', () => {
     fireEvent.change(names[2] as HTMLInputElement, { target: { value: 'Private Preview' } })
     // Only row 3 is open, so its capacity is addressed by its own label.
     fireEvent.change(screen.getByLabelText(`${zh.contextWindow} 3`), { target: { value: '131072' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
 
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     expect(mutate.mock.calls[0]).toEqual([
@@ -760,9 +772,9 @@ describe('ModelsSection', () => {
     fireEvent.click(screen.getByText(zh.addModel))
     const ids = screen.getAllByLabelText(new RegExp(zh.modelId))
     fireEvent.change(ids[2] as HTMLInputElement, { target: { value: 'deepseek-v4-flash' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
 
-    await screen.findByText(`Model 3: ${zh.modelIdDuplicate}`)
+    await screen.findByText(`${zh.model} 3: ${zh.modelIdDuplicate}`)
     expect(mutate).not.toHaveBeenCalled()
   })
 
@@ -847,7 +859,7 @@ describe('ModelsSection', () => {
 
     fireEvent.change(windows[1] as HTMLInputElement, { target: { value: '256K' } })
     fireEvent.blur(windows[1] as HTMLInputElement)
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
 
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     expect(mutate.mock.calls[0]).toEqual([
@@ -877,8 +889,8 @@ describe('ModelsSection', () => {
     // The text the user typed is still there to correct.
     expect((windows[0] as HTMLInputElement).value).toBe('1 gazillion')
 
-    fireEvent.click(screen.getByText(zh.apply))
-    await screen.findByText(`Model 1: ${zh.modelContextInvalid}`)
+    fireEvent.click(applyButton())
+    await screen.findByText(`${zh.model} 1: ${zh.modelContextInvalid}`)
     expect(mutate).not.toHaveBeenCalled()
   })
 
@@ -994,8 +1006,8 @@ describe('ModelsSection', () => {
 
     // Reset put the draft back where it started, so Apply writes nothing at
     // all rather than persisting whatever the stale text had parsed to.
-    fireEvent.click(screen.getByText(zh.apply))
-    await waitFor(() => { expect(screen.queryByText(zh.apply)).toBeNull() })
+    fireEvent.click(applyButton())
+    await waitFor(() => { expect(screen.queryByRole('dialog')).toBeNull() })
     expect(mutate).not.toHaveBeenCalled()
   })
 
@@ -1020,7 +1032,7 @@ describe('ModelsSection', () => {
     expandRow(1)
     expect(screen.queryByLabelText(`${zh.maxTokens} 1`)).toBeNull()
 
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     expect(mutate.mock.calls[0]).toEqual([
       'llm-deepseek',
@@ -1086,7 +1098,7 @@ describe('ModelsSection', () => {
     const windows = capacityInputs(zh.contextWindow)
     fireEvent.change(names[0] as HTMLInputElement, { target: { value: '' } })
     fireEvent.change(windows[0] as HTMLInputElement, { target: { value: '' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
 
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     expect(mutate.mock.calls[0]).toEqual([
@@ -1110,7 +1122,7 @@ describe('ModelsSection', () => {
     const url = screen.getByLabelText<HTMLInputElement>(zh.baseUrl)
     expect(url.value).toBe('https://base')
     fireEvent.change(url, { target: { value: '' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     // This editor clears one field through an unset op so it cannot clobber
     // sibling overrides with a whole-section replacement.
@@ -1156,7 +1168,7 @@ describe('ModelsSection', () => {
     const { mutate } = await mountDeepSeekCard()
     fireEvent.click(screen.getByText(zh.customized))
     fireEvent.change(screen.getByLabelText(zh.baseUrl), { target: { value: 'not-a-url' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await screen.findByText(/baseURL/)
     expect(mutate).not.toHaveBeenCalled()
   })
@@ -1173,7 +1185,7 @@ describe('ModelsSection', () => {
     const url = screen.getByLabelText<HTMLInputElement>(zh.baseUrl)
     expect(url.value).toBe('https://proxy')
     fireEvent.change(url, { target: { value: 'https://proxy/v2' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     // Only the edited field travels: apiKeyEnv and headers were already stored
     // with these values, so no op restates them.
@@ -1248,7 +1260,7 @@ describe('ModelsSection', () => {
     const addKey = screen.getByLabelText<HTMLInputElement>(zh.keyInput)
     expect(addKey.placeholder).toBe(zh.keyPlaceholderNative)
     fireEvent.change(addKey, { target: { value: 'sk-ant' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     expect(mutate.mock.calls[0]).toEqual([
       'llm-pi-ai',
@@ -1261,7 +1273,7 @@ describe('ModelsSection', () => {
   it('keeps pi-ai provider-native authentication when no key is entered', async () => {
     const { mutate, set } = await mountSection()
     await addProvider('anthropic')
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await waitFor(() => { expect(mutate).toHaveBeenCalledOnce() })
     expect(mutate.mock.calls[0]).toEqual([
       'llm-pi-ai',
@@ -1292,7 +1304,7 @@ describe('ModelsSection', () => {
     const { face, controller, mirror } = await mountSection({ mutate, set })
     await addProvider('anthropic')
     fireEvent.change(screen.getByLabelText<HTMLInputElement>(zh.keyInput), { target: { value: 'sk-ant' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await screen.findByText('credential store unavailable')
     expect(mutate).toHaveBeenCalledOnce()
     face.settings.describe.mockResolvedValue(remoteOk({
@@ -1307,7 +1319,7 @@ describe('ModelsSection', () => {
       await controller.load()
     })
     expect(controller.store.getSnapshot().namespaces.get('llm-pi-ai')?.revision).toBe(1)
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await waitFor(() => { expect(set).toHaveBeenCalledTimes(2) })
     expect(mutate).toHaveBeenCalledOnce()
     expect(set).toHaveBeenLastCalledWith('ANTHROPIC_API_KEY', 'sk-ant')
@@ -1318,13 +1330,13 @@ describe('ModelsSection', () => {
     const dialog = await addDialog()
     const pick = within(dialog).getByLabelText<HTMLSelectElement>(zh.provider)
     fireEvent.change(pick, { target: { value: 'broken' } })
-    await screen.findByText(/unresolvable settings path/)
+    await screen.findByText(new RegExp(zh.settingsPathUnresolvable))
     fireEvent.change(pick, { target: { value: 'plain' } })
     await waitFor(() => {
       expect(screen.getAllByText(content => content.includes(zh.advancedHint)).length).toBeGreaterThan(0)
     })
     // The hint-only card cannot apply anything, and offers no key field.
-    expect(screen.getByText<HTMLButtonElement>(zh.apply).disabled).toBe(true)
+    expect(applyButton().disabled).toBe(true)
     expect(screen.queryAllByLabelText(zh.keyInput)).toHaveLength(0)
   })
 
@@ -1334,7 +1346,7 @@ describe('ModelsSection', () => {
     })
     await addProvider('anthropic')
     fireEvent.change(screen.getByLabelText<HTMLInputElement>(zh.keyInput), { target: { value: 'sk-x' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await screen.findByText(/unknown pi-ai provider/)
     expect(set).not.toHaveBeenCalled()
   })
@@ -1366,7 +1378,7 @@ describe('ModelsSection', () => {
     })
     fireEvent.click(screen.getByText(zh.customized))
     fireEvent.change(screen.getByLabelText<HTMLInputElement>(zh.baseUrl), { target: { value: 'https://mine' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await screen.findByText(zh.conflict)
     expect(set).not.toHaveBeenCalled()
   })
@@ -1377,10 +1389,10 @@ describe('ModelsSection', () => {
     })
     fireEvent.click(screen.getByText(zh.customized))
     fireEvent.change(screen.getByLabelText<HTMLInputElement>(zh.baseUrl), { target: { value: 'https://next' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await screen.findByText('the host refused')
     // Not stuck in `applying…`: the finally cleared busy, so Apply is live again.
-    expect(screen.getByText(zh.apply)).toBeTruthy()
+    expect(applyButton()).toBeTruthy()
   })
 
   it('surfaces a shadowed credential write on the card', async () => {
@@ -1389,7 +1401,7 @@ describe('ModelsSection', () => {
     })
     const key = screen.getByLabelText<HTMLInputElement>(zh.keyInput)
     fireEvent.change(key, { target: { value: 'sk-live' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await screen.findByText(/shadowed by the read-only environment/)
     expect(screen.queryByRole('status')).toBeNull()
   })
@@ -1414,7 +1426,7 @@ describe('ModelsSection', () => {
     const editorKey = await screen.findByLabelText<HTMLInputElement>(zh.keyInput)
     expect(editorKey.placeholder).toBe(zh.keyPlaceholderNative)
     fireEvent.change(editorKey, { target: { value: 'sk-live' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await waitFor(() => { expect(set).toHaveBeenCalledTimes(1) })
   })
 

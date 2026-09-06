@@ -26,7 +26,7 @@ describe('TurnUsagePanel', () => {
     const view = render(<TurnUsagePanel usage={usage} t={t} />)
 
     const trigger = view.getByRole('button')
-    expect(trigger.textContent).toBe('Usage 15.8K tok')
+    expect(trigger.textContent).toBe('用量 15.8K tok')
     expect(trigger.querySelector('svg')).not.toBeNull()
     expect(trigger.getAttribute('aria-haspopup')).toBe('dialog')
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
@@ -38,15 +38,15 @@ describe('TurnUsagePanel', () => {
     expect(dialog.getAttribute('aria-label')).toBe('本轮用量')
     // Portaled out of the trigger's row, with a heading row carrying the total.
     expect(dialog.parentElement).toBe(document.body)
-    expect(dialog.firstChild?.textContent).toBe('Turn usage15,800 tok')
+    expect(dialog.firstChild?.textContent).toBe('本轮用量15,800 tok')
     const details = dialog.querySelector('[data-turn-usage-details]') as HTMLElement
     expect(details).toBeTruthy()
-    expect(details.textContent).toContain('Provider / modeldeepseek/deepseek-chat')
-    expect(details.textContent).toContain('Cache hit49.4%')
-    expect(details.textContent).toContain('Uncached input5,060 tok')
-    expect(details.textContent).toContain('Cached input4,940 tok')
-    expect(details.textContent).toContain('Cache write0 tok')
-    expect(details.textContent).toContain('Output5,800 tok（其中推理 42 tok）')
+    expect(details.textContent).toContain('提供方 / 模型deepseek/deepseek-chat')
+    expect(details.textContent).toContain('缓存命中49.4%')
+    expect(details.textContent).toContain('未缓存输入5,060 tok')
+    expect(details.textContent).toContain('缓存读取4,940 tok')
+    expect(details.textContent).toContain('缓存写入0 tok')
+    expect(details.textContent).toContain('输出5,800 tok（其中推理 42 tok）')
     expect(details.textContent).not.toContain('Total')
   })
 
@@ -59,7 +59,7 @@ describe('TurnUsagePanel', () => {
     const view = render(<TurnUsagePanel usage={usage} t={t} />)
 
     const trigger = view.getByRole('button')
-    expect(trigger.textContent).toBe('Usage 150 tok')
+    expect(trigger.textContent).toBe('用量 150 tok')
     fireEvent.click(trigger)
     expect(view.queryByText('提供方 / 模型')).toBeNull()
     expect(view.queryByText('缓存读取')).toBeNull()
@@ -110,11 +110,11 @@ describe('TurnUsagePanel', () => {
     const trigger = view.getByRole('button')
     // The pill carries the compact total; cache-hit rate and exact token
     // counts stay in the dialog.
-    expect(trigger.textContent).toBe('Usage 1.1K tok')
+    expect(trigger.textContent).toBe('用量 1.1K tok')
 
     fireEvent.click(trigger)
     const dialog = view.getByRole('dialog')
-    expect(dialog.textContent).toContain('Cache hit99.9%')
+    expect(dialog.textContent).toContain('缓存命中99.9%')
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(view.queryByRole('dialog')).toBeNull()
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
@@ -145,9 +145,9 @@ describe('TurnTimePanel', () => {
     expect(dialog.getAttribute('aria-label')).toBe('本轮用时和速度')
     expect(dialog.parentElement).toBe(document.body)
     const details = dialog.querySelector('[data-turn-time-details]') as HTMLElement
-    expect(details.textContent).toContain('Total run time19秒')
-    expect(details.textContent).toContain('Tokens per second (TPS)20 tok/s')
-    expect(details.textContent).toContain('Time to first token (TTFT)1.2秒')
+    expect(details.textContent).toContain('本轮总用时19秒')
+    expect(details.textContent).toContain('输出速度（TPS）20 tok/s')
+    expect(details.textContent).toContain('首 token 用时（TTFT）1.2秒')
 
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(view.queryByRole('dialog')).toBeNull()
@@ -157,8 +157,8 @@ describe('TurnTimePanel', () => {
     const view = render(<TurnTimePanel runMs={3_000} t={t} />)
     fireEvent.click(view.getByRole('button'))
     const dialog = view.getByRole('dialog')
-    expect(dialog.textContent).toContain('Total run time3秒')
-    expect(dialog.textContent).not.toContain('Tokens per second')
-    expect(dialog.textContent).not.toContain('Time to first token')
+    expect(dialog.textContent).toContain('本轮总用时3秒')
+    expect(dialog.textContent).not.toContain('输出速度')
+    expect(dialog.textContent).not.toContain('首 token 用时')
   })
 })

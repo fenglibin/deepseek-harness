@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
-import { zh as commonEn, zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/index.ts'
+import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/index.ts'
 import { ContextMeter, type ContextMeterProps } from '../src/client/skeleton/ContextMeter.tsx'
 import { contextOccupancy } from '../src/client/context-occupancy.ts'
 import css from '../src/client/skeleton/ContextMeter.module.css'
@@ -12,7 +12,6 @@ import { zh } from '../src/client/locales.ts'
 afterEach(cleanup)
 
 const t = makeTranslate(zh, commonZh) as ContextMeterProps['t']
-const tEn = makeTranslate(zh, commonEn) as ContextMeterProps['t']
 
 const BREAKDOWN = { systemTokens: 120, toolsTokens: 21_500, messageTokens: 477_000 }
 
@@ -67,21 +66,17 @@ describe('ContextMeter', () => {
     expect(view.container.querySelector('[role="dialog"]')).toBeNull()
   })
 
-  it('lets each locale own the headline word order around the reading', () => {
+  it('lets the locale own the headline word order around the reading', () => {
     const values = {
       contextPressure: { pressureTokens: 32_000, contextWindow: 128_000 },
       contextBreakdown: BREAKDOWN,
     }
     const zhView = meter(values)
     fireEvent.click(zhView.getByRole('button', { name: '上下文已用 25%' }))
-    // The reading follows the label in Chinese and leads it in English; both
-    // headers read as one sentence rather than a concatenated fragment.
+    // The reading follows the label, so the header reads as one sentence
+    // rather than a concatenated fragment.
     expect(zhView.container.querySelector('[role="dialog"]')!.textContent)
       .toMatch(/^上下文已用25%/)
-    const enView = meter(values, tEn)
-    fireEvent.click(enView.getByRole('button', { name: '上下文已用 25%' }))
-    expect(enView.container.querySelector('[role="dialog"]')!.textContent)
-      .toMatch(/^25%of context used/)
   })
 
   it('draws no bar segment at zero occupancy', () => {

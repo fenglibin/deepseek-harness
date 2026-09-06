@@ -31,7 +31,7 @@ function props(
 /** A deployment with a roster: one failed global row, two preset-provided rows. */
 const SNAPSHOT = {
   entries: [
-    { entryId: 'telemetry', moduleName: '@fixture/telemetry', enabled: true, fiberPhase: '已失败' },
+    { entryId: 'telemetry', moduleName: '@fixture/telemetry', enabled: true, fiberPhase: 'failed' },
     { entryId: 'timer', moduleName: 'cordis:timer', enabled: true, fiberPhase: 'active' },
     { entryId: '8a1b2c3d', moduleName: '@deepseek-ai/cordis-plugin-hmr', enabled: true, fiberPhase: 'active' },
     { entryId: 'unobserved', moduleName: '@fixture/unobserved-name', enabled: true, fiberPhase: null },
@@ -56,7 +56,7 @@ const SNAPSHOT = {
           fiberPhase: null,
         },
         { entryId: 'codex', moduleName: '@fixture/codex', enabled: false, fiberPhase: null },
-        { entryId: 'crashy', moduleName: '@fixture/crashy', enabled: true, fiberPhase: '已失败' },
+        { entryId: 'crashy', moduleName: '@fixture/crashy', enabled: true, fiberPhase: 'failed' },
         { entryId: null, moduleName: '@fixture/anonymous', enabled: true, fiberPhase: null },
       ],
     },
@@ -124,9 +124,10 @@ describe('PluginInventorySettingsTab', () => {
     expect(screen.queryByText(zh.condition)).toBeNull()
 
     // A failed preset row names its runtime state instead of a condition.
-    fireEvent.click(screen.getByRole('button', { name: 'crashy, Failed' }))
-    expect(screen.getByText(zh.runtime)).toBeTruthy()
-    expect(screen.getByText('启动失败')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'crashy, 启动失败' }))
+    // The row's tag and its runtime detail read alike in this locale, so the
+    // assertion names the detail's own value.
+    expect(screen.getByText(zh.runtime).nextElementSibling?.textContent).toBe('启动失败')
 
     // A row declaring no id has no Loader identity line, only its module.
     fireEvent.click(screen.getByRole('button', { name: 'anonymous, 已启用' }))
@@ -154,15 +155,15 @@ describe('PluginInventorySettingsTab', () => {
     expect(screen.getByText('标准模式 · ptc')).toBeTruthy()
 
     // The failed global card reports its runtime state.
-    fireEvent.click(screen.getByRole('button', { name: 'telemetry, Failed' }))
-    expect(screen.getByText('启动失败')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'telemetry, 启动失败' }))
+    expect(screen.getByText(zh.runtime).nextElementSibling?.textContent).toBe('启动失败')
 
     // An enabled entry with no live fiber says so in its details, dot-free.
     fireEvent.click(screen.getByRole('button', { name: 'unobserved-name, 已启用' }))
     expect(screen.getByText('未运行')).toBeTruthy()
 
     // A disabled row outside every preset stays plainly disabled.
-    fireEvent.click(screen.getByRole('button', { name: 'dormant, Disabled' }))
+    fireEvent.click(screen.getByRole('button', { name: 'dormant, 已停用' }))
     expect(screen.queryByText(zh.presetProvidedDetail)).toBeNull()
 
     fireEvent.click(globalToggle())
@@ -257,7 +258,7 @@ describe('PluginInventorySettingsTab', () => {
     expect(view.container.querySelector('[data-plugin-count]')?.getAttribute('data-plugin-count')).toBe('1')
     expect(screen.getByText(zh.presetEnabledTag)).toBeTruthy()
     expect(screen.queryByText(`1 ${zh.failedCountLabel}`)).toBeNull()
-    const hint = screen.getByText((text: string) => text.startsWith('2 more matches'))
+    const hint = screen.getByText((text: string) => text.startsWith('其他预设中还有 2 个匹配'))
     expect(hint).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'ptc' }))
     expect(screen.getByRole('button', { name: zh.switcherLabel }).textContent).toBe('ptc')
@@ -265,7 +266,7 @@ describe('PluginInventorySettingsTab', () => {
     // A match visible only in another preset keeps the pointer without rows.
     fireEvent.change(search, { target: { value: 'crashy' } })
     expect(view.container.querySelector('[data-preset-plugin-count]')?.getAttribute('data-preset-plugin-count')).toBe('0')
-    expect(screen.getByText((text: string) => text.startsWith('1 more matches'))).toBeTruthy()
+    expect(screen.getByText((text: string) => text.startsWith('其他预设中还有 1 个匹配'))).toBeTruthy()
     expect(screen.queryByText(zh.emptySearch)).toBeNull()
 
     // A match on a Loader entry id only reaches the global plane.
@@ -293,7 +294,7 @@ describe('PluginInventorySettingsTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'hmr, 已启用' }))
     expect(screen.getByText(zh.runtime)).toBeTruthy()
     expect(view.container.querySelector('[data-loader-entry]')?.textContent).toBe('hmr')
-    fireEvent.click(screen.getByRole('button', { name: 'off, Disabled' }))
+    fireEvent.click(screen.getByRole('button', { name: 'off, 已停用' }))
     expect(screen.getAllByText(zh.moduleLabel).length).toBeGreaterThan(0)
     expect(screen.queryByText(zh.runtime)).toBeNull()
   })

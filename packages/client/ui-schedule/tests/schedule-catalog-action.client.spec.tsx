@@ -138,11 +138,11 @@ describe('ScheduleCatalogAction rows', () => {
     expect(within(rows[0]!).getByText('已逾期', { exact: true })).toBeDefined()
     expect(within(rows[1]!).getByText('等待中', { exact: true })).toBeDefined()
     expect(rows[0]?.textContent).toContain('单次')
-    expect(rows[0]?.textContent).toContain('1 minute overdue')
-    expect(rows[1]?.textContent).toContain('Every 5 minutes')
-    expect(rows[1]?.textContent).toContain('in 5 minutes')
+    expect(rows[0]?.textContent).toContain('已逾期 1分钟')
+    expect(rows[1]?.textContent).toContain('5分钟一次')
+    expect(rows[1]?.textContent).toContain('5分钟后')
     expect(rows[2]?.textContent).toContain('单次')
-    expect(rows[2]?.textContent).toContain('in 1 hour')
+    expect(rows[2]?.textContent).toContain('1小时后')
     expect(rows[2]?.textContent).toContain(formatScheduleLocalTime(at.scheduledAt, 'zh'))
     expect(document.querySelector('img')).toBeNull()
     const text = screen.getByRole('list').textContent ?? ''
@@ -153,25 +153,23 @@ describe('ScheduleCatalogAction rows', () => {
     expect(rows.every(row => row.tabIndex === -1)).toBe(true)
   })
 
-  it('renders exact recurring units without rounding and localizes both dictionaries', () => {
-    const tEn = makeTranslate(zh)
-    const tZh = makeTranslate(zh)
+  it('renders exact recurring units without rounding', () => {
+    const t = makeTranslate(zh)
     const samples = [
-      [86_400, 'Every 1 day', '1天一次'],
-      [172_800, 'Every 2 days', '2天一次'],
-      [3_600, 'Every 1 hour', '1小时一次'],
-      [7_200, 'Every 2 hours', '2小时一次'],
-      [300, 'Every 5 minutes', '5分钟一次'],
-      [301, 'Every 301 seconds', '301秒一次'],
+      [86_400, '1天一次'],
+      [172_800, '2天一次'],
+      [3_600, '1小时一次'],
+      [7_200, '2小时一次'],
+      [300, '5分钟一次'],
+      [301, '301秒一次'],
     ] as const
-    for (const [seconds, english, chinese] of samples) {
+    for (const [seconds, chinese] of samples) {
       const item = record(String(seconds), 'every', START + 1_000, { everySeconds: seconds })
-      expect(formatScheduleFrequency(item, tEn)).toBe(english)
-      expect(formatScheduleFrequency(item, tZh)).toBe(chinese)
+      expect(formatScheduleFrequency(item, t)).toBe(chinese)
     }
-    expect(formatScheduleFrequency(record('once', 'at', START + 1_000), tZh)).toBe('单次')
-    expect(tZh('status.scheduled')).toBe('等待中')
-    expect(tZh('status.overdue')).toBe('已逾期')
+    expect(formatScheduleFrequency(record('once', 'at', START + 1_000), t)).toBe('单次')
+    expect(t('status.scheduled')).toBe('等待中')
+    expect(t('status.overdue')).toBe('已逾期')
   })
 
   it('formats absolute time with the active document locale instead of the runtime default', () => {
@@ -187,16 +185,16 @@ describe('ScheduleCatalogAction rows', () => {
   it('derives relative seconds, minutes, hours, days, and the exact due boundary', () => {
     const t = makeTranslate(zh)
     expect(formatScheduleRelative(new Date(START).toISOString(), START, t)).toBe('现在到期')
-    expect(formatScheduleRelative(new Date(START + 500).toISOString(), START, t)).toBe('in 1 second')
-    expect(formatScheduleRelative(new Date(START + 61_000).toISOString(), START, t)).toBe('in 2 minutes')
-    expect(formatScheduleRelative(new Date(START - 3_600_000).toISOString(), START, t)).toBe('1 hour overdue')
-    expect(formatScheduleRelative(new Date(START - 172_800_000).toISOString(), START, t)).toBe('2 days overdue')
+    expect(formatScheduleRelative(new Date(START + 500).toISOString(), START, t)).toBe('1秒后')
+    expect(formatScheduleRelative(new Date(START + 61_000).toISOString(), START, t)).toBe('2分钟后')
+    expect(formatScheduleRelative(new Date(START - 3_600_000).toISOString(), START, t)).toBe('已逾期 1小时')
+    expect(formatScheduleRelative(new Date(START - 172_800_000).toISOString(), START, t)).toBe('已逾期 2天')
   })
 
   it('keeps equal targets stable and updates overdue status as the browser clock advances', () => {
     const first = record('first', 'at', START + 500)
-    const second = record('秒', 'at', START + 500)
-    expect(orderScheduleRecords([first, second], START).map(item => item.id)).toEqual(['first', '秒'])
+    const second = record('second', 'at', START + 500)
+    expect(orderScheduleRecords([first, second], START).map(item => item.id)).toEqual(['first', 'second'])
     expect(orderScheduleRecords([
       record('future', 'at', START + 1_000),
       record('overdue', 'at', START - 1_000),

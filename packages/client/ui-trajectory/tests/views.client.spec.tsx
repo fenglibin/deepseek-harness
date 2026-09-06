@@ -496,7 +496,7 @@ describe('tab switching in ConversationRoot', () => {
     expect(screen.getByRole('region', { name: '轨迹时间线' })).toBeTruthy()
     expect(view.container.querySelector('[data-conversation-composer-overlay]')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '收起所有轮次' }))
-    expect(view.container.querySelector('[data-collapsed-summary="轮次"]')).toBeTruthy()
+    expect(view.container.querySelector('[data-collapsed-summary="turn"]')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '展开所有轮次' }))
     expect(screen.getByRole('row', { name: /用户/ })).toBeTruthy()
     expect(screen.queryByTestId('chat-body')).toBeNull()
@@ -780,9 +780,9 @@ describe('timeline projection', () => {
       expect(view.container.querySelector('[role="tooltip"]')).toBeNull()
       act(() => { vi.advanceTimersByTime(1) })
       const tooltip = view.container.querySelector<HTMLElement>('[role="tooltip"]')
-      expect(tooltip?.textContent).toContain('Total 2,000 毫秒')
-      expect(tooltip?.textContent).toContain('TTFT 500 毫秒')
-      expect(tooltip?.textContent).toContain('Decoding 1,500 毫秒')
+      expect(tooltip?.textContent).toContain('总计 2,000 毫秒')
+      expect(tooltip?.textContent).toContain('首 token 500 毫秒')
+      expect(tooltip?.textContent).toContain('解码 1,500 毫秒')
     } finally {
       vi.useRealTimers()
     }

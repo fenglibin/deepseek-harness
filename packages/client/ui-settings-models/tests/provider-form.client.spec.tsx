@@ -274,6 +274,15 @@ function openEditor(provider: string): void {
   fireEvent.click(summary)
 }
 
+/**
+ * The apply button of the open editor dialog. The page behind the dialog also
+ * carries 保存 buttons (lightweight model, image understanding), so the lookup
+ * stays scoped to the dialog.
+ */
+function applyButton(): HTMLButtonElement {
+  return within_(screen.getByRole('dialog'), zh.apply) as HTMLButtonElement
+}
+
 /** Open one model row's advanced fold, where the capacities live. */
 function expandModel(index: number): void {
   fireEvent.click(screen.getByLabelText(`${zh.modelAdvanced} ${index}`))
@@ -331,7 +340,7 @@ describe('model list editing', () => {
     fireEvent.change(screen.getByLabelText(`${zh.modelName} 1`), { target: { value: 'Acme' } })
     // Clearing an optional field must drop it rather than store an empty value.
     fireEvent.change(screen.getByLabelText(`${zh.modelName} 1`), { target: { value: '' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
 
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     expect(firstMutate(mutate)).toMatchObject({
@@ -353,7 +362,7 @@ describe('model list editing', () => {
     // The create card refuses this in place; an edited route must not have to
     // learn it from the host's refusal instead.
     expect(screen.getByText(`${zh.model} 2: ${zh.modelIdDuplicate}`)).toBeTruthy()
-    expect(buttonNamed(zh.apply).disabled).toBe(true)
+    expect(applyButton().disabled).toBe(true)
     expect(mutate).not.toHaveBeenCalled()
   })
 
@@ -373,7 +382,7 @@ describe('model list editing', () => {
     fireEvent.change(screen.getByLabelText(`${zh.modelMaxTokens} 1`), { target: { value: '1000' } })
     expect(screen.getByLabelText<HTMLInputElement>(`${zh.modelMaxTokens} 1`).value).toBe('1000')
 
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     // What lands in settings is always a plain token count.
     expect(firstMutate(mutate).ops[0]?.value)
@@ -393,7 +402,7 @@ describe('model list editing', () => {
     // field shows, so the text stays put and the write is refused instead.
     expect(screen.getByLabelText<HTMLInputElement>(`${zh.modelMaxTokens} 1`).value).toBe('abc')
     expect(screen.getByText(`${zh.model} 1: ${zh.modelMaxTokensInvalid}`)).toBeTruthy()
-    expect(buttonNamed(zh.apply).disabled).toBe(true)
+    expect(applyButton().disabled).toBe(true)
     expect(mutate).not.toHaveBeenCalled()
   })
 
@@ -428,7 +437,7 @@ describe('model list editing', () => {
     fireEvent.change(screen.getByLabelText(`${zh.modelContextWindow} 2`), { target: { value: '4096' } })
     // Clearing it back to empty must drop the field, not store a zero.
     fireEvent.change(screen.getByLabelText(`${zh.modelContextWindow} 2`), { target: { value: '' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
 
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     expect(firstMutate(mutate).ops[0]?.value).toEqual([
@@ -505,7 +514,7 @@ describe('model list editing', () => {
     // from handing the catalog back, which is what the reset affordance does.
     expect(screen.getByText(zh.modelsCustomized)).toBeTruthy()
     fireEvent.click(screen.getByText(zh.resetModels))
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     expect(firstMutate(mutate).ops)
       .toContainEqual({ op: 'unset', path: ['providers', 'openai', 'models'] })
@@ -610,7 +619,7 @@ describe('endpoint interrogation', () => {
     fireEvent.click(boxes[1] as HTMLInputElement)
     fireEvent.click(screen.getByText(zh.fetchAdopt))
 
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     expect(firstMutate(mutate).ops[0]?.value).toEqual([
       { id: 'kept', contextWindow: 111 },
@@ -733,7 +742,7 @@ describe('endpoint interrogation', () => {
     fireEvent.click(first)
     fireEvent.click(first)
     fireEvent.click(screen.getByText(zh.fetchAdopt))
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
 
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     // A disclosed output cap rides along with the candidate that has one.
@@ -837,7 +846,7 @@ describe('candidate filtering', () => {
     filter(dialog, 'large')
     fireEvent.click(within(dialog).getByText(zh.fetchSelectAll))
     fireEvent.click(within(dialog).getByText(zh.fetchAdopt))
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
 
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     expect(firstMutate(mutate).ops[0]?.value).toEqual([{ id: 'acme-mini' }, { id: 'acme-large' }])
@@ -1010,7 +1019,7 @@ describe('hand-declared providers', () => {
     // the moment the field is cleared.
     expect(name.placeholder).toBe('acme-gateway')
     fireEvent.change(name, { target: { value: 'Acme 网关' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
 
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     expect(firstMutate(mutate).ops)
@@ -1054,7 +1063,7 @@ describe('hand-declared providers', () => {
     openEditor('acme-gateway')
 
     fireEvent.change(screen.getByLabelText(zh.customDisplayName), { target: { value: 'Acme 网关' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
 
     const notice = await screen.findByRole('status')
     expect(notice.textContent).toBe(providerCopy(zh.savedProvider, {
@@ -1073,7 +1082,7 @@ describe('hand-declared providers', () => {
     openEditor('acme-gateway')
 
     fireEvent.change(screen.getByLabelText(zh.customDisplayName), { target: { value: '   ' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
 
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     expect(firstMutate(mutate).ops)
@@ -1097,7 +1106,7 @@ describe('hand-declared providers', () => {
     const protocol = screen.getByLabelText<HTMLSelectElement>(zh.customApi)
     expect(protocol.value).toBe('openai-completions')
     fireEvent.change(protocol, { target: { value: 'anthropic-messages' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
 
     await waitFor(() => { expect(mutate).toHaveBeenCalledTimes(1) })
     // Only the protocol travels: every other stored field is unchanged, so no
@@ -1537,8 +1546,8 @@ describe('API key field', () => {
     // The field opens empty even for a provider whose key is stored, where it
     // means "keep that one" — so editing anything else must not require it.
     fireEvent.change(screen.getByLabelText(zh.baseUrl), { target: { value: 'https://moved.example/v1' } })
-    expect(buttonNamed(zh.apply).disabled).toBe(false)
-    fireEvent.click(screen.getByText(zh.apply))
+    expect(applyButton().disabled).toBe(false)
+    fireEvent.click(applyButton())
 
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     expect(set).not.toHaveBeenCalled()
@@ -1551,7 +1560,7 @@ describe('API key field', () => {
     // The field renders this as empty, so the draft must agree: storing the
     // spaces would hand both adapters a non-empty string they accept as a URL.
     fireEvent.change(screen.getByLabelText(zh.baseUrl), { target: { value: '   ' } })
-    fireEvent.click(screen.getByText(zh.apply))
+    fireEvent.click(applyButton())
 
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     const ops = firstMutate(mutate).ops
@@ -1566,7 +1575,7 @@ describe('API key field', () => {
     fireEvent.change(screen.getByLabelText(zh.keyInput), { target: { value: '   ' } })
 
     expect(screen.getByText(zh.keyBlank)).toBeTruthy()
-    expect(buttonNamed(zh.apply).disabled).toBe(true)
+    expect(applyButton().disabled).toBe(true)
     expect(mutate).not.toHaveBeenCalled()
     expect(set).not.toHaveBeenCalled()
   })
@@ -1578,7 +1587,7 @@ describe('API key field', () => {
     fireEvent.change(screen.getByLabelText(zh.keyInput), { target: { value: 'sk-\u{1F600}' } })
 
     expect(screen.getByText(zh.keyIllegalCharacters)).toBeTruthy()
-    expect(buttonNamed(zh.apply).disabled).toBe(true)
+    expect(applyButton().disabled).toBe(true)
     expect(set).not.toHaveBeenCalled()
   })
 
@@ -1589,7 +1598,7 @@ describe('API key field', () => {
     fireEvent.change(screen.getByLabelText(zh.keyInput), { target: { value: 'OPENAI_API_KEY=sk-abc' } })
 
     expect(screen.getByText(zh.keyIllegalCharacters)).toBeTruthy()
-    expect(buttonNamed(zh.apply).disabled).toBe(true)
+    expect(applyButton().disabled).toBe(true)
   })
 
   it('trims a padded key before storing it', async () => {
@@ -1597,8 +1606,8 @@ describe('API key field', () => {
     openEditor('openai')
 
     fireEvent.change(screen.getByLabelText(zh.keyInput), { target: { value: '  sk-abc  ' } })
-    expect(buttonNamed(zh.apply).disabled).toBe(false)
-    fireEvent.click(screen.getByText(zh.apply))
+    expect(applyButton().disabled).toBe(false)
+    fireEvent.click(applyButton())
 
     await waitFor(() => { expect(set).toHaveBeenCalled() })
     expect(set.mock.calls[0]?.[1]).toBe('sk-abc')

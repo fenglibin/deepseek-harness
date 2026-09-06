@@ -169,7 +169,7 @@ describe('TrajectoryTable', () => {
     fireEvent.click(screen.getByRole('button', { name: '请求计时' }))
 
     expect(screen.getByText('500 毫秒')).toBeTruthy()
-    expect(screen.getByText('1.00 s')).toBeTruthy()
+    expect(screen.getByText('1.00 秒')).toBeTruthy()
     expect(screen.getByText('20.0 tok/s')).toBeTruthy()
   })
 
@@ -213,7 +213,7 @@ describe('TrajectoryTable', () => {
     const panel = screen.getByRole('tabpanel')
     expect(panel.querySelectorAll('[data-summary-scroll-region]').length).toBeGreaterThan(1)
 
-    fireEvent.click(screen.getByRole('tab', { name: '预览版' }))
+    fireEvent.click(screen.getByRole('tab', { name: '预览' }))
     expect(panel.querySelector('[data-summary-scroll-region]')).toBeNull()
   })
 
@@ -782,9 +782,9 @@ describe('TrajectoryTable', () => {
     expect(view.container.querySelector('tr[data-kind="tool"][data-running="true"]')).toBeTruthy()
     expect(view.container.querySelector('tr[data-kind="tool"][data-error="true"]')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('row', { name: /TOOL, bash \{"command":"pwd"\}/ }))
+    fireEvent.click(screen.getByRole('row', { name: /工具，bash \{"command":"pwd"\}/ }))
     expect(screen.getByText('等待中')).toBeTruthy()
-    fireEvent.click(screen.getByRole('row', { name: /TOOL, bash \{"command":"false"\}/ }))
+    fireEvent.click(screen.getByRole('row', { name: /工具，bash \{"command":"false"\}/ }))
     expect(screen.getByText('失败')).toBeTruthy()
     expect(screen.getByText('失败').className).toContain('error')
     fireEvent.click(screen.getByRole('tab', { name: '结果' }))
@@ -1084,7 +1084,7 @@ describe('TrajectoryTable', () => {
     )
     expect(screen.queryByRole('columnheader')).toBeNull()
     expect(screen.getByRole('row', { name: /助手/ })).toBeTruthy()
-    expect(screen.getByRole('row', { name: /Collapsed turn summary/ })).toBeTruthy()
+    expect(screen.getByRole('row', { name: /已收起的轮次概述/ })).toBeTruthy()
   })
 
   const CALL_TURNS: readonly TrajectoryTurnModel[] = [{

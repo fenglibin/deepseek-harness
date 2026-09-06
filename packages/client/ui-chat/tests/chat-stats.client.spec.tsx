@@ -131,7 +131,7 @@ describe('formatters', () => {
 
   it('formats durations under and over a minute', () => {
     expect(formatDuration(45_230, tEn)).toBe('45.2秒')
-    expect(formatDuration(162_000, tEn)).toBe('2m42秒')
+    expect(formatDuration(162_000, tEn)).toBe('2分42秒')
   })
 })
 
@@ -231,7 +231,7 @@ describe('StatsLine', () => {
     }
     const { source } = makeSource({ nodes: [timed] })
     const view = render(<StatsLine {...props(source)} />)
-    expect(view.container.textContent).toContain('LLM 3.8s| 首 token 平均 0.8s · 20 tok/s')
+    expect(view.container.textContent).toContain('LLM 3.8秒| 首 token 平均 0.8秒 · 20 tok/s')
   })
 
   it('takes every stats label from the active locale', () => {
@@ -327,7 +327,7 @@ describe('StatsLine', () => {
       }),
     })} />)
     expect(view.container.textContent).toBe(
-      '200 轮 · 200 步| LLM 1m40s · 工具调用 1m2s| 首 token 平均 0.8s · 20 tok/s| 缓存命中 90%| 输入 100 tok · 输出 5 tok',
+      '200 轮 · 200 步| LLM 1分40秒 · 工具调用 1分2秒| 首 token 平均 0.8秒 · 20 tok/s| 缓存命中 90%| 输入 100 tok · 输出 5 tok',
     )
   })
 

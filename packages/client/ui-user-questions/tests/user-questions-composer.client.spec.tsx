@@ -411,7 +411,7 @@ describe('PendingQuestion domain face', () => {
     await expect(result).resolves.toMatchObject({
       name: 'UserQuestionError',
       code: 'ASK_CANCELLED',
-      条消息: 'the user cancelled ask_user_question',
+      message: 'the user cancelled ask_user_question',
     })
     await expect(question.cancel()).rejects.toThrow(/already settled/)
   })

@@ -52,19 +52,19 @@ describe('EnterBehaviorRow', () => {
     mount()
     expect(screen.getByText('繁忙时 Enter 键行为')).toBeDefined()
     expect(screen.getByText('仅在智能体运行时生效；Cmd/Ctrl+Enter 使用另一行为')).toBeDefined()
-    expect(screen.getByRole('button', { name: /Queue/ }).getAttribute('aria-expanded')).toBe('false')
+    expect(screen.getByRole('button', { name: '排队发送' }).getAttribute('aria-expanded')).toBe('false')
   })
 
   it('selects Steer, follows later preference changes, and closes outside', () => {
     const b = mount()
-    const trigger = screen.getByRole('button', { name: /Queue/ })
+    const trigger = screen.getByRole('button', { name: '排队发送' })
     fireEvent.click(trigger)
     fireEvent.click(screen.getByRole('menuitem', { name: '插话发送' }))
     expect(b.setBusyEnter).toHaveBeenCalledWith('steer')
-    expect(screen.getByRole('button', { name: /Steer/ })).toBeDefined()
+    expect(screen.getByRole('button', { name: '插话发送' })).toBeDefined()
 
     act(() => { b.policy.setBusyEnter('queue') })
-    const queueTrigger = screen.getByRole('button', { name: /Queue/ })
+    const queueTrigger = screen.getByRole('button', { name: '排队发送' })
     fireEvent.click(queueTrigger)
     expect(screen.getByRole('menuitem', { name: '插话发送' })).toBeDefined()
     fireEvent.pointerDown(document.body)
