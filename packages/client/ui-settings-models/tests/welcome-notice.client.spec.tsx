@@ -99,9 +99,9 @@ function mount(
 describe('WelcomeNotice', () => {
   it('uses the exact owner copy in both GUI locales', () => {
     expect(WELCOME_NOTICE_COPY.zh).toEqual({
-      title: 'Internal Testing Notice',
+      title: '内测声明',
       body: "DeepSeek Harness 0.1 remains in testing for Harness developers. Many areas need further improvement, and we welcome feedback from the developer community. DeepSeek Harness's core plugins and foundational APIs will continue to evolve rapidly over the coming months.\n\nWe look forward to exploring the limits of intelligence with developers around the world, building on open-source, open, reusable, and composable infrastructure. We welcome Harness developers everywhere to join the DSH plugin ecosystem.",
-      continueLabel: 'Continue',
+      continueLabel: '继续',
     })
     expect(zh.welcomeBody).toBe(WELCOME_NOTICE_COPY.zh.body)
     expect(zh.welcomeBody).toBe(WELCOME_NOTICE_COPY.zh.body)

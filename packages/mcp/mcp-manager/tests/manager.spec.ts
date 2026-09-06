@@ -201,4 +201,28 @@ describe('mcp-manager', () => {
     await vi.waitFor(() => { expect(instances.length).toBeGreaterThan(before) })
     await ctx.fiber.dispose()
   })
+
+  it('mounts a stdio server carrying args and env values', async () => {
+    const ctx = await boot()
+    await replaceServers(ctx, [{
+      serverName: 'local_mysql',
+      enabled: true,
+      transport: 'stdio',
+      command: 'uvx',
+      args: ['--from', 'mysql-mcp-server', 'mysql_mcp_server'],
+      env: {
+        MYSQL_HOST: '127.0.0.1',
+        MYSQL_PORT: '3306',
+        MYSQL_USER: 'root',
+        MYSQL_PASSWORD: 'root',
+        MYSQL_DATABASE: 'root',
+      },
+      cwd: '',
+    }])
+    await vi.waitFor(() => {
+      expect(ctx.mcpManager?.statusOf('local_mysql')?.status).toBe('connected')
+      expect(ctx.tools.get('mcp__local_mysql__remote')).toBeDefined()
+    })
+    await ctx.fiber.dispose()
+  })
 })

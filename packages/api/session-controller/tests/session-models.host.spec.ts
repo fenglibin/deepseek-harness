@@ -748,4 +748,29 @@ describe('Web session model selection', () => {
     expect(vision.requests[0]?.purpose).toBe('image-understanding')
     await ctx.fiber.dispose()
   })
+
+  it('reports a misconfigured describer as an attachment-invalid refusal, not a prompt rejection', async () => {
+    const { ctx, agent, sessionId } = await harness()
+    registerTextOnly(ctx)
+    ctx.provide('attachments', Object.setPrototypeOf({
+      saveImages: () => Promise.resolve([]),
+    }, AttachmentStore.prototype) as never)
+    // A describer whose configured provider is gone: resolveRoute refuses with
+    // a diagnostic reason instead of surfacing as a generic `prompt rejected`.
+    await ctx.plugin(LlmImageUnderstanding, { provider: 'missing-provider', model: 'missing-model' })
+    Object.assign(agent, { followup: vi.fn() })
+    const remote = createSessionTestRemote(ctx, {
+      defaultModelSelection: () => ({ provider: 'deepseek-official', model: 'deepseek-chat' }),
+      cwd: '/tmp',
+    })
+    expectValue(await remote.selectModel(request({ sessionId, provider: 'text-only', model: 'plain' })))
+
+    expect(await remote.prompt(promptRequest({
+      sessionId, mode: 'queue', content: [{ type: 'image', mediaType: 'image/png', data: 'AQ==' }],
+    }))).toMatchObject({
+      ok: false,
+      error: { code: 'session/attachment-invalid', details: { reason: 'IMAGE_DESCRIBER_INVALID' } },
+    })
+    await ctx.fiber.dispose()
+  })
 })

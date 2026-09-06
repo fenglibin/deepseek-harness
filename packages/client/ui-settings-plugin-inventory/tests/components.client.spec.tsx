@@ -31,7 +31,7 @@ function props(
 /** A deployment with a roster: one failed global row, two preset-provided rows. */
 const SNAPSHOT = {
   entries: [
-    { entryId: 'telemetry', moduleName: '@fixture/telemetry', enabled: true, fiberPhase: 'failed' },
+    { entryId: 'telemetry', moduleName: '@fixture/telemetry', enabled: true, fiberPhase: '已失败' },
     { entryId: 'timer', moduleName: 'cordis:timer', enabled: true, fiberPhase: 'active' },
     { entryId: '8a1b2c3d', moduleName: '@deepseek-ai/cordis-plugin-hmr', enabled: true, fiberPhase: 'active' },
     { entryId: 'unobserved', moduleName: '@fixture/unobserved-name', enabled: true, fiberPhase: null },
@@ -56,7 +56,7 @@ const SNAPSHOT = {
           fiberPhase: null,
         },
         { entryId: 'codex', moduleName: '@fixture/codex', enabled: false, fiberPhase: null },
-        { entryId: 'crashy', moduleName: '@fixture/crashy', enabled: true, fiberPhase: 'failed' },
+        { entryId: 'crashy', moduleName: '@fixture/crashy', enabled: true, fiberPhase: '已失败' },
         { entryId: null, moduleName: '@fixture/anonymous', enabled: true, fiberPhase: null },
       ],
     },
@@ -88,12 +88,12 @@ describe('PluginInventorySettingsTab', () => {
     const view = await renderReady()
 
     const switcher = screen.getByRole('button', { name: zh.switcherLabel })
-    expect(switcher.textContent).toBe('标准模式 (default)')
+    expect(switcher.textContent).toBe('标准模式（默认）')
     fireEvent.click(switcher)
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      '标准模式 (default)',
+      '标准模式（默认）',
       'ptc',
-      '坏预设 (failed to load)',
+      '坏预设（加载失败）',
     ])
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryAllByRole('menuitem')).toHaveLength(0)
@@ -106,30 +106,30 @@ describe('PluginInventorySettingsTab', () => {
     expect(screen.getByText(zh.conditionalTag)).toBeTruthy()
     expect(screen.getByText(zh.disabledTag)).toBeTruthy()
     expect(screen.getByText(zh.failedTag)).toBeTruthy()
-    expect(screen.getByRole('img', { name: 'Running' })).toBeTruthy()
+    expect(screen.getByRole('img', { name: '运行中' })).toBeTruthy()
     // No live fiber, no dot: file-state rows carry only their enablement tag.
-    expect(screen.queryByRole('img', { name: 'Not running' })).toBeNull()
+    expect(screen.queryByRole('img', { name: '未运行' })).toBeNull()
 
     expect(globalToggle().getAttribute('aria-expanded')).toBe('false')
     expect(view.container.querySelector('[data-plugin-count]')?.getAttribute('data-plugin-count')).toBe('7')
     expect(screen.getByText(`1 ${zh.failedCountLabel}`)).toBeTruthy()
 
     // A preset row expands into its provenance facts.
-    fireEvent.click(screen.getByRole('button', { name: 'pwsh, Conditional' }))
+    fireEvent.click(screen.getByRole('button', { name: 'pwsh, 条件启用' }))
     expect(screen.getByText(zh.fromPreset)).toBeTruthy()
     expect(screen.getByText('标准模式')).toBeTruthy()
     expect(screen.getByText(zh.condition)).toBeTruthy()
     expect(screen.getByText('process.platform === \'win32\'')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'pwsh, Conditional' }))
+    fireEvent.click(screen.getByRole('button', { name: 'pwsh, 条件启用' }))
     expect(screen.queryByText(zh.condition)).toBeNull()
 
     // A failed preset row names its runtime state instead of a condition.
     fireEvent.click(screen.getByRole('button', { name: 'crashy, Failed' }))
     expect(screen.getByText(zh.runtime)).toBeTruthy()
-    expect(screen.getByText('Failed to start')).toBeTruthy()
+    expect(screen.getByText('启动失败')).toBeTruthy()
 
     // A row declaring no id has no Loader identity line, only its module.
-    fireEvent.click(screen.getByRole('button', { name: 'anonymous, Enabled' }))
+    fireEvent.click(screen.getByRole('button', { name: 'anonymous, 已启用' }))
     expect(view.container.querySelector('[data-loader-entry]')).toBeNull()
     expect(screen.getByText(zh.moduleLabel).nextElementSibling?.textContent).toBe('@fixture/anonymous')
   })
@@ -148,18 +148,18 @@ describe('PluginInventorySettingsTab', () => {
     // Rows the presets took over sit inline, marked instead of plainly disabled.
     expect(screen.getAllByText(zh.presetEnabledTag)).toHaveLength(2)
 
-    fireEvent.click(screen.getByRole('button', { name: 'tool-bash, Enabled via presets' }))
+    fireEvent.click(screen.getByRole('button', { name: 'tool-bash, 预设中启用' }))
     expect(screen.getByText(zh.presetProvidedDetail)).toBeTruthy()
     expect(screen.getByText(zh.enabledIn)).toBeTruthy()
     expect(screen.getByText('标准模式 · ptc')).toBeTruthy()
 
     // The failed global card reports its runtime state.
     fireEvent.click(screen.getByRole('button', { name: 'telemetry, Failed' }))
-    expect(screen.getByText('Failed to start')).toBeTruthy()
+    expect(screen.getByText('启动失败')).toBeTruthy()
 
     // An enabled entry with no live fiber says so in its details, dot-free.
-    fireEvent.click(screen.getByRole('button', { name: 'unobserved-name, Enabled' }))
-    expect(screen.getByText('Not running')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'unobserved-name, 已启用' }))
+    expect(screen.getByText('未运行')).toBeTruthy()
 
     // A disabled row outside every preset stays plainly disabled.
     fireEvent.click(screen.getByRole('button', { name: 'dormant, Disabled' }))
@@ -179,11 +179,11 @@ describe('PluginInventorySettingsTab', () => {
 
     pickPreset('ptc')
     expect(view.container.querySelector('[data-preset-plugin-count]')?.getAttribute('data-preset-plugin-count')).toBe('3')
-    fireEvent.click(screen.getAllByRole('button', { name: 'tool-bash, Enabled' })[0]!)
+    fireEvent.click(screen.getAllByRole('button', { name: 'tool-bash, 已启用' })[0]!)
     // An unnamed preset labels provenance by its id.
     expect(screen.getByText(zh.fromPreset).nextElementSibling?.textContent).toBe('ptc')
 
-    pickPreset('坏预设 (failed to load)')
+    pickPreset('坏预设（加载失败）')
     expect(screen.getByRole('alert').textContent).toBe('the composition file is missing')
     expect(view.container.querySelector('[data-preset-plugin-count]')?.getAttribute('data-preset-plugin-count')).toBe('0')
   })
@@ -218,20 +218,20 @@ describe('PluginInventorySettingsTab', () => {
     await screen.findByRole('searchbox', { name: zh.search })
 
     const switcher = screen.getByRole('button', { name: zh.switcherLabel })
-    expect(switcher.textContent).toBe('Localized standard (default)')
+    expect(switcher.textContent).toBe('Localized standard（默认）')
     fireEvent.click(switcher)
     expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual([
-      'Localized standard (default)',
+      'Localized standard（默认）',
       'Localized ptc',
-      '坏预设 (failed to load)',
+      '坏预设（加载失败）',
     ])
     fireEvent.keyDown(document, { key: 'Escape' })
 
-    fireEvent.click(screen.getByRole('button', { name: 'pwsh, Conditional' }))
+    fireEvent.click(screen.getByRole('button', { name: 'pwsh, 条件启用' }))
     expect(screen.getByText(zh.fromPreset).nextElementSibling?.textContent).toBe('Localized standard')
 
     fireEvent.click(globalToggle())
-    fireEvent.click(screen.getByRole('button', { name: 'tool-bash, Enabled via presets' }))
+    fireEvent.click(screen.getByRole('button', { name: 'tool-bash, 预设中启用' }))
     expect(screen.getByText('Localized standard · Localized ptc')).toBeTruthy()
   })
 
@@ -241,10 +241,10 @@ describe('PluginInventorySettingsTab', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'ptc' }))
 
     fireEvent.click(globalToggle())
-    fireEvent.click(screen.getByRole('button', { name: 'tool-bash, Enabled via presets' }))
+    fireEvent.click(screen.getByRole('button', { name: 'tool-bash, 预设中启用' }))
     fireEvent.click(screen.getByRole('button', { name: zh.viewInPreset }))
     expect(screen.getByRole('button', { name: zh.switcherLabel }).textContent)
-      .toBe('标准模式 (default)')
+      .toBe('标准模式（默认）')
   })
 
   it('searches across scopes and points at matches in other presets', async () => {
@@ -290,7 +290,7 @@ describe('PluginInventorySettingsTab', () => {
     expect(globalToggle().getAttribute('aria-expanded')).toBe('true')
     expect(screen.getAllByRole('listitem')).toHaveLength(2)
 
-    fireEvent.click(screen.getByRole('button', { name: 'hmr, Enabled' }))
+    fireEvent.click(screen.getByRole('button', { name: 'hmr, 已启用' }))
     expect(screen.getByText(zh.runtime)).toBeTruthy()
     expect(view.container.querySelector('[data-loader-entry]')?.textContent).toBe('hmr')
     fireEvent.click(screen.getByRole('button', { name: 'off, Disabled' }))

@@ -524,7 +524,7 @@ describe('ProducedFiles row', () => {
     )
     const row = view.container.querySelector('[data-produced-files-row]')
     if (!(row instanceof HTMLElement)) throw new Error('produced row missing')
-    expect(within(row).getByText('+ 1 file')).toBeTruthy()
+    expect(within(row).getByText('+ 1 个文件')).toBeTruthy()
   })
 })
 

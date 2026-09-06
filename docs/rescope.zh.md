@@ -48,4 +48,4 @@ pnpm run rescope-vendor:check      # assert the post-state; runs in the hygiene 
 pnpm run rescope-vendor --apply --reverse   # return to the upstream names
 ```
 
-上游 sync 之后重跑它（[流程](../vendor/README.md)），并接上它打印的重生成：`pnpm install` 重生成 lockfile、`pnpm run gen-third-party-notices`、以及对它触及的双语对跑 `pnpm run verify-translation-pairing --write`。
+上游 sync 之后重跑它（[流程](../vendor/README.md)），并接上它打印的重生成：`pnpm install` 重生成 lockfile、`pnpm run gen-third-party-notices`。

@@ -372,9 +372,9 @@ describe('QuestionComposer', () => {
   it('renders chrome copy through the English dictionary', () => {
     const { carrier } = wait([{ id: 'detail', question: '补充你的要求' }])
     render(<QuestionComposer matched={carrier} {...kit} t={seatOver(zh, commonEn)} />)
-    expect(screen.getByLabelText('Dismiss all questions')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Skip this question' })).toBeTruthy()
-    expect(screen.getByPlaceholderText('Type your answer')).toBeTruthy()
+    expect(screen.getByLabelText('放弃整组问题')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '跳过本题' })).toBeTruthy()
+    expect(screen.getByPlaceholderText('输入你的答案')).toBeTruthy()
   })
 
   it('restores the current page and drafts after the strict Session entry remounts', () => {
@@ -411,7 +411,7 @@ describe('PendingQuestion domain face', () => {
     await expect(result).resolves.toMatchObject({
       name: 'UserQuestionError',
       code: 'ASK_CANCELLED',
-      message: 'the user cancelled ask_user_question',
+      条消息: 'the user cancelled ask_user_question',
     })
     await expect(question.cancel()).rejects.toThrow(/already settled/)
   })

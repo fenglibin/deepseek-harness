@@ -1,9 +1,6 @@
-<!-- 英文源文件由 scripts/gen-cordis-catalog.ts 生成；本中文文件是通过双语配对维护的经评审对侧。
-     更新时先运行 `pnpm run gen-cordis-catalog` 更新英文，再更新本文件并运行 `pnpm run verify-translation-pairing --write docs/cordis-api/context.md` 重新记录配对。 -->
 
 # 上下文
 
-[English](context.md) | 中文
 
 上下文是 Cordis 的核心对象：所有服务、事件和生命周期 API 都通过 `ctx` 访问。事件方法见[事件](events.zh.md)，副作用与当前 fiber 见 [Fiber](fiber.zh.md)，插件加载见[注册表](registry.zh.md)。
 

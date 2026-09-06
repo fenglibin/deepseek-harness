@@ -273,7 +273,7 @@ async function bench(snapshot = historySnapshot(NODES)) {
   )
   const chatBody = vi.fn(() => <div data-testid="chat-body" />)
   slots.register(
-    { name: 'conversation.view', id: 'chat', order: 0, label: 'Chat' } as never, chatBody as never)
+    { name: 'conversation.view', id: 'chat', order: 0, label: '对话' } as never, chatBody as never)
   // The locale plugin backs the locale-aware view tab label ('locale' in
   // inject); its settings scope needs a connection handle and the
   // forwarded-event port.
@@ -309,7 +309,7 @@ function isConvViewOwner(owner: object): owner is ConvViewOwner {
 function mount(fixture: Awaited<ReturnType<typeof bench>>) {
   const { runtime, slots, trajectoryStore, conversationStore } = fixture
   const session = runtime.sessions.binding(SID)?.session
-  if (session === undefined) throw new Error('trajectory fixture session is unavailable')
+  if (session === undefined) throw new Error('trajectory fixture 个会话 is unavailable')
   const useSession = bindSnapshotSelector<SessionSnapshot>(session)
   const useTrajectory = bindSnapshotSelector<TrajectorySnapshot>(trajectoryStore)
   const useConversation = bindSnapshotSelector<ConversationSnapshot>(conversationStore)
@@ -405,7 +405,7 @@ describe('plugin registration', () => {
   it('registers trajectory after chat on the ring', async () => {
     const b = await bench()
     expect(tabsOf(b.slots)).toEqual([
-      { id: 'chat', label: 'Chat' },
+      { id: 'chat', label: '对话' },
       { id: 'trajectory', label: '轨迹' },
     ])
   })
@@ -444,7 +444,7 @@ describe('plugin registration', () => {
     expect(source.getSnapshot()).toBe(EMPTY_TRAJECTORY_SNAPSHOT)
   })
 
-  it('shares one browser-wide duration preference across session injections', async () => {
+  it('shares one browser-wide duration preference across 个会话 injections', async () => {
     const b = await bench()
     const entry = b.slots.entries('conversation.view')
       .find(candidate => candidate.options.id === 'trajectory')
@@ -486,7 +486,7 @@ describe('tab switching in ConversationRoot', () => {
     const b = await bench()
     const view = mount(b)
     expect(screen.getByTestId('chat-body')).toBeTruthy()
-    expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual(['Chat', '轨迹'])
+    expect(screen.getAllByRole('tab').map(t => t.textContent)).toEqual(['对话', '轨迹'])
 
     fireEvent.click(screen.getByRole('tab', { name: '轨迹' }))
     expect(screen.queryByText(/turns ·/)).toBeNull()
@@ -496,12 +496,12 @@ describe('tab switching in ConversationRoot', () => {
     expect(screen.getByRole('region', { name: '轨迹时间线' })).toBeTruthy()
     expect(view.container.querySelector('[data-conversation-composer-overlay]')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '收起所有轮次' }))
-    expect(view.container.querySelector('[data-collapsed-summary="turn"]')).toBeTruthy()
+    expect(view.container.querySelector('[data-collapsed-summary="轮次"]')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '展开所有轮次' }))
     expect(screen.getByRole('row', { name: /用户/ })).toBeTruthy()
     expect(screen.queryByTestId('chat-body')).toBeNull()
     expect(b.loadOlder).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('tab', { name: 'Chat' }))
+    fireEvent.click(screen.getByRole('tab', { name: '对话' }))
     expect(b.loadOlder).not.toHaveBeenCalled()
   })
 
@@ -718,7 +718,7 @@ describe('timeline projection', () => {
     groups: [{
       title: 'Step 1',
       cells: [
-        { index: 1, kind: 'message', text: 'assistant', startedAt: 1_000, timeSeconds: 1 },
+        { index: 1, kind: 'message', text: '助手', startedAt: 1_000, timeSeconds: 1 },
         { index: 2, kind: 'tool', text: 'bash', startedAt: 2_000, timeSeconds: 1 },
         { index: 3, kind: 'user', text: 'unknown', timeSeconds: 0 },
       ],
@@ -749,7 +749,7 @@ describe('timeline projection', () => {
               cells: [{
                 index: 1,
                 kind: 'message',
-                text: 'assistant',
+                text: '助手',
                 startedAt: 1_000,
                 timeSeconds: 2,
                 assistantMetrics: {
@@ -780,9 +780,9 @@ describe('timeline projection', () => {
       expect(view.container.querySelector('[role="tooltip"]')).toBeNull()
       act(() => { vi.advanceTimersByTime(1) })
       const tooltip = view.container.querySelector<HTMLElement>('[role="tooltip"]')
-      expect(tooltip?.textContent).toContain('Total 2,000 ms')
-      expect(tooltip?.textContent).toContain('TTFT 500 ms')
-      expect(tooltip?.textContent).toContain('Decoding 1,500 ms')
+      expect(tooltip?.textContent).toContain('Total 2,000 毫秒')
+      expect(tooltip?.textContent).toContain('TTFT 500 毫秒')
+      expect(tooltip?.textContent).toContain('Decoding 1,500 毫秒')
     } finally {
       vi.useRealTimers()
     }
@@ -801,19 +801,19 @@ describe('timeline projection', () => {
       />,
     )
 
-    const boundary = screen.getByLabelText('Load earlier history')
+    const boundary = screen.getByLabelText('加载更早的历史')
     expect(boundary.getAttribute('data-earlier-history')).not.toBeNull()
-    const plot = screen.getByLabelText('Timeline overview; drag horizontally to focus events')
+    const plot = screen.getByLabelText('时间线概览；水平拖动可聚焦事件')
     fireEvent.pointerMove(plot, { clientX: 50, pointerId: 1 })
     expect(view.container.querySelector('[data-timeline-hover-line]')).toBeTruthy()
     fireEvent.pointerEnter(boundary)
     expect(view.container.querySelector('[data-timeline-hover-line]')).toBeNull()
     fireEvent.focus(boundary)
     expect(screen.getByRole('tooltip').textContent)
-      .toContain('Click to load earlier history')
+      .toContain('点击加载更早的历史')
     fireEvent.click(boundary)
     expect(onLoadEarlier).toHaveBeenCalledOnce()
-    expect(screen.getByLabelText('Loading earlier history…')).toBeTruthy()
+    expect(screen.getByLabelText('正在加载更早的历史…')).toBeTruthy()
 
     view.rerender(
       <TrajectoryTimeline
@@ -823,7 +823,7 @@ describe('timeline projection', () => {
         onRangeChange={vi.fn()}
       />,
     )
-    expect(screen.queryByLabelText('Load earlier history')).toBeNull()
+    expect(screen.queryByLabelText('加载更早的历史')).toBeNull()
     expect(screen.queryByLabelText('Loading earlier history')).toBeNull()
   })
 
@@ -836,14 +836,14 @@ describe('timeline projection', () => {
         onRangeChange={vi.fn()}
       />,
     )
-    const plot = screen.getByLabelText('Timeline overview; drag horizontally to focus events')
+    const plot = screen.getByLabelText('时间线概览；水平拖动可聚焦事件')
     vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({
       x: 44, y: 0, left: 44, top: 0, right: 144, bottom: 50, width: 100, height: 50,
       toJSON: () => ({}),
     })
 
     expect(fireEvent.wheel(plot, { clientX: 94, deltaY: -100 })).toBe(false)
-    expect(fireEvent.wheel(screen.getByText('Input'), {
+    expect(fireEvent.wheel(screen.getByText('输入'), {
       clientX: 20,
       deltaY: -100,
     })).toBe(false)
@@ -903,14 +903,14 @@ describe('timeline projection', () => {
         onRangeChange={onRangeChange}
       />,
     )
-    const plot = screen.getByLabelText('Timeline overview; drag horizontally to focus events')
-    expect(screen.getByLabelText('Load earlier history')).toBeTruthy()
+    const plot = screen.getByLabelText('时间线概览；水平拖动可聚焦事件')
+    expect(screen.getByLabelText('加载更早的历史')).toBeTruthy()
     vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({
       x: 0, y: 0, left: 0, top: 0, right: 100, bottom: 72, width: 100, height: 72,
       toJSON: () => ({}),
     })
     fireEvent.wheel(plot, { clientX: 50, deltaY: -1_000 })
-    expect(screen.queryByLabelText('Load earlier history')).toBeNull()
+    expect(screen.queryByLabelText('加载更早的历史')).toBeNull()
     const domain = view.container.querySelector<HTMLElement>('[data-timeline-domain]')
     const domainWidth = domain?.style.getPropertyValue('--trajectory-domain-width')
     expect(domainWidth).not.toBe('100%')
@@ -934,7 +934,7 @@ describe('timeline projection', () => {
         onRangeChange={onRangeChange}
       />,
     )
-    const plot = screen.getByLabelText('Timeline overview; drag horizontally to focus events')
+    const plot = screen.getByLabelText('时间线概览；水平拖动可聚焦事件')
 
     fireEvent.pointerDown(plot, { button: 2, clientX: 50, pointerId: 1 })
     expect(fireEvent.contextMenu(plot)).toBe(false)
@@ -953,7 +953,7 @@ describe('timeline projection', () => {
         onRangeChange={onRangeChange}
       />,
     )
-    const plot = screen.getByLabelText('Timeline overview; drag horizontally to focus events')
+    const plot = screen.getByLabelText('时间线概览；水平拖动可聚焦事件')
     vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({
       x: 0, y: 0, left: 0, top: 0, right: 100, bottom: 72, width: 100, height: 72,
       toJSON: () => ({}),
@@ -983,7 +983,7 @@ describe('timeline projection', () => {
         onRangeChange={onRangeChange}
       />,
     )
-    const plot = screen.getByLabelText('Timeline overview; drag horizontally to focus events')
+    const plot = screen.getByLabelText('时间线概览；水平拖动可聚焦事件')
     vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({
       x: 0, y: 0, left: 0, top: 0, right: 100, bottom: 72, width: 100, height: 72,
       toJSON: () => ({}),
@@ -1033,7 +1033,7 @@ describe('timeline projection', () => {
         onRangeChange={onRangeChange}
       />,
     )
-    const plot = screen.getByLabelText('Timeline overview; drag horizontally to focus events')
+    const plot = screen.getByLabelText('时间线概览；水平拖动可聚焦事件')
     vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({
       x: 0, y: 0, left: 0, top: 0, right: 100, bottom: 72, width: 100, height: 72,
       toJSON: () => ({}),
@@ -1071,7 +1071,7 @@ describe('timeline projection', () => {
       end: 3,
       spans: [
         {
-          index: 1, isError: false, kind: 'message', label: 'assistant',
+          index: 1, isError: false, kind: 'message', label: '助手',
           lane: 1, start: 0, end: 1,
         },
         {
@@ -1212,7 +1212,7 @@ describe('timeline projection', () => {
       {
         turn: null,
         groups: [{
-          title: 'Compaction 3',
+          title: '压缩 3',
           cells: [{ index: 2, kind: 'compacted', text: 'summary', timeSeconds: 0 }],
         }],
       },

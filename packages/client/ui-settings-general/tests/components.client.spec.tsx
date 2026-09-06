@@ -34,20 +34,20 @@ describe('chrome content', () => {
   it('TriggerContent renders the icon with the label in the wide column', () => {
     const { container } = render(<TriggerContent {...kit} wide t={t} />)
     expect(container.querySelector('svg')).toBeTruthy()
-    expect(screen.getByText('Settings')).toBeTruthy()
+    expect(screen.getByText('设置')).toBeTruthy()
   })
 
   it('TriggerContent drops the label in the rail state', () => {
     const { container } = render(<TriggerContent {...kit} wide={false} t={t} />)
     expect(container.querySelector('svg')).toBeTruthy()
-    expect(screen.queryByText('Settings')).toBeNull()
+    expect(screen.queryByText('设置')).toBeNull()
   })
 
   it('HeaderContent and CloseLabel render their translated text', () => {
     render(<HeaderContent {...kit} t={t} />)
     render(<CloseLabel {...kit} t={t} />)
-    expect(screen.getByText('Settings')).toBeTruthy()
-    expect(screen.getByText('Close')).toBeTruthy()
+    expect(screen.getByText('设置')).toBeTruthy()
+    expect(screen.getByText('关闭')).toBeTruthy()
   })
 })
 
@@ -88,7 +88,7 @@ describe('SettingsDocumentAction', () => {
       controller={controller}
       useSnapshot={bindSnapshotSelector(controller.store)}
     />)
-    const action = await screen.findByRole('button', { name: 'Open configuration file' })
+    const action = await screen.findByRole('button', { name: '打开配置文件' })
     fireEvent.click(action)
     await waitFor(() => { expect(openDocument).toHaveBeenCalledWith() })
   })
@@ -107,7 +107,7 @@ describe('SettingsDocumentAction', () => {
       useSnapshot={bindSnapshotSelector(controller.store)}
     />)
     await waitFor(() => { expect(controller.store.getSnapshot().status).toBe('unavailable') })
-    expect(screen.queryByRole('button', { name: 'Open configuration file' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '打开配置文件' })).toBeNull()
     first.unmount()
     render(<SettingsDocumentAction
       {...kit}
@@ -120,7 +120,7 @@ describe('SettingsDocumentAction', () => {
     await waitFor(() => { expect(controller.store.getSnapshot().status).toBe('unavailable') })
     expect(describe).toHaveBeenCalledTimes(1)
     await mirror.load()
-    expect(await screen.findByRole('button', { name: 'Open configuration file' })).toBeTruthy()
+    expect(await screen.findByRole('button', { name: '打开配置文件' })).toBeTruthy()
     expect(describe).toHaveBeenCalledTimes(2)
   })
 
@@ -143,8 +143,8 @@ describe('SettingsDocumentAction', () => {
       controller={controller}
       useSnapshot={bindSnapshotSelector(controller.store)}
     />)
-    fireEvent.click(await screen.findByRole('button', { name: 'Open configuration file' }))
-    expect((await screen.findByRole('alert')).textContent).toBe('Could not open configuration file')
-    expect(screen.getByRole('button', { name: 'Open configuration file' })).toBeTruthy()
+    fireEvent.click(await screen.findByRole('button', { name: '打开配置文件' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('无法打开配置文件')
+    expect(screen.getByRole('button', { name: '打开配置文件' })).toBeTruthy()
   })
 })

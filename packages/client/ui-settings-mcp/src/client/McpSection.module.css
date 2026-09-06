@@ -131,6 +131,14 @@
   font-size: 12px;
 }
 
+.rowError {
+  margin: 8px 0 0;
+  color: var(--color-danger, #c62828);
+  font-size: 12px;
+  font-family: monospace;
+  word-break: break-word;
+}
+
 .rowName {
   font-weight: 600;
 }

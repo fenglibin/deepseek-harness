@@ -31,15 +31,3 @@ export const accessZh = {
 
 /** Current-session popup-gate key union. */
 export type PermissionAccessKey = keyof typeof accessZh
-
-/** English dictionary for the current-session popup gate. */
-export const accessEn = {
-  'preset.readOnly': 'Read Only',
-  'preset.workspaceWrite': 'Workspace Write',
-  'preset.fullAccess': 'Full access',
-  'confirm.title': 'Enable Full access?',
-  'confirm.description': 'Full access reduces confirmation steps and lets the agent perform more actions directly, including sensitive operations, file changes, or external commands. Only use it when you trust the current task.',
-  'confirm.acknowledge': 'I understand the risks and want to continue',
-  'confirm.cancel': 'Cancel',
-  'confirm.enable': 'Enable Full access',
-} satisfies Record<PermissionAccessKey, string>

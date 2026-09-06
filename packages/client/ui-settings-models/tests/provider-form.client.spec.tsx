@@ -418,7 +418,7 @@ describe('model list editing', () => {
 
   it('edits one row of several and lets a cleared capacity leave the profile', async () => {
     const { mutate } = await mountSection({
-      providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'first' }, { id: 'second' }] } },
+      providers: { openai: { baseURL: 'https://proxy.example/v1', models: [{ id: 'first' }, { id: '秒' }] } },
     })
     openEditor('openai')
 
@@ -433,7 +433,7 @@ describe('model list editing', () => {
     await waitFor(() => { expect(mutate).toHaveBeenCalled() })
     expect(firstMutate(mutate).ops[0]?.value).toEqual([
       { id: 'first' },
-      { id: 'second', name: 'Second', maxTokens: 2048 },
+      { id: '秒', name: 'Second', maxTokens: 2048 },
     ])
   })
 
@@ -453,7 +453,7 @@ describe('model list editing', () => {
       providers: {
         openai: {
           baseURL: 'https://proxy.example/v1',
-          models: [{ id: 'first' }, { id: 'second' }, { id: 'third' }],
+          models: [{ id: 'first' }, { id: '秒' }, { id: 'third' }],
         },
       },
     })
@@ -464,9 +464,9 @@ describe('model list editing', () => {
     expandModel(2)
     fireEvent.click(screen.getByLabelText(`${zh.removeModel} 1`))
 
-    // 'second' now sits at position 1 and keeps its capacities open; 'third'
+    // '秒' now sits at position 1 and keeps its capacities open; 'third'
     // moved to position 2 and stays folded.
-    expect(screen.getByLabelText<HTMLInputElement>(`${zh.modelId} 1`).value).toBe('second')
+    expect(screen.getByLabelText<HTMLInputElement>(`${zh.modelId} 1`).value).toBe('秒')
     expect(screen.queryByLabelText(`${zh.modelContextWindow} 1`)).not.toBeNull()
     expect(screen.queryByLabelText(`${zh.modelContextWindow} 2`)).toBeNull()
   })
@@ -476,7 +476,7 @@ describe('model list editing', () => {
       providers: {
         openai: {
           baseURL: 'https://proxy.example/v1',
-          models: [{ id: 'first' }, { id: 'second' }, { id: 'third' }],
+          models: [{ id: 'first' }, { id: '秒' }, { id: 'third' }],
         },
       },
     })
@@ -1270,7 +1270,7 @@ describe('hand-declared providers', () => {
     mountCard()
     fireEvent.change(screen.getByLabelText(zh.customRoute), { target: { value: 'acme' } })
     fireEvent.change(screen.getByLabelText(zh.baseUrl), { target: { value: 'https://acme.test/v1' } })
-    for (const [at, id] of [[1, 'first'], [2, 'second'], [3, 'third']] as const) {
+    for (const [at, id] of [[1, 'first'], [2, '秒'], [3, 'third']] as const) {
       fireEvent.click(screen.getByRole('button', { name: zh.addModel }))
       fireEvent.change(screen.getByLabelText(`${zh.modelId} ${String(at)}`), { target: { value: id } })
       expandModel(at)

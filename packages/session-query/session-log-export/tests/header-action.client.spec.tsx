@@ -6,7 +6,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { SessionLogDownloadController } from '../src/client/controller.ts'
 import { SessionLogDownloadHeaderAction } from '../src/client/HeaderAction.tsx'
 import type { SessionLogDownloadDialogProps } from '../src/client/Dialog.tsx'
-import { en } from '../src/client/locales.ts'
+import { zh } from '../src/client/locales.ts'
 
 const SID = 'session-export-header' as SessionId
 
@@ -31,7 +31,7 @@ function bench() {
     useSessionLogDownload,
     request,
     dismiss,
-    t: (key: keyof typeof en): string => en[key],
+    t: (key: keyof typeof zh): string => zh[key],
   } as unknown as SessionLogDownloadDialogProps
   const view = render(<SessionLogDownloadHeaderAction {...props} />)
   return { controller, request, view }
@@ -42,7 +42,7 @@ afterEach(cleanup)
 describe('Session export Header action', () => {
   it('renders the 111×32 text capsule and downloads through the shared controller', async () => {
     const b = bench()
-    const button = b.view.getByRole('button', { name: 'Session log' })
+    const button = b.view.getByRole('button', { name: 'Session 日志' })
     expect(button.querySelector('svg')).not.toBeNull()
     fireEvent.click(button)
     await waitFor(() => { expect(b.request).toHaveBeenCalledWith(SID) })
@@ -60,11 +60,11 @@ describe('Session export Header action', () => {
       useSessionLogDownload,
       request: (sessionId: SessionId) => controller.download(sessionId),
       dismiss: (sessionId: SessionId) => { controller.dismiss(sessionId) },
-      t: (key: keyof typeof en): string => en[key],
+      t: (key: keyof typeof zh): string => zh[key],
     } as unknown as SessionLogDownloadDialogProps)} />)
 
-    fireEvent.click(view.getByRole('button', { name: 'Session log' }))
-    const dialog = await view.findByRole('dialog', { name: 'Session export failed' })
+    fireEvent.click(view.getByRole('button', { name: 'Session 日志' }))
+    const dialog = await view.findByRole('dialog', { name: 'Session 导出失败' })
     expect(dialog.textContent).toContain('endpoint unavailable')
   })
 
@@ -79,11 +79,11 @@ describe('Session export Header action', () => {
       useSessionLogDownload,
       request: (sessionId: SessionId) => controller.download(sessionId),
       dismiss: (sessionId: SessionId) => { controller.dismiss(sessionId) },
-      t: (key: keyof typeof en): string => en[key],
+      t: (key: keyof typeof zh): string => zh[key],
     } as unknown as SessionLogDownloadDialogProps)} />)
 
     const download = controller.download(SID)
-    const button = b.view.getByRole('button', { name: 'Session log' })
+    const button = b.view.getByRole('button', { name: 'Session 日志' })
     await waitFor(() => { expect(button.getAttribute('aria-busy')).toBe('true') })
     expect((button as HTMLButtonElement).disabled).toBe(true)
     release(new Response('zip'))
@@ -93,12 +93,12 @@ describe('Session export Header action', () => {
 
   it('exports the descendant tree from the range menu and closes it after the choice', async () => {
     const b = bench()
-    const trigger = b.view.getByRole('button', { name: 'More export options' })
+    const trigger = b.view.getByRole('button', { name: '更多导出选项' })
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
 
     fireEvent.click(trigger)
-    const tree = await b.view.findByRole('menuitem', { name: 'Include sub-Sessions' })
-    expect(b.view.getByRole('menuitem', { name: 'Current Session only' })).toBeTruthy()
+    const tree = await b.view.findByRole('menuitem', { name: '包含子 Session' })
+    expect(b.view.getByRole('menuitem', { name: '仅当前 Session' })).toBeTruthy()
     fireEvent.click(tree)
 
     await waitFor(() => { expect(b.request).toHaveBeenCalledWith(SID, true) })
@@ -108,15 +108,15 @@ describe('Session export Header action', () => {
   it('exports only the current Session when the menu row of that range is chosen', async () => {
     const b = bench()
 
-    fireEvent.click(b.view.getByRole('button', { name: 'More export options' }))
-    fireEvent.click(await b.view.findByRole('menuitem', { name: 'Current Session only' }))
+    fireEvent.click(b.view.getByRole('button', { name: '更多导出选项' }))
+    fireEvent.click(await b.view.findByRole('menuitem', { name: '仅当前 Session' }))
 
     await waitFor(() => { expect(b.request).toHaveBeenCalledWith(SID, false) })
   })
 
   it('closes the range menu on Escape without exporting', async () => {
     const b = bench()
-    const trigger = b.view.getByRole('button', { name: 'More export options' })
+    const trigger = b.view.getByRole('button', { name: '更多导出选项' })
 
     fireEvent.click(trigger)
     expect(trigger.getAttribute('aria-expanded')).toBe('true')

@@ -17,10 +17,10 @@ type Step = { id: string; order: number }
 
 /** Slot-content stand-ins: the shell renders whatever the seats contribute. */
 const SEAT_CONTENT: Record<string, string> = {
-  'settings.trigger': 'Settings',
+  'settings.trigger': '设置',
   'settings.header': 'Settings Title',
-  'settings.action': 'Open configuration file',
-  'settings.close': 'Close',
+  'settings.action': '打开配置文件',
+  'settings.close': '关闭',
 }
 
 type AttentionSnapshot = Parameters<Parameters<SettingsRootComponentProps['useSessionPendingInteraction']>[0]>[0]
@@ -33,9 +33,9 @@ function mount({
   connectionState = 'connected',
   onboardingActive = true,
   rows = [
-    { id: 'general', order: 0, label: 'General' },
-    { id: 'models', order: 10, label: 'Models' },
-    { id: 'agent-presets', order: 20, label: 'Agent presets' },
+    { id: 'general', order: 0, label: '通用设置' },
+    { id: 'models', order: 10, label: '模型' },
+    { id: 'agent-presets', order: 20, label: 'Agent 预设' },
   ],
   steps = [
     { id: 'welcome', order: -100 },
@@ -114,7 +114,7 @@ function mount({
 }
 
 function openPanel() {
-  const trigger = screen.getByRole('button', { name: 'Settings' })
+  const trigger = screen.getByRole('button', { name: '设置' })
   trigger.focus()
   fireEvent.click(trigger)
   return trigger
@@ -123,13 +123,13 @@ function openPanel() {
 describe('SettingsRoot trigger', () => {
   it('renders the trigger seat content as the accessible name (no aria-label of its own)', () => {
     const { renderSlot } = mount()
-    const trigger = screen.getByRole('button', { name: 'Settings' })
+    const trigger = screen.getByRole('button', { name: '设置' })
     expect(trigger.hasAttribute('aria-label')).toBe(false)
     expect(renderSlot).toHaveBeenCalledWith('settings.trigger', { wide: true })
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
     fireEvent.click(trigger)
     expect(screen.getByRole('dialog')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Settings', expanded: true })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '设置', expanded: true })).toBeTruthy()
   })
 
   it('hands the rail state to the trigger seat', () => {
@@ -140,31 +140,31 @@ describe('SettingsRoot trigger', () => {
   it('shows outage, retry progress, and a two-second recovery confirmation', () => {
     vi.useFakeTimers()
     const mounted = mount()
-    expect(screen.queryByRole('button', { name: 'Disconnected, reconnect now' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '连接异常，点击立即重连' })).toBeNull()
 
     mounted.setConnectionState('disconnected')
-    const indicator = screen.getByRole('button', { name: 'Disconnected, reconnect now' })
-    expect(indicator.textContent).toContain('Disconnected')
+    const indicator = screen.getByRole('button', { name: '连接异常，点击立即重连' })
+    expect(indicator.textContent).toContain('连接异常')
     expect(indicator.hasAttribute('title')).toBe(false)
     expect(indicator.querySelector('svg')).toBeTruthy()
     fireEvent.click(indicator)
     expect(mounted.reconnect).toHaveBeenCalledOnce()
 
     mounted.setConnectionState('connecting')
-    expect(screen.getByRole('button', { name: 'Connecting, restart now' }).textContent)
+    expect(screen.getByRole('button', { name: '连接中，点击立即重连' }).textContent)
       .toContain('Connecting...')
 
     mounted.setConnectionState('connected')
-    expect(screen.getByRole('status', { name: 'Connected' })).toBeTruthy()
+    expect(screen.getByRole('status', { name: '连接成功' })).toBeTruthy()
     act(() => { vi.advanceTimersByTime(1_999) })
-    expect(screen.getByRole('status', { name: 'Connected' })).toBeTruthy()
+    expect(screen.getByRole('status', { name: '连接成功' })).toBeTruthy()
     act(() => { vi.advanceTimersByTime(1) })
     expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('keeps the reconnect indicator out of the collapsed rail', () => {
     mount({ wide: false, connectionState: 'disconnected' })
-    expect(screen.queryByRole('button', { name: 'Disconnected, reconnect now' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '连接异常，点击立即重连' })).toBeNull()
   })
 })
 
@@ -183,15 +183,15 @@ describe('SettingsPanel chrome seats', () => {
   it('names the close button through the visually-hidden close seat text', () => {
     mount()
     openPanel()
-    const close = screen.getByRole('button', { name: 'Close' })
+    const close = screen.getByRole('button', { name: '关闭' })
     expect(close.hasAttribute('aria-label')).toBe(false)
-    expect(close.textContent).toContain('Close')
+    expect(close.textContent).toContain('关闭')
   })
 
   it('renders header actions before the shell-owned close control', () => {
     const { renderSlot } = mount()
     openPanel()
-    expect(screen.getByText('Open configuration file')).toBeTruthy()
+    expect(screen.getByText('打开配置文件')).toBeTruthy()
     expect(renderSlot).toHaveBeenCalledWith('settings.action', {})
   })
 })
@@ -200,7 +200,7 @@ describe('SettingsPanel close paths', () => {
   it('closes via the header button and restores trigger focus', async () => {
     mount()
     const trigger = openPanel()
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }))
     expect(screen.queryByRole('dialog')).toBeNull()
     await vi.waitFor(() => { expect(document.activeElement).toBe(trigger) })
   })
@@ -231,7 +231,7 @@ describe('SettingsPanel close paths', () => {
   it('lands focus on the close button when the dialog opens', () => {
     mount()
     openPanel()
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close' }))
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: '关闭' }))
   })
 })
 
@@ -239,24 +239,24 @@ describe('SettingsPanel navigation', () => {
   it('projects rows, marks the first active, and renders only that section', () => {
     mount()
     openPanel()
-    expect(screen.getByRole('button', { name: 'General' }).getAttribute('aria-current')).toBe('true')
-    expect(screen.getByRole('button', { name: 'Models' }).getAttribute('aria-current')).toBeNull()
+    expect(screen.getByRole('button', { name: '通用设置' }).getAttribute('aria-current')).toBe('true')
+    expect(screen.getByRole('button', { name: '模型' }).getAttribute('aria-current')).toBeNull()
     expect(screen.getByTestId('section-general')).toBeTruthy()
   })
 
   it('gives every section a nav glyph, distinct for the ids the shell knows', () => {
     mount({
       rows: [
-        { id: 'general', order: 0, label: 'General' },
-        { id: 'models', order: 10, label: 'Models' },
-        { id: 'agent-presets', order: 20, label: 'Agent presets' },
-        { id: 'plugins', order: 30, label: 'Plugins' },
+        { id: 'general', order: 0, label: '通用设置' },
+        { id: 'models', order: 10, label: '模型' },
+        { id: 'agent-presets', order: 20, label: 'Agent 预设' },
+        { id: '个', order: 30, label: '插件' },
         { id: 'contributed', order: 40, label: 'Contributed' },
       ],
     })
     openPanel()
     // Glyphs carry no id of their own, so the drawn paths are what tells them apart.
-    const glyphs = ['General', 'Models', 'Agent presets', 'Plugins', 'Contributed']
+    const glyphs = ['通用设置', '模型', 'Agent 预设', '插件', 'Contributed']
       .map(name => screen.getByRole('button', { name }).querySelector('svg')?.innerHTML)
 
     expect(glyphs.every(glyph => glyph !== undefined && glyph !== '')).toBe(true)
@@ -269,8 +269,8 @@ describe('SettingsPanel navigation', () => {
   it('switches the rendered section on nav click', () => {
     mount()
     openPanel()
-    fireEvent.click(screen.getByRole('button', { name: 'Models' }))
-    expect(screen.getByRole('button', { name: 'Models' }).getAttribute('aria-current')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: '模型' }))
+    expect(screen.getByRole('button', { name: '模型' }).getAttribute('aria-current')).toBe('true')
     expect(screen.getByTestId('section-models')).toBeTruthy()
     expect(screen.queryByTestId('section-general')).toBeNull()
   })
@@ -320,9 +320,9 @@ describe('SettingsPanel navigation', () => {
   it('falls back to the first row when the active entry unregisters', () => {
     const { bump } = mount()
     openPanel()
-    fireEvent.click(screen.getByRole('button', { name: 'Models' }))
-    bump([{ id: 'general', order: 0, label: 'General' }])
-    expect(screen.queryByRole('button', { name: 'Models' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '模型' }))
+    bump([{ id: 'general', order: 0, label: '通用设置' }])
+    expect(screen.queryByRole('button', { name: '模型' })).toBeNull()
     expect(screen.getByTestId('section-general')).toBeTruthy()
   })
 

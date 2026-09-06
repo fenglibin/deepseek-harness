@@ -45,8 +45,8 @@ function mount(mode: 'normal' | 'compact' = 'compact') {
 describe('TranscriptViewRow', () => {
   it('explains the preference and shows Compact by default', () => {
     mount()
-    expect(screen.getByText('Conversation display')).toBeDefined()
-    expect(screen.getByText('Controls process content in completed turns')).toBeDefined()
+    expect(screen.getByText('对话显示')).toBeDefined()
+    expect(screen.getByText('控制已完成轮次的过程内容')).toBeDefined()
     expect(screen.getByRole('button', { name: /Compact/ }).getAttribute('aria-expanded')).toBe('false')
   })
 

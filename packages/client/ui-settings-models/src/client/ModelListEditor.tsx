@@ -23,7 +23,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import type { LlmDiscoveredModel } from '@deepseek-ai/dsh-api-remotes/client'
 import { Button, IconSearchOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import { formatCapacity, parseCapacity } from './DeepSeekModelsEditor.tsx'
+import { acceptsImages, formatCapacity, IMAGE_INPUT, parseCapacity } from './DeepSeekModelsEditor.tsx'
 import type { ModelsOperations } from './operations.ts'
 import type { DeepSeekModelDraft } from './DeepSeekModelsEditor.tsx'
 import type { zh } from './locales.ts'
@@ -230,7 +230,10 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
     })
   }
 
-  const patch = (index: number, next: Record<string, string | number | undefined>): void => {
+  const patch = (
+    index: number,
+    next: Record<string, string | number | boolean | readonly string[] | undefined>,
+  ): void => {
     onChange(models.map((model, at) => {
       if (at !== index) return model
       // Rebuilt rather than spread over: an emptied optional field has to leave
@@ -466,6 +469,25 @@ export function ModelListEditor(props: ModelListEditorProps): ReactNode {
                     disabled={disabled}
                     onChange={(event) => { editCapacity(index, 'maxTokens', event.target.value) }}
                   />
+                </label>
+                {/* The one capability no endpoint can be asked for and the row
+                    must state: a vision model declared by hand stays text-only
+                    until it is marked, and only then does the catalog offer it
+                    as an image describer. */}
+                <label className={styles['modelToggle']}>
+                  <input
+                    type="checkbox"
+                    checked={acceptsImages(model, 'input')}
+                    aria-label={`${t('modelImageInput')} ${index + 1}`}
+                    disabled={disabled}
+                    onChange={(event) => {
+                      // Unchecked drops the field instead of pinning a
+                      // text-only list: with no declaration the row takes the
+                      // route's own default, which is what it had before.
+                      patch(index, { input: event.currentTarget.checked ? IMAGE_INPUT : undefined })
+                    }}
+                  />
+                  <span className={styles['modelFieldLabel']}>{t('modelImageInput')}</span>
                 </label>
               </div>
             )

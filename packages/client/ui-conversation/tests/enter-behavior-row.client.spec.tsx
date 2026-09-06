@@ -50,8 +50,8 @@ function mount() {
 describe('EnterBehaviorRow', () => {
   it('explains the busy-only scope and shows Queue by default', () => {
     mount()
-    expect(screen.getByText('Enter behavior while busy')).toBeDefined()
-    expect(screen.getByText('Busy only; Cmd/Ctrl+Enter uses the other behavior')).toBeDefined()
+    expect(screen.getByText('繁忙时 Enter 键行为')).toBeDefined()
+    expect(screen.getByText('仅在智能体运行时生效；Cmd/Ctrl+Enter 使用另一行为')).toBeDefined()
     expect(screen.getByRole('button', { name: /Queue/ }).getAttribute('aria-expanded')).toBe('false')
   })
 
@@ -59,15 +59,15 @@ describe('EnterBehaviorRow', () => {
     const b = mount()
     const trigger = screen.getByRole('button', { name: /Queue/ })
     fireEvent.click(trigger)
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Steer' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '插话发送' }))
     expect(b.setBusyEnter).toHaveBeenCalledWith('steer')
     expect(screen.getByRole('button', { name: /Steer/ })).toBeDefined()
 
     act(() => { b.policy.setBusyEnter('queue') })
     const queueTrigger = screen.getByRole('button', { name: /Queue/ })
     fireEvent.click(queueTrigger)
-    expect(screen.getByRole('menuitem', { name: 'Steer' })).toBeDefined()
+    expect(screen.getByRole('menuitem', { name: '插话发送' })).toBeDefined()
     fireEvent.pointerDown(document.body)
-    expect(screen.queryByRole('menuitem', { name: 'Steer' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: '插话发送' })).toBeNull()
   })
 })

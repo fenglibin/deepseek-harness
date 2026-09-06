@@ -274,6 +274,9 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
                       </button>
                     </span>
                   </div>
+                  {dot === 'failed' && view?.error !== undefined
+                    ? <p className={styles['rowError']} role="alert">{view.error}</p>
+                    : null}
                 </li>
               )
             })}

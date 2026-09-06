@@ -432,11 +432,22 @@ export class SessionCommandController {
   /**
    * Whether a mounted describer can supply text for images this route cannot read.
    * @returns true when a describer resolved a usable vision route.
-   * @throws when a mounted describer is misconfigured.
+   * @throws RemoteError when a mounted describer is misconfigured, so the user
+   *   sees a diagnostic refusal instead of a generic `prompt rejected`.
    */
   private async canDescribeImages(): Promise<boolean> {
     const service = this.ctx.get('imageUnderstanding')
-    return service === undefined ? false : await service.resolveRoute() !== undefined
+    if (service === undefined) return false
+    try {
+      return await service.resolveRoute() !== undefined
+    } catch (error: unknown) {
+      const reason = error instanceof Error ? error.message : String(error)
+      throw new RemoteError(
+        'session/attachment-invalid',
+        `image description is misconfigured: ${reason}`,
+        { reason: 'IMAGE_DESCRIBER_INVALID' },
+      )
+    }
   }
 
   /**

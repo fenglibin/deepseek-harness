@@ -553,6 +553,14 @@
   line-height: 18px;
 }
 
+/* The capability toggle reads as a row: the checkbox answers the label beside
+   it instead of stacking under it like a capacity field. */
+.modelToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .modelEmpty {
   padding: 12px;
   border: 1px dashed var(--dsw-alias-border-l3);

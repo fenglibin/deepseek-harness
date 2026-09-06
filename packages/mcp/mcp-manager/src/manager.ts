@@ -46,15 +46,21 @@ function statusKindOf(status: McpConnectionStatus | undefined): McpServerStatusK
   return status
 }
 
-/** Convert one settings entry into the mcp-client config the bridge validates. */
+/**
+ * Convert one settings entry into the mcp-client config the bridge validates.
+ * The settings document returns a frozen snapshot, and Schemastery's dict and
+ * array resolvers mutate their input while normalizing. The `args`, `env`, and
+ * `headers` collections are therefore shallow-copied so the config parse never
+ * writes through a frozen reference and fails the union.
+ */
 function toMcpClientConfig(server: McpServerEntry): McpClient.Config {
   if (server.transport === 'stdio') {
     return McpClient.Config({
       transport: 'stdio',
       serverName: server.serverName,
       command: server.command,
-      args: server.args,
-      env: server.env,
+      args: [...server.args],
+      env: { ...server.env },
       cwd: server.cwd,
     })
   }
@@ -62,7 +68,7 @@ function toMcpClientConfig(server: McpServerEntry): McpClient.Config {
     transport: 'streamable-http',
     serverName: server.serverName,
     url: server.url,
-    headers: server.headers,
+    headers: { ...server.headers },
   })
 }
 

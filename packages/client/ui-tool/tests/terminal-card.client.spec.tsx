@@ -115,7 +115,7 @@ describe('terminalCardModel', () => {
     }))?.card).toMatchObject({ output: '[exit code: 5]', exitCode: 0 })
   })
 
-  it('resolves the raw workdir against the session workspace', () => {
+  it('resolves the raw workdir against the 个会话 workspace', () => {
     // Omitted workdir — the common bash call — IS the session workspace.
     expect(terminalCardModel(settled(), '/w/app')?.card.cwd).toBe('/w/app')
     // A relative workdir joins under it.
@@ -172,7 +172,7 @@ describe('terminalCardModel', () => {
     })
     const done = settled({ call: { name: 'terminal_send', argsRaw }, content: [{ type: 'text', text: 'ok' }] })
     expect(localizeTerminalCardModel(terminalCardModel(done)!, enT)).toMatchObject({
-      description: 'Terminal pty-3', card: { command: 'make', output: 'ok', running: false },
+      description: '终端 pty-3', card: { command: 'make', output: 'ok', running: false },
     })
     expect(terminalCardModel(settled({
       call: { name: 'terminal_send', argsRaw: JSON.stringify({ sessionId: 'pty-3', text: 'make', run_in_background: true }) },
@@ -198,7 +198,7 @@ describe('terminalCardModel', () => {
       content: [{ type: 'text', text: 'failed\n[exit code: 3]' }],
     }))).toMatchObject({
       copy: { kind: 'shell', command: 'ls -la', description: 'List files' },
-      card: { output: 'failed', exitCode: 3, running: false },
+      card: { output: '已失败', exitCode: 3, running: false },
     })
   })
 
@@ -212,7 +212,7 @@ describe('terminalCardModel', () => {
       description: '终端 pty-3', card: { command: '（发送输入）' },
     })
     expect(localizeTerminalCardModel(model, enT)).toMatchObject({
-      description: 'Terminal pty-3', card: { command: '(send input)' },
+      description: '终端 pty-3', card: { command: '（发送输入）' },
     })
   })
 
@@ -318,20 +318,20 @@ describe('chat row terminal body', () => {
 
   it('the fallback row shows the call description', () => {
     const view = render(<GenericToolCard {...ownerProps(settled({
-      call: { name: 'bash', argsRaw: shellArgs({ description: 'Terminal 3' }) },
+      call: { name: 'bash', argsRaw: shellArgs({ description: '终端 3' }) },
     }))} />)
-    expect(view.getByText('Terminal 3')).toBeTruthy()
+    expect(view.getByText('终端 3')).toBeTruthy()
     expect(view.queryByText('List files')).toBeNull()
   })
 
   it('keeps the call description visible once the terminal card is expanded', () => {
     const view = render(<GenericToolCard {...ownerProps(settled({
-      call: { name: 'bash', argsRaw: shellArgs({ description: 'Terminal 3' }) },
+      call: { name: 'bash', argsRaw: shellArgs({ description: '终端 3' }) },
     }))} />)
-    expect(view.getByText('Terminal 3')).toBeTruthy()
+    expect(view.getByText('终端 3')).toBeTruthy()
     toggleRow(view)
     expect(view.container.querySelector('[data-terminal]')).not.toBeNull()
-    expect(view.getByText('Terminal 3')).toBeTruthy()
+    expect(view.getByText('终端 3')).toBeTruthy()
   })
 
   it('a running terminal call opens by default to the prompt line with no output yet', () => {
@@ -347,7 +347,7 @@ describe('chat row terminal body', () => {
 
   it.each([
     { locale: 'zh', translate: t, description: '终端 pty-3', command: '（发送输入）' },
-    { locale: 'zh', translate: enT, description: 'Terminal pty-3', command: '(send input)' },
+    { locale: 'zh', translate: enT, description: '终端 pty-3', command: '（发送输入）' },
   ])('renders terminal_send copy through the $locale locale', ({ translate, description, command }) => {
     const block = running({
       name: 'terminal_send',
@@ -487,7 +487,7 @@ describe('BashRow terminal card', () => {
   // the reader sees on one line.
   it('agrees with the summary row about the run state', () => {
     const runningView = render(<BashRow {...rowProps(running())} />)
-    expect(runningView.container.querySelector('[data-variant="bash"]')?.getAttribute('data-state')).toBe('running')
+    expect(runningView.container.querySelector('[data-variant="bash"]')?.getAttribute('data-state')).toBe('运行中')
     // A running row is already open, so its card reads without a click.
     expect(runStateOf(runningView.container)).toBe('ongoing')
     cleanup()
@@ -506,9 +506,9 @@ describe('BashRow terminal card', () => {
 
   it('shows the call description as the terminal summary', () => {
     const view = render(<BashRow {...rowProps(settled({
-      call: { name: 'bash', argsRaw: shellArgs({ description: 'Terminal 3' }) },
+      call: { name: 'bash', argsRaw: shellArgs({ description: '终端 3' }) },
     }))} />)
-    expect(view.getByText('Terminal 3')).toBeTruthy()
+    expect(view.getByText('终端 3')).toBeTruthy()
     expect(view.queryByText('List files')).toBeNull()
   })
 
@@ -535,7 +535,7 @@ describe('BashRow terminal card', () => {
   it('a non-terminal bash call (background start) renders the summary row alone', () => {
     const view = render(<BashRow {...rowProps(settled({
       call: { name: 'bash', argsRaw: shellArgs({ command: 'sleep 30', description: 'Wait', run_in_background: true }) },
-      content: [{ type: 'text', text: 'started background job job-1' }],
+      content: [{ type: 'text', text: 'started 个后台任务 job-1' }],
     }))} />)
     expect(view.getByText('Wait')).toBeTruthy()
     expect(view.queryByText(/a\.ts/)).toBeNull()
@@ -636,9 +636,9 @@ describe('DetailsPanel Output section', () => {
 
   it('renders the raw call description above the card', () => {
     const view = mount(snapshot({
-      nodes: [settled({ call: { name: 'bash', argsRaw: shellArgs({ description: 'Terminal 3' }) } })],
+      nodes: [settled({ call: { name: 'bash', argsRaw: shellArgs({ description: '终端 3' }) } })],
     }), target)
-    const description = view.getByText('Terminal 3')
+    const description = view.getByText('终端 3')
     const card = view.container.querySelector('[data-terminal]')
     expect(card).not.toBeNull()
     // Above, not below: document order is what places it as the card's heading.
@@ -657,7 +657,7 @@ describe('DetailsPanel Output section', () => {
     expect(view.getByText('（发送输入）')).toBeTruthy()
   })
 
-  it('resolves the prompt cwd against the session workspace', () => {
+  it('resolves the prompt cwd against the 个会话 workspace', () => {
     const view = mount(snapshot({ nodes: [settled()] }), target, '/w/app')
     // No workdir in the call args: the prompt label is the workspace basename.
     expect(view.getByText('app')).toBeTruthy()
@@ -808,7 +808,7 @@ describe('DetailsPanel Output section', () => {
     const empty = mount(snapshot({
       nodes: [settled({
         content: [], isError: true,
-        error: { name: 'ToolError', code: 'interrupted' },
+        error: { name: 'ToolError', code: '已中断' },
       })],
     }), target)
     expect(empty.getByText('ToolError: interrupted')).toBeTruthy()

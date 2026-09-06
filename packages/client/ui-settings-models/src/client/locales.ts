@@ -68,6 +68,7 @@ export const zh = {
   modelDuplicate: '每个模型 ID 只能出现一次。',
   modelContextWindow: '上下文窗口',
   modelMaxTokens: '最大输出 token',
+  modelImageInput: '支持图片输入',
   fetchModels: '获取可用模型',
   fetching: '正在询问提供方\u2026',
   fetchNeedsBaseUrl: '请先填写 API 地址，再获取。',

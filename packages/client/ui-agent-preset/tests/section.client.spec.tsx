@@ -128,7 +128,7 @@ describe('the preset list', () => {
     // The page has no create button: the intro is what tells a first-time
     // reader that copying an existing preset — or drafting one in Creator
     // mode — IS the way to make one.
-    expect(screen.getByText(new RegExp('Creator mode'))).toBeTruthy()
+    expect(screen.getByText(new RegExp('创造模式'))).toBeTruthy()
   })
 
   it('picks a preset by clicking its card, and the one in use is inert', () => {
@@ -254,7 +254,7 @@ describe('the preset list', () => {
     expect(actions.view).toHaveBeenCalledWith('standard')
   })
 
-  it('starts a creator-mode draft session and leaves settings', () => {
+  it('starts a creator-mode draft 个会话 and leaves settings', () => {
     const actions = renderSection({
       rows: [...READY.rows, { id: 'cordis', trust: 'system', isDefault: false, name: '创造模式' }],
     })

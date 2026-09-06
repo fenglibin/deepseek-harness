@@ -106,19 +106,19 @@ describe('ScheduleCatalogAction visibility', () => {
     }
 
     view.rerender(<ScheduleCatalogAction {...props(active)} />)
-    expect(screen.getByRole('button', { name: '1 reminder' })).toBeDefined()
+    expect(screen.getByRole('button', { name: '1 个提醒' })).toBeDefined()
   })
 
   it('closes and removes the trigger when the last live record disappears', () => {
     const active = [record('active', 'after', START + 60_000)]
     const view = render(<><button type="button">Neighbor</button><ScheduleCatalogAction {...props(active)} /></>)
-    const trigger = screen.getByRole('button', { name: '1 reminder' })
+    const trigger = screen.getByRole('button', { name: '1 个提醒' })
     fireEvent.click(trigger)
     trigger.focus()
     expect(screen.getByRole('list', { name: zh['list.aria'] })).toBeDefined()
 
     view.rerender(<><button type="button">Neighbor</button><ScheduleCatalogAction {...props([])} /></>)
-    expect(screen.queryByRole('button', { name: '1 reminder' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '1 个提醒' })).toBeNull()
     expect(document.activeElement).toBe(document.body)
     expect(screen.getByRole('button', { name: 'Neighbor' })).not.toBe(document.activeElement)
   })
@@ -126,7 +126,7 @@ describe('ScheduleCatalogAction visibility', () => {
 
 describe('ScheduleCatalogAction rows', () => {
   it('shows only prompt and the three derived metadata fields, with overdue records first', () => {
-    const rawPrompt = '<img src=x onerror=alert(1)> Keep the complete long reminder prompt visible without truncation.'
+    const rawPrompt = '<img src=x onerror=alert(1)> Keep the complete long 个提醒 prompt visible without truncation.'
     const overdue = record('hidden-id', 'after', START - 60_000, { prompt: rawPrompt })
     const every = record('every-id', 'every', START + 300_000, { prompt: 'Check metrics', everySeconds: 300 })
     const at = record('at-id', 'at', START + 3_600_000, { prompt: 'Join meeting' })
@@ -135,13 +135,13 @@ describe('ScheduleCatalogAction rows', () => {
 
     expect(prompts()).toEqual([rawPrompt, 'Check metrics', 'Join meeting'])
     const rows = screen.getAllByRole('listitem')
-    expect(within(rows[0]!).getByText('Overdue', { exact: true })).toBeDefined()
-    expect(within(rows[1]!).getByText('Scheduled', { exact: true })).toBeDefined()
-    expect(rows[0]?.textContent).toContain('Once')
+    expect(within(rows[0]!).getByText('已逾期', { exact: true })).toBeDefined()
+    expect(within(rows[1]!).getByText('等待中', { exact: true })).toBeDefined()
+    expect(rows[0]?.textContent).toContain('单次')
     expect(rows[0]?.textContent).toContain('1 minute overdue')
     expect(rows[1]?.textContent).toContain('Every 5 minutes')
     expect(rows[1]?.textContent).toContain('in 5 minutes')
-    expect(rows[2]?.textContent).toContain('Once')
+    expect(rows[2]?.textContent).toContain('单次')
     expect(rows[2]?.textContent).toContain('in 1 hour')
     expect(rows[2]?.textContent).toContain(formatScheduleLocalTime(at.scheduledAt, 'zh'))
     expect(document.querySelector('img')).toBeNull()
@@ -186,7 +186,7 @@ describe('ScheduleCatalogAction rows', () => {
 
   it('derives relative seconds, minutes, hours, days, and the exact due boundary', () => {
     const t = makeTranslate(zh)
-    expect(formatScheduleRelative(new Date(START).toISOString(), START, t)).toBe('Due now')
+    expect(formatScheduleRelative(new Date(START).toISOString(), START, t)).toBe('现在到期')
     expect(formatScheduleRelative(new Date(START + 500).toISOString(), START, t)).toBe('in 1 second')
     expect(formatScheduleRelative(new Date(START + 61_000).toISOString(), START, t)).toBe('in 2 minutes')
     expect(formatScheduleRelative(new Date(START - 3_600_000).toISOString(), START, t)).toBe('1 hour overdue')
@@ -195,8 +195,8 @@ describe('ScheduleCatalogAction rows', () => {
 
   it('keeps equal targets stable and updates overdue status as the browser clock advances', () => {
     const first = record('first', 'at', START + 500)
-    const second = record('second', 'at', START + 500)
-    expect(orderScheduleRecords([first, second], START).map(item => item.id)).toEqual(['first', 'second'])
+    const second = record('秒', 'at', START + 500)
+    expect(orderScheduleRecords([first, second], START).map(item => item.id)).toEqual(['first', '秒'])
     expect(orderScheduleRecords([
       record('future', 'at', START + 1_000),
       record('overdue', 'at', START - 1_000),
@@ -205,11 +205,11 @@ describe('ScheduleCatalogAction rows', () => {
     render(<ScheduleCatalogAction {...props([first, second])} />)
     fireEvent.click(screen.getByRole('button'))
     expect(screen.getAllByRole('listitem').every(row => (
-      within(row).queryByText('Scheduled', { exact: true }) !== null
+      within(row).queryByText('等待中', { exact: true }) !== null
     ))).toBe(true)
     act(() => { vi.advanceTimersByTime(1_000) })
     expect(screen.getAllByRole('listitem').every(row => (
-      within(row).queryByText('Overdue', { exact: true }) !== null
+      within(row).queryByText('已逾期', { exact: true }) !== null
     ))).toBe(true)
   })
 })
@@ -219,7 +219,7 @@ describe('ScheduleCatalogAction dismissal', () => {
 
   it('closes on Escape inside the catalog and restores trigger focus', () => {
     render(<ScheduleCatalogAction {...props(active)} />)
-    const trigger = screen.getByRole('button', { name: '1 reminder' })
+    const trigger = screen.getByRole('button', { name: '1 个提醒' })
     fireEvent.click(trigger)
     expect(trigger.getAttribute('aria-expanded')).toBe('true')
     fireEvent.keyDown(screen.getByRole('list', { name: zh['list.aria'] }), { key: 'Escape' })
@@ -229,7 +229,7 @@ describe('ScheduleCatalogAction dismissal', () => {
 
   it('leaves the catalog open when Escape belongs to a sibling control', () => {
     render(<><ScheduleCatalogAction {...props(active)} /><button type="button">Sibling</button></>)
-    const trigger = screen.getByRole('button', { name: '1 reminder' })
+    const trigger = screen.getByRole('button', { name: '1 个提醒' })
     const sibling = screen.getByRole('button', { name: 'Sibling' })
     fireEvent.click(trigger)
     sibling.focus()
@@ -259,7 +259,7 @@ describe('ScheduleCatalogAction dismissal', () => {
         <button type="button">After</button>
       </>,
     )
-    const trigger = screen.getByRole('button', { name: '1 reminder' })
+    const trigger = screen.getByRole('button', { name: '1 个提醒' })
     const before = screen.getByRole('button', { name: 'Before' })
     const after = screen.getByRole('button', { name: 'After' })
 

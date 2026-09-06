@@ -6,7 +6,7 @@
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import {
-  type BoundActions, type LocaleDictOf, type LocaleNamespaceMap, type Translate, type TranslateNS,
+  type LocaleDictOf, type LocaleNamespaceMap, type Translate, type TranslateNS,
 } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: the ctx.settingsScope Context merge and the settings slot types.
 // Cross-plugin collaboration goes through the service, never a value import
@@ -19,13 +19,7 @@ import {
   type BuiltInLocaleId, type LocaleId, type LocaleSettings,
 } from '../locale-settings.ts'
 import { zh, type CommonKey } from '../locales/index.ts'
-import { zh as settingsZh, type SettingsLocaleKey } from '../locales/settings.ts'
-import type { LanguageRowInjected } from './LanguageRow.tsx'
-import { LanguageRow } from './LanguageRow.tsx'
-import { createLanguageRowStore } from './settings-store.ts'
 
-export type { LanguageRowComponentProps, LanguageRowInjected } from './LanguageRow.tsx'
-export type { LanguageOptionRow, LanguageRowState } from './settings-store.ts'
 export type { CommonKey } from '../locales/index.ts'
 export type { BuiltInLocaleId, LocaleId, LocaleSettings } from '../locale-settings.ts'
 
@@ -38,8 +32,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Shared cross-feature vocabulary, consulted by the lookup chain after the entry's own namespace misses. */
     common: CommonKey
-    /** This feature's own settings-row copy (the Language row). */
-    'settings.locale': SettingsLocaleKey
   }
 }
 
@@ -62,7 +54,7 @@ export interface LocaleDefinition {
   readonly id: LocaleId
   /** Display name written in the represented language. */
   readonly label: string
-  /** Next language in the per-key fallback chain; absent only for English. */
+  /** Next language in the per-key fallback chain; absent only for the fallback locale. */
   readonly fallback?: LocaleId
 }
 
@@ -103,10 +95,7 @@ export const FALLBACK_LOCALE: BuiltInLocaleId = 'zh'
 /** Shared namespace for shell-level texts. */
 export const COMMON_NS = 'common'
 
-/** Namespace owning this feature's settings-row copy. */
-export const SETTINGS_NS = 'settings.locale'
-
-/** The two locales and dictionaries shipped by this package. */
+/** The single locale and dictionary shipped by this package. */
 const BUILT_IN_LOCALE_METADATA = {
   zh: { label: '中文' },
 } as const satisfies Record<BuiltInLocaleId, Omit<LocaleDefinition, 'id'>>
@@ -237,7 +226,7 @@ export class LocaleRuntime {
   /**
    * Add one selectable language to the shared catalog. Its fallback must
    * already be registered, and following fallback definitions must terminate
-   * at English. Dictionaries may register before or after this definition.
+   * at the fallback locale. Dictionaries may register before or after this definition.
    * Registration rechecks an unresolved Host preference and the browser's
    * ordered language list. The caller owns the returned disposer; removing an
    * active language falls back without clearing the stored id.
@@ -304,7 +293,7 @@ export class LocaleRuntime {
     return Object.freeze([...this.catalog.values()])
   }
 
-  /** Fail a new definition whose complete fallback path does not reach English. */
+  /** Fail a new definition whose complete fallback path does not reach the fallback locale. */
   private assertFallbackChain(start: LocaleId): void {
     const seen = new Set<string>()
     let current = this.catalog.get(localeKey(start))
@@ -313,7 +302,7 @@ export class LocaleRuntime {
       if (seen.has(key)) throw new Error(`locale fallback cycle includes "${current.id}"`)
       seen.add(key)
       if (key === localeKey(FALLBACK_LOCALE)) return
-      /* v8 ignore next -- English is the only built-in terminal and every
+      /* v8 ignore next -- the fallback locale is the only built-in terminal and every
        * language accepted by addLanguage has a required fallback. */
       if (current.fallback === undefined) {
         throw new Error(`locale "${current.id}" fallback chain does not reach "${FALLBACK_LOCALE}"`)
@@ -326,7 +315,7 @@ export class LocaleRuntime {
     }
   }
 
-  /** Resolve a lookup chain, falling directly to English across an unload gap. */
+  /** Resolve a lookup chain, falling directly to the fallback locale across an unload gap. */
   private fallbackChain(start: LocaleId): readonly LocaleId[] {
     const startKey = localeKey(start)
     const cached = this.fallbackChains.get(startKey)
@@ -533,43 +522,13 @@ export function apply(ctx: ClientContext): void {
   const host = ctx.settingsScope.bind<LocaleSettings>({ namespace: LOCALE_SETTINGS_NAMESPACE })
   const locale = new LocaleRuntime(ctx, host)
   locale.register(COMMON_NS, { zh })
-  locale.register(SETTINGS_NS, { zh: settingsZh })
   ctx.provide('locale', locale)
   // The service IS the LocaleFace (bind + getSnapshot/subscribe): install it
   // so the render machinery can synthesize the `t` standard seat.
   ctx.slots.installLocale(locale)
 
-  const store = createLanguageRowStore()
-  let bound: BoundActions<typeof store> | undefined
-  const sync = (): void => {
-    const snapshot = locale.getSnapshot()
-    syncDocumentLanguage(snapshot)
-    bound?.sync(
-      snapshot.active,
-      snapshot.locales.map(l => ({ id: l.id, label: l.label })),
-      snapshot.revision,
-    )
-  }
-  ctx.effect(() => locale.subscribe(sync), 'locale: language row and document synchronization')
-  // The served markup declares one language; the resolved locale may differ
-  // (browser detection, or a stored preference adopted after activation), so
-  // state it once at activation rather than waiting for the first change.
-  sync()
-  const injected = (actions: BoundActions<typeof store>): LanguageRowInjected => {
-    bound = actions
-    // Re-sync from the getter so no event is lost between registration and
-    // first render (the store's revision guard drops stale duplicates).
-    sync()
-    return {
-      setLocale: (id) => { locale.setLocale(id) },
-    }
-  }
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item',
-    id: 'language',
-    order: 0,
-    store,
-    locale: SETTINGS_NS,
-    inject: injected,
-  }, LanguageRow))
+  // Keep <html lang> in sync with the active locale, including a browser- or
+  // preference-derived change adopted after activation.
+  ctx.effect(() => locale.subscribe(() => { syncDocumentLanguage(locale.getSnapshot()) }), 'locale: document language synchronization')
+  syncDocumentLanguage(locale.getSnapshot())
 }

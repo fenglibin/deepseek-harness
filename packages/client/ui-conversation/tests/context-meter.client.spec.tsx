@@ -79,7 +79,7 @@ describe('ContextMeter', () => {
     expect(zhView.container.querySelector('[role="dialog"]')!.textContent)
       .toMatch(/^上下文已用25%/)
     const enView = meter(values, tEn)
-    fireEvent.click(enView.getByRole('button', { name: '25% of context used' }))
+    fireEvent.click(enView.getByRole('button', { name: '上下文已用 25%' }))
     expect(enView.container.querySelector('[role="dialog"]')!.textContent)
       .toMatch(/^25%of context used/)
   })

@@ -25,11 +25,11 @@ afterEach(cleanup)
 
 describe('formatDurationMillis', () => {
   it('formats exact millisecond labels with thousands separators', () => {
-    expect(formatDurationMillis(0)).toBe('0 ms')
-    expect(formatDurationMillis(29)).toBe('29 ms')
-    expect(formatDurationMillis(500)).toBe('500 ms')
-    expect(formatDurationMillis(1_500)).toBe('1,500 ms')
-    expect(formatDurationMillis(235_200)).toBe('235,200 ms')
+    expect(formatDurationMillis(0)).toBe('0 毫秒')
+    expect(formatDurationMillis(29)).toBe('29 毫秒')
+    expect(formatDurationMillis(500)).toBe('500 毫秒')
+    expect(formatDurationMillis(1_500)).toBe('1,500 毫秒')
+    expect(formatDurationMillis(235_200)).toBe('235,200 毫秒')
     expect(formatDurationMillis(null)).toBe('—')
     expect(formatDurationMillis(Number.NaN)).toBe('—')
   })
@@ -38,14 +38,14 @@ describe('formatDurationMillis', () => {
 describe('formatElapsedSeconds', () => {
   it('formats known durations and uses an em dash when absent', () => {
     expect(formatElapsedSeconds(null)).toBe('—')
-    expect(formatElapsedSeconds(235)).toBe('235,000 ms')
-    expect(formatElapsedSeconds(235.0)).toBe('235,000 ms')
-    expect(formatElapsedSeconds(235.2)).toBe('235,200 ms')
-    expect(formatElapsedSeconds(235.25)).toBe('235,250 ms')
-    expect(formatElapsedSeconds(0)).toBe('0 ms')
-    expect(formatElapsedSeconds(0.029)).toBe('29 ms')
-    expect(formatElapsedSeconds(0.5)).toBe('500 ms')
-    expect(formatElapsedSeconds(1.5)).toBe('1,500 ms')
+    expect(formatElapsedSeconds(235)).toBe('235,000 毫秒')
+    expect(formatElapsedSeconds(235.0)).toBe('235,000 毫秒')
+    expect(formatElapsedSeconds(235.2)).toBe('235,200 毫秒')
+    expect(formatElapsedSeconds(235.25)).toBe('235,250 毫秒')
+    expect(formatElapsedSeconds(0)).toBe('0 毫秒')
+    expect(formatElapsedSeconds(0.029)).toBe('29 毫秒')
+    expect(formatElapsedSeconds(0.5)).toBe('500 毫秒')
+    expect(formatElapsedSeconds(1.5)).toBe('1,500 毫秒')
     expect(formatElapsedSeconds(Number.NaN)).toBe('—')
   })
 })
@@ -61,9 +61,9 @@ describe('TrajectoryCell', () => {
       />,
     )
     expect(screen.getByText('#6')).toBeTruthy()
-    expect(screen.getByText('TOOL')).toBeTruthy()
+    expect(screen.getByText('工具')).toBeTruthy()
     expect(screen.getByText('bash · Read src/index.ts')).toBeTruthy()
-    expect(screen.getByText('5,000 ms')).toBeTruthy()
+    expect(screen.getByText('5,000 毫秒')).toBeTruthy()
   })
 
   it('Message rows expose Input / Output / Think metric columns before time', () => {
@@ -78,15 +78,15 @@ describe('TrajectoryCell', () => {
         think={155}
       />,
     )
-    expect(screen.getByText('Message')).toBeTruthy()
+    expect(screen.getByText('消息')).toBeTruthy()
     expect(screen.getByText('136')).toBeTruthy()
     expect(screen.getByText('381')).toBeTruthy()
     expect(screen.getByText('155')).toBeTruthy()
-    expect(screen.getByText('235,200 ms')).toBeTruthy()
+    expect(screen.getByText('235,200 毫秒')).toBeTruthy()
     const texts = [...container.querySelectorAll('span')].map(el => el.textContent)
     expect(texts.indexOf('136')).toBeLessThan(texts.indexOf('381'))
     expect(texts.indexOf('381')).toBeLessThan(texts.indexOf('155'))
-    expect(texts.indexOf('155')).toBeLessThan(texts.indexOf('235,200 ms'))
+    expect(texts.indexOf('155')).toBeLessThan(texts.indexOf('235,200 毫秒'))
   })
 
   it('selected marks the row for the brand-primary inset ring', () => {
@@ -97,8 +97,8 @@ describe('TrajectoryCell', () => {
   })
 
   it.each([
-    ['user', 'USER'],
-    ['tool', 'TOOL'],
+    ['user', '用户'],
+    ['tool', '工具'],
   ] as const)('kind %s shows the %s tag and no metric columns', (kind: TrajectoryCellKind, label: string) => {
     const { container } = render(
       <TrajectoryCell index={1} kind={kind} text="summary" timeSeconds={kind === 'user' ? 0 : null} input={1} output={2} think={3} />,

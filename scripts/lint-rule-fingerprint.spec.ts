@@ -16,21 +16,23 @@ interface Profile {
 // mapped @typescript-eslint/* to typescript/* and four extension rules to their
 // Oxlint core equivalents. These fingerprints pin the resulting repository
 // snapshot; they do not re-evaluate that deleted baseline or track its preset.
+// Re-pinned when `@stylistic/max-len` raised `code` from 140 to 300, which
+// changes the option payload every profile hashes.
 const profiles = {
   source: {
     count: 89,
     indexes: [0, 1, 4, 5],
-    sha256: '3e8b8455827254d6da59afb803d30f062b9fe1264b4df75ce4c8cd6e742b93dd',
+    sha256: '72a0222daff9633beaba9b75e02f80253575c235e6f37306a77c48e29fbabaa8',
   },
   example: {
     count: 88,
     indexes: [0, 1, 2, 4, 5],
-    sha256: 'e2b944c028ef1971302d47b2eb0e95c05e740623c7cbaebb4b1312dbf73bf156',
+    sha256: 'a334d094c7f2625ccd42d49b8681c9d0efe1b5a01f93f62db4595f78f1879a78',
   },
   test: {
     count: 84,
     indexes: [0, 3, 4, 5],
-    sha256: '7800bf57f0d689a5623e4ad60315b10173158fb9cf988d3f005cb115f2245691',
+    sha256: '9e825991b0d6fc04826f58a7cd31df2e160e172257a4e2865203e275de642577',
   },
 } as const satisfies Record<string, Profile>
 

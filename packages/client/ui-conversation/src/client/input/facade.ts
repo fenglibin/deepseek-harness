@@ -167,6 +167,13 @@ interface DetachedDraft {
   readonly occurrences: readonly Occurrence[]
   /** Inline images with their clipboard offsets, for position-preserving restoration. */
   readonly images: readonly DraftImage[]
+  /**
+   * Insert-time display caches of {@link images}, captured alongside them.
+   * The send's own commit prunes a chip's cache entry once it leaves the
+   * document, so a failure rebuilding chips from that cache would restore the
+   * text and silently drop every image.
+   */
+  readonly inserts: readonly DraftImageInsert[]
 }
 
 /**
@@ -851,7 +858,7 @@ export class SessionInputShell implements SessionInput {
   ): void {
     const images = this.projection.images
     const occurrences = this.projection.occurrences
-    const record = { draft, occurrences, images }
+    const record: DetachedDraft = { draft, occurrences, images, inserts: this.insertsOf(images) }
     this.detachedDrafts.set(attempt.seq, record)
     if (this.failedRestoreRev === this.rev) {
       this.failedDetached.clear()
@@ -923,6 +930,9 @@ export class SessionInputShell implements SessionInput {
   private restoreFailedDrafts(): void {
     const records = [...this.failedDetached.entries()].sort(([a], [b]) => a - b).map(([, record]) => record)
     if (records.length === 0) return
+    const inserts = new Map(
+      records.flatMap(record => record.inserts.map(insert => [insert.attachmentId, insert] as const)),
+    )
     const separator = '\n\n'
     let draft = ''
     const occurrences: Occurrence[] = []
@@ -982,8 +992,11 @@ export class SessionInputShell implements SessionInput {
             }, occurrence.invalid === true))
             cursor = item.offset + occurrence.length
           } else {
-            const insert = this.imageCache.get(item.image.attachmentId)
+            const insert = inserts.get(item.image.attachmentId)
             if (insert !== undefined) {
+              // The cache belongs to the restored document: a chip whose entry
+              // stayed pruned would send as nothing on the next submit.
+              this.imageCache.set(insert.attachmentId, insert)
               paragraph.append($createImageChipNode(insert, this.imageLabelsOf(insert), (id) => { this.removeImage(id) }))
             }
             cursor = item.offset

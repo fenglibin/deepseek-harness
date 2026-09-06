@@ -510,7 +510,7 @@ describe('ModelsSection', () => {
     expect(screen.getByLabelText(zh.keyInput)).toBeTruthy()
     expect(screen.getByText('openai')).toBeTruthy()
     expect(screen.queryByText('Active')).toBeNull()
-    expect(screen.queryByText('Inactive')).toBeNull()
+    expect(screen.queryByText('未运行')).toBeNull()
     expect(screen.getByText(zh.add)).toBeTruthy()
   })
 
@@ -1450,7 +1450,7 @@ describe('ModelsSection', () => {
     ])
   })
 
-  it('blocks duplicate deletion while the confirmed removal is pending', async () => {
+  it('blocks duplicate deletion while the confirmed removal is 待处理', async () => {
     let resolveRemoval!: (response: { ok: true; value: SettingsNamespaceView }) => void
     const mutate = vi.fn(() => new Promise<{ ok: true; value: SettingsNamespaceView }>((resolve) => {
       resolveRemoval = resolve
@@ -1624,7 +1624,7 @@ describe('ModelsSection', () => {
     ])
   })
 
-  it('keeps the snapshot untouched and reports the message when a removal write is refused', async () => {
+  it('keeps the snapshot untouched and reports the 条消息 when a removal write is refused', async () => {
     const { face, controller } = await mountSection({
       mutate: vi.fn(() => Promise.resolve(remoteFail('read-only', 'settings/rejected'))),
     })

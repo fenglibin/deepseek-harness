@@ -36,11 +36,11 @@ afterEach(cleanup)
 describe('TrajectoryTurnHeader', () => {
   it('renders Turn N and the four metric column labels', () => {
     render(<TrajectoryTurnHeader turn={1} t={t} />)
-    expect(screen.getByText('Turn 1')).toBeTruthy()
-    expect(screen.getByText('Input')).toBeTruthy()
-    expect(screen.getByText('Output')).toBeTruthy()
-    expect(screen.getByText('Think')).toBeTruthy()
-    expect(screen.getByText('Time')).toBeTruthy()
+    expect(screen.getByText('第 1 轮')).toBeTruthy()
+    expect(screen.getByText('输入')).toBeTruthy()
+    expect(screen.getByText('输出')).toBeTruthy()
+    expect(screen.getByText('思考')).toBeTruthy()
+    expect(screen.getByText('时间')).toBeTruthy()
   })
 })
 
@@ -52,8 +52,8 @@ describe('TrajectoryGroupHeader', () => {
   })
 
   it('omits the description node when absent', () => {
-    const { container } = render(<TrajectoryGroupHeader title="Message" />)
-    expect(screen.getByText('Message')).toBeTruthy()
+    const { container } = render(<TrajectoryGroupHeader title="消息" />)
+    expect(screen.getByText('消息')).toBeTruthy()
     expect(container.querySelectorAll('span')).toHaveLength(1)
   })
 })
@@ -62,12 +62,12 @@ describe('TrajectoryTurn', () => {
   it('wraps a sticky header and body children', () => {
     render(
       <TrajectoryTurn turn={3} t={t}>
-        <TrajectoryGroupHeader title="Message" description="49s" />
+        <TrajectoryGroupHeader title="消息" description="49秒" />
       </TrajectoryTurn>,
     )
-    expect(screen.getByText('Turn 3')).toBeTruthy()
-    expect(screen.getByText('Message')).toBeTruthy()
-    expect(screen.getByText('49s')).toBeTruthy()
+    expect(screen.getByText('第 3 轮')).toBeTruthy()
+    expect(screen.getByText('消息')).toBeTruthy()
+    expect(screen.getByText('49秒')).toBeTruthy()
   })
 })
 
@@ -116,7 +116,7 @@ describe('deriveTrajectoryLayout', () => {
         turn: 1, step: 2, time: 9_000, subCalls: [],
       }],
     })
-    expect(turns[0]?.groups.map(g => g.title)).toEqual(['Step 2'])
+    expect(turns[0]?.groups.map(g => g.title)).toEqual(['步骤 2'])
     expect(turns[0]?.groups[0]?.cells[0]).toMatchObject({
       kind: 'tool',
       text: 'bash',
@@ -161,7 +161,7 @@ describe('deriveTrajectoryLayout', () => {
     expect(streamed[1]?.groups[0]?.cells[0]?.requestOnly).toBeUndefined()
   })
 
-  it('replaces a running-call placeholder with the matching streamed tool call', () => {
+  it('replaces a running-call placeholder with the matching streamed 次工具调用', () => {
     const partial = {
       turn: 1,
       step: 1,
@@ -227,17 +227,17 @@ describe('deriveTrajectoryLayout', () => {
       },
     ] as unknown as LegacyConversationSlice['nodes']
     const turns = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
-    expect(turns[0]?.groups[0]?.description).toBe('3,000 ms bash×2')
+    expect(turns[0]?.groups[0]?.description).toBe('3,000 毫秒 bash×2')
   })
 
-  it('assigns each user message to its enclosing turn instead of pooling into Turn 1', () => {
+  it('assigns each user 条消息 to its enclosing turn instead of pooling into 第 1 轮', () => {
     const nodes = [
       { kind: 'user', seq: 1, time: 1_000, content: [{ type: 'text', text: 'first' }], source: null },
       {
         kind: 'assistant', seq: 2, time: 2_000, turn: 1, step: 0,
         blocks: [{ kind: 'text', text: 'ok1' }],
       },
-      { kind: 'user', seq: 3, time: 3_000, content: [{ type: 'text', text: 'second' }], source: null },
+      { kind: 'user', seq: 3, time: 3_000, content: [{ type: 'text', text: '秒' }], source: null },
       {
         kind: 'assistant', seq: 4, time: 4_000, turn: 2, step: 0,
         blocks: [{ kind: 'text', text: 'ok2' }],
@@ -250,7 +250,7 @@ describe('deriveTrajectoryLayout', () => {
       'ok1',
     ])
     expect(turns[1]?.groups.flatMap(g => g.cells.map(c => c.previewMarkdown))).toEqual([
-      'second',
+      '秒',
       'ok2',
     ])
   })
@@ -290,7 +290,7 @@ describe('deriveTrajectoryLayout', () => {
 
     expect(turns).toHaveLength(1)
     expect(turns[0]?.groups.map(group => group.title)).toEqual([
-      'Message', 'Step 1', 'Step 2',
+      '消息', '步骤 1', '步骤 2',
     ])
     expect(turns[0]?.groups[2]?.cells).toMatchObject([
       { kind: 'user', previewMarkdown: 'change direction', sourceSeq: 3 },
@@ -352,7 +352,7 @@ describe('deriveTrajectoryLayout', () => {
     expect(turns[0]).toMatchObject({
       turn: 2,
       groups: [{
-        title: 'Step 3',
+        title: '步骤 3',
         cells: [
           { kind: 'user', previewMarkdown: 'change direction' },
           { kind: 'message', previewMarkdown: 'continued' },
@@ -368,7 +368,7 @@ describe('deriveTrajectoryLayout', () => {
         kind: 'assistant', seq: 2, time: 2_000, turn: 1, step: 1,
         blocks: [{ kind: 'text', text: 'before compaction' }],
       },
-      { kind: 'user', seq: 5, time: 5_000, content: [{ type: 'text', text: 'second' }], source: null },
+      { kind: 'user', seq: 5, time: 5_000, content: [{ type: 'text', text: '秒' }], source: null },
       {
         kind: 'assistant', seq: 6, time: 6_000, turn: 2, step: 1,
         blocks: [{ kind: 'text', text: 'after compaction' }],
@@ -394,7 +394,7 @@ describe('deriveTrajectoryLayout', () => {
 
     expect(turns.map(turn => turn.turn)).toEqual([1, null, 2])
     expect(turns[1]?.groups).toMatchObject([{
-      title: 'Compaction 3',
+      title: '压缩 3',
       cells: [{
         kind: 'compacted',
         sourceSeq: 3,
@@ -526,7 +526,7 @@ describe('run_code sub-dispatch cells', () => {
     const turns = deriveTrajectoryLayout({ nodes: withSubCalls(subCalls), partial: null, runningCalls: [] })
     const cells = turns[0]!.groups.flatMap(g => g.cells)
     expect(cells.map(c => c.kind)).toEqual(['message', 'tool', 'subtool', 'subtool'])
-    expect(cells[0]?.text).toBe('Tool call only')
+    expect(cells[0]?.text).toBe('仅工具调用')
     // Sequential indexes across the interleave; durations from the pair times.
     expect(cells.map(c => c.index)).toEqual([1, 2, 3, 4])
     expect(cells[2]).toMatchObject({
@@ -586,7 +586,7 @@ describe('durable image attachments', () => {
     ] as unknown as LegacyConversationSlice['nodes']
     const turns = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
     const user = turns[0]?.groups[0]?.cells[0]
-    expect(user?.text).toBe('Images ×2')
+    expect(user?.text).toBe('图片 ×2')
     expect(user?.previewMarkdown).toBeUndefined()
     expect(user?.sourceBlocks).toEqual([
       { type: 'image', content: '', attachment },
@@ -603,11 +603,11 @@ describe('durable image attachments', () => {
     ] as unknown as LegacyConversationSlice['nodes']
     const turns = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
     const user = turns[0]?.groups[0]?.cells[0]
-    expect(user?.text).toBe('Images ×1')
+    expect(user?.text).toBe('图片 ×1')
     expect(user?.previewMarkdown).toBeUndefined()
   })
 
-  it('keeps the text preview when a user message mixes text and images', () => {
+  it('keeps the text preview when a user 条消息 mixes text and images', () => {
     const nodes = [
       {
         kind: 'user', seq: 1, time: 1_000, source: null,
@@ -630,7 +630,7 @@ describe('durable image attachments', () => {
     ] as unknown as LegacyConversationSlice['nodes']
     const turns = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
     const message = turns[0]?.groups.flatMap(g => g.cells).find(c => c.kind === 'message')
-    expect(message?.text).toBe('Images ×1')
+    expect(message?.text).toBe('图片 ×1')
     expect(message?.sourceBlocks).toEqual([{ type: 'image', content: '', attachment }])
   })
 
@@ -648,8 +648,8 @@ describe('durable image attachments', () => {
     ] as unknown as LegacyConversationSlice['nodes']
     const turns = deriveTrajectoryLayout({ nodes, partial: null, runningCalls: [] })
     const tool = turns[0]?.groups.flatMap(g => g.cells).find(c => c.kind === 'tool')
-    expect(tool?.result).toBe('Images ×1')
-    expect(tool?.outputDetail).toBe('Images ×1')
+    expect(tool?.result).toBe('图片 ×1')
+    expect(tool?.outputDetail).toBe('图片 ×1')
     expect(tool?.outputBlocks).toEqual([{ type: 'image', content: '', attachment }])
   })
 

@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import type { CSSProperties, DragEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
 import clsx from 'clsx'
 import {
   IconPlusOutline16, IconWarningOutline16, Toast, Tooltip,
@@ -238,6 +238,24 @@ export function InputBar({
     if (rejected !== null) showToast(rejected)
   }, [addImages, imageCount, imageLimits, showToast, t])
 
+  // The capsule is the drop target, not the contenteditable inside it. Lexical
+  // listens on the editable alone, so a file released on the card's padding,
+  // the placeholder strip, or the toolbar row reaches no listener and the
+  // browser answers the way it answers any file drop: navigate to the file,
+  // discarding the draft. A drop the editor already took arrives here with its
+  // default prevented, so the same file is never taken in twice.
+  const onCardDragOver = (event: DragEvent<HTMLDivElement>): void => {
+    if (!event.dataTransfer.types.includes('Files')) return
+    event.preventDefault()
+  }
+  const onCardDrop = (event: DragEvent<HTMLDivElement>): void => {
+    if (event.defaultPrevented) return
+    const files = Array.from(event.dataTransfer.files)
+    if (files.length === 0) return
+    event.preventDefault()
+    intakeImages(files)
+  }
+
   // The keymap handlers read live bar state through this ref so the editor
   // registration survives re-renders without re-arming per keystroke.
   const gate = useRef({
@@ -382,6 +400,8 @@ export function InputBar({
         data-composer-card
         onClick={workspaceTrigger ? onRequestWorkspace : undefined}
         onPointerDown={workspaceTrigger ? (e) => { e.stopPropagation() } : undefined}
+        onDragOver={onCardDragOver}
+        onDrop={onCardDrop}
       >
         {overlay !== undefined && <div className={css.overlayAnchor}>{overlay}</div>}
         {accessory !== undefined && <div className={css.accessory}>{accessory}</div>}

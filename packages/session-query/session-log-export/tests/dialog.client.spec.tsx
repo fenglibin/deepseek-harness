@@ -6,7 +6,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { SessionLogDownloadController } from '../src/client/controller.ts'
 import { SessionLogDownloadDialog } from '../src/client/Dialog.tsx'
 import type { SessionLogDownloadDialogProps } from '../src/client/Dialog.tsx'
-import { en } from '../src/client/locales.ts'
+import { zh } from '../src/client/locales.ts'
 
 const SID = 'session-export-dialog' as SessionId
 
@@ -22,7 +22,7 @@ function bench(
       () => selector(controller.store.getSnapshot()),
     )
   }
-  const t = (key: keyof typeof en): string => en[key]
+  const t = (key: keyof typeof zh): string => zh[key]
   const props = { sessionId: SID, useSessionLogDownload, dismiss, t } as unknown as SessionLogDownloadDialogProps
   const view = render(<SessionLogDownloadDialog {...props} />)
   return { controller, dismiss, view }
@@ -40,9 +40,9 @@ describe('SessionLogDownloadDialog', () => {
         },
       })
     })
-    const dialog = await b.view.findByRole('dialog', { name: 'Session export failed' })
+    const dialog = await b.view.findByRole('dialog', { name: 'Session 导出失败' })
     expect(dialog.textContent).toContain('toolbar failed')
-    const close = b.view.getAllByRole('button', { name: 'Close' })[0]
+    const close = b.view.getAllByRole('button', { name: '关闭' })[0]
     if (close === undefined) throw new Error('Session export dialog has no close button')
     fireEvent.click(close)
     await waitFor(() => { expect(b.dismiss).toHaveBeenCalledWith(SID) })
@@ -70,9 +70,9 @@ describe('SessionLogDownloadDialog', () => {
         },
       })
     })
-    const dialog = await b.view.findByRole('dialog', { name: 'Session export failed' })
-    expect(dialog.textContent).toContain('Could not start the Session export.')
-    const close = b.view.getAllByRole('button', { name: 'Close' }).at(-1)
+    const dialog = await b.view.findByRole('dialog', { name: 'Session 导出失败' })
+    expect(dialog.textContent).toContain('无法启动 Session 导出。')
+    const close = b.view.getAllByRole('button', { name: '关闭' }).at(-1)
     if (close === undefined) throw new Error('Session export dialog has no footer action')
     fireEvent.click(close)
     await waitFor(() => { expect(b.dismiss).toHaveBeenCalledWith(SID) })

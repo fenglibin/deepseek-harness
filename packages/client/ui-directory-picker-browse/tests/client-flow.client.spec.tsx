@@ -138,11 +138,11 @@ describe('directory-picker-browse client half', () => {
     }
   })
 
-  it('rolls back the zh dictionary when a rival already owns the namespace en slot', async () => {
+  it('rolls back the zh dictionary when a rival already owns the namespace slot', async () => {
     const b = await bench()
     b.declare()
     const locale = b.ctx.get('locale') as LocaleRuntime
-    const disposeRival = locale.register('directory-browser', 'en', { 'browser.title': 'rival' })
+    const disposeRival = locale.register('directory-browser', 'zh', { 'browser.title': 'rival' })
     const rejections: unknown[] = []
     const onUnhandled = (reason: unknown): void => { rejections.push(reason) }
     // cordis re-raises the apply throw as a late rejection (installFailLoud's contract).

@@ -26,7 +26,7 @@ describe('SystemPromptNodeView', () => {
       t={makeTranslate(zh)}
     />)
 
-    const disclosure = screen.getByRole('button', { name: 'System prompt' })
+    const disclosure = screen.getByRole('button', { name: '系统提示词' })
     expect(disclosure.getAttribute('aria-expanded')).toBe('false')
     expect(container.querySelector('[data-system-prompt-body]')).toBeNull()
     expect(container.querySelector('[data-context-text]')).toBeNull()

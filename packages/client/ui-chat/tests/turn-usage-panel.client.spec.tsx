@@ -35,7 +35,7 @@ describe('TurnUsagePanel', () => {
     fireEvent.click(trigger)
     expect(trigger.getAttribute('aria-expanded')).toBe('true')
     const dialog = view.getByRole('dialog')
-    expect(dialog.getAttribute('aria-label')).toBe('Turn usage')
+    expect(dialog.getAttribute('aria-label')).toBe('本轮用量')
     // Portaled out of the trigger's row, with a heading row carrying the total.
     expect(dialog.parentElement).toBe(document.body)
     expect(dialog.firstChild?.textContent).toBe('Turn usage15,800 tok')
@@ -46,7 +46,7 @@ describe('TurnUsagePanel', () => {
     expect(details.textContent).toContain('Uncached input5,060 tok')
     expect(details.textContent).toContain('Cached input4,940 tok')
     expect(details.textContent).toContain('Cache write0 tok')
-    expect(details.textContent).toContain('Output5,800 tok (42 tok reasoning)')
+    expect(details.textContent).toContain('Output5,800 tok（其中推理 42 tok）')
     expect(details.textContent).not.toContain('Total')
   })
 
@@ -61,13 +61,13 @@ describe('TurnUsagePanel', () => {
     const trigger = view.getByRole('button')
     expect(trigger.textContent).toBe('Usage 150 tok')
     fireEvent.click(trigger)
-    expect(view.queryByText('Provider / model')).toBeNull()
-    expect(view.queryByText('Cached input')).toBeNull()
-    expect(view.queryByText('Cache write')).toBeNull()
+    expect(view.queryByText('提供方 / 模型')).toBeNull()
+    expect(view.queryByText('缓存读取')).toBeNull()
+    expect(view.queryByText('缓存写入')).toBeNull()
     expect(view.queryByText(/reasoning/)).toBeNull()
     // No reported cache traffic still renders a 0% cache-hit share, matching
     // the session StatsLine's whole-log reading.
-    expect(view.getByText('Cache hit')).toBeTruthy()
+    expect(view.getByText('缓存命中')).toBeTruthy()
     expect(view.getByText('0%')).toBeTruthy()
   })
 
@@ -134,7 +134,7 @@ describe('TurnTimePanel', () => {
       <TurnTimePanel runMs={19_000} tokensPerSecond={20} ttftMs={1_200} t={t} />,
     )
     const trigger = view.getByRole('button')
-    expect(trigger.textContent).toBe('Ran for 19s')
+    expect(trigger.textContent).toBe('用时 19秒')
     expect(trigger.querySelector('svg')).not.toBeNull()
     expect(trigger.getAttribute('aria-haspopup')).toBe('dialog')
     expect(view.queryByRole('dialog')).toBeNull()
@@ -142,12 +142,12 @@ describe('TurnTimePanel', () => {
     fireEvent.click(trigger)
     expect(trigger.getAttribute('aria-expanded')).toBe('true')
     const dialog = view.getByRole('dialog')
-    expect(dialog.getAttribute('aria-label')).toBe('Turn time and speed')
+    expect(dialog.getAttribute('aria-label')).toBe('本轮用时和速度')
     expect(dialog.parentElement).toBe(document.body)
     const details = dialog.querySelector('[data-turn-time-details]') as HTMLElement
-    expect(details.textContent).toContain('Total run time19s')
+    expect(details.textContent).toContain('Total run time19秒')
     expect(details.textContent).toContain('Tokens per second (TPS)20 tok/s')
-    expect(details.textContent).toContain('Time to first token (TTFT)1.2s')
+    expect(details.textContent).toContain('Time to first token (TTFT)1.2秒')
 
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(view.queryByRole('dialog')).toBeNull()
@@ -157,7 +157,7 @@ describe('TurnTimePanel', () => {
     const view = render(<TurnTimePanel runMs={3_000} t={t} />)
     fireEvent.click(view.getByRole('button'))
     const dialog = view.getByRole('dialog')
-    expect(dialog.textContent).toContain('Total run time3s')
+    expect(dialog.textContent).toContain('Total run time3秒')
     expect(dialog.textContent).not.toContain('Tokens per second')
     expect(dialog.textContent).not.toContain('Time to first token')
   })

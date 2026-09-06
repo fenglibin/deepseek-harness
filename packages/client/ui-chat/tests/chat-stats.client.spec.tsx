@@ -130,8 +130,8 @@ describe('formatters', () => {
   })
 
   it('formats durations under and over a minute', () => {
-    expect(formatDuration(45_230, tEn)).toBe('45.2s')
-    expect(formatDuration(162_000, tEn)).toBe('2m42s')
+    expect(formatDuration(45_230, tEn)).toBe('45.2秒')
+    expect(formatDuration(162_000, tEn)).toBe('2m42秒')
   })
 })
 
@@ -162,12 +162,12 @@ describe('StatsLine', () => {
     return { uncachedInputTokens, outputTokens: 1, cacheReadTokens, cacheWriteTokens: 0 }
   }
 
-  it('renders the grouped stats row and hides a brand-new empty session', () => {
+  it('renders the grouped stats row and hides a brand-new empty 个会话', () => {
     const { source } = makeSource({ nodes: [assistant(1, 1)] })
     const view = render(<StatsLine {...props(source)} />)
     // No timing on the fixture: the duration group drops out whole. Tokens come
     // from the projection, so paging the window cannot change them.
-    expect(view.container.textContent).toBe('1 turns · 1 steps| Cache hit 90%| Input 100 tok · Output 5 tok')
+    expect(view.container.textContent).toBe('1 轮 · 1 步| 缓存命中 90%| 输入 100 tok · 输出 5 tok')
     const empty = makeSource()
     const emptyView = render(<StatsLine {...props(empty.source, {
       tokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
@@ -177,22 +177,22 @@ describe('StatsLine', () => {
   })
 
   it.each([
-    { actual: '98.6%', tokenUsageValue: tokenUsage(986, 14), expected: 'Cache hit 99%' },
-    { actual: '99.1%', tokenUsageValue: tokenUsage(991, 9), expected: 'Cache hit 99%' },
-    { actual: '99.49%', tokenUsageValue: tokenUsage(9_949, 51), expected: 'Cache hit 99%' },
-    { actual: '99.5%', tokenUsageValue: tokenUsage(995, 5), expected: 'Cache hit 99.5%' },
-    { actual: '99.94%', tokenUsageValue: tokenUsage(9_994, 6), expected: 'Cache hit 99.9%' },
-    { actual: '99.95%', tokenUsageValue: tokenUsage(9_995, 5), expected: 'Cache hit 99.95%' },
-    { actual: '99.955%', tokenUsageValue: tokenUsage(19_991, 9), expected: 'Cache hit 99.96%' },
-    { actual: '99.985%', tokenUsageValue: tokenUsage(19_997, 3), expected: 'Cache hit 99.99%' },
-    { actual: '99.995%', tokenUsageValue: tokenUsage(19_999, 1), expected: 'Cache hit 99.995%' },
-    { actual: '99.9975%', tokenUsageValue: tokenUsage(39_999, 1), expected: 'Cache hit 99.998%' },
+    { actual: '98.6%', tokenUsageValue: tokenUsage(986, 14), expected: '缓存命中 99%' },
+    { actual: '99.1%', tokenUsageValue: tokenUsage(991, 9), expected: '缓存命中 99%' },
+    { actual: '99.49%', tokenUsageValue: tokenUsage(9_949, 51), expected: '缓存命中 99%' },
+    { actual: '99.5%', tokenUsageValue: tokenUsage(995, 5), expected: '缓存命中 99.5%' },
+    { actual: '99.94%', tokenUsageValue: tokenUsage(9_994, 6), expected: '缓存命中 99.9%' },
+    { actual: '99.95%', tokenUsageValue: tokenUsage(9_995, 5), expected: '缓存命中 99.95%' },
+    { actual: '99.955%', tokenUsageValue: tokenUsage(19_991, 9), expected: '缓存命中 99.96%' },
+    { actual: '99.985%', tokenUsageValue: tokenUsage(19_997, 3), expected: '缓存命中 99.99%' },
+    { actual: '99.995%', tokenUsageValue: tokenUsage(19_999, 1), expected: '缓存命中 99.995%' },
+    { actual: '99.9975%', tokenUsageValue: tokenUsage(39_999, 1), expected: '缓存命中 99.998%' },
     {
       actual: 'the closest non-full ratio available from safe integer cumulative counts',
       tokenUsageValue: tokenUsage(Number.MAX_SAFE_INTEGER - 1, 1),
-      expected: 'Cache hit 99.99999999999999%',
+      expected: '缓存命中 99.99999999999999%',
     },
-    { actual: '100%', tokenUsageValue: tokenUsage(10_000, 0), expected: 'Cache hit 100%' },
+    { actual: '100%', tokenUsageValue: tokenUsage(10_000, 0), expected: '缓存命中 100%' },
   ])('formats an actual $actual cache-hit ratio as $expected', ({ tokenUsageValue, expected }) => {
     const { source } = makeSource({ nodes: [assistant(1, 1)] })
     const view = render(<StatsLine {...props(source, { tokenUsage: tokenUsageValue })} />)
@@ -206,13 +206,13 @@ describe('StatsLine', () => {
     vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(400)
     const { source } = makeSource({ nodes: [assistant(1, 1)] })
     const view = render(<StatsLine {...props(source, { tokenUsage: tokenUsage(9_995, 5) })} />)
-    expect(view.container.textContent).toContain('Cache hit 99.95%')
+    expect(view.container.textContent).toContain('缓存命中 99.95%')
     fireEvent.mouseEnter(view.container.firstElementChild!)
     act(() => { vi.advanceTimersByTime(499) })
     expect(view.container.querySelector('[role="tooltip"]')).toBeNull()
     act(() => { vi.advanceTimersByTime(1) })
     expect(view.container.querySelector('[role="tooltip"]')?.textContent)
-      .toBe('1 turns · 1 steps | Cache hit 99.95% | Input 10K tok · Output 1 tok')
+      .toBe('1 轮 · 1 步 | 缓存命中 99.95% | 输入 10K tok · 输出 1 tok')
   })
 
   it('suppresses the tooltip while the row fits without truncation', () => {
@@ -231,7 +231,7 @@ describe('StatsLine', () => {
     }
     const { source } = makeSource({ nodes: [timed] })
     const view = render(<StatsLine {...props(source)} />)
-    expect(view.container.textContent).toContain('LLM 3.8s| TTFT avg 0.8s · 20 tok/s')
+    expect(view.container.textContent).toContain('LLM 3.8s| 首 token 平均 0.8s · 20 tok/s')
   })
 
   it('takes every stats label from the active locale', () => {
@@ -259,16 +259,16 @@ describe('StatsLine', () => {
     })} />)
     // Context occupancy lives on the composer's ContextMeter ring, not here.
     expect(view.container.textContent)
-      .toBe('Cache hit 90%| Input 100 tok · Output 5 tok')
+      .toBe('缓存命中 90%| 输入 100 tok · 输出 5 tok')
   })
 
   it('drops every token group when no projection is composed', () => {
     const { source } = makeSource({ nodes: [assistant(1, 1)] })
     const view = render(<StatsLine {...props(source, {})} />)
-    expect(view.container.textContent).toBe('1 turns · 1 steps')
+    expect(view.container.textContent).toBe('1 轮 · 1 步')
   })
 
-  it('renders whole-session counts from the sessionStats projection over the paged window', () => {
+  it('renders whole-session counts from the 个会话Stats projection over the paged window', () => {
     // The bug's acceptance at unit level: one loaded page must not scope the
     // counter — the durable projection's totals win over the window fold.
     const { source } = makeSource({ nodes: [assistant(1, 1)] })
@@ -277,7 +277,7 @@ describe('StatsLine', () => {
       sessionStats: sessionStats({ turns: 10, steps: 89 }),
     })} />)
     expect(view.container.textContent)
-      .toBe('10 turns · 89 steps| Cache hit 90%| Input 100 tok · Output 5 tok')
+      .toBe('10 轮 · 89 步| 缓存命中 90%| 输入 100 tok · 输出 5 tok')
   })
 
   it('treats a defined zero-count projection as empty, not as fallback', () => {
@@ -299,7 +299,7 @@ describe('StatsLine', () => {
       tokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
       sessionStats: sessionStats({ turns: 1, steps: 1 }),
     })} />)
-    expect(view.container.textContent).toBe('1 turns · 1 steps')
+    expect(view.container.textContent).toBe('1 轮 · 1 步')
   })
 
   it('keeps the counts group over an empty visible window when the projection carries totals', () => {
@@ -311,7 +311,7 @@ describe('StatsLine', () => {
       sessionStats: sessionStats({ turns: 7, steps: 44 }),
     })} />)
     expect(view.container.textContent)
-      .toBe('7 turns · 44 steps| Cache hit 90%| Input 100 tok · Output 5 tok')
+      .toBe('7 轮 · 44 步| 缓存命中 90%| 输入 100 tok · 输出 5 tok')
   })
 
   it('renders whole-log wall times and speeds from the projection, not the loaded window', () => {
@@ -327,7 +327,7 @@ describe('StatsLine', () => {
       }),
     })} />)
     expect(view.container.textContent).toBe(
-      '200 turns · 200 steps| LLM 1m40s · Tool call 1m2s| TTFT avg 0.8s · 20 tok/s| Cache hit 90%| Input 100 tok · Output 5 tok',
+      '200 轮 · 200 步| LLM 1m40s · 工具调用 1m2s| 首 token 平均 0.8s · 20 tok/s| 缓存命中 90%| 输入 100 tok · 输出 5 tok',
     )
   })
 
@@ -336,7 +336,7 @@ describe('StatsLine', () => {
     const view = render(<StatsLine {...props(source, {
       tokenUsage: { uncachedInputTokens: 0, outputTokens: 7, cacheReadTokens: 0, cacheWriteTokens: 0 },
     })} />)
-    expect(view.container.textContent).toBe('1 turns · 1 steps| Input 0 tok · Output 7 tok')
+    expect(view.container.textContent).toBe('1 轮 · 1 步| 输入 0 tok · 输出 7 tok')
   })
 
   it('includes cache writes in billed input and the cache-hit denominator', () => {
@@ -350,7 +350,7 @@ describe('StatsLine', () => {
       },
     })} />)
     expect(view.container.textContent)
-      .toBe('1 turns · 1 steps| Cache hit 45%| Input 200 tok · Output 7 tok')
+      .toBe('1 轮 · 1 步| 缓存命中 45%| 输入 200 tok · 输出 7 tok')
   })
 
   it('renders ZERO times during streaming chunk frames (RFC hard acceptance)', () => {

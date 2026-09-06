@@ -127,14 +127,14 @@ const PLAN = '# Ship the picker\n\n- read the store\n- render the rows\n'
 /** The plan-mode request shape: one question, the plan as detail, approve named. */
 const questions = (): QuestionWait['questions'] => [{
   id: 'plan-review',
-  header: 'Plan review',
+  header: '计划待审',
   question: 'Approve this plan and leave plan mode?',
   detail: PLAN,
   options: [
-    { label: 'Approve', description: 'Leave plan mode; the plan is carried out from the next step.' },
+    { label: '确认执行', description: 'Leave plan mode; the plan is carried out from the next step.' },
     { label: 'Keep planning', description: 'Stay in plan mode; feedback goes back to the model.' },
   ],
-  intent: { kind: 'plan-review', approve: 'Approve' },
+  intent: { kind: 'plan-review', approve: '确认执行' },
 }]
 
 /** Pending waterfall fixture with observable Client response methods. */
@@ -154,15 +154,15 @@ describe('planReviewOf', () => {
       id: 'plan-review',
       question: 'Approve this plan and leave plan mode?',
       plan: PLAN,
-      approve: { label: 'Approve', description: 'Leave plan mode; the plan is carried out from the next step.' },
+      approve: { label: '确认执行', description: 'Leave plan mode; the plan is carried out from the next step.' },
       decline: { label: 'Keep planning', description: 'Stay in plan mode; feedback goes back to the model.' },
     })
   })
 
   it('leaves the decline absent when the asker offered approve alone', () => {
     const [question] = questions()
-    const review = planReviewOf([{ ...question as object, options: [{ label: 'Approve' }] } as never])
-    expect(review?.approve).toEqual({ label: 'Approve' })
+    const review = planReviewOf([{ ...question as object, options: [{ label: '确认执行' }] } as never])
+    expect(review?.approve).toEqual({ label: '确认执行' })
     expect(review === undefined ? true : 'decline' in review).toBe(false)
   })
 
@@ -178,7 +178,7 @@ describe('planReviewOf', () => {
     // flow can: an intent never costs the user a reachable answer.
     ['a third option the card could not offer', () => [{
       ...questions()[0] as object,
-      options: [{ label: 'Approve' }, { label: 'Keep planning' }, { label: 'Start over' }],
+      options: [{ label: '确认执行' }, { label: 'Keep planning' }, { label: 'Start over' }],
     }]],
     ['a multi-select decision', () => [{ ...questions()[0] as object, multiSelect: true }]],
   ])('declines %s, leaving the request to the generic flow', (_case, build) => {
@@ -217,7 +217,7 @@ describe('PlanReviewPanel', () => {
     const approve = screen.getByRole('button', { name: zh['plan.approve'] })
     expect(approve.getAttribute('title')).toBe('Leave plan mode; the plan is carried out from the next step.')
     fireEvent.click(approve)
-    expect(answer).toHaveBeenCalledWith(decision('Approve'))
+    expect(answer).toHaveBeenCalledWith(decision('确认执行'))
     // One-shot: every action locks until the host's resolved frame lands.
     expect(approve.hasAttribute('disabled')).toBe(true)
     expect(screen.getByRole('button', { name: zh['plan.decline'] }).hasAttribute('disabled')).toBe(true)
@@ -233,7 +233,7 @@ describe('PlanReviewPanel', () => {
     expect(answer).toHaveBeenCalledWith(decision('Keep planning'))
   })
 
-  it('dismisses the request so the composer returns for a plain message', () => {
+  it('dismisses the request so the composer returns for a plain 条消息', () => {
     const { carrier, cancel } = wait()
     render(<QuestionComposer matched={carrier} {...kit} />)
 
@@ -244,7 +244,7 @@ describe('PlanReviewPanel', () => {
   it('omits the tooltip for an option carrying no description', () => {
     const { carrier } = wait([{
       ...questions()[0] as object,
-      options: [{ label: 'Approve' }, { label: 'Keep planning' }],
+      options: [{ label: '确认执行' }, { label: 'Keep planning' }],
     }] as never)
     render(<QuestionComposer matched={carrier} {...kit} />)
 
@@ -254,7 +254,7 @@ describe('PlanReviewPanel', () => {
 
   it('hides the decline action when the asker offered approve alone', () => {
     const { carrier } = wait([{
-      ...questions()[0] as object, options: [{ label: 'Approve' }],
+      ...questions()[0] as object, options: [{ label: '确认执行' }],
     }] as never)
     render(<QuestionComposer matched={carrier} {...kit} />)
 
@@ -291,9 +291,9 @@ describe('PlanReviewPanel', () => {
     const { carrier } = wait()
     render(<QuestionComposer matched={carrier} {...kit} t={seatOver(zh, commonEn)} />)
 
-    expect(screen.getByText('Plan review')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Approve' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Refuse' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Chat about it' })).toBeTruthy()
+    expect(screen.getByText('计划待审')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '确认执行' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '拒绝' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '去聊天里说' })).toBeTruthy()
   })
 })

@@ -17,7 +17,25 @@ import styles from './ModelsSection.module.css'
 export type DeepSeekModelDraft = Record<string, unknown>
 
 /** The catalog fields this editor writes. */
-type CatalogField = 'id' | 'name' | 'contextWindow' | 'maxTokens'
+type CatalogField = 'id' | 'name' | 'contextWindow' | 'maxTokens' | 'inputModalities'
+
+/** Modality list of a row that reads images; text is always declared first. */
+export const IMAGE_INPUT: readonly string[] = ['text', 'image']
+
+/**
+ * Whether one drafted row claims image input. Nothing interrogates an endpoint
+ * for what it accepts, so this is the deployment's own statement, and a row
+ * that makes none resolves to the route default — text. A vision model added by
+ * hand therefore has to be marked before the catalog will offer it as an image
+ * describer.
+ * @param model - the drafted row.
+ * @param key - the family's modality field (`input` for pi-ai, `inputModalities` for DeepSeek).
+ * @returns whether the row claims image input.
+ */
+export function acceptsImages(model: DeepSeekModelDraft, key: 'input' | 'inputModalities'): boolean {
+  const input = model[key]
+  return Array.isArray(input) && input.includes('image')
+}
 
 /** The two token counts edited as K/M-suffixed text behind a row's disclosure. */
 type CapacityField = 'contextWindow' | 'maxTokens'
@@ -343,6 +361,22 @@ export function DeepSeekModelsEditor(props: DeepSeekModelsEditorProps): ReactNod
                     <div className={styles['modelAdvanced']}>
                       {capacityField(model, index, 'contextWindow', props.defaultContextWindow)}
                       {capacityField(model, index, 'maxTokens', props.defaultMaxTokens)}
+                      <label className={styles['modelToggle']}>
+                        <input
+                          type="checkbox"
+                          checked={acceptsImages(model, 'inputModalities')}
+                          aria-label={`${props.t('modelImageInput')} ${String(index + 1)}`}
+                          disabled={props.disabled}
+                          onChange={(event) => {
+                            // Unchecked drops the field rather than pinning a
+                            // text-only list, so the row falls back to the
+                            // adapter default it had before being marked.
+                            update(index, 'inputModalities',
+                              event.currentTarget.checked ? IMAGE_INPUT : undefined)
+                          }}
+                        />
+                        <span className={styles['modelFieldLabel']}>{props.t('modelImageInput')}</span>
+                      </label>
                     </div>
                   )
                   : null}

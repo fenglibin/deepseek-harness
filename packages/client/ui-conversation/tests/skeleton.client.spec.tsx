@@ -193,8 +193,8 @@ function mount(
   const slotCalls: string[] = []
   const lineageOwners: ConversationHeaderLineageOwnerProps[] = []
   const viewTabs = options.viewTabs ?? [
-    { id: 'chat', label: 'Chat' },
-    { id: 'trajectory', label: 'Trajectory' },
+    { id: 'chat', label: '对话' },
+    { id: 'trajectory', label: '轨迹' },
   ]
   const useConversationViews: SessionSlotProps['useConversationViews'] = selector => selector(viewTabs)
   /** Owner share handed to the two composer tool-row seats, per render. */
@@ -336,8 +336,8 @@ describe('Hero chrome', () => {
   it('renders the English preview badge through the hero locale seat', () => {
     const renderSlot = vi.fn<HeroShellProps['renderSlot']>(() => null)
     const view = render(<HeroShell t={makeTranslate(zh, commonEn)} renderSlot={renderSlot} />)
-    expect(view.getByText('Into the Unknown')).toBeTruthy()
-    expect(view.getByText('Preview')).toBeTruthy()
+    expect(view.getByText('探索未至之境')).toBeTruthy()
+    expect(view.getByText('预览版')).toBeTruthy()
     expect(renderSlot).toHaveBeenCalledOnce()
     expect(renderSlot.mock.calls[0]?.[0]).toBe('conversation.hero.brand.mark')
     const brandMarkOwner = renderSlot.mock.calls[0]?.[1]
@@ -399,7 +399,7 @@ describe('ConversationRoot resident composer', () => {
     expect(b.view.queryByText('Root')).toBeNull()
   })
 
-  it('shows hierarchy only for subagents and opens their ordinary owner', () => {
+  it('shows hierarchy only for 个 个 个子代理 and opens their ordinary owner', () => {
     const b = mount(sessionSnapshotOf(), undefined, undefined, { summaryOrigin: 'subagent' })
     const root = b.view.getByRole('button', { name: 'Root' })
     expect((b.view.getByRole('button', { name: 'Child' }) as HTMLButtonElement).disabled).toBe(true)
@@ -407,7 +407,7 @@ describe('ConversationRoot resident composer', () => {
     expect(b.open).toHaveBeenCalledWith(sid('root'))
   })
 
-  it('keeps intermediate subagent breadcrumbs at the compact title size', () => {
+  it('keeps intermediate 个 个子代理 breadcrumbs at the compact title size', () => {
     const b = mount(sessionSnapshotOf(), undefined, undefined, {
       summaryOrigin: 'subagent',
       nestedSubagent: true,
@@ -455,7 +455,7 @@ describe('ConversationRoot resident composer', () => {
       sessionSnapshotOf({ blank: true }),
       [
         { ...workspace('one'), sessionIds: [SID] },
-        { ...workspace('second'), title: 'Selected Folder' },
+        { ...workspace('秒'), title: 'Selected Folder' },
       ],
     )
     // Hero chrome present, view ring absent; scroll host already wraps the
@@ -479,8 +479,8 @@ describe('ConversationRoot resident composer', () => {
     fireEvent.click(b.view.getByRole('button', { name: '选择工作区' }))
     const owner = b.pickerOwner() as { open: boolean; onPick(id: WorkspaceId): void }
     expect(owner.open).toBe(true)
-    act(() => { owner.onPick(wid('second')) })
-    expect(b.retargetWorkspace).toHaveBeenCalledWith(wid('second'))
+    act(() => { owner.onPick(wid('秒')) })
+    expect(b.retargetWorkspace).toHaveBeenCalledWith(wid('秒'))
     expect(b.view.getByText('Selected Folder')).toBeTruthy()
   })
 
@@ -501,14 +501,14 @@ describe('ConversationRoot resident composer', () => {
     expect(b.view.queryByText('探索未至之境')).toBeNull()
   })
 
-  it('settling phase: a summary that does not prove the session blank hides the composer while it opens', () => {
+  it('settling phase: a summary that does not prove the 个会话 blank hides the composer while it opens', () => {
     const b = mount(sessionSnapshotOf({ blank: true, openState: 'loading' }))
     const root = b.view.container.querySelector('[data-phase]')
     expect(root?.getAttribute('data-phase')).toBe('settling')
     expect(b.view.queryByTestId('hero-headline')).toBeNull()
   })
 
-  it('settling phase: a session the list has no row for settles conservatively', () => {
+  it('settling phase: a 个会话 the list has no row for settles conservatively', () => {
     const b = mount(
       sessionSnapshotOf({ blank: true, openState: 'loading' }),
       undefined,
@@ -519,7 +519,7 @@ describe('ConversationRoot resident composer', () => {
     expect(root?.getAttribute('data-phase')).toBe('settling')
   })
 
-  it('startup auto-selection: a summary-proven blank session opens straight into the hero', () => {
+  it('startup auto-selection: a summary-proven blank 个会话 opens straight into the hero', () => {
     const b = mount(
       sessionSnapshotOf({ blank: true, openState: 'loading' }),
       undefined,
@@ -554,8 +554,8 @@ describe('ConversationRoot resident composer', () => {
 
   it('keeps the Chat fallback selected by id when a view is inserted before it', () => {
     const viewTabs: ViewTab[] = [
-      { id: 'chat', label: 'Chat' },
-      { id: 'trajectory', label: 'Trajectory' },
+      { id: 'chat', label: '对话' },
+      { id: 'trajectory', label: '轨迹' },
     ]
     const b = mount(sessionSnapshotOf(), undefined, undefined, { viewTabs })
     // A removed dynamic view leaves its persisted id behind. The visible
@@ -568,29 +568,29 @@ describe('ConversationRoot resident composer', () => {
 
     expect(b.view.getByTestId('view-chat')).toBeTruthy()
     expect(b.view.queryByTestId('view-new-view')).toBeNull()
-    expect(b.view.getByRole('tab', { name: 'Chat' }).getAttribute('aria-selected')).toBe('true')
+    expect(b.view.getByRole('tab', { name: '对话' }).getAttribute('aria-selected')).toBe('true')
     expect(b.view.getByRole('tab', { name: 'New view' }).getAttribute('aria-selected')).toBe('false')
   })
 
-  it('rolls the pending workspace label back when switching fails', async () => {
+  it('rolls the 待处理 workspace label back when switching fails', async () => {
     const selectWorkspace = vi.fn(async () => { throw new Error('connect failed') })
     const b = mount(
       sessionSnapshotOf({ blank: true }),
       [
         { ...workspace('one'), sessionIds: [SID] },
-        { ...workspace('second'), title: 'Selected Folder' },
+        { ...workspace('秒'), title: 'Selected Folder' },
       ],
       selectWorkspace,
     )
     fireEvent.click(b.view.getByRole('button', { name: '选择工作区' }))
     const owner = b.pickerOwner() as { onPick(id: WorkspaceId): void }
-    await act(async () => { owner.onPick(wid('second')); await Promise.resolve() })
-    expect(selectWorkspace).toHaveBeenCalledWith(wid('second'))
+    await act(async () => { owner.onPick(wid('秒')); await Promise.resolve() })
+    expect(selectWorkspace).toHaveBeenCalledWith(wid('秒'))
     expect(b.view.queryByText('Selected Folder')).toBeNull()
     expect(b.view.getByText('one')).toBeTruthy()
   })
 
-  it('blank session keeps the interactive picker chip (workspace switchable until the first message)', () => {
+  it('blank 个会话 keeps the interactive picker chip (workspace switchable until the first 条消息)', () => {
     const b = mount(sessionSnapshotOf({ blank: true }))
     const chip = b.view.getByRole('button', { name: '选择工作区' })
     expect((chip as HTMLButtonElement).disabled).toBe(false)
@@ -605,7 +605,7 @@ describe('ConversationRoot resident composer', () => {
       promptError: { op: 'send', error: { code: 'offline', message: 'Message send failed' } as never },
     }))
     expect(b.view.getByRole('alert').textContent).toContain('Message send failed (offline)')
-    expect(b.view.queryByRole('button', { name: 'Retry' })).toBeNull()
+    expect(b.view.queryByRole('button', { name: '重试' })).toBeNull()
   })
 
   it('publishes the column width as a px variable for the shared width axis', () => {
@@ -728,7 +728,7 @@ describe('ConversationRoot resident composer', () => {
     expect(root.style.getPropertyValue('--dsh-composer-user-height')).toBe('')
   })
 
-  it('hero phase offers the height handle, so a fresh session resizes like a live one', () => {
+  it('hero phase offers the height handle, so a fresh 个会话 resizes like a live one', () => {
     const b = mount(sessionSnapshotOf({ blank: true }))
     const root = b.view.container.querySelector('[data-phase]') as HTMLElement
     expect(root.getAttribute('data-phase')).toBe('hero')

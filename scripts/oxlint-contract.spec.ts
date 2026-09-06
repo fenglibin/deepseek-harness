@@ -111,6 +111,9 @@ probePromise()
     const suffix = randomUUID()
     const configPath = await writeContractConfig(suffix)
     const path = join(repositoryRoot, 'scripts', `oxlint-contract-${suffix}.ts`)
+    // Assembled rather than written out: the probe must cross the repository's
+    // max-len `code` (300) without this spec carrying a line that long.
+    const longLine = `export const longProbe = 1${' + 1'.repeat(80)}`
     const source = `export function firstProbe(): number {
   const first = 1
   const second = 2
@@ -127,7 +130,7 @@ export function hasValue(value: string): boolean {
   return value !== undefined
 }
 
-export const longProbe = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1
+${longLine}
 `
 
     try {

@@ -389,6 +389,52 @@ describe('inline image intake and send', () => {
     expect(result.view.getByRole('alert').textContent).toContain('图片发送失败')
   })
 
+  it('restores text and images together when a mixed send fails', async () => {
+    const file = new File([Uint8Array.of(1)], 'pixel.png', { type: 'image/png' })
+    const attachments = [
+      { kind: 'image' as const, id: 'draft-1' as DraftAttachmentId, file, previewUrl: 'blob:draft-1' },
+    ]
+    const result = bench({ draft: '看图', attachments })
+    const { button, sink } = result
+    let fail!: (outcome: SubmitOutcome) => void
+    sink.mockImplementationOnce(() => new Promise<SubmitOutcome>((resolve) => { fail = resolve }))
+    // The Send button, not Enter: a keydown runs the commit inside Lexical's
+    // own update, where the cache prune still reads the pre-commit tree.
+    fireEvent.click(button)
+    expect(sink).toHaveBeenCalledWith(
+      [{ type: 'text', text: '看图' }, { type: 'image', attachmentId: 'draft-1' }],
+      'queue', expect.any(AbortSignal),
+    )
+    // The commit clears the draft — and prunes the chip's display cache with
+    // it, which is why restoration cannot read the cache back.
+    expect(result.shell.snapshot.parts.filter(part => part.type === 'image').length).toBe(0)
+    await act(async () => { fail({ kind: 'error', text: '图片发送失败' }) })
+    await vi.waitFor(() => {
+      expect(result.shell.snapshot.parts.filter(part => part.type === 'image').length).toBe(1)
+    })
+    expect(result.shell.snapshot.draft).toContain('看图')
+  })
+
+  it('takes a file dropped anywhere on the capsule, and only once on the editable', () => {
+    const image = new File([Uint8Array.of(1)], 'pixel.png', { type: 'image/png' })
+    const transfer = (): { files: File[]; types: string[] } => ({ files: [image], types: ['Files'] })
+
+    // Released on the card's padding: no Lexical listener covers it, and the
+    // browser's own answer to a file drop is to navigate to the file.
+    const onPadding = bench({ addImages: vi.fn(() => null) })
+    const card = onPadding.view.container.querySelector('[data-composer-card]') as HTMLElement
+    expect(fireEvent.dragOver(card, { dataTransfer: transfer() })).toBe(false)
+    expect(fireEvent.drop(card, { dataTransfer: transfer() })).toBe(false)
+    expect(onPadding.props.addImages).toHaveBeenCalledExactlyOnceWith([image])
+    cleanup()
+
+    // Released on the editable: the editor takes it, and the capsule must not
+    // take the same file again on its way up.
+    const onEditable = bench({ addImages: vi.fn(() => null) })
+    fireEvent.drop(onEditable.textarea, { dataTransfer: transfer() })
+    expect(onEditable.props.addImages).toHaveBeenCalledExactlyOnceWith([image])
+  })
+
   it('announces an image-intake rejection as a fading toast, repeatable for the same reason', () => {
     vi.useFakeTimers()
     try {

@@ -1,9 +1,6 @@
-<!-- 英文源文件由 scripts/gen-doc-graphs.ts 生成；本中文文件是通过双语配对维护的经评审对侧。
-     更新时先运行 `pnpm run gen-doc-graphs` 更新英文，再更新本文件并运行 `pnpm run verify-translation-pairing --write docs/agent-lifecycle.md` 重新记录配对。 -->
 
 # Agent 轮次与步骤生命周期
 
-[English](agent-lifecycle.md) | 中文
 
 此时序图是 [architecture.md](architecture.zh.md#turn-flow) 的配套图示。持久的回放事实保存在 `session/event` 中，实时控制与状态则保存在 `agent/*` 中。
 
@@ -81,4 +78,4 @@ sequenceDiagram
 
 需要可回放 transcript（文本记录）数据的 SDK 用户应当消费 `session/event`；`agent/*` 是用于队列与状态、提示词拦截、请求构造、steering、继续执行和错误处理的实时协调接口。
 
-维护模式：英文源文件包含人工维护的 Mermaid 时序图，并由生成器写出；本中文文件作为经评审对侧通过双语配对维护。确切的事件签名位于生成的 Cordis 目录中。
+维护模式：英文源文件包含人工维护的 Mermaid 时序图，并由生成器写出；本中文文件作为对英文源的评审翻译。确切的事件签名位于生成的 Cordis 目录中。

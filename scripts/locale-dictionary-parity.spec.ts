@@ -1,27 +1,25 @@
 /**
- * Gate for the invariant `FALLBACK_LOCALE` rests on: every shipped dictionary
- * declares the same keys in `zh` and `en`.
+ * Gate for the invariant `FALLBACK_LOCALE` rests on: `zh` is the only shipped
+ * locale, so every dictionary declares Chinese and none declares English.
  *
- * The locale runtime resolves a key through the active locale, then through
- * the single fallback locale (`en`), then surfaces the key itself. With
- * symmetric dictionaries that middle step always resolves, so one constant can
- * serve as both the opening locale and the dictionary fallback. A key added to
- * only one side breaks that: a reader of the other language sees a bare key
- * such as `list.aria` instead of text. This gate fails on the asymmetry rather
- * than waiting for the bare key to reach a UI.
+ * The repository removed its bilingual runtime (see
+ * `docs/design/chinese-only-localization.zh.md`): `FALLBACK_LOCALE` is now
+ * `zh`, and a second dictionary would reintroduce the key-set symmetry
+ * obligation that removal retired. An `en` dictionary surviving anywhere means
+ * the migration missed a declaration — and, worse, that a fallback chain could
+ * again resolve through a half-maintained side. This gate fails on any English
+ * dictionary rather than waiting for a bare key to reach a UI.
  *
  * Discovery is deliberately broad, because a gate that silently narrows is
  * worse than no gate. It sweeps every workspace package (not just
- * `packages/client`), reads dictionaries wherever they are declared —
- * `locales.ts`, a `locales/` directory, or inline in the plugin body — and
- * pairs `zh`/`en` across sibling files as well as within one module. A `zh`
- * dictionary whose `en` counterpart cannot be found anywhere is an error, not
- * a skip.
+ * `packages/client`) and reads dictionaries wherever they are declared —
+ * `locales.ts`, a `locales/` directory, or inline in the plugin body,
+ * including `register(ns, 'zh' | 'en', ...)` calls.
  */
 
 import type { Dirent } from 'node:fs'
 import { readdirSync, readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
@@ -240,69 +238,26 @@ function localeOf(name: string): { locale: 'zh' | 'en'; pair: string } | undefin
 }
 
 describe('shipped locale dictionaries', () => {
-  it('declares the same keys in zh and en, so the single fallback locale always resolves', () => {
+  it('declares Chinese only, so the single fallback locale always resolves', () => {
     const files = sourceFiles()
     // Guard the discovery itself: an empty or narrowed sweep would pass every
     // assertion below while checking nothing.
     expect(files.length).toBeGreaterThan(500)
 
-    // Pair within a file first; a dictionary whose counterpart is not in the
-    // same module then pairs with a sibling in the same directory. Both shapes
-    // ship here: `locales/settings.ts` exports zh+en together, while
-    // `locales/zh.ts` + `locales/en.ts` split the common pair across files.
-    const perFile = new Map<string, Dictionary[]>()
+    const english: string[] = []
+    let chinese = 0
     for (const file of files) {
-      const dicts = dictionariesIn(file)
-      if (dicts.length > 0) perFile.set(relative(file), dicts)
-    }
-
-    const groups = new Map<string, Map<'zh' | 'en', Dictionary>>()
-    const place = (key: string, locale: 'zh' | 'en', dict: Dictionary): void => {
-      const slot = groups.get(key) ?? new Map<'zh' | 'en', Dictionary>()
-      if (slot.has(locale)) {
-        throw new Error(`two ${locale} dictionaries claim pair ${key}: ${slot.get(locale)?.file} and ${dict.file}`)
-      }
-      slot.set(locale, dict)
-      groups.set(key, slot)
-    }
-
-    for (const [rel, dicts] of perFile) {
-      for (const dict of dicts) {
+      for (const dict of dictionariesIn(file)) {
         const parsed = localeOf(dict.name)
         if (parsed === undefined) continue
-        const sameFileCounterpart = dicts.some((other) => {
-          const otherParsed = localeOf(other.name)
-          return otherParsed !== undefined
-            && otherParsed.pair === parsed.pair
-            && otherParsed.locale !== parsed.locale
-        })
-        // Same-file pairs key by file so two pairs in one directory stay
-        // distinct; split pairs key by directory so siblings meet.
-        const key = sameFileCounterpart ? `${rel}::${parsed.pair}` : `${dirname(rel)}::${parsed.pair}`
-        place(key, parsed.locale, dict)
+        if (parsed.locale === 'en') english.push(`${dict.file} declares ${dict.name}`)
+        else chinese++
       }
     }
 
-    const problems: string[] = []
-    let comparedPairs = 0
-    for (const [key, slot] of [...groups].sort()) {
-      const zh = slot.get('zh')
-      const en = slot.get('en')
-      if (zh === undefined || en === undefined) {
-        const present = zh ?? en
-        problems.push(`${present?.file} declares ${present?.name} with no counterpart for pair ${key}`)
-        continue
-      }
-      comparedPairs++
-      const zhOnly = zh.keys.filter(k => !en.keys.includes(k))
-      const enOnly = en.keys.filter(k => !zh.keys.includes(k))
-      if (zhOnly.length > 0) problems.push(`${zh.file} ${zh.name} has keys absent from ${en.name}: ${zhOnly.join(', ')}`)
-      if (enOnly.length > 0) problems.push(`${en.file} ${en.name} has keys absent from ${zh.name}: ${enOnly.join(', ')}`)
-    }
-
-    // The shipped dictionary count only grows; a collapse means discovery or
-    // pairing broke, which would hide real asymmetry.
-    expect(comparedPairs).toBeGreaterThan(25)
-    expect(problems).toEqual([])
+    // The shipped Chinese dictionary count only grows; a collapse means
+    // discovery broke, which would hide a real English survivor.
+    expect(chinese).toBeGreaterThan(25)
+    expect(english.sort()).toEqual([])
   })
 })
