@@ -107,4 +107,52 @@ describe('turnOutline session projection', () => {
     expect(entry?.prompt.length).toBeLessThanOrEqual(160)
     expect(entry?.prompt).toBe('x'.repeat(160))
   })
+
+  it('keeps a turn whose direct user message carried only image content', async () => {
+    // A user typing without text — paste or attach a picture — must still appear
+    // in the drawer list; the host's `promptOf` returns '' for image-only
+    // messages, so the projection keeps the turn on its own user-message
+    // signal and stores an empty preview.
+    const { ctx, session } = await harness()
+    session.append('turn/start', { turn: 1 })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'image', attachment: { attachmentId: 'attach-1' as never, mediaType: 'image/png', bytes: 0, width: 1, height: 1 } }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('step/start', { turn: 1, step: 1 })
+    session.append('assistant/message', {
+      turn: 1,
+      step: 1,
+      message: createMessage({
+        role: 'assistant',
+        content: [],
+        source: { kind: 'model', provider: 'mock', model: 'mock' },
+      }),
+    }, { surfaceOp: 'append', sourceEventSeqs: [] })
+    session.append('step/end', { turn: 1, step: 1 })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    expect(projected(ctx, session).turns).toEqual([
+      { turn: 1, prompt: '' },
+    ])
+  })
+
+  it('keeps a turn whose first user message was empty but a later image-only message was direct', async () => {
+    // The opening text message is steering (source.kind === 'user' but the
+    // first direct message with text happens later, mixed), and the drawer
+    // shows the late image-only message as the prompt — empty preview.
+    const { ctx, session } = await harness()
+    session.append('turn/start', { turn: 1 })
+    session.append('user/message', createUserMessage({
+      content: [],
+      source: { kind: 'plugin', plugin: 'test' },
+    }), { surfaceOp: 'append' })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'image', attachment: { attachmentId: 'attach-2' as never, mediaType: 'image/png', bytes: 0, width: 1, height: 1 } }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    expect(projected(ctx, session).turns).toEqual([
+      { turn: 1, prompt: '' },
+    ])
+  })
 })

@@ -2796,4 +2796,90 @@ describe('ChatView history paging', () => {
       restoreLayout()
     }
   })
+
+  it('settles on a topmost loaded turn when the reader is pinned to the floor', () => {
+    // Whole log loaded — picking any row is a loaded row: settleAt scrolls
+    // straight there without paging. Without this the topmost message in the
+    // drawer could appear "stuck" at the bottom even though every node is
+    // already on screen.
+    const items = Array.from({ length: 12 }, (_, i) => i + 1)
+    const nodes = items.flatMap(turn => [
+      userInTurn(turn, `第 ${String(turn).padStart(2, '0')} 轮`, turn),
+      assistant(turn * 10 + 1, `第 ${String(turn).padStart(2, '0')} 轮回答`, turn, 1),
+    ])
+    const outline = items.map(turn => ({ turn, prompt: `第 ${String(turn).padStart(2, '0')} 轮` }))
+    const h = makeHarness({ nodes, turnOutline: outline, turnTimings: new Map(items.map(t => [t, { startTime: t * 1_000 }])) }, {})
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLElement
+    const restoreLayout = installFlowLayout(scroller)
+    try {
+      readerScrollTo(scroller, scroller.scrollHeight)
+      fireEvent.click(screen.getByRole('button', { name: '打开用户消息列表' }))
+      fireEvent.click(within(screen.getByRole('dialog')).getByText('第 06 轮'))
+
+      // Turn 6 sits in the middle of the visible band: settleAt should bring
+      // its row to within the reading-line margin, not the floor.
+      expect(rowOffset(scroller, 'fixture:user:6')).toBe(SETTLE_MARGIN)
+    } finally {
+      restoreLayout()
+    }
+  })
+
+  it('settles on the topmost loaded turn by clamping at 0 instead of stranding the row above the viewport', () => {
+    // The very first turn is the only row whose content position is at 0;
+    // scrolling there from the floor pushes newScrollTop below 0, which the
+    // browser clamps to 0. The row lands flush at the top (visible) — a
+    // failing assertion here would mean a regression in the click→settle path
+    // (e.g. settleAt never ran, so the row remains clipped above the viewport).
+    const items = Array.from({ length: 12 }, (_, i) => i + 1)
+    const nodes = items.flatMap(turn => [
+      userInTurn(turn, `第 ${String(turn).padStart(2, '0')} 轮`, turn),
+      assistant(turn * 10 + 1, `第 ${String(turn).padStart(2, '0')} 轮回答`, turn, 1),
+    ])
+    const outline = items.map(turn => ({ turn, prompt: `第 ${String(turn).padStart(2, '0')} 轮` }))
+    const h = makeHarness({ nodes, turnOutline: outline, turnTimings: new Map(items.map(t => [t, { startTime: t * 1_000 }])) }, {})
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLElement
+    const restoreLayout = installFlowLayout(scroller)
+    try {
+      readerScrollTo(scroller, scroller.scrollHeight)
+      fireEvent.click(screen.getByRole('button', { name: '打开用户消息列表' }))
+      fireEvent.click(within(screen.getByRole('dialog')).getByText('第 01 轮'))
+      // settleAt clamps negative scrollTop to 0; the row's top equals the
+      // viewport top — the row is visible (not stranded above it).
+      expect(rowOffset(scroller, 'fixture:user:1')).toBeGreaterThanOrEqual(0)
+    } finally {
+      restoreLayout()
+    }
+  })
+
+  it('reader-driven scroll into the top of the loaded window arms another older-history page', () => {
+    // Reads the production “automatic older-history loading” path: scrolling
+    // back into the top should call loadOlder when there is still history
+    // and the previous request is not busy. This protects against a future
+    // regression where the pinned-to-floor bookkeeping would silently swallow
+    // every manual scroll attempt and the reader could never page back.
+    const latest = Array.from({ length: 6 }, (_, i) => i + 1).flatMap(turn => [
+      userInTurn(turn * 5, `turn ${String(turn * 5).padStart(2, '0')}`, turn * 5),
+      assistant(turn * 50 + 1, `reply ${String(turn * 50 + 1).padStart(3, '0')}`, turn * 5, 1),
+    ])
+    const outline = Array.from({ length: 12 }, (_, i) => ({
+      turn: i + 1,
+      prompt: `第 ${String(i + 1).padStart(2, '0')} 轮`,
+    }))
+    const h = makeHarness({ nodes: latest, turnOutline: outline, turnTimings: new Map(latest.map((_, i) => [Math.floor(i / 2) + 5, { startTime: 5_000 + i * 1_000 }])) }, { hasMore: true })
+    const view = render(<h.ChatView {...h.props} />)
+    const scroller = view.container.querySelector('[class*="scroll"]') as HTMLElement
+    const restoreLayout = installFlowLayout(scroller)
+    try {
+      // Pin to floor (>= FOLLOW_THRESHOLD below scrollHeight - clientHeight),
+      // then swipe up to scrollTop = 0. The auto-load arm must fire because
+      // the picked top is within OLDER_LOAD_THRESHOLD_PX and hasMore is true.
+      readerScrollTo(scroller, scroller.scrollHeight)
+      readerScrollTo(scroller, 0)
+      expect(h.loadOlder).toHaveBeenCalled()
+    } finally {
+      restoreLayout()
+    }
+  })
 })

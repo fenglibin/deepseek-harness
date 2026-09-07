@@ -35,6 +35,7 @@ export const zh = {
   'chat.userTurnList.toggle': '打开用户消息列表',
   'chat.userTurnList.total': '共 {count} 条用户消息',
   'chat.userTurnList.totalInline': '共 {count} 条',
+  'chat.userTurnList.previewEmpty': '（无文本，仅附件）',
   'settings.transcript.title': '对话显示',
   'settings.transcript.description': '控制已完成轮次的过程内容',
   'settings.transcript.normal': 'Normal',

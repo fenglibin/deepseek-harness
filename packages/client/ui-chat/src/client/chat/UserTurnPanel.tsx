@@ -43,8 +43,9 @@ function railBandStyle(): SlotStyle {
 }
 
 /** Bound the user-facing preview so a quoted paste cannot blow up the row. */
-function trimPrompt(text: string): string {
+function trimPrompt(text: string, t: ChatViewSlotProps['t']): string {
   const collapsed = text.replace(/\s+/g, ' ').trim()
+  if (collapsed === '') return t('chat.userTurnList.previewEmpty')
   return collapsed.length <= PROMPT_PREVIEW_LIMIT
     ? collapsed
     : `${collapsed.slice(0, PROMPT_PREVIEW_LIMIT)}…`
@@ -52,10 +53,13 @@ function trimPrompt(text: string): string {
 
 /**
  * User-message drawer. `items` is the whole-log outline, so every entry
- * already represents a turn with a direct user prompt — no client-side
- * filtering is needed, and the empty state honestly reports "no user
- * messages yet". Each row's `aria-current` mirrors `activeTurn` so the
- * highlighted row and {@link TurnNavigator}'s active mark stay in lockstep.
+ * already represents a turn with a direct user prompt — including image-only
+ * or empty-text direct prompts the host's projection explicitly counts as
+ * user turns (their row renders a localized "no text, attachment only"
+ * placeholder). No client-side filtering is needed; the empty state
+ * honestly reports "no user messages yet". Each row's `aria-current` mirrors
+ * `activeTurn` so the highlighted row and {@link TurnNavigator}'s active
+ * mark stay in lockstep.
  */
 export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPanelProps) {
   const [open, setOpen] = useState(false)
@@ -114,7 +118,7 @@ export function UserTurnPanel({ items, activeTurn, onNavigate, t }: UserTurnPane
                     onClick={() => { onPick(item.turn) }}
                   >
                     <span className={css.tag} aria-hidden>#{ZERO_PAD(item.turn)}</span>
-                    <span className={css.preview}>{trimPrompt(item.prompt)}</span>
+                    <span className={css.preview}>{trimPrompt(item.prompt, t)}</span>
                   </button>
                 </li>
               )

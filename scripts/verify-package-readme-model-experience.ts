@@ -10,6 +10,41 @@ import { relative, resolve, sep } from 'node:path'
 import { markdownHeadingLines, markdownProseLines, type MarkdownProseLine } from './markdown.ts'
 
 const root = resolve(import.meta.dirname, '..')
+
+/**
+ * The package README sections this gate owns. Chinese-only READMEs translate
+ * the heading text, so each role accepts both the English spelling and the
+ * Chinese spellings the corpus actually uses.
+ */
+type SectionRole = 'model-experience' | 'limitations' | 'model-view' | 'token-effect' | 'kv-cache-effect'
+
+const SECTION_SPELLINGS: Record<SectionRole, readonly string[]> = {
+  'model-experience': ['## Model Experience', '## 模型体验'],
+  'limitations': [
+    '## Known Limitations and Deferred Work',
+    '## 已知限制与延期工作',
+    '## 已知限制与后续工作',
+    '## 已知限制与待办事项',
+    '## 已知限制与暂缓事项',
+    '## 已知限制与未竟事项',
+  ],
+  'model-view': ['#### What the model sees', '#### 模型会看到什么', '#### 模型看到什么', '#### 模型看到的内容'],
+  'token-effect': ['#### Token effect', '#### Token 影响', '#### token 影响'],
+  'kv-cache-effect': ['#### KV Cache effect', '#### KV Cache 影响', '#### KV 缓存影响'],
+}
+
+/** Map a heading's raw text to its section role, or undefined when unrelated. */
+function sectionRole(raw: string): SectionRole | undefined {
+  for (const [role, spellings] of Object.entries(SECTION_SPELLINGS)) {
+    if (spellings.includes(raw)) return role as SectionRole
+  }
+  return undefined
+}
+
+function hasRole(raw: string, role: SectionRole): boolean {
+  return sectionRole(raw) === role
+}
+
 const HEADING = '## Model Experience'
 const LIMITATIONS_HEADING = '## Known Limitations and Deferred Work'
 const MODEL_VIEW_HEADING = '#### What the model sees'
@@ -258,12 +293,12 @@ function isDirectSystemPromptEntry(title: string): boolean {
 
 /** Anchored generated-catalog links in one model-view field. */
 function toolCatalogLinkFragments(text: string): string[] {
-  return [...text.matchAll(/\]\(\.\.\/\.\.\/\.\.\/docs\/tool-catalog\.md#([a-z0-9_-]+)\)/g)]
+  return [...text.matchAll(/\]\(\.\.\/\.\.\/\.\.\/docs\/tool-catalog\.zh\.md#([a-z0-9_-]+)\)/g)]
     .map(match => match[1] as string)
 }
 
 const toolCatalogFragments = new Set<string>()
-for (const line of readFileSync(resolve(root, 'docs/tool-catalog.md'), 'utf8').split('\n')) {
+for (const line of readFileSync(resolve(root, 'docs/tool-catalog.zh.md'), 'utf8').split('\n')) {
   const title = /^## (.+)$/.exec(line)?.[1]
   if (title !== undefined) toolCatalogFragments.add(headingFragment(title))
 }
@@ -304,7 +339,7 @@ for (const [pkg, contract] of Object.entries(SENTENCE_MODEL_EXPERIENCE)) {
 
 for (const packageJson of packageJsons) {
   const pkg = packageJson.slice(0, -'/package.json'.length)
-  const readme = packageJson.replace(/package\.json$/, 'README.md')
+  const readme = packageJson.replace(/package\.json$/, 'README.zh.md')
   const abs = resolve(root, readme)
   if (!existsSync(abs)) {
     failures.push({ path: readme, message: 'missing package README' })
@@ -316,9 +351,8 @@ for (const packageJson of packageJsons) {
   const lines = markdownProseLines(text)
   const headings = markdownHeadingLines(text)
   const h2Headings = headings.filter(heading => heading.depth === 2)
-  const modelExperienceHeadings = headings.filter(heading => heading.text
-    .trim().replaceAll(/\s+/g, ' ').toLowerCase() === 'model experience')
-  const modelHeadings = modelExperienceHeadings.filter(heading => heading.depth === 2 && heading.raw === HEADING)
+  const modelExperienceHeadings = headings.filter(heading => hasRole(heading.raw, 'model-experience'))
+  const modelHeadings = modelExperienceHeadings.filter(heading => heading.depth === 2)
   if (NO_MODEL_EXPERIENCE_SECTION[pkg] !== undefined) {
     if (modelExperienceHeadings.length !== 0) {
       for (const heading of modelExperienceHeadings) {
@@ -329,7 +363,7 @@ for (const packageJson of packageJsons) {
     }
     continue
   }
-  const nonCanonicalModelHeading = modelExperienceHeadings.find(heading => heading.depth !== 2 || heading.raw !== HEADING)
+  const nonCanonicalModelHeading = modelExperienceHeadings.find(heading => heading.depth !== 2)
   if (nonCanonicalModelHeading !== undefined) {
     failures.push({ path: readme, message: `line ${nonCanonicalModelHeading.index}: non-canonical Model Experience heading ${JSON.stringify(nonCanonicalModelHeading.raw)}; use exactly ${JSON.stringify(HEADING)}` })
     continue
@@ -347,7 +381,7 @@ for (const packageJson of packageJsons) {
     continue
   }
   const modelH2Index = h2Headings.indexOf(modelHeading)
-  const limitationsH2Index = h2Headings.findIndex(heading => heading.depth === 2 && heading.raw === LIMITATIONS_HEADING)
+  const limitationsH2Index = h2Headings.findIndex(heading => heading.depth === 2 && hasRole(heading.raw, 'limitations'))
   if (limitationsH2Index >= 0) {
     if (modelH2Index !== h2Headings.length - 2 || limitationsH2Index !== h2Headings.length - 1) {
       failures.push({
@@ -381,7 +415,7 @@ for (const packageJson of packageJsons) {
       failures.push({ path: readme, message: `must contain exactly one sentence beginning ${JSON.stringify(prefix)} and ending with a period, followed by ${KV_CACHE_EFFECT_HEADING} and one non-empty paragraph` })
       continue
     }
-    if (kvCacheHeading?.raw !== KV_CACHE_EFFECT_HEADING
+    if ((kvCacheHeading === undefined || !hasRole(kvCacheHeading.raw, 'kv-cache-effect'))
       || kvCacheEffect === undefined
       || /^#{1,6} /.test(kvCacheEffect.raw)
       || kvCacheEffect.raw.trim().length === 0) {
@@ -452,10 +486,12 @@ for (const packageJson of packageJsons) {
     }
     const parsedFields: ParsedField[] = []
     const verbatimFragments = new Set<string>()
-    for (let fieldIndex = 0; fieldIndex < FIELD_HEADINGS.length; fieldIndex += 1) {
+    const FIELD_ROLES = ['model-view', 'token-effect', 'kv-cache-effect'] as const
+    for (let fieldIndex = 0; fieldIndex < FIELD_ROLES.length; fieldIndex += 1) {
       const fieldStart = fieldStarts[fieldIndex] as { line: Line; index: number }
+      const expectedRole = FIELD_ROLES[fieldIndex]
       const expectedHeading = FIELD_HEADINGS[fieldIndex] as string
-      if (fieldStart.line.raw !== expectedHeading) {
+      if (!hasRole(fieldStart.line.raw, expectedRole)) {
         failures.push({ path: readme, message: `line ${fieldStart.line.index}: expected exact field heading ${JSON.stringify(expectedHeading)}, found ${JSON.stringify(fieldStart.line.raw)}` })
         entryError = true
         break
@@ -544,7 +580,7 @@ for (const packageJson of packageJsons) {
     if (!/\bschemas?\b/i.test(entry.title)) continue
     const fragments = toolCatalogLinkFragments(entry.modelView.raw)
     if (fragments.length === 0) {
-      failures.push({ path: readme, message: `line ${entry.heading.index}: tool-schema entry must link an anchored section of ../../../docs/tool-catalog.md` })
+      failures.push({ path: readme, message: `line ${entry.heading.index}: tool-schema entry must link an anchored section of ../../../docs/tool-catalog.zh.md` })
       catalogError = true
       break
     }

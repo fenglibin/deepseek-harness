@@ -1253,6 +1253,45 @@ describe('built-in conversation node Definitions', () => {
     ])
   })
 
+  it('hides rather than withdraws a materialized prompt when prepend reveals its same-series predecessor', () => {
+    // A window with `hasMore` materializes a change-header prompt because its
+    // predecessor lies beyond the loaded window. Prepending that predecessor
+    // reclassifies the header as a same-series config/tool-only change, which
+    // flips `showsPrompt` off. The already materialized row must go hidden —
+    // not null — or the assembler throws "withdrew materialized target".
+    const windowed = assembler([
+      at(10, 'request/header', {
+        reason: 'change',
+        header: { config: { provider: 'fake', model: 'fake' }, system: '# Same prompt' },
+      }),
+    ], true)
+    expect(node(snapshot(windowed), 'system-prompt')?.data).toEqual({ text: '# Same prompt' })
+
+    windowed.prepend([
+      at(5, 'request/header', {
+        reason: 'change',
+        header: { config: { provider: 'fake', model: 'fake' }, system: '# Same prompt' },
+      }),
+    ], false)
+    expect(() => windowed.flush()).not.toThrow()
+
+    const restored = snapshot(windowed)
+    const promptNodes = [...restored.nodes.values()]
+      .filter(candidate => candidate.kind === 'system-prompt')
+      .sort((left, right) => left.anchorSeq - right.anchorSeq)
+    // The earlier header stays visible; the later same-series header is hidden
+    // and no longer participates in the visible order.
+    expect(promptNodes.map(prompt => ({
+      visibility: prompt.visibility,
+      data: prompt.data,
+    }))).toEqual([
+      { visibility: 'visible', data: { text: '# Same prompt' } },
+      { visibility: 'hidden', data: { text: '# Same prompt' } },
+    ])
+    expect(restored.order.filter(key => restored.nodes.get(key)?.kind === 'system-prompt'))
+      .toHaveLength(1)
+  })
+
   it('orders the system field before the request messages while preserving message order', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),

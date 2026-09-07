@@ -118,4 +118,23 @@ describe('UserTurnPanel', () => {
     expect(screen.getByRole('dialog')).toBeTruthy()
     expect(screen.getAllByRole('listitem')).toHaveLength(40)
   })
+
+  it('renders a placeholder preview for image-only direct user turns', () => {
+    // The host now records image-only direct user turns (empty `prompt`) so
+    // the drawer badge and the chat panel turn count match; rows without a
+    // textual prompt collapse to a localized placeholder, never to a blank
+    // row that the reader can't act on.
+    const items: TurnOutlineEntry[] = [
+      { turn: 1, prompt: 'first question' },
+      { turn: 2, prompt: '' },
+      { turn: 3, prompt: 'third question' },
+    ]
+    render(<UserTurnPanel items={items} activeTurn={null} onNavigate={vi.fn()} t={t} />)
+    const toggle = screen.getByRole('button', { name: '打开用户消息列表' })
+    expect(within(toggle).getByText('3')).toBeTruthy()
+    fireEvent.click(toggle)
+    const rows = screen.getAllByRole('listitem')
+    expect(rows).toHaveLength(3)
+    expect(within(rows[1]!).getByText('（无文本，仅附件）')).toBeTruthy()
+  })
 })

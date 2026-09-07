@@ -2,7 +2,7 @@
 
 Status: implemented
 
-> 分工线：历史上的通道无关分层模型与 RPC 协议见[已归档的分层与 RPC 协议笔记](../../archived/architecture/2026-07-19-gui-layering-and-rpc-protocol.md)；本篇 = 浏览器侧：client cordis 树如何装载、UI 插件如何经 slot 与服务组合、React-free 对象层如何以不可变快照供给 React。
+> 分工线：历史上的通道无关分层模型与 RPC 协议见[已归档的分层与 RPC 协议笔记](../../archived/architecture/2026-07-19-gui-layering-and-rpc-protocol.zh.md)；本篇 = 浏览器侧：client cordis 树如何装载、UI 插件如何经 slot 与服务组合、React-free 对象层如何以不可变快照供给 React。
 
 ## Problem
 

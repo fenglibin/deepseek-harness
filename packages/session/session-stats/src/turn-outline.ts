@@ -18,13 +18,23 @@ import type { TurnOutlineEntry } from './types.ts'
 /** Preview budget per prompt, matching the Chat navigation rail's own bound. */
 const PROMPT_LIMIT = 160
 
-/** Fold state: finalized entries plus the open turn's captured prompt. */
+/**
+ * Fold state: finalized entries plus the open turn's captured prompt.
+ *
+ * `currentIsUserTurn` records whether the open turn has seen at least one
+ * direct user `user/message` (source.kind === 'user') regardless of text
+ * content — image-only direct prompts would otherwise leave `currentPrompt`
+ * empty and the projection skip the turn, so the drawer badge would under-
+ * count when a turn carried no textual prompt.
+ */
 interface TurnOutlineState {
   turns: TurnOutlineEntry[]
   /** Turn number of the open turn; null between turns. */
   currentTurn: number | null
   /** Bounded opening prompt of the open turn; empty until one is captured. */
   currentPrompt: string
+  /** True once an own user `user/message` lands in the open turn. */
+  currentIsUserTurn: boolean
 }
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
@@ -42,6 +52,7 @@ const turnOutlineStateSchema = z.object({
   turns: z.array(turnOutlineEntrySchema),
   currentTurn: z.number().int().nonnegative().nullable(),
   currentPrompt: z.string(),
+  currentIsUserTurn: z.boolean(),
 }).strict()
 
 const turnOutlineViewSchema = z.object({
@@ -78,25 +89,42 @@ export const turnOutlineProjectionDefinition = {
   key: 'turnOutline',
   stateVersion: 1,
   stateSchema: turnOutlineStateSchema,
-  init: () => ({ turns: [], currentTurn: null, currentPrompt: '' }),
+  init: () => ({ turns: [], currentTurn: null, currentPrompt: '', currentIsUserTurn: false }),
   apply: (state, event) => {
     if (event.type === 'turn/start') {
-      return { turns: state.turns, currentTurn: event.data.turn, currentPrompt: '' }
+      return { turns: state.turns, currentTurn: event.data.turn, currentPrompt: '', currentIsUserTurn: false }
     }
     if (state.currentTurn === null) return state
     if (event.type === 'user/message') {
-      if (state.currentPrompt !== '') return state
+      if (state.currentPrompt !== '') {
+        // The opening prompt is already settled; still flag the turn if the
+        // own user sent a (later) message with only images so the drawer does
+        // not omit a direct user turn whose text never landed.
+        return event.data.source.kind === 'user'
+          ? { ...state, currentIsUserTurn: true }
+          : state
+      }
       const prompt = promptOf(event)
-      return prompt === '' ? state : { ...state, currentPrompt: prompt }
+      if (prompt !== '') return { ...state, currentPrompt: prompt, currentIsUserTurn: state.currentIsUserTurn || event.data.source.kind === 'user' }
+      // Direct user messages with image-only or empty content must still be
+      // captured: the drawer renders the turn with a placeholder preview, and
+      // turn/end below keeps the turn on its own user-message signal.
+      return event.data.source.kind === 'user'
+        ? { ...state, currentIsUserTurn: true }
+        : state
     }
     if (event.type === 'turn/end') {
-      return state.currentPrompt === ''
-        ? { turns: state.turns, currentTurn: null, currentPrompt: '' }
-        : {
-          turns: [...state.turns, { turn: state.currentTurn, prompt: state.currentPrompt }],
-          currentTurn: null,
-          currentPrompt: '',
-        }
+      const keepOwnPrompt = state.currentPrompt !== ''
+      const keepOwnUser = state.currentIsUserTurn
+      if (!keepOwnPrompt && !keepOwnUser) {
+        return { turns: state.turns, currentTurn: null, currentPrompt: '', currentIsUserTurn: false }
+      }
+      return {
+        turns: [...state.turns, { turn: state.currentTurn, prompt: state.currentPrompt }],
+        currentTurn: null,
+        currentPrompt: '',
+        currentIsUserTurn: false,
+      }
     }
     return state
   },

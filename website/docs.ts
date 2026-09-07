@@ -390,9 +390,19 @@ const reference = [
     section: { root: '概念', en: 'Concepts' },
     order,
   }))),
+  ...mirroredPages(([
+    ['config-catalog.zh.md', '插件配置', 'Plugin configuration'],
+    ['tool-catalog.zh.md', 'Tool Schema', 'Tool schemas'],
+  ] as const).map(([file, rootLabel, enLabel], order): MirroredPage => ({
+    source: `docs/${file}`,
+    route: `reference/${file.replace(/\.zh\.md$/, '.md')}`,
+    contentLocale: 'zh-CN',
+    label: { root: rootLabel, en: enLabel },
+    sidebar: { root: 'zh-reference', en: 'en-reference' },
+    section: { root: '生成参考', en: 'Generated reference' },
+    order,
+  }))),
   ...pairedPages(([
-    ['docs/config-catalog.md', 'reference/config-catalog.md', '插件配置', 'Plugin configuration'],
-    ['docs/tool-catalog.md', 'reference/tool-catalog.md', 'Tool Schema', 'Tool schemas'],
     ['docs/persistence-catalog.md', 'reference/persistence-catalog.md', '持久化事件', 'Persistence events', 'deep'],
   ] as const).map(([source, route, rootLabel, enLabel, outline], order): PairedPage => ({
     source,
@@ -400,7 +410,7 @@ const reference = [
     label: { root: rootLabel, en: enLabel },
     sidebar: { root: 'zh-reference', en: 'en-reference' },
     section: { root: '生成参考', en: 'Generated reference' },
-    order,
+    order: order + 2,
     ...(outline === undefined ? {} : { outline }),
   }))),
   ...pairedPages(([

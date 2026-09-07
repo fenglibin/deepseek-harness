@@ -89,8 +89,22 @@ export function requestPromptDefinition(inspect: RequestPromptInspector): Conver
     update: context => context.state,
     buildViewNode: (context) => {
       const state = context.state
-      if (state === undefined || !state.showsPrompt || state.prompt.system === '') return null
-      return chatNode(context, 'system-prompt', state.anchorSeq, { text: state.prompt.system })
+      if (state === undefined) return null
+      const visible = state.showsPrompt && state.prompt.system !== ''
+      if (visible) {
+        return chatNode(context, 'system-prompt', state.anchorSeq, { text: state.prompt.system })
+      }
+      // A live turn materializes the prompt row first; when prepending older
+      // history reshuffles the previous-request chain and `showsPrompt` flips
+      // off, withdraw the row with hidden visibility rather than `null`: the
+      // assembler forbids withdrawing a materialized node under the same key.
+      // A prompt that was never materialized (config/tool-only change, or a
+      // header without a system field) keeps no node at all.
+      const current = context.current.get('chat')
+      if (current === undefined || current === null) return null
+      return chatNode(context, 'system-prompt', state.anchorSeq, { text: state.prompt.system }, {
+        visibility: 'hidden',
+      })
     },
   }
 }
