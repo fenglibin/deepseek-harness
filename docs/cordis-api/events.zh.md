@@ -1,6 +1,7 @@
+<!-- 由 scripts/gen-cordis-catalog.ts 生成——请勿手工编辑。
+     运行 `pnpm run gen-cordis-catalog` 重新生成。 -->
 
 # 事件
-
 
 每个上下文中都混入了事件分发 API。Harness 事件声明及其分发模式会生成到各自所属的[子系统页面](../subsystems/core.zh.md)。
 
@@ -18,14 +19,14 @@ parallel<K extends keyof Events>(name: K, ...args: Parameters<Events[K]>): Promi
 parallel<K extends keyof Events>(thisArg: NoInfer<ThisType<Events[K]>>, name: K, ...args: Parameters<Events[K]>): Promise<void>
 ```
 
-分发一个事件，并发运行所有监听器。
+Dispatch an event, running all listeners concurrently.
 
-- `name`：事件名称。
-- `args`：传递给每个监听器的参数。
+- `name` — the event name.
+- `args` — arguments passed to every listener.
 
-**返回值**：一个 Promise，在所有监听器均已完成后兑现。
+**返回** a promise resolving once every listener has settled.
 
-[源码](../../vendor/cordis/src/events.ts#L44)
+[来源](../../vendor/cordis/src/events.ts#L44)
 
 ### ctx.emit(name, ...args)
 
@@ -40,12 +41,12 @@ emit<K extends keyof Events>(name: K, ...args: Parameters<Events[K]>): void
 emit<K extends keyof Events>(thisArg: NoInfer<ThisType<Events[K]>>, name: K, ...args: Parameters<Events[K]>): void
 ```
 
-同步分发一个事件，忽略监听器的返回值。
+Dispatch an event synchronously, ignoring listener return values.
 
-- `name`：事件名称。
-- `args`：传递给每个监听器的参数。
+- `name` — the event name.
+- `args` — arguments passed to every listener.
 
-[源码](../../vendor/cordis/src/events.ts#L53)
+[来源](../../vendor/cordis/src/events.ts#L53)
 
 ### ctx.serial(name, ...args)
 
@@ -61,14 +62,14 @@ serial<K extends keyof Events>(name: K, ...args: Parameters<Events[K]>): Promisi
 serial<K extends keyof Events>(thisArg: NoInfer<ThisType<Events[K]>>, name: K, ...args: Parameters<Events[K]>): Promisify<ReturnType<Events[K]>>
 ```
 
-分发一个事件，依次等待各监听器，直到其中一个提前终止分发。
+Dispatch an event, awaiting listeners in order until one bails.
 
-- `name`：事件名称。
-- `args`：传递给每个监听器的参数。
+- `name` — the event name.
+- `args` — arguments passed to each listener.
 
-**返回值**：第一个提前终止值（非 null、非 false 且非 undefined）；如果没有，则不返回此类值。
+**返回** the first bail value (non-null, non-false, non-undefined), if any.
 
-[源码](../../vendor/cordis/src/events.ts#L63)
+[来源](../../vendor/cordis/src/events.ts#L63)
 
 ### ctx.bail(name, ...args)
 
@@ -84,14 +85,14 @@ bail<K extends keyof Events>(name: K, ...args: Parameters<Events[K]>): ReturnTyp
 bail<K extends keyof Events>(thisArg: NoInfer<ThisType<Events[K]>>, name: K, ...args: Parameters<Events[K]>): ReturnType<Events[K]>
 ```
 
-分发一个事件，依次调用各监听器，直到其中一个提前终止分发。
+Dispatch an event, calling listeners in order until one bails.
 
-- `name`：事件名称。
-- `args`：传递给每个监听器的参数。
+- `name` — the event name.
+- `args` — arguments passed to each listener.
 
-**返回值**：第一个提前终止值（非 null、非 false 且非 undefined）；如果没有，则不返回此类值。
+**返回** the first bail value (non-null, non-false, non-undefined), if any.
 
-[源码](../../vendor/cordis/src/events.ts#L73)
+[来源](../../vendor/cordis/src/events.ts#L73)
 
 ### ctx.waterfall(name, ...args)
 
@@ -110,16 +111,16 @@ waterfall<K extends keyof Events>(name: K, ...args: Parameters<Events[K]>): Retu
 waterfall<K extends keyof Events>(thisArg: NoInfer<ThisType<Events[K]>>, name: K, ...args: Parameters<Events[K]>): ReturnType<Events[K]>
 ```
 
-分发一个事件，其最后一个参数是续接执行的 `next` 回调。
+Dispatch an event whose last argument is a `next` continuation.
 
-每个监听器都会包装调用链的其余部分：调用 `next()` 会执行下一个监听器，最终执行内置行为；不调用则会否决后续执行。
+Each listener wraps the rest of the chain: calling `next()` invokes the next listener (finally the built-in behavior); not calling it vetoes.
 
-- `name`：事件名称。
-- `args`：监听器参数；最后一个参数是最内层的 `next`。
+- `name` — the event name.
+- `args` — listener arguments; the final one is the innermost `next`.
 
-**返回值**：最外层监听器的返回值。
+**返回** the outermost listener's return value.
 
-[源码](../../vendor/cordis/src/events.ts#L86)
+[来源](../../vendor/cordis/src/events.ts#L86)
 
 ### ctx.on(name, listener, options?)
 
@@ -135,15 +136,15 @@ waterfall<K extends keyof Events>(thisArg: NoInfer<ThisType<Events[K]>>, name: K
 on<K extends keyof Events>(name: K, listener: Events[K], options?: boolean | EventOptions): () => boolean
 ```
 
-注册一个归当前 fiber 所有的事件监听器。
+Register an event listener owned by the current fiber.
 
-- `name`：要监听的事件名称。
-- `listener`：使用分发参数调用的监听器。
-- `options`：监听器选项；布尔值可作为 `prepend` 的简写。
+- `name` — the event name to listen for.
+- `listener` — called with the dispatch arguments.
+- `options` — listener options; a boolean is shorthand for `prepend`.
 
-**返回值**：一个用于移除监听器的资源释放函数；如果调用该函数时监听器仍处于注册状态，则返回 `true`。
+**返回** a disposer removing the listener; `true` if it was still registered.
 
-[源码](../../vendor/cordis/src/events.ts#L97)
+[来源](../../vendor/cordis/src/events.ts#L97)
 
 ### ctx.once(name, listener, options?)
 
@@ -159,19 +160,19 @@ on<K extends keyof Events>(name: K, listener: Events[K], options?: boolean | Eve
 once<K extends keyof Events>(name: K, listener: Events[K], options?: boolean | EventOptions): () => boolean
 ```
 
-与 `on()` 相同，但监听器在首次调用后会自行注销。
+Same as `on()`, but the listener disposes itself after its first call.
 
-- `name`：要监听的事件名称。
-- `listener`：使用分发参数调用，最多调用一次。
-- `options`：监听器选项；布尔值可作为 `prepend` 的简写。
+- `name` — the event name to listen for.
+- `listener` — called at most once with the dispatch arguments.
+- `options` — listener options; a boolean is shorthand for `prepend`.
 
-**返回值**：一个用于移除监听器的资源释放函数；如果调用该函数时监听器仍处于注册状态，则返回 `true`。
+**返回** a disposer removing the listener; `true` if it was still registered.
 
-[源码](../../vendor/cordis/src/events.ts#L106)
+[来源](../../vendor/cordis/src/events.ts#L106)
 
 ## EventOptions
 
-`ctx.on()` 和 `ctx.once()` 接受的选项。
+Options accepted by `ctx.on()` and `ctx.once()`.
 
 ```ts cordis-catalog
 /** Options accepted by `ctx.on()` and `ctx.once()`. */
@@ -183,13 +184,13 @@ interface EventOptions {
 }
 ```
 
-[源码](../../vendor/cordis/src/events.ts#L112)
+[来源](../../vendor/cordis/src/events.ts#L112)
 
 ## DispatchMode
 
-事件服务使用的事件分发策略。
+Event dispatch strategy used by the event service.
 
-`emit` 运行同步监听器但不等待它们，`parallel` 同时等待所有监听器，`serial` 依次等待监听器直至其中一个提前终止分发，`bail` 遇到第一个同步提前终止值时停止，`waterfall` 则围绕最终的 `next` 回调组合监听器。
+`emit` runs synchronous listeners without awaiting them, `parallel` awaits all listeners together, `serial` awaits them in order until one bails, `bail` stops on the first synchronous bail value, and `waterfall` composes listeners around a final `next` callback.
 
 ```ts cordis-catalog
 /**
@@ -203,4 +204,4 @@ interface EventOptions {
 type DispatchMode = 'emit' | 'parallel' | 'serial' | 'bail' | 'waterfall'
 ```
 
-[源码](../../vendor/cordis/src/events.ts#L32)
+[来源](../../vendor/cordis/src/events.ts#L32)

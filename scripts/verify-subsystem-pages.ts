@@ -55,7 +55,7 @@ function subsystemLinks(source: string): string[] {
     if (node.type !== 'link') return
     const match = /^\.\.\/\.\.\/docs\/subsystems\/([^/#?]+\.md)(?:#[^?#]*)?$/.exec(node.url)
     const page = match?.[1]
-    if (page !== undefined && page !== 'README.md' && !page.endsWith('.zh.md')) links.add(`docs/subsystems/${page}`)
+    if (page !== undefined && page.endsWith('.zh.md')) links.add(`docs/subsystems/${page}`)
   })
   return [...links].sort()
 }
@@ -70,7 +70,7 @@ export function auditSubsystemPages(
   scanRoot: string = root,
   exemptions: Readonly<Record<string, string>> = GROUPS_WITHOUT_SUBSYSTEM_PAGE,
 ): SubsystemPageAudit {
-  const readmes = globSync('packages/*/README.md', { cwd: scanRoot }).map(normalize).sort()
+  const readmes = globSync('packages/*/README.zh.md', { cwd: scanRoot }).map(normalize).sort()
   const manifests = globSync('packages/*/*/package.json', { cwd: scanRoot }).map(normalize).sort()
   const groups = new Set([...readmes, ...manifests].map(groupOf))
   const violations: string[] = []
@@ -87,7 +87,7 @@ export function auditSubsystemPages(
   }
 
   for (const group of [...groups].sort()) {
-    const readme = `packages/${group}/README.md`
+    const readme = `packages/${group}/README.zh.md`
     const readmePath = resolve(scanRoot, readme)
     if (!existsSync(readmePath)) {
       violations.push(`${readme}: package group has no group README declaring subsystem ownership`)

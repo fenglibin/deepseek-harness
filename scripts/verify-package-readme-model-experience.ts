@@ -71,6 +71,10 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
   'packages/util/launch-environment': 'The package only resolves host environment values; model-facing consumers own any rendered use.',
   'packages/util/workspace-path': 'The package only formats Workspace paths for browser UI; it never constructs model input.',
   'packages/util/values': 'The package only validates, snapshots, compares, freezes, or rejects caller-owned values; consumers own every model-facing use.',
+  'packages/client/ui-delivery': 'The package only renders read-only delivery-projection views; the task advances through model-side tools, so it registers nothing model-facing.',
+  'packages/client/ui-session-changes': 'The package only renders the browser-side changed-files dock from the deliverables vocabulary; accepting a file clears the surface only and changes nothing on disk.',
+  'packages/client/ui-settings-commands': 'The package only edits the browser-side prompt-command settings namespace; it registers no prompt, tool, or session event of its own.',
+  'packages/interaction/command-prompt-config': 'The package registers configuration-driven prompt shortcuts whose text reaches the model only as an ordinary user message on invocation; it registers no system prompt, schema, or context.',
 }
 
 /**
@@ -247,18 +251,20 @@ interface ParsedField {
 
 /** Validate H5-plus-markdown literals nested under one Model Experience field. */
 function validateNestedVerbatim(raw: readonly string[], fragments: Set<string>): { blocks: number; error?: string } {
+  // <a id> anchor tags keep translated headings reachable; treat them as blank so they never count as field content.
+  const lines = raw.map(line => (/^<a id=/.test(line.trim()) ? '' : line))
   let cursor = 0
-  while (raw[cursor]?.trim().length === 0) cursor += 1
-  if (cursor === raw.length) return { blocks: 0 }
+  while (lines[cursor]?.trim().length === 0) cursor += 1
+  if (cursor === lines.length) return { blocks: 0 }
 
   let blocks = 0
   while (true) {
-    while (raw[cursor]?.trim().length === 0) cursor += 1
-    if (cursor === raw.length) break
-    if (!/^##### \S/.test(raw[cursor] ?? '')) {
+    while (lines[cursor]?.trim().length === 0) cursor += 1
+    if (cursor === lines.length) break
+    if (!/^##### \S/.test(lines[cursor] ?? '')) {
       return { blocks, error: 'content after a field paragraph must be a titled H5 verbatim block' }
     }
-    const title = (raw[cursor] as string).slice('##### '.length)
+    const title = (lines[cursor] as string).slice('##### '.length)
     const fragment = headingFragment(title)
     if (fragment.length === 0) return { blocks, error: 'verbatim H5 title must be non-empty' }
     if (fragments.has(fragment)) {
@@ -266,14 +272,14 @@ function validateNestedVerbatim(raw: readonly string[], fragments: Set<string>):
     }
     fragments.add(fragment)
     cursor += 1
-    while (raw[cursor]?.trim().length === 0) cursor += 1
-    if (raw[cursor] !== '```markdown') {
+    while (lines[cursor]?.trim().length === 0) cursor += 1
+    if (lines[cursor] !== '```markdown') {
       return { blocks, error: 'each nested verbatim H5 requires an exact ```markdown fence' }
     }
     cursor += 1
     const contentStart = cursor
-    while (cursor < raw.length && raw[cursor] !== '```') cursor += 1
-    if (cursor === raw.length) return { blocks, error: 'unterminated nested ```markdown fence' }
+    while (cursor < lines.length && lines[cursor] !== '```') cursor += 1
+    if (cursor === lines.length) return { blocks, error: 'unterminated nested ```markdown fence' }
     if (cursor === contentStart) return { blocks, error: 'nested ```markdown fence must not be empty' }
     cursor += 1
     blocks += 1
@@ -281,14 +287,14 @@ function validateNestedVerbatim(raw: readonly string[], fragments: Set<string>):
   return { blocks }
 }
 
-/** GitHub-style fragment for the simple ASCII nested titles allowed by these rules. */
+/** GitHub-style fragment. Keeps Unicode letters (e.g. Chinese) so translated titles stay non-empty. */
 function headingFragment(title: string): string {
-  return title.toLowerCase().replaceAll('`', '').replaceAll(/[^a-z0-9 _-]/g, '').trim().replaceAll(/\s+/g, '-')
+  return title.toLowerCase().replaceAll('`', '').replaceAll(/[^\p{L}\p{N} _-]/gu, '').trim().replaceAll(/\s+/g, '-')
 }
 
 /** A direct stable system-prompt contribution, as named by the README rules. */
 function isDirectSystemPromptEntry(title: string): boolean {
-  return /\bsystem prompt\b/i.test(title)
+  return /\bsystem prompt\b/i.test(title) || /系统提示词/.test(title)
 }
 
 /** Anchored generated-catalog links in one model-view field. */
@@ -299,6 +305,9 @@ function toolCatalogLinkFragments(text: string): string[] {
 
 const toolCatalogFragments = new Set<string>()
 for (const line of readFileSync(resolve(root, 'docs/tool-catalog.zh.md'), 'utf8').split('\n')) {
+  // Translated headings keep their English anchor via an explicit <a id> tag; collect both.
+  const anchor = /^<a id="([a-z0-9_-]+)"><\/a>$/.exec(line)?.[1]
+  if (anchor !== undefined) toolCatalogFragments.add(anchor)
   const title = /^## (.+)$/.exec(line)?.[1]
   if (title !== undefined) toolCatalogFragments.add(headingFragment(title))
 }
@@ -402,17 +411,21 @@ for (const packageJson of packageJsons) {
   const section = nextH2 < 0 ? body : body.slice(0, nextH2)
   const nextH2Line = nextH2 < 0 ? rawLines.length + 1 : (body[nextH2] as Line).index
   const rawSection = rawLines.slice(modelHeading.index, nextH2Line - 1)
-  const content = section.filter(line => line.raw.trim().length > 0)
+  const content = section.filter(line => line.raw.trim().length > 0 && !/^<a id=/.test(line.raw.trim()))
   const sentenceContract = SENTENCE_MODEL_EXPERIENCE[pkg]
   if (sentenceContract !== undefined) {
-    const pattern = sentenceContract.kind === 'none' ? /^None, as .+\.$/ : /^Indirectly, through .+\.$/
+    const pattern = sentenceContract.kind === 'none'
+      ? /^(?:None, as .+\.|(?:无|没有).+。)$/
+      : /^(?:Indirectly, through .+\.|.*间接.+。)$/
     const rawContent = rawSection.filter(line => line.trim().length > 0)
     const sentence = content[0]
     const kvCacheHeading = content[1]
     const kvCacheEffect = content[2]
     if (content.length !== 3 || rawContent.length !== 3 || !pattern.test(sentence?.raw ?? '')) {
-      const prefix = sentenceContract.kind === 'none' ? 'None, as ' : 'Indirectly, through '
-      failures.push({ path: readme, message: `must contain exactly one sentence beginning ${JSON.stringify(prefix)} and ending with a period, followed by ${KV_CACHE_EFFECT_HEADING} and one non-empty paragraph` })
+      const spec = sentenceContract.kind === 'none'
+        ? '"None, as " (or 无/没有 in Chinese) and ending with a period'
+        : '"Indirectly, through " (or a sentence containing 间接 in Chinese) and ending with a period'
+      failures.push({ path: readme, message: `must contain exactly one sentence beginning ${spec}, followed by ${KV_CACHE_EFFECT_HEADING} and one non-empty paragraph` })
       continue
     }
     if ((kvCacheHeading === undefined || !hasRole(kvCacheHeading.raw, 'kv-cache-effect'))
@@ -489,7 +502,7 @@ for (const packageJson of packageJsons) {
     const FIELD_ROLES = ['model-view', 'token-effect', 'kv-cache-effect'] as const
     for (let fieldIndex = 0; fieldIndex < FIELD_ROLES.length; fieldIndex += 1) {
       const fieldStart = fieldStarts[fieldIndex] as { line: Line; index: number }
-      const expectedRole = FIELD_ROLES[fieldIndex]
+      const expectedRole = FIELD_ROLES[fieldIndex] as SectionRole
       const expectedHeading = FIELD_HEADINGS[fieldIndex] as string
       if (!hasRole(fieldStart.line.raw, expectedRole)) {
         failures.push({ path: readme, message: `line ${fieldStart.line.index}: expected exact field heading ${JSON.stringify(expectedHeading)}, found ${JSON.stringify(fieldStart.line.raw)}` })
@@ -518,7 +531,11 @@ for (const packageJson of packageJsons) {
       const nextHeadingLine = fieldStarts[fieldIndex + 1]?.line.index
         ?? entryStarts[entryIndex + 1]?.line.index
         ?? nextH2Line
-      if (rawLines[nextHeadingLine - 2]?.trim().length !== 0) {
+      let precedingIndex = nextHeadingLine - 2
+      while (precedingIndex >= 0 && /^<a id=/.test(rawLines[precedingIndex]?.trim() ?? '')) {
+        precedingIndex -= 1
+      }
+      if ((rawLines[precedingIndex]?.trim() ?? '').length !== 0) {
         failures.push({ path: readme, message: `line ${nextHeadingLine}: Model Experience headings require a preceding blank line` })
         entryError = true
         break

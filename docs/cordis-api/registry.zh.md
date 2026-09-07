@@ -1,6 +1,7 @@
+<!-- 由 scripts/gen-cordis-catalog.ts 生成——请勿手工编辑。
+     运行 `pnpm run gen-cordis-catalog` 重新生成。 -->
 
 # 注册表
-
 
 插件加载与依赖注入。
 
@@ -20,16 +21,16 @@
 inject(deps: Inject, callback: Plugin.Function<void>): Fiber & PromiseLike<Fiber>
 ```
 
-请求的服务可用后，运行回调。
+Run a callback once the requested services are available.
 
-这是 `ctx.plugin({ inject, apply: callback })` 的简写形式：每当某个必需服务发生变化时，系统都会卸载并重新运行该回调。
+Shorthand for `ctx.plugin({ inject, apply: callback })`: the callback is unloaded and re-run whenever a required service changes.
 
-- `deps`：必需服务，形式可以是数组，也可以是从名称到配置的映射。
-- `callback`：以 `(ctx, config)` 调用的插件主体。
+- `deps` — required services, as an array or a name → config map.
+- `callback` — plugin body called with `(ctx, config)`.
 
-**返回** fiber；对其执行 await 会在加载完成后结束等待。
+**返回** the fiber; awaiting it settles once loading finished.
 
-[源码](../../vendor/cordis/src/registry.ts#L176)
+[来源](../../vendor/cordis/src/registry.ts#L176)
 
 ### ctx.plugin(plugin, ...args)
 
@@ -45,18 +46,18 @@ inject(deps: Inject, callback: Plugin.Function<void>): Fiber & PromiseLike<Fiber
 plugin<P extends Plugin>(plugin: P, ...args: Spread<GetPluginConfig<P>>): Fiber & PromiseLike<Fiber>
 ```
 
-在当前上下文中加载插件。
+Load a plugin in the current context.
 
-- `plugin`：函数、类或 `{ apply }` 对象形式的插件。
-- `args`：插件配置，会根据其 `Config` schema 进行校验。
+- `plugin` — a function, class, or `{ apply }` object plugin.
+- `args` — the plugin config, validated against its `Config` schema.
 
-**返回** fiber；对其执行 await 会在加载完成后结束等待（如果发生配置错误或启动错误，则会被拒绝）。
+**返回** the fiber; awaiting it settles once loading finished (rejecting on config or startup errors).
 
-[源码](../../vendor/cordis/src/registry.ts#L185)
+[来源](../../vendor/cordis/src/registry.ts#L185)
 
 ## Plugin
 
-支持的插件入口点形式。
+Supported plugin entrypoint shapes.
 
 ```ts cordis-catalog
 /** Supported plugin entrypoint shapes. */
@@ -117,13 +118,13 @@ namespace Plugin {
 }
 ```
 
-[源码](../../vendor/cordis/src/registry.ts#L92)
+[来源](../../vendor/cordis/src/registry.ts#L92)
 
 ## Inject
 
-插件和 `@Inject` 装饰器接受的服务依赖声明。
+Service dependency declaration accepted by plugins and the `@Inject` decorator.
 
-数组形式请求不带拦截配置的服务。对象形式将每个服务名称映射到插件上下文中可选的拦截配置。
+Array form requests services without intercept config. Object form maps each service name to optional intercept config for the plugin context.
 
 ```ts cordis-catalog
 /**
@@ -148,4 +149,4 @@ namespace Inject {
 }
 ```
 
-[源码](../../vendor/cordis/src/registry.ts#L19)
+[来源](../../vendor/cordis/src/registry.ts#L19)

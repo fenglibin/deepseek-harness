@@ -105,7 +105,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['attachment-local'],
     consumers: ['api-session-controller', 'tool-fs', 'llm-pi-ai', 'llm-deepseek'],
-    note: 'The host commits accepted images before session events; provider adapters resolve authorized durable references into provider-native content.',
+    note: '宿主会在会话事件之前提交已接受的图片；提供方适配器将已授权的持久引用解析为提供方原生内容。',
   },
   {
     key: 'llm',
@@ -114,7 +114,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['llm-deepseek', 'llm-pi-ai', 'llm-replay'],
     consumers: ['agent-loop', 'compaction-basic'],
-    note: 'Adapters register provider implementations; the loop and compaction call the provider-neutral stream service.',
+    note: '适配器注册提供方实现；agent loop（智能体循环）与压缩功能调用提供方无关的流服务。',
   },
   {
     key: 'deepseekLlmApiExtensions',
@@ -123,7 +123,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['session-log-deepseek', 'plugin-package-inventory-deepseek'],
     consumers: ['llm-deepseek'],
-    note: 'Plugins prepare independent top-level fields; the official adapter merges them and commits their delivery state after HTTP acceptance.',
+    note: '插件准备彼此独立的顶层字段；官方适配器会合并这些字段，并在 HTTP 接受后提交其交付状态。',
   },
   {
     key: 'tokenMeter',
@@ -131,7 +131,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Replay token measurement',
     mode: 'core',
     consumers: ['compaction-basic'],
-    note: 'Owns isolated per-session replay folds; pressure consumers share immutable revisioned measurements.',
+    note: '拥有按会话隔离的回放折叠区；压力消费方共享不可变且带修订版本的测量结果。',
   },
   {
     key: 'toolResultPruner',
@@ -139,7 +139,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Model-free tool-result pruning',
     mode: 'core',
     consumers: ['compaction-basic'],
-    note: 'Rewrites oversized current tool results through replayable single-node surface replacements before summary compaction.',
+    note: '在摘要压缩之前，通过可回放的单节点表面替换来重写过大的当前工具结果。',
   },
   {
     key: 'sessions',
@@ -147,49 +147,49 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'In-memory session store',
     mode: 'core',
     consumers: ['agent-loop', 'agent', 'session-persistence', 'session-query', 'session-query-sqlite', 'subagent-in-process-driver', 'invariants', 'message-feedback'],
-    note: 'Owns append-only Session instances and emits the durable session event feed.',
+    note: '拥有仅追加的 Session 实例，并发出持久的会话事件流。',
   },
   {
     key: 'sessionController',
     pkg: 'api-session-controller',
     title: 'Host Session Remote controller',
     mode: 'core',
-    note: 'Owns Session commands, cold reads, durable-event following, live control state, model catalogs, workspace opening, and Agent activation policy.',
+    note: '拥有 Session 命令、冷读取、持久事件跟踪、实时控制状态、模型目录、工作区打开和 Agent 激活策略。',
   },
   {
     key: 'sessionFileReferences',
     pkg: 'api-session-controller',
     title: 'Session-addressed file-reference Remote adapter',
     mode: 'core',
-    note: 'Delegates file-reference discovery through the Session Controller\'s established Agent lookup policy.',
+    note: '通过 Session Controller 已建立的 Agent 查找策略委派文件引用发现。',
   },
   {
     key: 'sessionSkillCatalog',
     pkg: 'api-session-controller',
     title: 'Session-addressed skill Remote adapter',
     mode: 'core',
-    note: 'Lists the Session composition\'s user-invocable skills without activating a cold Agent.',
+    note: '列出 Session 组合中用户可调用的技能，而不激活冷 Agent。',
   },
   {
     key: 'credentialsController',
     pkg: 'api-settings-controller',
     title: 'Host credential-surface Remote controller',
     mode: 'core',
-    note: 'Projects the credential-reference seam onto the generated Remote namespace: batch fan-out, view projection, and refusal mapping live here, not on the seam Definition.',
+    note: '将凭据引用 seam 投影到生成的 Remote 命名空间：批量分发、视图投影和拒绝映射都在此处，而非 seam Definition。',
   },
   {
     key: 'settingsController',
     pkg: 'api-settings-controller',
     title: 'Host settings-surface Remote controller',
     mode: 'core',
-    note: 'Projects the user-settings seam onto the generated Remote namespace: the read is always redacted and every refusal is classified here, not on the seam Definition.',
+    note: '将用户设置 seam 投影到生成的 Remote 命名空间：读取始终脱敏，且每一次拒绝都在此处分类，而非 seam Definition。',
   },
   {
     key: 'workspaceController',
     pkg: 'api-workspace-controller',
     title: 'Host Workspace Remote controller',
     mode: 'core',
-    note: 'Owns Workspace commands and reconnect-safe Workspace state delivery through the generated Remote namespace.',
+    note: '通过生成的 Remote 命名空间拥有 Workspace 命令和可安全重连的 Workspace 状态投递。',
   },
   {
     key: 'directoryPickerController',
@@ -204,7 +204,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Package-owned invariant registry',
     mode: 'core',
     consumers: ['session', 'agent', 'scope', 'agent-loop'],
-    note: 'Companion subpaths register owner-local checks; the service owns selection, uniqueness, child fibers, and package-attributed failures.',
+    note: '配套子路径注册所有者本地的检查；服务拥有选择、唯一性、子 fiber 和按包归属的失败。',
   },
   {
     key: 'typert',
@@ -212,14 +212,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Runtime type registry',
     mode: 'core',
     consumers: ['typert-loader', 'api-gateway'],
-    note: 'Plugins register live zod contributions directly or through dsh-typert-loader; the API gateway consumes invocation descriptors and providers, while other runtime consumers query schemas and reflection metadata at their own edges.',
+    note: '插件直接或通过 dsh-typert-loader 注册实时 zod 贡献；API 网关消费调用描述符与提供方，而其他运行时消费方在各自的边界查询 schema 与反射元数据。',
   },
   {
     key: 'typertGateway',
     pkg: 'api-gateway',
     title: 'Typert Host invocation gateway',
     mode: 'core',
-    note: 'Associates generated Remote descriptors with live Cordis services, resolves registered identities, and exposes unary calls through the shared Connection RPC carrier.',
+    note: '将生成的 Remote 描述符与实时 Cordis 服务关联，解析已注册身份，并通过共享的 Connection RPC 载体暴露一元调用。',
   },
   {
     key: 'sessionPersistence',
@@ -228,7 +228,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['session-persistence-jsonl', 'session-persistence-sqlite'],
     consumers: ['agent-loop', 'tool-bash', 'hooks-claude-code', 'hooks-codex', 'session-query', 'session-query-sqlite', 'message-feedback'],
-    note: 'Backends persist the same SessionEvent vocabulary; apps choose a backend at composition time.',
+    note: '后端持久化同一套 SessionEvent 词汇；应用在组合期选择后端。',
   },
   {
     key: 'settings',
@@ -237,7 +237,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['settings-file'],
     consumers: ['api-settings-controller', 'llm-deepseek', 'llm-pi-ai'],
-    note: 'Plugins register namespace schemas and resolve layered values; providers store the raw document. The LLM adapters register their entry config as the composition base under the user section; the settings controller serves redacted layered descriptors and writes the user layer.',
+    note: '插件注册命名空间 schema 并解析分层值；提供方存储原始文档。LLM 适配器在 user 段下把入口配置注册为组合基底；设置控制器提供脱敏的分层描述符并写入 user 层。',
   },
   {
     key: 'subagentModelSelection',
@@ -245,7 +245,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Subagent model-selection preference',
     mode: 'core',
     consumers: ['tool-subagent'],
-    note: 'Owns the default-off settings namespace that Agent-scoped delegation tools sample when composing a new top-level Session.',
+    note: '拥有默认关闭的设置命名空间，Agent 作用域的委派工具在组装新的顶层 Session 时采样它。',
   },
   {
     key: 'credentials',
@@ -254,7 +254,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['credentials-local'],
     consumers: ['api-settings-controller', 'llm-deepseek', 'llm-pi-ai'],
-    note: 'Configuration carries references to secrets; providers own the values. Consumers resolve per operation, so a rotated credential reaches the very next request; the settings controller exposes value-free views and write-only storage.',
+    note: '配置承载对机密的引用；提供方拥有值。消费方按操作解析，因此轮换后的凭据会立即作用于下一次请求；设置控制器暴露无值的视图与仅写存储。',
   },
   {
     key: 'authorization',
@@ -263,7 +263,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: [],
     consumers: ['llm-pi-ai'],
-    note: 'Flows are registered by the plugin that knows how to obtain one credential and keyed by the record they write; the seam owns the conversation and the one-attempt-per-key lifecycle, never the protocol.',
+    note: '流程由知道如何获取某个凭据的插件注册，并以它们写入的记录为键；seam 拥有对话与每键一次尝试的生命周期，而从不拥有协议。',
   },
   {
     key: 'sessionTelemetry',
@@ -272,7 +272,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['session-telemetry-otel'],
     consumers: [],
-    note: 'The seam captures, redacts, and hands session records to one backend; nothing else consumes the service — its output leaves the process.',
+    note: 'seam 捕获、脱敏会话记录并交给一个后端；没有其他消费方使用该服务——其输出离开进程。',
   },
   {
     key: 'storage',
@@ -281,7 +281,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['storage-json', 'storage-sqlite'],
     consumers: ['storage-domain'],
-    note: 'Backends register side by side under names; data forms (domain first) mount on the hub and translate typed operations into opaque KV-unit primitives.',
+    note: '后端按名称并列注册；数据形态（domain 优先）挂载在 hub 上，并把类型化操作转换为不透明的 KV 单元原语。',
   },
   {
     key: 'storageDomain',
@@ -289,14 +289,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Domain data facility',
     mode: 'core',
     consumers: ['workspace', 'message-feedback'],
-    note: 'Waits for every configured backend, then publishes the domain form as one lifecycle-bound service for typed durable state.',
+    note: '等待每个已配置的后端，然后把 domain 形态发布为类型化持久状态的生命周期绑定服务。',
   },
   {
     key: 'messageFeedback',
     pkg: 'message-feedback',
     title: 'Lifecycle-bound message feedback',
     mode: 'core',
-    note: 'Owns local per-assistant-message feedback, lifecycle and target validation, per-item compare-and-set, and the Host unary Remote contract without entering Session history or telemetry.',
+    note: '拥有按 assistant 消息本地的反馈、生命周期与目标校验、逐项 compare-and-set 以及 Host 一元 Remote 契约，而不进入 Session 历史或遥测。',
   },
   {
     key: 'workspaceRegistry',
@@ -304,7 +304,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Workspace entity registry',
     mode: 'core',
     consumers: ['api-workspace-controller', 'api-session-controller'],
-    note: 'Owns WorkspaceId-branded records over the domain facility; stable sessionIds accounts drive Host RPC and GUI projections.',
+    note: '在 domain 设施之上拥有带 WorkspaceId 标记的记录；稳定的 sessionIds 账户驱动 Host RPC 与 GUI 投影。',
   },
   {
     key: 'sessionQuery',
@@ -313,7 +313,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['session-query-sqlite'],
     consumers: ['session-reference', 'tool-session-query'],
-    note: 'The interface supplies exact reads, filters, and traces; its concrete backend adds full-text reconciliation, ranking, snippets, and cursor generations, while the model consumer owns workspace authority and cursor-free rendering.',
+    note: '接口提供精确读取、过滤和轨迹；其具体后端增加全文对账、排序、片段和游标生成，而模型消费方拥有工作区权限和无游标渲染。',
   },
   {
     key: 'fileReferences',
@@ -322,14 +322,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['file-reference-local'],
     consumers: ['api-session-controller'],
-    note: 'The interface returns path-only completion candidates within an Agent cwd; providers own namespace access and ranking without reading file contents.',
+    note: '接口在 Agent cwd 内返回仅路径的补全候选；提供方拥有命名空间访问与排序，而不读取文件内容。',
   },
   {
     key: 'sessionReferenceResolver',
     pkg: 'session-reference',
     title: 'Cross-session snapshot preparation',
     mode: 'core',
-    note: 'Projects bounded current-surface conversation snapshots into durable untrusted message context; host adapters own mention syntax.',
+    note: '将受限的当前表面会话快照投影为持久的不受信消息上下文；宿主适配器拥有提及语法。',
   },
   {
     key: 'sessionTitle',
@@ -337,7 +337,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Log-backed session titles',
     mode: 'seam',
     implementations: ['session-title-first-prompt-llm', 'session-title-all-prompts-llm'],
-    note: 'Owns the deterministic fallback, latest-title fold, and sole optional asynchronous provider registration.',
+    note: '拥有确定性的回退、最新标题折叠以及唯一的可选异步提供方注册。',
   },
   {
     key: 'systemPrompt',
@@ -345,7 +345,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'System prompt assembly registry',
     mode: 'core',
     consumers: ['agent-loop', 'tools', 'tool-fs', 'tool-terminal', 'tool-web'],
-    note: 'Collects prompt sections and model-facing tool schemas for each step.',
+    note: '为每一步收集提示词段落与面向模型的工具 schema。',
   },
   {
     key: 'tools',
@@ -353,7 +353,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Tool registry and guarded execution pipeline',
     mode: 'core',
     consumers: ['agent-loop', 'tool-ask-user', 'tool-bash', 'tool-cordis', 'tool-fs', 'tool-terminal', 'tool-skill', 'tool-subagent', 'tool-todo', 'tool-web'],
-    note: 'Registers capabilities, owns PTC mode transport, and routes calls through pre-policy, monotonic guards, around dispatch, post-policy, and final-result observation.',
+    note: '注册能力、拥有 PTC 模式传输，并把调用路由通过前置策略、单调守卫、分发环绕、后置策略和最终结果观察。',
   },
   {
     key: 'userQuestions',
@@ -361,28 +361,28 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Human question/answer seam',
     mode: 'seam',
     consumers: ['tool-ask-user'],
-    note: 'UI front ends provide the active human-answer provider; tool-ask-user pauses a tool call on the provider-neutral ask() promise.',
+    note: 'UI 前端提供活跃的人类应答提供方；tool-ask-user 在提供方无关的 ask() promise 上暂停一次工具调用。',
   },
   {
     key: 'planMode',
     pkg: 'plan-mode',
     title: 'Plan collaboration state',
     mode: 'core',
-    note: 'Folds logged plan/mode state, flushes user selections at turn boundaries, renders deployment-owned guidance, registers /plan, and keeps the plan-exit schema stable across transitions.',
+    note: '折叠已记录的 plan/mode 状态、在轮次边界冲刷用户选择、渲染部署自有指引、注册 /plan，并在状态切换间保持 plan-exit schema 稳定。',
   },
   {
     key: 'agentPresets',
     pkg: 'agent-presets',
     title: 'Per-session agent composition',
     mode: 'core',
-    note: 'Discovers preset directories over trusted and user-authored roots and mounts one preset cordis.yml under an agent scope during creation, rejecting a row that never activates or that publishes into the root service realm.',
+    note: '在受信与用户自建根上发现预设目录，并在创建期间在 agent 作用域下挂载一个预设 cordis.yml，拒绝从不激活或发布到根服务域的条目。',
   },
   {
     key: 'commands',
     pkg: 'commands',
     title: 'Human command registry',
     mode: 'core',
-    note: 'Plugins register direct human commands without sending invocations to the model.',
+    note: '插件注册直接面向人类的命令，而不把调用发送给模型。',
   },
   {
     key: 'sessionProjections',
@@ -390,7 +390,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Session projection units',
     mode: 'core',
     consumers: ['api-session-controller', 'tool-todo', 'session-title'],
-    note: 'Domains register state-driven fold units; the eager drive keeps per-session watermark states and the Session controller serves baselines and pushes changed values.',
+    note: '各 domain 注册状态驱动的折叠单元；急切驱动器维护按会话的水位状态，Session 控制器提供基线并推送变化值。',
   },
   {
     key: 'sessionProjectionCache',
@@ -398,7 +398,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Persisted projection cache',
     mode: 'core',
     consumers: ['api-session-controller', 'session-query', 'session-reference', 'subagent'],
-    note: 'Durably checkpoints projection unit states per session (throttled + turn/end/detach mandatory points) and serves the cold-read ladder: cache row + persistence tail replay, so listings never load full logs.',
+    note: '按会话持久化检查点投影单元状态（节流 + turn/end/detach 必检点），并提供冷读取阶梯：缓存行 + 持久化尾部回放，使列表永不加载完整日志。',
   },
   {
     key: 'skills',
@@ -407,7 +407,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['skill-badge', 'skill-filesystem'],
     consumers: ['tool-skill'],
-    note: 'Merges provider skill catalogs; tool-skill renders the session-prefix catalog and loads complete skill bodies.',
+    note: '合并提供方的技能目录；tool-skill 渲染会话前缀目录并加载完整技能体。',
   },
   {
     key: 'agents',
@@ -415,7 +415,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Agent service',
     mode: 'core',
     consumers: ['agent-loop', 'acp', 'subagent-in-process-driver'],
-    note: 'Owns live Agent handles, the create/resume factory seam, and process-local initiator propagation.',
+    note: '拥有实时 Agent 句柄、create/resume 工厂 seam 以及进程本地的发起者传播。',
   },
   {
     key: 'agentDefaultModel',
@@ -423,7 +423,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Default Agent model selection',
     mode: 'core',
     consumers: ['api-session-controller', 'headless'],
-    note: 'Layers the default ModelSelection through settings so direct and Host-backed Agent entry points share one state owner.',
+    note: '通过设置分层默认 ModelSelection，使直接与 Host 支撑的 Agent 入口共享同一状态所有者。',
   },
   {
     key: 'agentLoop',
@@ -431,14 +431,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Concrete loop driver',
     mode: 'bundle',
     consumers: ['agent-spine-demo'],
-    note: 'The one concrete loop plugin; extension packages depend on dsh-agent events and services, not on this package.',
+    note: '唯一的具体 loop 插件；扩展包依赖 dsh-agent 事件与服务，而非本包。',
   },
   {
     key: 'goals',
     pkg: 'goal',
     title: 'Same-session goal domain',
     mode: 'core',
-    note: 'Folds revisioned objective state from the session log and keeps live continuation activation process-local.',
+    note: '从会话日志折叠带修订的目标状态，并把实时续行激活保持在进程本地。',
   },
   {
     key: 'e2b',
@@ -446,7 +446,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'E2B sandbox lifecycle owner',
     mode: 'core',
     consumers: ['fs-e2b', 'subprocess-e2b'],
-    note: 'Owns one shared E2B SDK handle, remote working directory, and final sandbox disposition so both fundamental E2B providers inhabit the same Linux runtime.',
+    note: '拥有一个共享的 E2B SDK 句柄、远程工作目录和最终沙箱处置，使两个基础 E2B 提供方驻留在同一 Linux 运行时。',
   },
   {
     key: 'subprocess',
@@ -455,7 +455,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['subprocess-local', 'subprocess-e2b'],
     consumers: ['bash-local', 'bash-sandbox', 'terminal-bash', 'lsp-stdio', 'subagent-acp', 'subagent-codex', 'subagent-claude-code'],
-    note: 'The bash executors, the PTY shell backend, the LSP host, and the out-of-process ACP, Codex, and Claude Code subagent backends spawn through ctx.subprocess; the service owns process coordinates, tree/session lifetime, stdio dispositions, terminal mechanics, and kill escalation.',
+    note: 'bash 执行器、PTY shell 后端、LSP 宿主，以及进程外的 ACP、Codex、Claude Code subagent 后端都通过 ctx.subprocess 启动；服务拥有进程坐标、树/会话生命周期、stdio 配置、终端机制和 kill 升级。',
   },
   {
     key: 'shell',
@@ -464,7 +464,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['bash-local', 'bash-sandbox', 'pwsh-local'],
     consumers: ['tool-bash', 'tool-pwsh', 'hooks-claude-code', 'hooks-codex'],
-    note: 'The model-facing shell tools and hook bridges consume this seam; sandboxed, remote, or PowerShell executors replace bash-local without touching them.',
+    note: '面向模型的 shell 工具与钩子桥接消费此 seam；沙箱、远程或 PowerShell 执行器替换 bash-local 而不触及它们。',
   },
   {
     key: 'shellEnv',
@@ -472,7 +472,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Managed bash environment registry',
     mode: 'core',
     consumers: ['tool-bash', 'tool-pwsh'],
-    note: 'Plugins declare effect-scoped DSH_* facts; each shell tool collects one trusted snapshot per execution and its executor rebuilds the namespace.',
+    note: '插件声明作用域受限的 DSH_* 事实；每个 shell 工具在每次执行时收集一份受信快照，其执行器重建命名空间。',
   },
   {
     key: 'terminals',
@@ -481,7 +481,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['terminal-bash'],
     consumers: ['tool-terminal'],
-    note: 'The registry owns exact-Agent session identity and cleanup; backends own terminal mechanics, while tool-terminal exposes the owner-scoped model tools.',
+    note: '注册表拥有精确的 Agent 会话身份与清理；后端拥有终端机制，而 tool-terminal 暴露所有者作用域的模型工具。',
   },
   {
     key: 'sandbox',
@@ -490,7 +490,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['sandbox-local'],
     consumers: ['bash-sandbox', 'terminal-bash'],
-    note: 'Consumers hand over the exact argv they are about to spawn; same-world backends wrap it under a per-call policy and report enforcement.',
+    note: '消费方交出它们即将启动的确切 argv；同世界后端在逐调用策略下包装它并报告执行情况。',
   },
   {
     key: 'sandboxPolicy',
@@ -499,7 +499,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'core',
     implementations: [],
     consumers: ['bash-sandbox', 'fs-sandbox', 'terminal-bash'],
-    note: 'The one home for the deployment default mode + workspace root; only the sandboxed executor and provider read the service (the tool layers use the pure `sandbox/mode` fold it also exports). Both enforcing families read it so bash and fs cannot confine to different roots.',
+    note: '部署默认模式 + 工作区根的唯一归属；只有沙箱执行器与提供方读取该服务（工具层使用它同时导出的纯 `sandbox/mode` 折叠）。两个执行族都读取它，因此 bash 与 fs 不能限制到不同根。',
   },
   {
     key: 'approval',
@@ -508,7 +508,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: [],
     consumers: ['tools', 'tool-bash', 'acp'],
-    note: 'One-shot permission decisions dispatched over the `approval/request` waterfall; answerers are listeners (the ACP bridge for its own agents), absence fails closed to `unavailable`.',
+    note: '一次性权限决策在 `approval/request` waterfall 上派发；应答者是监听者（ACP 桥接用于其自身 agent），缺席时失败关闭为 `unavailable`。',
   },
   {
     key: 'permissionPresets',
@@ -516,7 +516,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Permission presets',
     mode: 'core',
     implementations: [],
-    note: 'User-facing preset table (`workspace-write`/`danger-full-access`) bundling the sandbox-mode and approval-policy knobs; a switch writes one `permission/preset` event through to both knob events.',
+    note: '面向用户的预设表（`workspace-write`/`danger-full-access`），捆绑沙箱模式与审批策略旋钮；一次切换写入一个 `permission/preset` 事件并贯穿到两个旋钮事件。',
   },
   {
     key: 'codeRuntime',
@@ -525,7 +525,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['code-runtime-worker-thread'],
     consumers: ['tools'],
-    note: 'Runs one model-written program against host-provided async bindings; backends differ by substrate and language (the tool registry consumes it for PTC mode).',
+    note: '针对宿主提供的异步绑定运行一个模型编写的程序；后端因底层与语言而异（工具注册表在 PTC 模式下消费它）。',
   },
   {
     key: 'fs',
@@ -535,7 +535,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     implementations: ['fs-local', 'fs-sandbox', 'fs-e2b'],
     consumers: ['tool-fs'],
     companions: ['fs-observation-policy'],
-    note: 'tool-fs executes read/write/edit through ctx.fs; fs-sandbox fences mutations by the shared sandbox mode; fs-observation-policy contributes observed-state checks through the fs/* event gate.',
+    note: 'tool-fs 通过 ctx.fs 执行读写与编辑；fs-sandbox 按共享沙箱模式围栏变更；fs-observation-policy 通过 fs/* 事件门贡献观察状态检查。',
   },
   {
     key: 'compaction',
@@ -544,7 +544,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['compaction-basic'],
     consumers: ['compaction-basic'],
-    note: 'The basic backend consumes post-step pressure and request-error recovery events; there is no model-facing compact tool.',
+    note: '基础后端消费步后压力与请求错误恢复事件；没有面向模型的 compact 工具。',
   },
   {
     key: 'subagents',
@@ -553,7 +553,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['subagent-spawn-in-process', 'subagent-fork-in-process', 'subagent-acp', 'subagent-codex', 'subagent-claude-code', 'subagent-dsh-sdk'],
     consumers: ['tool-subagent', 'tool-subagent-control', 'tool-ralph'],
-    note: 'Providers implement transports; the service also owns optional Activation-based continuation orchestration, tool-subagent selects one-shot or continuable delegation, tool-subagent-control delivers follow-ups, and tool-ralph requires one fresh structured-output route.',
+    note: '提供方实现传输；服务还拥有可选的基于 Activation 的续行编排，tool-subagent 选择一次性或可续行的委派，tool-subagent-control 投递后续消息，tool-ralph 需要一条全新的结构化输出路由。',
   },
   {
     key: 'agentTeams',
@@ -561,14 +561,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Agent Teams coordination domain',
     mode: 'core',
     consumers: ['experimental-tool-agent-team', 'experimental-client-ui-agent-team'],
-    note: 'Owns the implicit-root roster, durable peer mailbox, shared task DAG, continuable-child lifecycle, and generated Team Remote methods; tool-agent-team contributes model controls and client-ui-agent-team mounts the browser contribution.',
+    note: '拥有隐式根名册、持久对等邮箱、共享任务 DAG、可续行子生命周期和生成的 Team Remote 方法；tool-agent-team 贡献模型控制，client-ui-agent-team 挂载浏览器贡献。',
   },
   {
     key: 'inspector',
     pkg: 'inspector',
     title: 'Cross-realm runtime inspection',
     mode: 'core',
-    note: 'Owns the Worker-hosted CDP target and the transport-independent Host and Client observation and Cordis-tree query API.',
+    note: '拥有 Worker 托管的 CDP 目标，以及与传输无关的 Host 和 Client 观察和 Cordis 树查询 API。',
   },
   {
     key: 'jobs',
@@ -577,7 +577,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['jobs-local'],
     consumers: ['tool-bash', 'tool-terminal', 'tool-subagent', 'tool-jobs'],
-    note: 'Producers (background bash, PTY sends, and subagent delegations) register running work; tool-jobs is the model-facing controller that reads, lists, and kills it; jobs-local is the process-local registry.',
+    note: '生产方（后台 bash、PTY 发送和 subagent 委派）注册运行中的工作；tool-jobs 是读取、列出并终止它的面向模型控制器；jobs-local 是进程本地注册表。',
   },
   {
     key: 'web',
@@ -586,7 +586,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['web-search-exa', 'web-search-perplexity', 'web-search-deepseek', 'web-fetch-http'],
     consumers: ['tool-web'],
-    note: 'Search and fetch providers register into one ctx.web seam; tool-web owns the stable model-facing names.',
+    note: '搜索与抓取提供方注册进同一个 ctx.web seam；tool-web 拥有稳定的面向模型名称。',
   },
   {
     key: 'spillStore',
@@ -595,7 +595,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['spill-local'],
     consumers: ['spill-policy'],
-    note: 'The backend saves oversized tool text and returns a model-facing locator plus retrieval hint; spill-policy is the tools/post-execute consumer that decides when to spill.',
+    note: '后端保存过大的工具文本并返回面向模型的定位符加检索提示；spill-policy 是决定何时 spill 的 tools/post-execute 消费方。',
   },
   {
     key: 'directoryPicker',
@@ -604,7 +604,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['host-directory-picker-native', 'host-directory-picker-browse'],
     consumers: ['api-workspace-controller'],
-    note: 'Discriminated interaction capability: the native backend opens one OS chooser on the host display, the browse backend serves listing/creation primitives for the in-app browser; dual-face backends fill ui-workspace directory-flow slots from their browser halves (no wire advertisement).',
+    note: '区分交互能力：native 后端在宿主显示器上打开一个 OS 选择器，browse 后端为应用内浏览器提供列出/创建原语；双面后端从其浏览器半填充 ui-workspace 目录流槽位（无线上通告）。',
   },
   {
     key: 'webServer',
@@ -612,7 +612,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'HTTP route registration',
     mode: 'core',
     consumers: ['client-connection', 'client-modules', 'client-hmr'],
-    note: 'Plain node:http carrier: named-route registry, index transform taps, and the static dist fallback; web-transport plugins register their own routes.',
+    note: '纯 node:http 载体：命名路由注册表、index 转换钩子和静态 dist 回退；web-transport 插件注册自己的路由。',
   },
   {
     key: 'clientModules',
@@ -620,7 +620,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Client plugin graph host',
     mode: 'core',
     consumers: ['client-hmr'],
-    note: 'Composes the __DSH_BOOT__ entry graph from an incremental dsh.client scan, serves plugin bundles, and notifies rebuilt/graph-changed subscribers.',
+    note: '从增量 dsh.client 扫描组合 __DSH_BOOT__ 入口图，提供插件 bundle，并通知 rebuilt/graph-changed 订阅者。',
   },
   {
     key: 'workflowEngine',
@@ -629,7 +629,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['workflow-worker-thread'],
     consumers: ['tool-workflow', 'tool-ralph'],
-    note: 'One engine per context, as in bash, with no named-provider registry; the general workflow and fixed Ralph consumers start runs whose agent() calls fan out through ctx.subagents.',
+    note: '每个上下文一个引擎，如同 bash，没有命名提供方注册表；通用 workflow 与固定的 Ralph 消费方启动运行，其 agent() 调用通过 ctx.subagents 扇出。',
   },
   {
     key: 'webhookRuntime',
@@ -637,7 +637,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Webhook rule runtime',
     mode: 'core',
     consumers: ['webhook-github'],
-    note: 'Provider adapters dispatch authenticated deliveries; trusted plugins register independent process-local rules, and the runtime turns non-null results into ordinary Workspace-backed Sessions without delivery or completion state.',
+    note: '提供方适配器派发已认证的投递；受信插件注册独立的进程本地规则，运行时把非空结果转换为普通的 Workspace 支撑 Session，而无投递或完成状态。',
   },
   {
     key: 'lsp',
@@ -646,7 +646,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['lsp-stdio'],
     consumers: ['tool-lsp'],
-    note: 'Provider registration and selection plus normalized query execution over exactly four operations; the seam offers no protocol escape hatch, so a backend translates into the normalized request and result.',
+    note: '提供方注册与选择，加上恰好四种操作之上的规范化查询执行；seam 不提供协议逃生口，因此后端翻译为规范化请求与结果。',
   },
   {
     key: 'imageUnderstanding',
@@ -654,7 +654,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Generated text for images a route cannot read',
     mode: 'seam',
     consumers: ['api-session-controller'],
-    note: 'One vision route describes a durable image for a target route that declares text-only input; the admission path attaches the result to the image block, so the target model reads bounded prose instead of an omission notice.',
+    note: '一条视觉路由为声明仅文本输入的目标路由描述一张持久图片；准入路径把结果附加到图片块，因此目标模型读到有界文字而非省略提示。',
   },
   {
     key: 'lightweightModel',
@@ -662,7 +662,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Auxiliary route for session titles and compaction',
     mode: 'core',
     consumers: ['compaction-basic', 'session-title-llm', 'tool-cordis'],
-    note: 'Holds one optional provider/model pair that auxiliary model calls share, so a deployment points every helper call at one route without configuring each caller.',
+    note: '持有一对可选的提供方/模型，供辅助模型调用共享，使部署把每个辅助调用指向同一路由而无需逐个配置调用方。',
   },
   {
     key: 'delivery',
@@ -670,7 +670,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Delivery task state and change log',
     mode: 'core',
     consumers: ['tool-delivery', 'tool-cordis'],
-    note: 'Owns the current delivery task, its phase order, and the durable change feed the delivery surface replays; callers read state and record changes, never rewrite them.',
+    note: '拥有当前交付任务、其阶段顺序和交付界面回放的持久变更流；调用方读取状态并记录变更，从不重写它们。',
   },
   {
     key: 'dynamicCordisRunner',
@@ -678,7 +678,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Dynamic Cordis package host runner',
     mode: 'core',
     consumers: ['tool-cordis'],
-    note: 'Owns the in-memory definition registry, the vm sandbox for host halves, and the request-run round trip; browser pages reach the same service over the wire through its remote namespace.',
+    note: '拥有内存定义注册表、Host 半的 vm 沙箱和 request-run 往返流程；浏览器页面通过其 Remote 命名空间在线访问同一服务。',
   },
   {
     key: 'cordisInspect',
@@ -686,14 +686,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Dynamic Cordis inspect registry',
     mode: 'core',
     consumers: ['tool-cordis'],
-    note: 'Registers host inspect providers, mirrors the client provider manifest, and routes client queries through the dynamic Cordis transport.',
+    note: '注册 Host inspect 提供方、镜像 Client 提供方 manifest，并通过动态 Cordis 传输路由 Client 查询。',
   },
 ]
 
 function generatedHeader(title: string): string[] {
   return [
-    '<!-- Generated by scripts/gen-doc-graphs.ts - do not edit by hand.',
-    '     Run `pnpm run gen-doc-graphs` to regenerate. -->',
+    '<!-- 由 scripts/gen-doc-graphs.ts 生成——请勿手工编辑。',
+    '     运行 `pnpm run gen-doc-graphs` 重新生成。 -->',
     '',
     `# ${title}`,
     '',
@@ -701,7 +701,7 @@ function generatedHeader(title: string): string[] {
 }
 
 function maintenanceFooter(source: string): string[] {
-  return [`Maintenance mode: ${source}.`, '']
+  return [`维护模式：${source}。`, '']
 }
 
 function graphIndexLink(rel: string): string {
@@ -753,7 +753,7 @@ function assertServiceRolesComplete(services: readonly ServiceEntry[]): void {
 function renderCapabilitySeams(pkgs: Pkg[], services: readonly ServiceEntry[]): string {
   assertServiceRolesComplete(services)
   const pkgsByShort = new Map(pkgs.map(pkg => [pkg.short, pkg]))
-  const maintenance = 'hybrid: services are discovered from Cordis declarations; interface/implementation/consumer roles are classified in `scripts/gen-doc-graphs.ts` with a completeness guard'
+  const maintenance = '混合模式。服务从 Cordis 声明中发现；接口、实现和消费方角色在 `scripts/gen-doc-graphs.ts` 中分类，并设有完整性守卫'
   const nodes = new Map<string, string>()
   const edges = new Set<string>()
   const companionEdges = new Set<string>()
@@ -761,9 +761,9 @@ function renderCapabilitySeams(pkgs: Pkg[], services: readonly ServiceEntry[]): 
     if (!nodes.has(id)) nodes.set(id, `  ${id}["${escLabel(label)}"]`)
   }
   const addEdge = (from: string, to: string): void => { edges.add(`  ${from} --> ${to}`) }
-  const lines = generatedHeader('Capability Seams And Core Services')
+  const lines = generatedHeader('能力 Seams 与核心服务')
   lines.push(
-    'A service can be a core spine service, a swappable capability seam, or a bundle/composition point. The graph shows the package that owns the service declaration, known implementation packages, and packages that consume the service directly.',
+    '服务可以是核心主干服务、可替换的能力 seam，也可以是组合包／组合点。下图展示了拥有服务声明的包、已知实现包，以及直接消费该服务的包。',
     '',
     '```mermaid',
     'flowchart LR',
@@ -788,7 +788,7 @@ function renderCapabilitySeams(pkgs: Pkg[], services: readonly ServiceEntry[]): 
     }
   }
   lines.push(...nodes.values(), ...[...edges].sort(), ...[...companionEdges].sort())
-  lines.push('```', '', '| ctx key | Role | Owner | Implementations | Direct consumers | Companion plugins | Note |', '| --- | --- | --- | --- | --- | --- | --- |')
+  lines.push('```', '', '| ctx 键 | 角色 | 所属包 | 实现 | 直接消费方 | 配套插件 | 说明 |', '| --- | --- | --- | --- | --- | --- | --- |')
   for (const role of SERVICE_ROLES) {
     lines.push(`| \`ctx.${role.key}\` | \`${role.mode}\` | ${pkgLink(pkgsByShort.get(role.pkg), role.pkg)} | ${pkgList(role.implementations, pkgsByShort)} | ${pkgList(role.consumers, pkgsByShort)} | ${pkgList(role.companions, pkgsByShort)} | ${tableCell(role.note)} |`)
   }
@@ -1270,12 +1270,12 @@ function listenerPackages(listeners: Set<string>, pkgsByShort: Map<string, Pkg>)
 function renderEventRelations(pkgs: Pkg[], events: readonly EventEntry[]): string {
   const relations = collectEventRelations()
   const pkgsByShort = new Map(pkgs.map(pkg => [pkg.short, pkg]))
-  const maintenance = 'generated: Cordis event declarations and producer/listener edges are resolved from the repository TypeScript Program'
-  const lines = generatedHeader('Event Producer And Consumer Matrix')
+  const maintenance = '生成内容。Cordis 事件声明及生产方／监听方的关系边由仓库的 TypeScript Program 解析。'
+  const lines = generatedHeader('事件生产方与消费方矩阵')
   lines.push(
-    'This matrix shows which packages dispatch each harness-owned event and which packages listen to it. Events are many-to-many, so the dense relation data is presented as a table rather than one large graph. Receiver and event-name types also cover contained dispatch sites that deliberately bypass `ctx.emit`, such as subagent lifecycle containment.',
+    '本矩阵展示哪些包会派发各个 harness 自有事件，以及哪些包会监听这些事件。事件之间存在多对多关系，因此密集的关系数据以表格而非一张大型关系图呈现。接收方和事件名称类型还涵盖有意绕过 `ctx.emit` 的内含派发位置，例如 subagent 生命周期封装。',
     '',
-    '| Event | Mode | Declared in | Dispatchers | Listeners |',
+    '| 事件 | 模式 | 声明位置 | 派发方 | 监听方 |',
     '| --- | --- | --- | --- | --- |',
   )
   for (const event of [...events].sort((a, b) => a.name.localeCompare(b.name))) {
@@ -1303,7 +1303,7 @@ function renderEventRelations(pkgs: Pkg[], events: readonly EventEntry[]): strin
   const declared = new Set(events.map(event => event.name))
   const extra = [...relations.keys()].filter(event => !declared.has(event)).sort()
   if (extra.length > 0) {
-    lines.push('', '## Non-harness or undeclared event strings seen in package source', '', '| Event string | Dispatchers | Listeners |', '| --- | --- | --- |')
+    lines.push('', '## 包源码中出现的非 harness 或未声明事件字符串', '', '| 事件字符串 | 派发方 | 监听方 |', '| --- | --- | --- |')
     for (const event of extra) {
       const relation = relations.get(event)
       if (!relation) continue
@@ -1315,10 +1315,10 @@ function renderEventRelations(pkgs: Pkg[], events: readonly EventEntry[]): strin
 }
 
 function renderLifecycle(): string {
-  const maintenance = 'curated Mermaid sequence; exact event signatures live in the generated Cordis catalog'
+  const maintenance = '人工维护的 Mermaid 时序图，由生成器写出；确切的事件签名位于生成的 Cordis 目录中。'
   return [
-    ...generatedHeader('Agent Turn And Step Lifecycle'),
-    'This sequence is the visual companion to [architecture.md](architecture.zh.md#turn-flow). It keeps durable replay facts on `session/event` and live control/status on `agent/*`.',
+    ...generatedHeader('Agent 轮次与步骤生命周期'),
+    '此时序图是 [architecture.md](architecture.zh.md#turn-flow) 的配套图示。持久的回放事实保存在 `session/event` 中，实时控制与状态则保存在 `agent/*` 中。',
     '',
     '```mermaid',
     'sequenceDiagram',
@@ -1386,23 +1386,23 @@ function renderLifecycle(): string {
     `  Driver-->>SDK: ${mermaidCode('agent/status')} idle`,
     '```',
     '',
-    'The `assistant/message` event records every successful provider call, including content-less and `max-tokens` finishes. Empty content stays out of derived history, while the durable event keeps usage and `sourceEventSeqs` listing the exact `assistant/chunk` events, including an explicit empty list.',
+    '`assistant/message` 事件记录每一次成功的提供方调用，包括无内容和 `max-tokens` 的结束。空内容不进入派生历史，而持久事件保留用量和 `sourceEventSeqs`，列出确切的 `assistant/chunk` 事件，包括显式的空列表。',
     '',
-    '`dsh-compaction-basic` uses `agent/pre-step` for pressure before request derivation and `agent/request-error` only for canonical context overflow. Once either trigger qualifies, optional tool-result pruning runs before summary selection. Recovery works between the closed failed step and failed turn close, and opens a fresh retry turn only when pruning or summarization advances the surface replacement generation; otherwise the original request error remains authoritative.',
+    '`dsh-compaction-basic` 在请求派生之前用 `agent/pre-step` 处理压力，并仅在规范上下文溢出时用 `agent/request-error`。一旦任一触发条件成立，可选的工具结果剪枝会在摘要选择之前运行。恢复在已关闭的失败步与失败轮次关闭之间工作，且仅在剪枝或摘要推进表面替换代数时才开启新的重试轮次；否则原始请求错误保持权威。',
     '',
-    'The returned `agent/pre-step` decision is authoritative; listeners wrapping `next()` preserve downstream messages and `startsRequestSeries` unless replacement is intentional. Steering and injected context pass through the same waterfall after a later claim operation takes their next-step batch.',
+    '返回的 `agent/pre-step` 决策是权威的；包裹 `next()` 的监听者保留下游消息和 `startsRequestSeries`，除非替换是有意的。转向与注入的上下文在后续 claim 操作取走其下一批后，通过同一 waterfall。',
     '',
-    'SDK users that need replayable transcript data should consume `session/event`; `agent/*` is the live coordination API for queue/status, prompt interception, request construction, steering, continuation, and errors.',
+    '需要可回放转录数据的 SDK 用户应消费 `session/event`；`agent/*` 是队列/状态、提示词拦截、请求构造、转向、续行和错误的实时协调 API。',
     '',
     ...maintenanceFooter(maintenance),
   ].join('\n')
 }
 
 function renderToolPipeline(): string {
-  const maintenance = 'curated Mermaid flow; exact tool schemas and event signatures live in generated catalogs'
+  const maintenance = '人工维护的 Mermaid 流程图，由生成器写出；确切的工具 schema 与事件签名位于生成的目录中。'
   return [
-    ...generatedHeader('Tool Execution Pipeline'),
-    'This graph shows where policy, hooks, sandboxing, filesystem guards, result rewriting, final-outcome observation, and UI rendering run without changing the loop. The `tools/pre-execute` waterfall runs first, monotonic guards run next, and the `tools/execute` and `tools/post-execute` waterfalls follow; the three waterfalls may transform a call. Definition-owned `finalizeContent` and `tools/result` run afterward.',
+    ...generatedHeader('工具执行流水线'),
+    '此图展示策略、钩子、沙箱、文件系统守卫、结果重写、最终结果观察和 UI 渲染在不改变循环的情况下何时运行。`tools/pre-execute` waterfall（瀑布式事件）首先运行，随后是单调守卫，然后运行 `tools/execute` 和 `tools/post-execute` waterfall；这三个 waterfall 可以改写一次调用。由定义自身控制的 `finalizeContent` 和 `tools/result` 在此之后运行。',
     '',
     '```mermaid',
     'flowchart TD',
@@ -1456,7 +1456,7 @@ function renderToolPipeline(): string {
     '  allResults --> context',
     '```',
     '',
-    'Filesystem read-before-edit checks stay below `tool-fs` on `fs/*` events. Generic pre/post waterfalls host hooks and approval policy; `ctx.approval` resolves asks before monotonic guards, and owner policy that must not be reordered remains a registered guard. Around-dispatch concerns such as timeouts wrap `tools/execute`. The registry losslessly snapshots the candidate result and normalizes a snapshot failure before the visible definition\'s snapshotted `finalizeContent` callback enforces its synchronous content-only invariant. `tools/result` then observes the immutable, lossless-JSON outcome. This lets hooks span tool families without coupling the tools to one policy service. PTC mode sends both the reserved `run_code` transport and its serialized sub-calls through the pipeline; sub-calls carry the parent token, log `tool/code-dispatch`, return denials as binding rejections, and omit `additionalContexts` to preserve call/result adjacency.',
+    '文件系统的先读后编辑检查在 `fs/*` 事件上位于 `tool-fs` 之下。通用 pre/post waterfall 承载钩子与审批策略；`ctx.approval` 在单调守卫之前解析询问，而不可重排的所有者策略仍是注册守卫。超时等环绕分发关注点包裹 `tools/execute`。注册表无损快照候选结果，并在可见定义快照后的 `finalizeContent` 回调强制执行其同步的仅内容不变量之前规范化快照失败。随后 `tools/result` 观察不可变的、无损 JSON 结果。这让钩子跨工具族而不把工具耦合到某个策略服务。PTC 模式把保留的 `run_code` 传输及其序列化子调用都送入流水线；子调用携带父 token、记录 `tool/code-dispatch`、把拒绝作为绑定拒绝返回，并省略 `additionalContexts` 以保持调用/结果相邻。',
     '',
     ...maintenanceFooter(maintenance),
   ].join('\n')
@@ -1466,51 +1466,51 @@ function renderDocs(): GraphDoc[] {
   const pkgs = collectPackageGraph(root, GROUP_ORDER, 'gen-doc-graphs')
   const { model } = projectCordisCatalog(root, CORDIS_CATALOG_POLICY)
   const docs: GraphDoc[] = [
-    { rel: 'docs/capability-seams.md', content: renderCapabilitySeams(pkgs, model.services) },
+    { rel: 'docs/capability-seams.zh.md', content: renderCapabilitySeams(pkgs, model.services) },
     ...APP_EXAMPLES.map(example => ({ rel: example.rel, content: renderAppComposition(example) })),
-    { rel: 'docs/event-producer-consumer.md', content: renderEventRelations(pkgs, model.events) },
-    { rel: 'docs/agent-lifecycle.md', content: renderLifecycle() },
-    { rel: 'docs/tool-execution-pipeline.md', content: renderToolPipeline() },
+    { rel: 'docs/event-producer-consumer.zh.md', content: renderEventRelations(pkgs, model.events) },
+    { rel: 'docs/agent-lifecycle.zh.md', content: renderLifecycle() },
+    { rel: 'docs/tool-execution-pipeline.zh.md', content: renderToolPipeline() },
   ]
-  docs.unshift({ rel: 'docs/graph-atlas.md', content: renderIndex(docs) })
+  docs.unshift({ rel: 'docs/graph-atlas.zh.md', content: renderIndex(docs) })
   return docs
 }
 
 function renderIndex(docs: GraphDoc[]): string {
   const labels: Record<string, string> = {
-    'docs/capability-seams.md': 'capability seams and core services',
-    'apps/cli/composition.md': 'dsh shared base composition',
-    'docs/event-producer-consumer.md': 'event producer/consumer matrix',
-    'docs/agent-lifecycle.md': 'agent turn and step lifecycle',
-    'docs/tool-execution-pipeline.md': 'tool execution pipeline',
+    'docs/capability-seams.zh.md': '能力 seam 与核心服务',
+    'apps/cli/composition.md': 'dsh 共享基础组合',
+    'docs/event-producer-consumer.zh.md': '事件生产方／消费方矩阵',
+    'docs/agent-lifecycle.zh.md': 'agent（智能体）轮次与步骤生命周期',
+    'docs/tool-execution-pipeline.zh.md': '工具执行流水线',
   }
   const modes: Record<string, string> = {
-    'docs/capability-seams.md': 'hybrid generated',
+    'docs/capability-seams.zh.md': 'hybrid generated',
     'apps/cli/composition.md': 'hybrid generated',
-    'docs/event-producer-consumer.md': 'hybrid generated',
-    'docs/agent-lifecycle.md': 'curated',
-    'docs/tool-execution-pipeline.md': 'curated',
+    'docs/event-producer-consumer.zh.md': 'hybrid generated',
+    'docs/agent-lifecycle.zh.md': 'curated',
+    'docs/tool-execution-pipeline.zh.md': 'curated',
   }
   const rows = [
-    '| [module dependency graph](module-graph.md) | `generated` |',
-    '| [tool schema catalog and package map](tool-catalog.md) | `generated` |',
+    '| [模块依赖图](module-graph.zh.md) | `generated` |',
+    '| [工具 schema 目录与包映射](tool-catalog.zh.md) | `generated` |',
     ...docs.map((doc) => {
       const link = graphIndexLink(doc.rel)
       return `| [${labels[doc.rel] ?? link}](${link}) | \`${modes[doc.rel] ?? 'generated'}\` |`
     }),
   ]
-  const maintenance = 'mixed: each linked page declares generated, hybrid, or curated mode'
+  const maintenance = '混合。每个链接页面声明其模式为生成、混合或人工维护。'
   return [
-    ...generatedHeader('Documentation Graph Index'),
-    'These diagrams show relationships that the generated catalogs do not. Use them to find package relationships, capability seams, event flow, model-facing tools, app composition, and runtime lifecycle paths. Exact signatures and type definitions still live in the [subsystem pages](subsystems/core.zh.md) (types + the generated Cordis API regions) and [tool-catalog.md](tool-catalog.md).',
+    ...generatedHeader('文档图索引'),
+    '这些图展示生成目录未包含的关系。可以用它们查找包之间的关系、能力 seam、事件流、面向模型的工具、应用组合和运行时生命周期路径。精确签名和类型定义仍以[子系统页面](subsystems/core.zh.md)（类型和生成的 `cordis-surface` 区域）及[工具目录](tool-catalog.zh.md)为准。',
     '',
-    'The process decision behind this index is recorded in [the documentation graph Agent Note](../.agents/notes/archived/process/2026-07-03-documentation-graph-atlas.md).',
+    '本索引背后的流程决策记录在[文档图 Agent Note](../.agents/notes/archived/process/2026-07-03-documentation-graph-atlas.zh.md)中。',
     '',
-    '| Graph | Mode |',
+    '| 图 | 模式 |',
     '| --- | --- |',
     ...rows,
     '',
-    'Regenerate with `pnpm run gen-doc-graphs`; verify freshness with `pnpm run verify-doc-graphs`.',
+    '运行 `pnpm run gen-doc-graphs` 重新生成；运行 `pnpm run verify-doc-graphs` 验证新鲜度。',
     '',
     ...maintenanceFooter(maintenance),
   ].join('\n')

@@ -11,8 +11,21 @@ import { markdownHeadingLines, markdownProseLines } from './markdown.ts'
 
 const root = resolve(import.meta.dirname, '..')
 
-/** The one canonical section heading, required verbatim as an h2. */
+/** The canonical English heading, plus the Chinese spellings the corpus uses. */
 const CANONICAL = '## Known Limitations and Deferred Work'
+const LIMITATIONS_HEADINGS = [
+  CANONICAL,
+  '## 已知限制与延期工作',
+  '## 已知限制与后续工作',
+  '## 已知限制与待办事项',
+  '## 已知限制与暂缓事项',
+  '## 已知限制与未竟事项',
+] as const
+
+/** Whether a raw heading is one of the canonical limitations spellings. */
+function isCanonicalLimitations(raw: string): boolean {
+  return (LIMITATIONS_HEADINGS as readonly string[]).includes(raw.trimEnd())
+}
 
 /** Packages audited as having no limitations section, keyed by repo-relative directory. */
 const NO_LIMITATIONS: Readonly<Record<string, string>> = {
@@ -27,6 +40,7 @@ function isLimitationsLike(headingText: string): boolean {
     || /what is not here/i.test(headingText)
     || /^deferred\b/i.test(headingText)
     || /^non-goals?\b/i.test(headingText)
+    || /已知限制/.test(headingText)
   )
 }
 
@@ -44,7 +58,7 @@ for (const [entry, reason] of Object.entries(NO_LIMITATIONS)) {
 }
 
 for (const pkg of scannedPackages) {
-  const readme = `${pkg}/README.md`
+  const readme = `${pkg}/README.zh.md`
   if (!existsSync(resolve(root, readme))) {
     failures.push(`${readme}: package manifest has no sibling README with the \`${CANONICAL}\` section`)
     continue
@@ -70,8 +84,8 @@ for (const pkg of scannedPackages) {
     failures.push(`${readme}: ${limitations.length} limitations-like headings (lines ${limitations.map(line => line.index).join(', ')}) — keep exactly one \`${CANONICAL}\` section`)
     continue
   }
-  if (heading.depth !== 2 || heading.raw.trimEnd() !== CANONICAL) {
-    failures.push(`${readme}:${heading.index}: non-canonical heading ${JSON.stringify(heading.raw)} — use \`${CANONICAL}\``)
+  if (heading.depth !== 2 || !isCanonicalLimitations(heading.raw)) {
+    failures.push(`${readme}:${heading.index}: non-canonical heading ${JSON.stringify(heading.raw)} — use \`${CANONICAL}\` (or its Chinese equivalent)`)
     continue
   }
   const headingAt = lines.findIndex(line => line.index === heading.index)

@@ -1,6 +1,7 @@
+<!-- 由 scripts/gen-doc-graphs.ts 生成——请勿手工编辑。
+     运行 `pnpm run gen-doc-graphs` 重新生成。 -->
 
 # 文档图索引
-
 
 这些图展示生成目录未包含的关系。可以用它们查找包之间的关系、能力 seam、事件流、面向模型的工具、应用组合和运行时生命周期路径。精确签名和类型定义仍以[子系统页面](subsystems/core.zh.md)（类型和生成的 `cordis-surface` 区域）及[工具目录](tool-catalog.zh.md)为准。
 
@@ -16,6 +17,6 @@
 | [agent（智能体）轮次与步骤生命周期](agent-lifecycle.zh.md) | `curated` |
 | [工具执行流水线](tool-execution-pipeline.zh.md) | `curated` |
 
-运行 `pnpm run gen-doc-graphs` 可重新生成英文源文件；运行 `pnpm run verify-doc-graphs` 可验证英文源的新鲜度，中文对侧则人工维护。
+运行 `pnpm run gen-doc-graphs` 重新生成；运行 `pnpm run verify-doc-graphs` 验证新鲜度。
 
-英文源文件的维护模式为混合。每个链接页面都会声明其英文源模式为生成、混合或人工编写；本中文文件是对英文源的评审翻译。
+维护模式：混合。每个链接页面声明其模式为生成、混合或人工维护。。

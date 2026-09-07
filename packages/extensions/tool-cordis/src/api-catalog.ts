@@ -6394,16 +6394,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
 
 /** The inherited `ctx` API (cordis core + loader/hmr/timer), in curated order. */
 export const INHERITED_CTX_API: readonly InheritedApiEntry[] = [
-  { name: 'ctx.on / ctx.once', summary: 'Register an event listener (disposable).' },
-  { name: 'ctx.emit / ctx.parallel / ctx.serial / ctx.bail / ctx.waterfall', summary: 'Dispatch an event (sync / awaited / first-bail / short-circuit chain).' },
-  { name: 'ctx.plugin / ctx.inject', summary: 'Load a plugin / declare required services.' },
-  { name: 'ctx.effect', summary: 'Register a disposable side effect tied to the fiber.' },
-  { name: 'ctx.get / ctx.set / ctx.provide / ctx.accessor / ctx.mixin', summary: 'Low-level service-store access and binding.' },
-  { name: 'ctx.extend / ctx.isolate / ctx.intercept', summary: 'Derive a child context (scoped services / isolation / interception).' },
-  { name: 'ctx.root / ctx.fiber / ctx.registry / ctx.reflect / ctx.events / ctx.logger', summary: 'Ambient handles onto the running context graph.' },
-  { name: 'ctx.timer (+ interval / timeout / throttle / debounce)', summary: 'Disposable timer helpers. The `timer` key is provided at runtime; the four supported helpers are mixed onto ctx directly (declared via Pick).' },
-  { name: 'ctx.loader', summary: 'The config Loader that booted the app (present under the loader).' },
-  { name: 'ctx.hmr', summary: 'The hot-module-reload watcher (present under the hmr plugin).' },
+  { name: 'ctx.on / ctx.once', summary: '注册一个事件监听器（可处置）。' },
+  { name: 'ctx.emit / ctx.parallel / ctx.serial / ctx.bail / ctx.waterfall', summary: '派发一个事件（同步 / 等待 / 首个 bail / 短路链）。' },
+  { name: 'ctx.plugin / ctx.inject', summary: '加载插件 / 声明所需服务。' },
+  { name: 'ctx.effect', summary: '注册一个绑定到 fiber 的可处置副作用。' },
+  { name: 'ctx.get / ctx.set / ctx.provide / ctx.accessor / ctx.mixin', summary: '低层服务 store 访问与绑定。' },
+  { name: 'ctx.extend / ctx.isolate / ctx.intercept', summary: '派生子上下文（作用域服务 / 隔离 / 拦截）。' },
+  { name: 'ctx.root / ctx.fiber / ctx.registry / ctx.reflect / ctx.events / ctx.logger', summary: '运行中上下文图的环境句柄。' },
+  { name: 'ctx.timer (+ interval / timeout / throttle / debounce)', summary: '可处置的计时器辅助。`timer` 键在运行时提供；四个受支持的辅助直接混入 ctx（通过 Pick 声明）。' },
+  { name: 'ctx.loader', summary: '启动应用的配置 Loader（在 loader 下存在）。' },
+  { name: 'ctx.hmr', summary: '热模块重载监视器（在 hmr 插件下存在）。' },
 ]
 
 function referencedTypeClosure(seeds: readonly string[]): TypeApiEntry[] {

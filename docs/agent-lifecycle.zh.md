@@ -1,6 +1,7 @@
+<!-- 由 scripts/gen-doc-graphs.ts 生成——请勿手工编辑。
+     运行 `pnpm run gen-doc-graphs` 重新生成。 -->
 
 # Agent 轮次与步骤生命周期
-
 
 此时序图是 [architecture.md](architecture.zh.md#turn-flow) 的配套图示。持久的回放事实保存在 `session/event` 中，实时控制与状态则保存在 `agent/*` 中。
 
@@ -70,12 +71,12 @@ sequenceDiagram
   Driver-->>SDK: <code>agent/status</code> idle
 ```
 
-`assistant/message` 事件会记录每次成功的提供方调用，包括返回空内容或以 `max-tokens` 结束的调用。空内容不会进入派生历史，但该持久事件仍会保留用量，并通过 `sourceEventSeqs` 精确列出对应的 `assistant/chunk` 事件，包括显式空列表。
+`assistant/message` 事件记录每一次成功的提供方调用，包括无内容和 `max-tokens` 的结束。空内容不进入派生历史，而持久事件保留用量和 `sourceEventSeqs`，列出确切的 `assistant/chunk` 事件，包括显式的空列表。
 
-`dsh-compaction-basic` 在派生请求之前通过 `agent/pre-step` 处理压力，而 `agent/request-error` 仅用于规范的上下文溢出。任一触发条件满足后，系统都会先执行可选的工具结果剪枝，再选择摘要。恢复发生在失败步骤结束之后、失败轮次结束之前；只有当剪枝或摘要生成推进了 surface replacement generation 时，系统才会开启一个全新的重试轮次，否则仍以原始请求错误为准。
+`dsh-compaction-basic` 在请求派生之前用 `agent/pre-step` 处理压力，并仅在规范上下文溢出时用 `agent/request-error`。一旦任一触发条件成立，可选的工具结果剪枝会在摘要选择之前运行。恢复在已关闭的失败步与失败轮次关闭之间工作，且仅在剪枝或摘要推进表面替换代数时才开启新的重试轮次；否则原始请求错误保持权威。
 
-以返回的 `agent/pre-step` 决策为准；通过包装 `next()` 的监听器会保留下游消息与 `startsRequestSeries`，除非有意替换。steering（中途引导）和注入的上下文在后续的认领操作取得其下一步骤批次后，会经过同一 waterfall（瀑布式事件）。
+返回的 `agent/pre-step` 决策是权威的；包裹 `next()` 的监听者保留下游消息和 `startsRequestSeries`，除非替换是有意的。转向与注入的上下文在后续 claim 操作取走其下一批后，通过同一 waterfall。
 
-需要可回放 transcript（文本记录）数据的 SDK 用户应当消费 `session/event`；`agent/*` 是用于队列与状态、提示词拦截、请求构造、steering、继续执行和错误处理的实时协调接口。
+需要可回放转录数据的 SDK 用户应消费 `session/event`；`agent/*` 是队列/状态、提示词拦截、请求构造、转向、续行和错误的实时协调 API。
 
-维护模式：英文源文件包含人工维护的 Mermaid 时序图，并由生成器写出；本中文文件作为对英文源的评审翻译。确切的事件签名位于生成的 Cordis 目录中。
+维护模式：人工维护的 Mermaid 时序图，由生成器写出；确切的事件签名位于生成的 Cordis 目录中。。
