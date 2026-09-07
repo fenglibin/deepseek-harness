@@ -15,15 +15,15 @@ import type {} from '@deepseek-ai/dsh-settings'
 import type { SettingsScope } from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-tools'
 import { watch as chokidarWatch } from 'chokidar'
-import { openNativeTextFile } from '@deepseek-ai/dsh-native-command'
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import type { McpServerEntry } from './config.ts'
 import { MCP_SETTINGS_NAMESPACE, MCP_SETTINGS_SCHEMA, validateServers } from './config.ts'
 import type { McpSettings } from './config.ts'
-import { MCP_JSON_FILENAME, mcpJsonToSettings, parseMcpJson, renderMcpJson, settingsToMcpJson } from './mcp-json.ts'
+import { MCP_JSON_FILENAME, mcpJsonToSettings, parseMcpJson, renderMcpJson, sanitizeServerName, settingsToMcpJson } from './mcp-json.ts'
+import type { McpJson } from './mcp-json.ts'
 import { reconcile } from './reconcile.ts'
-import type { McpDocumentOpenValue, McpServerStatusKind, McpServerStatusView } from './status.ts'
+import type { McpDocumentTextValue, McpDocumentWriteValue, McpServerStatusKind, McpServerStatusView, McpToolInfo } from './status.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -218,36 +218,115 @@ export class McpManager extends TypertRemoteService {
   }
 
   /** The model-facing tool names one server currently registers. */
-  private toolsOf(serverName: string): string[] {
+  private toolsOf(serverName: string): McpToolInfo[] {
     const prefix = `mcp__${serverName}__`
     return this.ctx.tools.schemas()
-      .map(schema => schema.name)
-      .filter(name => name.startsWith(prefix))
+      .filter(schema => schema.name.startsWith(prefix))
+      .map(schema => ({
+        name: schema.name.slice(prefix.length),
+        description: schema.description,
+      }))
   }
 
   /**
-   * Materialize the user-editable `mcp.json` and open it in a native text
-   * editor. Edits made there flow back through the one-way sync when the file
-   * changes.
-   * @param signal - caller lifetime; abort terminates the native command.
-   * @returns confirmation after the native opener accepts the document.
-   * @throws RemoteError when no local document exists or opening fails.
+   * Read the current `mcp.json` text for in-place editing. A missing document
+   * is seeded first, so the editor always starts from what settings holds.
+   * @param signal - caller lifetime; abort terminates the read.
+   * @returns the raw document text.
+   * @throws RemoteError when no local document exists or the read fails.
    */
   @Remote
-  async openMcpDocument(signal: AbortSignal): Promise<McpDocumentOpenValue> {
+  async readMcpDocument(signal: AbortSignal): Promise<McpDocumentTextValue> {
     const path = this.mcpJsonPath
     if (path === undefined) {
       throw new RemoteError('gateway/internal', 'this deployment has no local MCP document', {})
     }
     await this.bootstrapMcpJson()
-    if (signal.aborted) throw new RemoteError('gateway/cancelled', 'mcp.json open was aborted', {})
+    if (signal.aborted) throw new RemoteError('gateway/cancelled', 'mcp.json read was aborted', {})
     try {
-      await openNativeTextFile(path, signal)
-      return { opened: true }
+      const text = await readFile(path, 'utf8')
+      return { text }
     } catch (error) {
-      if (isAborted(signal)) throw new RemoteError('gateway/cancelled', 'mcp.json open was aborted', {})
-      throw new RemoteError('gateway/internal', `mcp.json open failed: ${messageOf(error)}`, {}, { cause: error })
+      if (isAborted(signal)) throw new RemoteError('gateway/cancelled', 'mcp.json read was aborted', {})
+      throw new RemoteError('gateway/internal', `mcp.json read failed: ${messageOf(error)}`, {}, { cause: error })
     }
+  }
+
+  /**
+   * Validate, persist, and immediately sync a whole `mcp.json` document. The
+   * text is parsed and converted before any write, so a malformed or invalid
+   * document is refused with its diagnostic and never reaches settings. A valid
+   * write is synced synchronously (not left to the file watcher) so the change
+   * takes effect immediately.
+   * @param text - the candidate `mcp.json` text.
+   * @param signal - caller lifetime; abort terminates the write.
+   * @returns confirmation after the document is persisted and synced.
+   * @throws RemoteError when no local document exists, the text is invalid, or the write fails.
+   */
+  @Remote
+  async writeMcpDocument(text: string, signal: AbortSignal): Promise<McpDocumentWriteValue> {
+    const path = this.mcpJsonPath
+    if (path === undefined) {
+      throw new RemoteError('gateway/internal', 'this deployment has no local MCP document', {})
+    }
+    // Validate before any write: a malformed document is refused in place.
+    try {
+      mcpJsonToSettings(parseMcpJson(text))
+    } catch (error) {
+      throw new RemoteError('gateway/bad-request', `mcp.json is invalid: ${messageOf(error)}`, {})
+    }
+    if (signal.aborted) throw new RemoteError('gateway/cancelled', 'mcp.json write was aborted', {})
+    try {
+      await writeFile(path, text, { mode: 0o600 })
+    } catch (error) {
+      if (isAborted(signal)) throw new RemoteError('gateway/cancelled', 'mcp.json write was aborted', {})
+      throw new RemoteError('gateway/internal', `mcp.json write failed: ${messageOf(error)}`, {}, { cause: error })
+    }
+    // Sync immediately so the change applies now, not on the watcher's debounce.
+    await this.syncMcpJson()
+    return { ok: true }
+  }
+
+  /**
+   * Write one server's entry back into `mcp.json` and immediately sync it. The
+   * entry is converted to the cross-vendor `mcpServers` shape and merged over
+   * the existing document, so fields outside the edited server are preserved.
+   * @param server - the entry to write, keyed by its `serverName`.
+   * @param signal - caller lifetime; abort terminates the write.
+   * @returns confirmation after the document is persisted and synced.
+   * @throws RemoteError when no local document exists or the write fails.
+   */
+  @Remote
+  async updateMcpServer(server: McpServerEntry, signal: AbortSignal): Promise<McpDocumentWriteValue> {
+    const path = this.mcpJsonPath
+    if (path === undefined) {
+      throw new RemoteError('gateway/internal', 'this deployment has no local MCP document', {})
+    }
+    let document: McpJson
+    try {
+      const text = await this.readMcpDocument(signal)
+      document = parseMcpJson(text.text)
+    } catch (error) {
+      if (error instanceof RemoteError) throw error
+      throw new RemoteError('gateway/internal', `mcp.json read failed: ${messageOf(error)}`, {}, { cause: error })
+    }
+    const converted = settingsToMcpJson({ servers: [server] })
+    const entry = converted.mcpServers[server.serverName]
+    if (entry === undefined) {
+      throw new RemoteError('gateway/bad-request', `cannot render server "${server.serverName}"`, {})
+    }
+    // Rebuild the map so a raw key the sync hashed into `server.serverName` (a
+    // non-contract name like CJK) is replaced rather than left beside the new
+    // one — a leftover would read back as a duplicate serverName and refuse the
+    // whole sync.
+    const mcpServers: McpJson['mcpServers'] = {}
+    for (const [rawName, raw] of Object.entries(document.mcpServers)) {
+      if (rawName !== server.serverName && sanitizeServerName(rawName) === server.serverName) continue
+      mcpServers[rawName] = raw
+    }
+    mcpServers[server.serverName] = entry
+    document.mcpServers = mcpServers
+    return this.writeMcpDocument(renderMcpJson(document), signal)
   }
 
   /** Seed a missing `mcp.json` from the current settings section, then watch it. */

@@ -14,12 +14,8 @@ export interface PromptCommandEntry {
   name: string
   /** Localized display title (e.g. a Chinese name). */
   title?: string
-  /** Human-readable summary shown in discovery UI. */
-  description: string
   /** The prompt text submitted to the model on invocation. */
   prompt: string
-  /** Optional free-form input hint. */
-  hint?: string
 }
 
 /** The `prompt-commands` settings section value. */
@@ -30,7 +26,6 @@ export interface PromptCommandsValue {
 /** A blank editor draft for a new command. */
 export const EMPTY_DRAFT: PromptCommandEntry = {
   name: '',
-  description: '',
   prompt: '',
 }
 
@@ -39,23 +34,19 @@ const COMMAND_NAME = /^[a-z][a-z0-9_-]*$/
 
 /**
  * Whether an editor draft is a command the list accepts. `name` (a lowercase
- * hyphenated identifier), `description`, and `prompt` are required; a blank
- * `title`/`hint` is stored as absent rather than empty.
+ * hyphenated identifier) and `prompt` are required; a blank `title` is stored
+ * as absent rather than empty.
  */
 export function normalizeDraft(draft: PromptCommandEntry): PromptCommandEntry | undefined {
   const name = draft.name.trim()
-  const description = draft.description.trim()
   const prompt = draft.prompt.trim()
-  if (name === '' || description === '' || prompt === '') return undefined
+  if (name === '' || prompt === '') return undefined
   if (!COMMAND_NAME.test(name)) return undefined
   const title = draft.title?.trim() ?? ''
-  const hint = draft.hint?.trim() ?? ''
   return {
     name,
-    description,
     prompt,
     ...(title === '' ? {} : { title }),
-    ...(hint === '' ? {} : { hint }),
   }
 }
 

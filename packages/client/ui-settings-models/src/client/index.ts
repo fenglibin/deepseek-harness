@@ -138,14 +138,20 @@ export function apply(ctx: ClientContext): void {
   // follows its settings scope, so it needs no subscription here.
   ctx.effect(() => {
     const refreshModels = (): void => { refreshIfLoaded(controller) }
+    // A settings commit or an adapter re-registration can each change what the
+    // two preference cards offer (a model's input modalities, a route set)
+    // without necessarily re-registering a route, so both re-read their
+    // catalog. A card that never requested one stays idle and reaches no wire.
+    const refreshCatalogs = (): void => {
+      lightweight.refresh()
+      imageUnderstanding.refresh()
+    }
     const refreshAdapters = (): void => {
       refreshModels()
-      // The adapter topology moved, so the card's catalog is stale too. A card
-      // that never requested one stays idle and reaches no wire.
-      lightweight.refresh()
+      refreshCatalogs()
     }
     const disposers = [
-      ctx.remote.$on('settings/document-updated', () => { refreshModels() }),
+      ctx.remote.$on('settings/document-updated', () => { refreshModels(); refreshCatalogs() }),
       ctx.remote.$on('credentials/reference-updated', refreshModels),
       ctx.remote.$on('llm/adapters-updated', refreshAdapters),
       ctx.on('connection/reset', refreshModels),

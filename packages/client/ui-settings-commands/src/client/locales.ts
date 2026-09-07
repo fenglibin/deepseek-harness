@@ -8,8 +8,8 @@ export type PromptCommandKey =
   | 'add' | 'edit' | 'delete'
   | 'deleteTitle' | 'deleteDescription' | 'deleteAcknowledge' | 'deleteCancel' | 'deleteConfirm'
   | 'save' | 'cancel'
-  | 'fieldName' | 'fieldTitle' | 'fieldDescription' | 'fieldPrompt' | 'fieldHint'
-  | 'titleOptional' | 'hintOptional'
+  | 'fieldName' | 'fieldTitle' | 'fieldPrompt'
+  | 'titleOptional'
   | 'readOnly'
   | 'invalid'
 
@@ -31,11 +31,8 @@ export const zh: Record<PromptCommandKey, string> = {
   cancel: '取消',
   fieldName: '命令名',
   fieldTitle: '显示名称',
-  fieldDescription: '描述',
   fieldPrompt: '提示词内容',
-  fieldHint: '输入提示',
   titleOptional: '可选',
-  hintOptional: '可选',
   readOnly: '当前部署的设置为只读，无法修改命令。',
-  invalid: '命令名需为小写字母、数字、连字符或下划线；命令名、描述和提示词内容不能为空',
+  invalid: '命令名需为小写字母、数字、连字符或下划线；命令名和提示词内容不能为空',
 }

@@ -1,3 +1,10 @@
+/* Widen the editor card 50% over the Modal primitive's default 380px. Use
+   `width`, not `max-width`: the primitive's own dialog rule is
+   `width: min(380px, 100%)`, and a larger `max-width` has no effect. */
+.dialog {
+  width: min(570px, 100%);
+}
+
 .content {
   display: flex;
   flex-direction: column;

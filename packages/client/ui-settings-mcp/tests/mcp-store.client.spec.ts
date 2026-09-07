@@ -1,8 +1,10 @@
 /**
- * MCP server-list store: whole-list writes over the `mcp` namespace, the
- * duplicate-name refusal, and the revision fence around one write. The scope
- * runs over a scripted Remote carrier whose mutate applies the `servers` set
- * op to a mutable document, so a landed write is observable in the next read.
+ * MCP server-list store: whole-list writes over the `mcp` namespace for
+ * add/remove/toggle, the duplicate-name refusal, the revision fence around one
+ * write, and the single-server edit that goes through the Host `mcp.json`
+ * update instead. The scope runs over a scripted Remote carrier whose mutate
+ * applies the `servers` set op to a mutable document, so a landed write is
+ * observable in the next read.
  */
 import { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
@@ -62,13 +64,18 @@ function stdio(name: string, enabled = true): McpStdioServer {
   return { serverName: name, enabled, transport: 'stdio', command: 'echo', args: [], env: {}, cwd: '' }
 }
 
+interface BuildOptions {
+  mutate?: () => Promise<RemoteAnswer<SettingsNamespaceView>>
+  updateMcpServer?: () => Promise<RemoteAnswer<{ ok: true }>>
+}
+
 /** The store over a scripted wire whose `mutate` applies the servers set op. */
-async function build(initial: McpServerEntry[] = [], options?: { mutate?: () => Promise<RemoteAnswer<SettingsNamespaceView>> }) {
+async function build(initial: McpServerEntry[] = [], options: BuildOptions = {}) {
   let current: McpServerEntry[] = [...initial]
   const describe = vi.fn(() => Promise.resolve(ok({
     writable: true, hasDocument: false, namespaces: [view(current)],
   })))
-  const mutate = vi.fn(options?.mutate ?? (async (_ns: string, ops: SettingsPathOpView[]) => {
+  const mutate = vi.fn(options.mutate ?? (async (_ns: string, ops: SettingsPathOpView[]) => {
     for (const op of ops) {
       if (op.op === 'set' && op.path.length === 1 && op.path[0] === 'servers') {
         current = op.value as unknown as McpServerEntry[]
@@ -76,14 +83,15 @@ async function build(initial: McpServerEntry[] = [], options?: { mutate?: () => 
     }
     return ok(view(current))
   }))
-  const wireFace = { remote: { settings: { describe, mutate } } } as never
+  const updateMcpServer = vi.fn(options.updateMcpServer ?? (() => Promise.resolve(ok({ ok: true as const }))))
+  const wireFace = { remote: { settings: { describe, mutate }, mcp: { updateMcpServer } } } as never
   const mirror = new SettingsDescribeMirror(wireFace, 'host')
   const scope = new SettingsScopeController<McpSettings>(
     wireFace, { namespace: 'mcp' }, mirror, 'host', schemaService,
   )
-  const store = new McpStore(scope)
+  const store = new McpStore(wireFace, scope)
   await mirror.load()
-  return { store, scope, describe, mutate }
+  return { store, scope, describe, mutate, updateMcpServer }
 }
 
 describe('McpStore', () => {
@@ -104,12 +112,14 @@ describe('McpStore', () => {
     expect(store.servers().map(server => server.serverName)).toEqual(['web'])
   })
 
-  it('updates an existing server in place', async () => {
-    const { store } = await build([stdio('github')])
+  it('updates an existing server through the Host mcp.json write', async () => {
+    const { store, updateMcpServer, mutate } = await build([stdio('github')])
     const updated: McpServerEntry = { ...stdio('github'), command: 'other' }
     const landed = await store.update(updated)
     expect(landed).toBe(true)
-    expect(store.servers()[0]).toMatchObject({ serverName: 'github', command: 'other' })
+    expect(updateMcpServer).toHaveBeenCalledWith(updated)
+    // The edit writes `mcp.json`, not the settings namespace.
+    expect(mutate).not.toHaveBeenCalled()
   })
 
   it('flips the enabled flag', async () => {
@@ -132,6 +142,15 @@ describe('McpStore', () => {
       mutate: () => Promise.resolve(fail('settings/conflict')),
     })
     const landed = await store.add(stdio('github'))
+    expect(landed).toBe(false)
+    expect(store.store.getSnapshot().failed).toBe(true)
+  })
+
+  it('reports a failure when the mcp.json update is refused', async () => {
+    const { store } = await build([stdio('github')], {
+      updateMcpServer: () => Promise.resolve(fail('invalid')),
+    })
+    const landed = await store.update({ ...stdio('github'), command: 'other' })
     expect(landed).toBe(false)
     expect(store.store.getSnapshot().failed).toBe(true)
   })

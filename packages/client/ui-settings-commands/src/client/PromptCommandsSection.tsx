@@ -113,7 +113,6 @@ export function PromptCommandsSection({ t, controller }: PromptCommandsSectionPr
                   {command.title !== undefined && command.title !== ''
                     ? <span className={css.title}>{command.title}</span>
                     : null}
-                  <span className={css.description}>{command.description}</span>
                 </div>
                 <div className={css.rowActions}>
                   <Button size="sm" disabled={!canWrite} onClick={() => { openEdit(index) }}>{t('edit')}</Button>

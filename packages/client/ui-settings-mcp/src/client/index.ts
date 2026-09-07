@@ -51,7 +51,7 @@ export const inject = ['slots', 'locale', 'settingsScope', 'remote', 'remote.mcp
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh }), 'ui-settings-mcp: copy dictionaries')
 
-  const store = new McpStore(ctx.settingsScope.bind<McpSettings>({ namespace: MCP_SETTINGS_NAMESPACE }))
+  const store = new McpStore(ctx, ctx.settingsScope.bind<McpSettings>({ namespace: MCP_SETTINGS_NAMESPACE }))
   ctx.effect(() => () => { store.dispose() }, 'ui-settings-mcp: server store')
 
   const status = new McpStatusStore(ctx)

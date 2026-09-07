@@ -102,7 +102,7 @@ export function parseMcpJson(text: string): McpJson {
  * @param raw - the server name as written in `mcp.json`.
  * @returns a name matching {@link SERVER_NAME_PATTERN}.
  */
-function sanitizeServerName(raw: string): string {
+export function sanitizeServerName(raw: string): string {
   if (SERVER_NAME_PATTERN.test(raw)) return raw
   return `mcp-${createHash('sha256').update(raw).digest('hex').slice(0, 12)}`
 }

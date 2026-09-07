@@ -4,40 +4,33 @@ import { normalizeDraft, type PromptCommandEntry } from '../src/client/controlle
 function draft(partial: Partial<PromptCommandEntry> = {}): PromptCommandEntry {
   return {
     name: 'code-review',
-    description: 'review the diff',
     prompt: 'Review this diff',
     ...partial,
   }
 }
 
 describe('normalizeDraft', () => {
-  it('trims required fields and drops blank optional fields', () => {
+  it('trims required fields and drops a blank title', () => {
     expect(normalizeDraft(draft({
       name: '  code-review  ',
       title: '   ',
-      description: ' review ',
       prompt: ' Review ',
-      hint: '  ',
     }))).toEqual({
       name: 'code-review',
-      description: 'review',
       prompt: 'Review',
     })
   })
 
-  it('keeps non-blank optional fields', () => {
-    expect(normalizeDraft(draft({ title: ' 代码审查 ', hint: ' focus ' }))).toEqual({
+  it('keeps a non-blank title', () => {
+    expect(normalizeDraft(draft({ title: ' 代码审查 ' }))).toEqual({
       name: 'code-review',
       title: '代码审查',
-      description: 'review the diff',
       prompt: 'Review this diff',
-      hint: 'focus',
     })
   })
 
   it('returns undefined when a required field is blank', () => {
     expect(normalizeDraft(draft({ name: '  ' }))).toBeUndefined()
-    expect(normalizeDraft(draft({ description: '' }))).toBeUndefined()
     expect(normalizeDraft(draft({ prompt: '   ' }))).toBeUndefined()
   })
 

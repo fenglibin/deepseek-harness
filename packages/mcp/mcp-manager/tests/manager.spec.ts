@@ -83,9 +83,9 @@ function stdio(name: string, enabled = true): McpStdioServer {
 }
 
 /** The tool list the mock server advertises after a successful (re)connect. */
-function listing(...names: string[]): { tools: { name: string; inputSchema: { type: string } }[]; nextCursor: undefined } {
+function listing(...names: string[]): { tools: { name: string; description: string; inputSchema: { type: string } }[]; nextCursor: undefined } {
   return {
-    tools: names.map(name => ({ name, inputSchema: { type: 'object' } })),
+    tools: names.map(name => ({ name, description: `Run ${name}`, inputSchema: { type: 'object' } })),
     nextCursor: undefined,
   }
 }
@@ -187,7 +187,7 @@ describe('mcp-manager', () => {
     const views = ctx.mcpManager!.list()
     expect(views).toHaveLength(1)
     expect(views[0]).toMatchObject({ serverName: 'srv', status: 'connected' })
-    expect(views[0]!.tools).toEqual(['mcp__srv__remote'])
+    expect(views[0]!.tools).toEqual([{ name: 'remote', description: 'Run remote' }])
     await ctx.fiber.dispose()
   })
 

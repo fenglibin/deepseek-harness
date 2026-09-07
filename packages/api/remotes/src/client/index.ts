@@ -109,7 +109,7 @@ export type {
   SettingsDescribeValue, SettingsNamespaceView, SettingsPathOpView, SettingsSecretView,
 } from '@deepseek-ai/dsh-settings/types'
 // MCP server status vocabulary for the mcp namespace.
-export type { McpServerStatusKind, McpServerStatusView } from '@deepseek-ai/dsh-mcp-manager/types'
+export type { McpServerStatusKind, McpServerStatusView, McpToolInfo } from '@deepseek-ai/dsh-mcp-manager/types'
 // Provider registry and discovery vocabulary for the llm namespace.
 export type {
   LlmConfigurableProvider, LlmDiscoveredModel,

@@ -28,7 +28,9 @@ async function bench() {
     mcp: {
       list: () => Promise.resolve({ ok: true as const, value: [] }),
       refresh: () => Promise.resolve({ ok: true as const, value: true }),
-      openMcpDocument: () => Promise.resolve({ ok: true as const, value: { opened: true as const } }),
+      readMcpDocument: () => Promise.resolve({ ok: true as const, value: { text: '{"mcpServers":{}}' } }),
+      writeMcpDocument: () => Promise.resolve({ ok: true as const, value: { ok: true as const } }),
+      updateMcpServer: () => Promise.resolve({ ok: true as const, value: { ok: true as const } }),
     },
   })
   remote.$host = { home: undefined, isLoopback: true }

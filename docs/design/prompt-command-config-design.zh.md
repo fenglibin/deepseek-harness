@@ -41,7 +41,7 @@
 
 ### 3.3 决策 C：配置里存双语字段
 
-配置条目直接携带 `name`（英文 kebab，唯一 id）、`title`（中文显示名，可选）、`description`（英文描述）、`prompt`（提示词正文）、`hint`（可选输入提示）。前端按 `title ?? name` 显示，不接入 locale 字典（因为命令是运行时增删的，不适合硬编码字典）。
+配置条目直接携带 `name`（英文 kebab，唯一 id）、`title`（中文显示名，可选）、`prompt`（提示词正文）。前端按 `title ?? name` 显示，不接入 locale 字典（因为命令是运行时增删的，不适合硬编码字典）。命令在 `/` 菜单中的发现摘要由 `title ?? name` 派生。
 
 ### 3.4 决策 D：走 settings 能力 + 设置界面
 
@@ -69,7 +69,7 @@
 - 注册 `settings.section` slot（id `prompt-commands`），挂到设置导航。
 - `PromptCommandsController`：绑定 `prompt-commands` scope，提供整表提交。
 - `PromptCommandsSection`：列表 + 新增/编辑入口 + 删除二次确认。
-- `PromptCommandEditor`：新增/编辑表单（name/title/description/prompt/hint）。
+- `PromptCommandEditor`：新增/编辑表单（name/title/prompt）。
 
 ### 4.4 前端中文名（`ui-input-trigger` + `ui-commands`）
 

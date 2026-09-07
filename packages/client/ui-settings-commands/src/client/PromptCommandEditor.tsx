@@ -1,8 +1,8 @@
 /**
  * Add/edit form for one prompt command. A draft is staged locally and saved
  * only when the user confirms, so nothing writes while they type. The save is
- * blocked until the draft normalizes to a valid entry (name, description, and
- * prompt text are all non-empty).
+ * blocked until the draft normalizes to a valid entry (name and prompt text
+ * are both non-empty).
  */
 
 import { Button, Input, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -81,6 +81,7 @@ export function PromptCommandEditor(props: PromptCommandEditorProps) {
       onClose={props.onCancel}
       title={title}
       closeLabel={t('cancel')}
+      className={css.dialog ?? ''}
       contentClassName={css.content ?? ''}
       footer={(
         <>
@@ -106,28 +107,12 @@ export function PromptCommandEditor(props: PromptCommandEditorProps) {
         onChange={(value) => { set({ title: value }) }}
       />
       <Field
-        id="prompt-command-description"
-        label={t('fieldDescription')}
-        value={draft.description}
-        placeholder={t('fieldDescription')}
-        onChange={(value) => { set({ description: value }) }}
-      />
-      <Field
         id="prompt-command-prompt"
         label={t('fieldPrompt')}
         value={draft.prompt}
         placeholder={t('fieldPrompt')}
         textarea
         onChange={(value) => { set({ prompt: value }) }}
-      />
-      <Field
-        id="prompt-command-hint"
-        label={t('fieldHint')}
-        optional
-        optionalLabel={t('hintOptional')}
-        value={draft.hint ?? ''}
-        placeholder={t('fieldHint')}
-        onChange={(value) => { set({ hint: value }) }}
       />
       {!valid ? <p className={css.invalid} role="status">{t('invalid')}</p> : null}
     </Modal>

@@ -3,8 +3,7 @@
  * validated list of prompt-command entries into `kind: 'prompt'` slash
  * commands, so adding a reusable prompt shortcut needs no code — only a
  * configuration change. Each entry carries the command name, an optional
- * localized title, a discovery description, the prompt text submitted to the
- * model, and an optional free-form input hint.
+ * localized title, and the prompt text submitted to the model.
  *
  * When a settings provider is composed, the command list becomes the
  * user-editable `prompt-commands` settings section (the cordis.yml `commands`
@@ -32,18 +31,14 @@ const COMMAND_NAME = /^[a-z][a-z0-9_-]*$/u
 export const name = 'command-prompt-config'
 export const inject = ['commands']
 
-/** One prompt-command entry: discovery metadata plus the prompt text. */
+/** One prompt-command entry: the name, optional localized title, and prompt text. */
 export interface PromptCommandEntry {
   /** Lowercase command name without the leading slash. */
   name: string
   /** Localized display title (e.g. a Chinese name). */
   title?: string
-  /** Human-readable summary shown in discovery UI. */
-  description: string
   /** The prompt text submitted to the model on invocation. */
   prompt: string
-  /** Optional free-form input hint advertised to capable clients. */
-  hint?: string
 }
 
 /** Prompt-command configuration. */
@@ -56,16 +51,14 @@ export const Config: Schema<Config> = z.object({
   commands: z.array(z.object({
     name: z.string(),
     title: z.string(),
-    description: z.string(),
     prompt: z.string(),
-    hint: z.string(),
   })).default([]),
 })
 
 /**
  * Reject a resolved command list the registry could not register, for
  * constraints the schema cannot express — the command-name grammar and the
- * required non-empty description/prompt. Throwing here refuses the settings
+ * required non-empty prompt. Throwing here refuses the settings
  * write that produced the value, so a user edit that would strand the command
  * list is never persisted; the last good section keeps serving.
  * @param value - the resolved section, schema-valid by construction.
@@ -80,9 +73,6 @@ function validateCommands(value: Config): void {
       throw new Error(`prompt command "${command.name}" is duplicated`)
     }
     seen.add(command.name)
-    if (command.description.trim() === '') {
-      throw new Error(`prompt command "${command.name}" requires a description`)
-    }
     if (command.prompt.trim() === '') {
       throw new Error(`prompt command "${command.name}" requires a prompt`)
     }
@@ -112,9 +102,11 @@ export function apply(ctx: Context, config: Config = {}): void {
         kind: 'prompt',
         name: command.name,
         ...(command.title === undefined ? {} : { title: command.title }),
-        description: command.description,
+        // The command registry requires a non-empty description, but the
+        // settings editor no longer collects one. Derive it from the display
+        // title, falling back to the command name when no title is set.
+        description: command.title !== undefined && command.title.trim() !== '' ? command.title : command.name,
         prompt: command.prompt,
-        ...(command.hint === undefined ? {} : { input: { hint: command.hint } }),
       }))
     }
   }

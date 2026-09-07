@@ -13,6 +13,8 @@ import {
 import { ModelsSection } from '../src/client/ModelsSection.tsx'
 import { DeepSeekOnboardingDialog } from '../src/client/DeepSeekOnboardingDialog.tsx'
 import { WelcomeNotice } from '../src/client/WelcomeNotice.tsx'
+import { LightweightModelStore } from '../src/client/lightweight-model-store.ts'
+import { ImageUnderstandingModelStore } from '../src/client/image-understanding-model-store.ts'
 
 // These specs assert the shipped Chinese copy. The lane has no jsdom `window`,
 // so browser-language detection never runs and a fresh LocaleRuntime opens on
@@ -254,6 +256,27 @@ describe('pushed invalidations', () => {
     const load = vi.spyOn(injected.controller, 'load').mockResolvedValue()
     b.remote.emit('credentials/reference-updated', ['DEEPSEEK_API_KEY'])
     expect(load).toHaveBeenCalledTimes(1)
+  })
+
+  it('refreshes both preference catalogs when model inputs or the adapter topology change', async () => {
+    const lightweightRefresh = vi.spyOn(LightweightModelStore.prototype, 'refresh')
+    const imageRefresh = vi.spyOn(ImageUnderstandingModelStore.prototype, 'refresh')
+    const b = await bench()
+    declare(b.slots)
+    await b.ctx.plugin({ inject: [...inject], apply }).await()
+    lightweightRefresh.mockClear()
+    imageRefresh.mockClear()
+
+    // A settings commit can change a model's input modalities without
+    // re-registering a route, so both cards must re-read the catalog.
+    b.remote.emit('settings/document-updated', ['llm-pi-ai', 1])
+    expect(lightweightRefresh).toHaveBeenCalledTimes(1)
+    expect(imageRefresh).toHaveBeenCalledTimes(1)
+
+    // An adapter topology change refreshes both cards symmetrically.
+    b.remote.emit('llm/adapters-updated', [])
+    expect(lightweightRefresh).toHaveBeenCalledTimes(2)
+    expect(imageRefresh).toHaveBeenCalledTimes(2)
   })
 
   it('welcome state follows the shared mirror across document commits', async () => {

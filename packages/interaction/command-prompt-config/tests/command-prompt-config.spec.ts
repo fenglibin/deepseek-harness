@@ -59,12 +59,12 @@ describe('@deepseek-ai/dsh-command-prompt-config', () => {
     const { agent } = await mintAgentScope(ctx, 'a')
     await ctx.plugin(commandPromptConfig, {
       commands: [
-        { name: 'code-review', title: '代码审查', description: 'review the diff', prompt: 'Review this diff' },
-        { name: 'summarize', description: 'summarize', prompt: 'Summarize this' },
+        { name: 'code-review', title: '代码审查', prompt: 'Review this diff' },
+        { name: 'summarize', prompt: 'Summarize this' },
       ],
     })
     expect(ctx.commands.list(agent)).toEqual([
-      { name: 'code-review', title: '代码审查', description: 'review the diff' },
+      { name: 'code-review', title: '代码审查', description: '代码审查' },
       { name: 'summarize', description: 'summarize' },
     ])
   })
@@ -75,7 +75,7 @@ describe('@deepseek-ai/dsh-command-prompt-config', () => {
     const followup = vi.fn()
     Object.assign(agent, { followup })
     await ctx.plugin(commandPromptConfig, {
-      commands: [{ name: 'summarize', description: 'summarize', prompt: 'Summarize this workspace' }],
+      commands: [{ name: 'summarize', prompt: 'Summarize this workspace' }],
     })
     const execution = await ctx.commands.execute(agent, '/summarize', [], new AbortController().signal)
     expect(execution?.result).toEqual({ kind: 'success' })
@@ -95,7 +95,7 @@ describe('@deepseek-ai/dsh-command-prompt-config', () => {
   it('fails loud when an entry is invalid (registry-level validation)', async () => {
     const ctx = await mount()
     await expect(ctx.plugin(commandPromptConfig, {
-      commands: [{ name: 'blank', description: 'blank prompt', prompt: '   ' }],
+      commands: [{ name: 'blank', prompt: '   ' }],
     })).rejects.toThrow('prompt must be a non-empty string')
   })
 })
@@ -113,29 +113,29 @@ describe('settings-backed prompt commands', () => {
     const ctx = await mountWithSettings()
     const { agent } = await mintAgentScope(ctx, 'a')
     await ctx.plugin(commandPromptConfig, {
-      commands: [{ name: 'default-cmd', description: 'default', prompt: 'default prompt' }],
+      commands: [{ name: 'default-cmd', prompt: 'default prompt' }],
     })
-    expect(ctx.commands.list(agent)).toEqual([{ name: 'default-cmd', description: 'default' }])
+    expect(ctx.commands.list(agent)).toEqual([{ name: 'default-cmd', description: 'default-cmd' }])
   })
 
   it('re-registers commands when the settings section changes', async () => {
     const ctx = await mountWithSettings()
     const { agent } = await mintAgentScope(ctx, 'a')
     await ctx.plugin(commandPromptConfig, {
-      commands: [{ name: 'default-cmd', description: 'default', prompt: 'default prompt' }],
+      commands: [{ name: 'default-cmd', prompt: 'default prompt' }],
     })
     expect(ctx.commands.list(agent).map(command => command.name)).toEqual(['default-cmd'])
 
     await ctx.settings.update('prompt-commands', {
       commands: [
-        { name: 'new-cmd', title: '新命令', description: 'new', prompt: 'new prompt' },
-        { name: 'second-cmd', description: 'second', prompt: 'second prompt' },
+        { name: 'new-cmd', title: '新命令', prompt: 'new prompt' },
+        { name: 'second-cmd', prompt: 'second prompt' },
       ],
     })
 
     expect(ctx.commands.list(agent)).toEqual([
-      { name: 'new-cmd', title: '新命令', description: 'new' },
-      { name: 'second-cmd', description: 'second' },
+      { name: 'new-cmd', title: '新命令', description: '新命令' },
+      { name: 'second-cmd', description: 'second-cmd' },
     ])
   })
 
@@ -143,10 +143,10 @@ describe('settings-backed prompt commands', () => {
     const ctx = await mountWithSettings()
     const { agent } = await mintAgentScope(ctx, 'a')
     await ctx.plugin(commandPromptConfig, {
-      commands: [{ name: 'default-cmd', description: 'default', prompt: 'default prompt' }],
+      commands: [{ name: 'default-cmd', prompt: 'default prompt' }],
     })
     await ctx.settings.update('prompt-commands', {
-      commands: [{ name: 'user-cmd', description: 'user', prompt: 'user prompt' }],
+      commands: [{ name: 'user-cmd', prompt: 'user prompt' }],
     })
     expect(ctx.commands.list(agent).map(command => command.name)).toEqual(['user-cmd'])
 
@@ -159,11 +159,11 @@ describe('settings-backed prompt commands', () => {
     const ctx = await mountWithSettings()
     const { agent } = await mintAgentScope(ctx, 'a')
     await ctx.plugin(commandPromptConfig, {
-      commands: [{ name: 'default-cmd', description: 'default', prompt: 'default prompt' }],
+      commands: [{ name: 'default-cmd', prompt: 'default prompt' }],
     })
     // An invalid name must be refused by the settings write, not strand the list.
     await expect(ctx.settings.update('prompt-commands', {
-      commands: [{ name: 'Invalid Name', description: 'x', prompt: 'y' }],
+      commands: [{ name: 'Invalid Name', prompt: 'y' }],
     })).rejects.toThrow(/command name/)
 
     expect(ctx.commands.list(agent).map(command => command.name)).toEqual(['default-cmd'])
@@ -173,10 +173,10 @@ describe('settings-backed prompt commands', () => {
     const ctx = await mountWithSettings()
     const { agent } = await mintAgentScope(ctx, 'a')
     await ctx.plugin(commandPromptConfig, {
-      commands: [{ name: 'default-cmd', description: 'default', prompt: 'default prompt' }],
+      commands: [{ name: 'default-cmd', prompt: 'default prompt' }],
     })
     await expect(ctx.settings.update('prompt-commands', {
-      commands: [{ name: 'blank', description: 'blank', prompt: '   ' }],
+      commands: [{ name: 'blank', prompt: '   ' }],
     })).rejects.toThrow(/requires a prompt/)
 
     expect(ctx.commands.list(agent).map(command => command.name)).toEqual(['default-cmd'])
@@ -186,12 +186,12 @@ describe('settings-backed prompt commands', () => {
     const ctx = await mountWithSettings()
     const { agent } = await mintAgentScope(ctx, 'a')
     await ctx.plugin(commandPromptConfig, {
-      commands: [{ name: 'default-cmd', description: 'default', prompt: 'default prompt' }],
+      commands: [{ name: 'default-cmd', prompt: 'default prompt' }],
     })
     await expect(ctx.settings.update('prompt-commands', {
       commands: [
-        { name: 'dup', description: 'a', prompt: 'a' },
-        { name: 'dup', description: 'b', prompt: 'b' },
+        { name: 'dup', prompt: 'a' },
+        { name: 'dup', prompt: 'b' },
       ],
     })).rejects.toThrow(/duplicated/)
 

@@ -71,14 +71,6 @@
   color: var(--dsw-text-secondary, #666);
 }
 
-.description {
-  font-size: 12px;
-  color: var(--dsw-text-secondary, #666);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .rowActions {
   display: flex;
   gap: 8px;

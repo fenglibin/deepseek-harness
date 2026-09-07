@@ -1,23 +1,26 @@
 /**
  * MCP servers settings section: the user-managed server list with an
- * enable/disable toggle and add/edit/delete flows. The list stays a list; an
- * add or edit opens a dialog over the section rather than expanding a row. An
- * enable toggle writes immediately (it is a single visible decision), while the
- * add/edit form stages and writes only on save. The status dot reflects the
+ * enable/disable toggle and edit/delete flows. An edit opens a dialog over the
+ * section and writes the single server back into the user-editable `mcp.json`;
+ * the "configure" action opens an in-place `mcp.json` editor with syntax
+ * highlighting, formatting, and a validated save. An enable toggle writes
+ * immediately (it is a single visible decision). The status dot reflects the
  * live connection status the Host manager reports over the `mcp` Remote
- * namespace, and a refresh button forces one server to reconnect.
+ * namespace, and entering the section reconnects every enabled server that is
+ * not connected yet.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Button, IconPlusOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { InjectFace, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+import { Button, IconChevronDownOutline14, IconChevronRightOutline14, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
 import type { McpServerStatusView } from '@deepseek-ai/dsh-api-remotes/client'
 import { McpServerDialog } from './McpServerDialog.tsx'
+import { McpJsonEditor } from './McpJsonEditor.tsx'
 import type { McpServerEntry } from './types.ts'
 import type { McpStore } from './mcp-store.ts'
 import type { McpStatusStore } from './mcp-status-store.ts'
-import type { McpDocumentState, McpDocumentStore } from './mcp-document-store.ts'
+import type { McpDocumentStore } from './mcp-document-store.ts'
 import type { McpKey } from './locales.ts'
 import styles from './McpSection.module.css'
 
@@ -27,7 +30,7 @@ export interface McpSectionInjected {
   store: McpStore
   /** The live-status store over the Host `mcp` Remote namespace. */
   status: McpStatusStore
-  /** The configure-document controller; reports `unavailable` when the provider has no local document. */
+  /** The `mcp.json` document controller; reports `unavailable` when the provider has no local document. */
   document: McpDocumentStore
   hooks: {
     /** Server-list snapshot bound by the UI renderer as useMcp. */
@@ -62,41 +65,6 @@ function statusDot(server: McpServerEntry, view: McpServerStatusView | undefined
 }
 
 /**
- * Render the "configure" action: opens the file-backed settings document that
- * carries the `mcp` namespace for manual editing. Mounted only where the
- * controller exists, so the selector hook is always bound when this runs.
- */
-function ConfigureMcpAction({ document, useDocument, t }: {
-  document: McpDocumentStore
-  useDocument: SnapshotSelectorHook<McpDocumentState>
-  t: (key: McpKey) => string
-}): ReactNode {
-  const doc = useDocument(snapshot => snapshot)
-
-  useEffect(() => {
-    void document.load()
-  }, [document])
-
-  if (doc.status !== 'ready') return null
-
-  return (
-    <div className={styles['configure']}>
-      {doc.error === null
-        ? null
-        : <span className={styles['configureError']} role="alert">{t('configure.error')}</span>}
-      <button
-        type="button"
-        className={styles['configureButton']}
-        disabled={doc.opening}
-        onClick={() => { void document.open() }}
-      >
-        {t('configure')}
-      </button>
-    </div>
-  )
-}
-
-/**
  * Render the MCP servers section content column.
  * @param props - slot-delivered injected dependencies.
  * @returns the section, or null while the shell has not injected yet.
@@ -112,12 +80,17 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
   const { store, status, useMcp, useStatus, t, document, useDocument } = injected
   const state = useMcp(snapshot => snapshot)
   const statusState = useStatus(snapshot => snapshot)
+  const doc = useDocument(snapshot => snapshot)
   const [editing, setEditing] = useState<McpServerEntry | undefined>(undefined)
-  const [adding, setAdding] = useState(false)
+  const [editingDocument, setEditingDocument] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<string | undefined>(undefined)
   const [deleting, setDeleting] = useState(false)
   const [savedName, setSavedName] = useState<string | undefined>(undefined)
   const [failure, setFailure] = useState<string | undefined>(undefined)
+  /** Per-server tool list expansion: only a name in the set is currently open. */
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
+  /** Servers already force-reconnected on entry, so a re-pull never re-triggers. */
+  const autoConnected = useRef(new Set<string>())
 
   // Re-pull status whenever the server list changes (add, remove, edit, or
   // toggle), so a newly mounted server's status appears without a manual refresh.
@@ -125,14 +98,40 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
     if (state.available) void status.load()
   }, [status, state.available, state.servers])
 
+  // Resolve the `mcp.json` document availability and pull its text once.
+  useEffect(() => {
+    void document.load()
+  }, [document])
+
+  // Entering the section connects every enabled server that is not connected.
+  // One server at a time: the status store serializes a single refresh, so a
+  // parallel fan-out would drop every call after the first. The set of already
+  // reconnected names keeps a status re-pull from re-triggering the loop.
+  useEffect(() => {
+    if (!state.available) return
+    const pending = state.servers.filter((server) => {
+      if (!server.enabled || autoConnected.current.has(server.serverName)) return false
+      const view = statusState.statuses.get(server.serverName)
+      return view !== undefined && view.status !== 'connected'
+    })
+    if (pending.length === 0) return
+    void (async () => {
+      for (const server of pending) {
+        autoConnected.current.add(server.serverName)
+        await status.refresh(server.serverName)
+      }
+    })()
+  }, [status, state.available, state.servers, statusState.statuses])
+
   /** The names of every server except the one the dialog is editing. */
   const existingNames = state.servers
     .filter(server => editing === undefined || server.serverName !== editing.serverName)
     .map(server => server.serverName)
 
+  // The section has no add flow anymore: new servers are pasted into the
+  // `mcp.json` editor, so the dialog always edits an existing entry.
   const saveEntry = (entry: McpServerEntry): void => {
-    const write = editing === undefined ? store.add(entry) : store.update(entry)
-    void write.then((landed) => {
+    void store.update(entry).then((landed) => {
       if (!landed) {
         setFailure(t('failed'))
         return
@@ -140,7 +139,21 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
       setFailure(undefined)
       setSavedName(entry.serverName)
       setEditing(undefined)
-      setAdding(false)
+    })
+  }
+
+  /** Open the `mcp.json` editor after pulling the latest document text. */
+  const openDocumentEditor = (): void => {
+    setSavedName(undefined)
+    setFailure(undefined)
+    setEditingDocument(true)
+    void document.read()
+  }
+
+  /** Persist one validated document, closing the editor on success. */
+  const saveDocument = (text: string): void => {
+    void document.write(text).then((landed) => {
+      if (landed) setEditingDocument(false)
     })
   }
 
@@ -163,18 +176,14 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
     }).finally(() => { setDeleting(false) })
   }
 
-  const dialogOpen = adding || editing !== undefined
-  const dialog = dialogOpen
+  const dialog = editing !== undefined
     ? (
       <McpServerDialog
         entry={editing}
         existingNames={existingNames}
         saving={state.saving}
         onSave={saveEntry}
-        onClose={() => {
-          setAdding(false)
-          setEditing(undefined)
-        }}
+        onClose={() => { setEditing(undefined) }}
         t={t}
       />
     )
@@ -184,9 +193,20 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
     <div className={styles['section']}>
       <div className={styles['head']}>
         <h2 className={styles['title']}>{t('title')}</h2>
-        {/* Renders null while the provider owns no local document, so the
-            configure action appears only where it can actually open the file. */}
-        <ConfigureMcpAction document={document} useDocument={useDocument} t={t} />
+        {doc.status !== 'ready'
+          ? null
+          : (
+            <div className={styles['configure']}>
+              <button
+                type="button"
+                className={styles['configureButton']}
+                disabled={doc.opening}
+                onClick={openDocumentEditor}
+              >
+                {t('configure')}
+              </button>
+            </div>
+          )}
       </div>
       <p className={styles['intro']}>{t('intro')}</p>
       {!state.writable && state.available ? <p className={styles['notice']}>{t('readOnly')}</p> : null}
@@ -210,6 +230,16 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
                 unknown: styles['statusDotUnknown'],
               }[dot]
               const transport = server.transport === 'stdio' ? server.command : server.url
+              const tools = view?.tools ?? []
+              const isExpanded = expanded.has(server.serverName)
+              const toggleExpanded = (): void => {
+                setExpanded((previous) => {
+                  const next = new Set(previous)
+                  if (next.has(server.serverName)) next.delete(server.serverName)
+                  else next.add(server.serverName)
+                  return next
+                })
+              }
               return (
                 <li key={server.serverName} className={styles['rowCard']}>
                   <div className={styles['rowHead']}>
@@ -222,9 +252,20 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
                       />
                       <span className={styles['rowName']}>{server.serverName}</span>
                       <span className={styles['rowTransport']}>{transport}</span>
-                      <span className={styles['rowTools']}>
-                        {view === undefined ? '' : t('toolsCount').replace('{count}', String(view.tools.length))}
-                      </span>
+                      <button
+                        type="button"
+                        className={styles['toolsToggle']}
+                        disabled={tools.length === 0}
+                        aria-expanded={isExpanded}
+                        aria-controls={`mcp-tools-${server.serverName}`}
+                        title={tools.length === 0 ? t('noTools') : (isExpanded ? t('collapseTools') : t('expandTools'))}
+                        onClick={toggleExpanded}
+                      >
+                        {isExpanded
+                          ? <IconChevronDownOutline14 size={12} />
+                          : <IconChevronRightOutline14 size={12} />}
+                        <span>{t('toolsCount').replace('{count}', String(tools.length))}</span>
+                      </button>
                     </span>
                     <span className={styles['rowActions']}>
                       <button
@@ -254,7 +295,6 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
                         onClick={() => {
                           setSavedName(undefined)
                           setFailure(undefined)
-                          setAdding(false)
                           setEditing(server)
                         }}
                       >
@@ -277,28 +317,42 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
                   {dot === 'failed' && view?.error !== undefined
                     ? <p className={styles['rowError']} role="alert">{view.error}</p>
                     : null}
+                  {isExpanded && tools.length > 0
+                    ? (
+                      <ul
+                        id={`mcp-tools-${server.serverName}`}
+                        className={styles['toolsList']}
+                        aria-label={t('expandTools')}
+                      >
+                        {tools.map(tool => (
+                          <li key={tool.name} className={styles['toolsItem']}>
+                            <span className={styles['toolsName']} title={tool.description}>{tool.name}</span>
+                            {tool.description !== ''
+                              ? <span className={styles['toolsDescription']}>{tool.description}</span>
+                              : null}
+                          </li>
+                        ))}
+                      </ul>
+                    )
+                    : null}
                 </li>
               )
             })}
           </ul>
         )}
-      <div className={styles['addBlock']}>
-        <button
-          type="button"
-          className={styles['addButton']}
-          disabled={!state.writable}
-          onClick={() => {
-            setSavedName(undefined)
-            setFailure(undefined)
-            setEditing(undefined)
-            setAdding(true)
-          }}
-        >
-          <IconPlusOutline16 size={14} />
-          {t('add')}
-        </button>
-      </div>
       {dialog}
+      {editingDocument
+        ? (
+          <McpJsonEditor
+            text={doc.text}
+            opening={doc.opening}
+            error={doc.error}
+            onSave={saveDocument}
+            onClose={() => { setEditingDocument(false) }}
+            t={t}
+          />
+        )
+        : null}
       <Modal
         open={deleteTarget !== undefined}
         onClose={() => {

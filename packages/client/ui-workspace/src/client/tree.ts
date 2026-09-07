@@ -91,8 +91,6 @@ export interface SearchResultSet {
 /** Viewing state consumed by the derivation. */
 export interface TreeView {
   expandedGroups: readonly string[]
-  /** Browser-local order for Sessions without a backing Workspace account. */
-  ungroupedOrder?: readonly string[]
 }
 
 interface Group {
@@ -170,42 +168,25 @@ function buildGroup(
   order: 'account' | 'recency',
 ): Group {
   const sessions = [...members]
-  // Real Workspace order comes from sessionIds. Ungrouped falls back to
-  // recency until the browser supplies its persisted local order.
+  // `account` keeps the Host Workspace sessionIds order (manual mode);
+  // `recency` sorts by update time (updated mode and the ungrouped bucket).
   if (order === 'recency') sessions.sort(byRecency)
   return { key, workspaceId, cwd, createdAt, label, sessions }
 }
 
-/** Apply a stored Ungrouped order and append newly loose Sessions by recency. */
-function orderedUngrouped(members: readonly SessionSummary[], stored: readonly string[]): SessionSummary[] {
-  const byId = new Map(members.map(session => [session.id as string, session]))
-  const included = new Set<string>()
-  const ordered: SessionSummary[] = []
-  for (const key of stored) {
-    const session = byId.get(key)
-    if (session === undefined || included.has(key)) continue
-    ordered.push(session)
-    included.add(key)
-  }
-  for (const session of [...members].sort(byRecency)) {
-    if (included.has(session.id)) continue
-    ordered.push(session)
-  }
-  return ordered
-}
-
 /**
  * Group Sessions by Host Workspace: one group per entity in stable Host
- * order, with members resolved from sessionIds in their stored order. Sessions
- * outside every Workspace trail in the browser-local Ungrouped order, which
- * falls back to recency before that order is initialized.
+ * order, with members resolved from sessionIds in their stored order. In
+ * `manual` mode members keep that Host account order; in `updated` mode they
+ * sort by recency. Sessions outside every Workspace trail in the Ungrouped
+ * bucket, always newest-first.
  */
 function groupByWorkspace(
   list: SessionListState,
   workspaces: readonly WorkspaceView[],
   archived: ReadonlySet<SessionId>,
   drafting: ReadonlySet<SessionId>,
-  ungroupedOrder: readonly string[] | undefined,
+  orderBy: SessionOrderBy,
 ): Group[] {
   const groups: Group[] = []
   const accounted = new Set<SessionId>()
@@ -220,7 +201,8 @@ function groupByWorkspace(
     }
     groups.push(buildGroup(
       workspace.workspaceId, workspace.workspaceId, workspace.path,
-      Date.parse(workspace.createdAt), workspace.title, members, 'account',
+      Date.parse(workspace.createdAt), workspace.title, members,
+      orderBy === 'manual' ? 'account' : 'recency',
     ))
   }
   const stray = list.ids
@@ -234,8 +216,8 @@ function groupByWorkspace(
       undefined,
       undefined,
       '',
-      ungroupedOrder === undefined ? stray : orderedUngrouped(stray, ungroupedOrder),
-      ungroupedOrder === undefined ? 'recency' : 'account',
+      stray,
+      'recency',
     ))
   }
   return groups
@@ -276,16 +258,18 @@ function sessionNode(
  * Derive the workspace browser groups with every session as a top-level row.
  *
  * Every group shows; sessions populate under expanded groups in the selected
- * local order. Blank sessions are excluded except for the selected
- * provisional New Session row and any session still carrying an unsent
- * composer draft; archived sessions are excluded everywhere. Content search
- * lives outside this derivation (see {@link deriveSearchResults}).
+ * order mode (`manual` = Host account order, `updated` = newest-first). Blank
+ * sessions are excluded except for the selected provisional New Session row
+ * and any session still carrying an unsent composer draft; archived sessions
+ * are excluded everywhere. Content search lives outside this derivation (see
+ * {@link deriveSearchResults}).
  * @param list - sessions list snapshot (`current` feeds containsCurrent).
  * @param workspaces - real workspaces in stable Host order.
  * @param archivedSessionIds - registry-global archive set.
  * @param draftingSessions - Sessions whose composer holds an unsent draft.
  * @param pendingInteractions - pending UI interactions by Session.
  * @param view - local expansion arrays.
+ * @param orderBy - session ordering mode; defaults to `manual` (Host account order).
  * @returns group sections in render order.
  */
 export function deriveGroups(
@@ -295,6 +279,7 @@ export function deriveGroups(
   draftingSessions: ReadonlySet<SessionId>,
   pendingInteractions: SessionPendingInteractions,
   view: TreeView,
+  orderBy: SessionOrderBy = 'manual',
 ): GroupNode[] {
   const archived = new Set(archivedSessionIds)
   const expandedGroups = new Set(view.expandedGroups)
@@ -304,7 +289,7 @@ export function deriveGroups(
     : (workspaces.find(w => w.sessionIds.includes(list.current as SessionId))?.workspaceId as string | undefined)
         ?? UNGROUPED_KEY
   const groups: GroupNode[] = []
-  for (const g of groupByWorkspace(list, workspaces, archived, draftingSessions, view.ungroupedOrder)) {
+  for (const g of groupByWorkspace(list, workspaces, archived, draftingSessions, orderBy)) {
     const expanded = expandedGroups.has(g.key)
     groups.push({
       key: g.key,

@@ -1,0 +1,107 @@
+/* Editor dialog: wider than the default 380px card. `width`, not `max-width`:
+   the Modal primitive's own rule is `width: min(380px, 100%)`, so a
+   single-class rule loaded after the primitive wins the cascade. */
+.dialog {
+  width: min(720px, 100%);
+}
+
+/* The editor: a colored token layer stacked behind a transparent-text textarea.
+   Both share font, line-height, padding, and box-sizing, so the caret and the
+   colored glyphs stay on the same row. The wrapper has no intrinsic height;
+   the textarea's `min-height` (320px) sets the floor and the resize handle
+   lifts it from there. */
+.editor {
+  position: relative;
+  display: block;
+}
+
+/* One rule for both layers: same metric, same padding, same border. The
+   highlight is a `<div>`, not `<pre>`, because `<pre>` always renders a
+   trailing newline row that `<textarea>` does not reserve, which used to
+   drift the caret one row up from the colored text near the document end. */
+.highlight,
+.input {
+  margin: 0;
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 13px;
+  line-height: 1.6;
+  tab-size: 2;
+  white-space: pre;
+  overflow-wrap: normal;
+  box-sizing: border-box;
+}
+
+/* The token layer sits behind the textarea; its scroll mirrors the textarea's
+   and its height tracks the textarea's via a ResizeObserver set from React. */
+.highlight {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--shiki-foreground, inherit);
+  background: var(--shiki-background, transparent);
+}
+
+/* The input: transparent glyphs so the token layer shows through, with a
+   visible caret and background. It owns the interaction and scrolling. */
+.input {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  min-height: 320px;
+  resize: vertical;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--color-text, #1f1f1f);
+  outline: none;
+}
+
+/* The textarea's UA selection background still shows through transparent
+   text, so the selected run is visible without re-coloring the highlight. */
+.input::selection {
+  background: var(--color-selection, rgba(25, 113, 194, 0.35));
+}
+
+.input:focus {
+  border-color: var(--color-primary, #1971c2);
+}
+
+/* Token colors ride the theme package's --shiki-* sheets. */
+.tokKey {
+  color: var(--shiki-token-parameter);
+}
+
+.tokString {
+  color: var(--shiki-token-string);
+}
+
+.tokNumber {
+  color: var(--shiki-token-constant);
+}
+
+.tokBoolean,
+.tokNull {
+  color: var(--shiki-token-keyword);
+}
+
+.tokPunct {
+  color: var(--shiki-token-punctuation);
+}
+
+.tokPlain,
+.tokSentinel {
+  color: var(--shiki-foreground, inherit);
+}
+
+.error {
+  margin: 8px 0 0;
+  color: var(--color-danger, #c62828);
+  font-size: 12px;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

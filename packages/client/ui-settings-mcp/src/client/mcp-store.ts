@@ -6,6 +6,9 @@
  * lands on a moved revision fails rather than clobbering the newer answer.
  */
 
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+// Type-only: pulls the ctx.remote merge (the `mcp` Remote namespace) into this program.
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
@@ -36,9 +39,14 @@ export class McpStore {
   private readonly unsubscribe: () => void
 
   /**
+   * @param ctx - the page plugin's context, whose `remote.mcp` writes the
+   * user-editable `mcp.json` for single-server edits.
    * @param scope - bound `mcp` settings scope.
    */
-  constructor(private readonly scope: SettingsScope<McpSettings>) {
+  constructor(
+    private readonly ctx: ClientContext,
+    private readonly scope: SettingsScope<McpSettings>,
+  ) {
     this.store = createSnapshotStore(this.projection())
     this.unsubscribe = scope.subscribe(() => { this.publish() })
   }
@@ -74,13 +82,37 @@ export class McpStore {
   }
 
   /**
-   * Replace one server's entry in place.
+   * Replace one server's entry in place. Unlike add/remove/toggle, an edit
+   * writes the user-editable `mcp.json` (through the Host's single-server
+   * update) rather than the settings namespace, so the document that is the
+   * manual-edit source stays the authority and the change applies immediately.
    * @param server - the entry, keyed by its `serverName`.
-   * @returns whether the write landed.
+   * @returns whether the write landed and synced.
    */
-  update(server: McpServerEntry): Promise<boolean> {
+  async update(server: McpServerEntry): Promise<boolean> {
     if (!this.has(server.serverName)) return Promise.resolve(false)
-    return this.write(this.servers().map(entry => entry.serverName === server.serverName ? server : entry))
+    const snapshot = this.scope.getSnapshot()
+    if (snapshot.status !== 'ready' || !snapshot.writable || this.saving) return false
+    const generation = ++this.saveGeneration
+    this.saving = true
+    this.failed = false
+    this.publish()
+    try {
+      const result = await this.ctx.remote.mcp.updateMcpServer(server)
+      if (generation !== this.saveGeneration) return false
+      this.saving = false
+      this.failed = !result.ok
+      this.publish()
+      // The Host sync pushes `settings/document-updated`, which refreshes the
+      // mirror and this store's server list through the existing subscription.
+      return result.ok
+    } catch {
+      if (generation !== this.saveGeneration) return false
+      this.saving = false
+      this.failed = true
+      this.publish()
+      return false
+    }
   }
 
   /**

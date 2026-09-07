@@ -498,18 +498,14 @@ export interface Config {
   commands?: PromptCommandEntry[]
 }
 
-/** One prompt-command entry: discovery metadata plus the prompt text. */
+/** One prompt-command entry: the name, optional localized title, and prompt text. */
 export interface PromptCommandEntry {
   /** Lowercase command name without the leading slash. */
   name: string
   /** Localized display title (e.g. a Chinese name). */
   title?: string
-  /** Human-readable summary shown in discovery UI. */
-  description: string
   /** The prompt text submitted to the model on invocation. */
   prompt: string
-  /** Optional free-form input hint advertised to capable clients. */
-  hint?: string
 }
 ```
 

@@ -10,8 +10,7 @@ import type { SessionPendingInteractionSnapshot } from '@deepseek-ai/dsh-client-
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type { SessionDeleteOutcome, WorkspaceBrowserProps } from '../src/client/contract/slots.ts'
-import { createWorkspaceViewStore, FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
-import { UNGROUPED_KEY } from '../src/client/tree.ts'
+import { createWorkspaceViewStore } from '../src/client/stores.ts'
 import { WorkspaceBrowser } from '../src/client/rows/WorkspaceBrowser.tsx'
 import { zh } from '../src/client/locales.ts'
 
@@ -128,7 +127,7 @@ describe('WorkspaceBrowser', () => {
     }
   })
 
-  it('prunes deleted Workspace view state only after the Workspace baseline is ready', async () => {
+  it('prunes deleted Workspace expansion state only after the Workspace baseline is ready', async () => {
     const pending = {
       ...workspaceState([]),
       phase: 'pending' as const,
@@ -137,15 +136,12 @@ describe('WorkspaceBrowser', () => {
     const b = mount({ useWorkspaces: hook(pending) })
     act(() => {
       b.store.actions.setGroupExpanded('deleted', true)
-      b.store.actions.syncSessionOrderAccount('deleted', ['session'], { session: 1 })
     })
     expect(b.store.getSnapshot().groupExpansion).toEqual({ deleted: true })
 
     rerender(b, { useWorkspaces: hook(workspaceState([])) })
     await waitFor(() => {
       expect(b.store.getSnapshot().groupExpansion).toEqual({})
-      expect(b.store.getSnapshot().sessionOrderByAccount).toEqual({ [UNGROUPED_KEY]: [] })
-      expect(b.store.getSnapshot().sessionUpdatedAtByAccount).toEqual({ [UNGROUPED_KEY]: {} })
     })
   })
 
@@ -190,8 +186,7 @@ describe('WorkspaceBrowser', () => {
     expect(b.store.getSnapshot().groupBy).toBe('workspace')
   })
 
-  it('persists flat-list drag order locally and applies Last updated within that account', async () => {
-    const insertSessionBefore = vi.fn(async () => {})
+  it('renders the flat list newest-first and persists the view preference', async () => {
     const sessions = sessionState([summary('one', 3), summary('two', 2), summary('three', 1)])
     const workspaces = workspaceState([
       workspace('alpha', ['one']),
@@ -200,48 +195,21 @@ describe('WorkspaceBrowser', () => {
     const b = mount({
       useSessions: hook(sessions),
       useWorkspaces: hook(workspaces),
-      insertSessionBefore,
     })
     fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '单列表' }))
-    await waitFor(() => {
-      expect(b.store.getSnapshot().sessionOrderByAccount[FLAT_SESSION_ORDER_KEY])
-        .toEqual(['one', 'two', 'three'])
-    })
-
-    const one = screen.getByText('one').closest('[role="treeitem"]') as HTMLElement
-    const three = screen.getByText('three').closest('[role="treeitem"]') as HTMLElement
-    three.getBoundingClientRect = () => ({
-      top: 150, bottom: 184, left: 0, right: 200, width: 200, height: 34,
-      x: 0, y: 150, toJSON: () => ({}),
-    })
-    fireEvent.dragStart(one, { dataTransfer: dragData() })
-    fireDrag(three, 'drop', 180)
-    expect(b.store.getSnapshot().sessionOrderByAccount[FLAT_SESSION_ORDER_KEY])
-      .toEqual(['two', 'three', 'one'])
-    expect(insertSessionBefore).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '最近更新' }))
-    await waitFor(() => {
-      expect(b.store.getSnapshot().sessionOrderByAccount[FLAT_SESSION_ORDER_KEY])
-        .toEqual(['one', 'two', 'three'])
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '手动排序' }))
-    fireEvent.dragStart(one, { dataTransfer: dragData() })
-    fireDrag(three, 'drop', 180)
-    b.view.unmount()
-
-    const restored = mount({ useSessions: hook(sessions), useWorkspaces: hook(workspaces) })
-    expect(restored.store.getSnapshot().groupBy).toBe('flat')
-    expect(restored.store.getSnapshot().orderBy).toBe('manual')
-    expect(screen.getAllByRole('treeitem').map(row => row.textContent)).toEqual([
+    // Flat rows are deterministic newest-first and carry no drag affordance.
+    const rows = screen.getAllByRole('treeitem')
+    expect(rows.map(row => row.textContent)).toEqual([
+      expect.stringContaining('one'),
       expect.stringContaining('two'),
       expect.stringContaining('three'),
-      expect.stringContaining('one'),
     ])
+    expect(rows.every(row => row.getAttribute('draggable') !== 'true')).toBe(true)
+
+    b.view.unmount()
+    const restored = mount({ useSessions: hook(sessions), useWorkspaces: hook(workspaces) })
+    expect(restored.store.getSnapshot().groupBy).toBe('flat')
   })
 
   it('expands a group on click and opens a session row', () => {
@@ -308,115 +276,68 @@ describe('WorkspaceBrowser', () => {
     expect(screen.getByRole('button', { name: '展开其余 2 个会话' })).toBeTruthy()
   })
 
-  it('anchors collapsed drags before hidden rows so the source stays visible', async () => {
-    const ordinary = Array.from({ length: 6 }, (_, index) => summary(`session-${index + 1}`, 6 - index))
-    const blank = summary('blank', 7, { blank: true })
+  it('anchors a collapsed drag before hidden rows so the source stays visible', async () => {
+    const sessions = Array.from({ length: 7 }, (_, index) => summary(`session-${index + 1}`, 7 - index))
     const insertSessionBefore = vi.fn(async () => {})
-    const b = mount({
-      useSessions: hook(sessionState([blank, ...ordinary], { current: blank.id })),
-      useWorkspaces: hook(workspaceState([workspace('alpha', [blank.id, ...ordinary.map(item => item.id)])])),
+    mount({
+      useSessions: hook(sessionState(sessions)),
+      useWorkspaces: hook(workspaceState([workspace('alpha', sessions.map(item => item.id))])),
       insertSessionBefore,
     })
-    await waitFor(() => {
-      expect(b.store.getSnapshot().sessionOrderByAccount.alpha)
-        .toEqual(['blank', 'session-1', 'session-2', 'session-3', 'session-4', 'session-5', 'session-6'])
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: '展开其余 1 个会话' }))
-    const blankRow = screen.getByText('新会话').closest('[role="treeitem"]') as HTMLElement
-    const session6 = screen.getByText('session-6').closest('[role="treeitem"]') as HTMLElement
-    session6.getBoundingClientRect = () => ({
-      top: 200, bottom: 234, left: 0, right: 200, width: 200, height: 34,
-      x: 0, y: 200, toJSON: () => ({}),
-    })
-    fireEvent.dragStart(blankRow, { dataTransfer: dragData() })
-    fireDrag(session6, 'drop', 230)
-    expect(b.store.getSnapshot().sessionOrderByAccount.alpha)
-      .toEqual(['session-1', 'session-2', 'session-3', 'session-4', 'session-5', 'session-6', 'blank'])
-
-    insertSessionBefore.mockClear()
-    fireEvent.click(screen.getByRole('button', { name: '收起' }))
-    const collapsedBlank = screen.getByText('新会话').closest('[role="treeitem"]') as HTMLElement
-    collapsedBlank.getBoundingClientRect = () => ({
-      top: 200, bottom: 234, left: 0, right: 200, width: 200, height: 34,
-      x: 0, y: 200, toJSON: () => ({}),
-    })
+    // Expand the group so its five-row fold shows session-1..5 and hides
+    // session-6/7. Dragging session-4 to session-5's bottom half anchors to
+    // the hidden session-6.
+    fireEvent.click(screen.getByText('alpha'))
     const session5 = screen.getByText('session-5').closest('[role="treeitem"]') as HTMLElement
-    fireEvent.dragStart(session5, { dataTransfer: dragData() })
-    fireDrag(collapsedBlank, 'drop', 205)
-    expect(insertSessionBefore).not.toHaveBeenCalled()
-
+    session5.getBoundingClientRect = () => ({
+      top: 200, bottom: 234, left: 0, right: 200, width: 200, height: 34,
+      x: 0, y: 200, toJSON: () => ({}),
+    })
     const session4 = screen.getByText('session-4').closest('[role="treeitem"]') as HTMLElement
     fireEvent.dragStart(session4, { dataTransfer: dragData() })
-    fireDrag(collapsedBlank, 'drop', 205)
-    expect(b.store.getSnapshot().sessionOrderByAccount.alpha)
-      .toEqual(['session-1', 'session-2', 'session-3', 'session-5', 'session-4', 'session-6', 'blank'])
+    fireDrag(session5, 'drop', 230)
     expect(insertSessionBefore).toHaveBeenCalledWith(wid('alpha'), sid('session-4'), sid('session-6'))
     expect(screen.getByText('session-4')).toBeTruthy()
     expect(screen.queryByText('session-6')).toBeNull()
   })
 
-  it('shares one editable order across modes and promotes only while Last updated is active', async () => {
+  it('keeps Host order in manual mode and sorts by recency in Last updated', async () => {
     const initial = sessionState([summary('one', 3), summary('two', 2)])
     const b = mount({
       useSessions: hook(initial),
       useWorkspaces: hook(workspaceState([workspace('alpha', ['two', 'one'])])),
     })
+    // Manual mode (the beforeEach default) keeps the Host sessionIds order.
     fireEvent.click(screen.getByText('alpha'))
+    let rows = screen.getAllByRole('treeitem').slice(1)
+    expect(rows[0]?.textContent).toContain('two')
+    expect(rows[1]?.textContent).toContain('one')
+
+    // Last updated sorts deterministically by recency.
     fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '最近更新' }))
     await waitFor(() => {
-      const rows = screen.getAllByRole('treeitem').slice(1)
+      rows = screen.getAllByRole('treeitem').slice(1)
       expect(rows[0]?.textContent).toContain('one')
       expect(rows[1]?.textContent).toContain('two')
     })
 
-    const [one, two] = screen.getAllByRole('treeitem').slice(1) as [HTMLElement, HTMLElement]
-    two.getBoundingClientRect = () => ({
-      top: 150, bottom: 184, left: 0, right: 200, width: 200, height: 34, x: 0, y: 150, toJSON: () => ({}),
+    // A later activity keeps the recency order (one stays newest).
+    rerender(b, { useSessions: hook(sessionState([summary('one', 4), summary('two', 2)])) })
+    await waitFor(() => {
+      rows = screen.getAllByRole('treeitem').slice(1)
+      expect(rows[0]?.textContent).toContain('one')
+      expect(rows[1]?.textContent).toContain('two')
     })
-    fireEvent.dragStart(one, { dataTransfer: dragData() })
-    fireDrag(two, 'drop', 180)
-    expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['two', 'one'])
 
+    // Switching back to manual restores the Host account order.
     fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
     fireEvent.click(screen.getByRole('menuitem', { name: '手动排序' }))
-    expect(screen.getAllByRole('treeitem').slice(1)[0]?.textContent).toContain('two')
-
-    // User activity updates the timestamp baseline in Manual mode without
-    // changing the shared visual order.
-    const updated = sessionState([summary('one', 4), summary('two', 2)])
-    rerender(b, { useSessions: hook(updated) })
     await waitFor(() => {
-      expect(b.store.getSnapshot().sessionUpdatedAtByAccount.alpha).toEqual({ one: 4, two: 2 })
+      rows = screen.getAllByRole('treeitem').slice(1)
+      expect(rows[0]?.textContent).toContain('two')
+      expect(rows[1]?.textContent).toContain('one')
     })
-    expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['two', 'one'])
-    expect(screen.getAllByRole('treeitem').slice(1)[0]?.textContent).toContain('two')
-
-    // Entering Last updated performs one complete recency sort.
-    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '最近更新' }))
-    await waitFor(() => {
-      expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['one', 'two'])
-      expect(screen.getAllByRole('treeitem').slice(1)[0]?.textContent).toContain('one')
-    })
-
-    // A later user activity timestamp promotes that Session once while the
-    // mode remains active.
-    const promoted = sessionState([summary('one', 4), summary('two', 5)])
-    rerender(b, { useSessions: hook(promoted) })
-    await waitFor(() => {
-      expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['two', 'one'])
-      expect(screen.getAllByRole('treeitem').slice(1)[0]?.textContent).toContain('two')
-    })
-
-    b.view.unmount()
-    const restored = mount({
-      useSessions: hook(promoted),
-      useWorkspaces: hook(workspaceState([workspace('alpha', ['two', 'one'])])),
-    })
-    expect(restored.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['two', 'one'])
-    expect(screen.getAllByRole('treeitem').slice(1)[0]?.textContent).toContain('two')
   })
 
   it('archives a session from the row menu and hides archived rows in both modes', async () => {
@@ -719,39 +640,39 @@ describe('WorkspaceBrowser', () => {
     expect(screen.queryByText('新会话')).toBeNull()
   })
 
-  it('promotes the blank selected by New Session in its grouped and flat orders', async () => {
+  it('shows the blank New Session row without reordering the Host account', async () => {
     const items = [
       summary('old', 100),
       summary('blank', 150, { blank: true }),
       summary('mid', 200),
     ]
-    const startSession = vi.fn()
     const b = mount({
-      useSessions: hook(sessionState(items)),
+      useSessions: hook(sessionState(items, { current: sid('blank') })),
       useWorkspaces: hook(workspaceState([workspace('alpha', ['old', 'blank', 'mid'])])),
-      startSession,
     })
-    await waitFor(() => {
-      expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['old', 'blank', 'mid'])
-    })
-    startSession.mockImplementation(() => {
-      rerender(b, { useSessions: hook(sessionState(items, { current: sid('blank') })) })
-    })
-    fireEvent.click(screen.getByRole('button', { name: '在“alpha”中新建会话' }))
-    expect(startSession).toHaveBeenCalledWith(wid('alpha'))
-    await waitFor(() => {
-      expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['blank', 'old', 'mid'])
-      expect(b.store.getSnapshot().sessionOrderByAccount[FLAT_SESSION_ORDER_KEY]).toEqual(['blank'])
-    })
+    // Manual mode keeps the Host account order; the blank stays in place.
+    let rows = screen.getAllByRole('treeitem').slice(1)
+    expect(rows.map(row => row.textContent)).toEqual([
+      expect.stringContaining('old'),
+      expect.stringContaining('新会话'),
+      expect.stringContaining('mid'),
+    ])
+
+    // Flat mode sorts every session newest-first.
     b.store.actions.setGroupBy('flat')
     await waitFor(() => {
-      expect(b.store.getSnapshot().sessionOrderByAccount[FLAT_SESSION_ORDER_KEY]).toEqual(['blank', 'mid', 'old'])
+      rows = screen.getAllByRole('treeitem')
+      expect(rows.map(row => row.textContent)).toEqual([
+        expect.stringContaining('mid'),
+        expect.stringContaining('新会话'),
+        expect.stringContaining('old'),
+      ])
     })
   })
 
-  it('does not repeat blank promotion after a manual drag or the first prompt', async () => {
+  it('reorders the blank New Session row through its Workspace account', async () => {
     const insertSessionBefore = vi.fn(async () => {})
-    const b = mount({
+    mount({
       useSessions: hook(sessionState([
         summary('old', 100),
         summary('blank', 150, { blank: true }),
@@ -760,9 +681,6 @@ describe('WorkspaceBrowser', () => {
       useWorkspaces: hook(workspaceState([workspace('alpha', ['old', 'blank', 'mid'])])),
       insertSessionBefore,
     })
-    await waitFor(() => {
-      expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['blank', 'old', 'mid'])
-    })
     const blank = screen.getByText('新会话').closest('[role="treeitem"]') as HTMLElement
     const mid = screen.getByText('mid').closest('[role="treeitem"]') as HTMLElement
     mid.getBoundingClientRect = () => ({
@@ -770,19 +688,7 @@ describe('WorkspaceBrowser', () => {
     })
     fireEvent.dragStart(blank, { dataTransfer: dragData() })
     fireDrag(mid, 'drop', 180)
-    expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['old', 'mid', 'blank'])
     expect(insertSessionBefore).toHaveBeenCalledWith(wid('alpha'), sid('blank'), undefined)
-
-    rerender(b, {
-      useSessions: hook(sessionState([
-        summary('old', 100),
-        summary('blank', 150),
-        summary('mid', 200),
-      ], { current: sid('blank') })),
-    })
-    await waitFor(() => {
-      expect(b.store.getSnapshot().sessionOrderByAccount.alpha).toEqual(['old', 'mid', 'blank'])
-    })
   })
 
   it('shows local metadata matches immediately, then clears back to the grouped tree', async () => {
@@ -1198,53 +1104,21 @@ describe('WorkspaceBrowser', () => {
     expect(insertSessionBefore).toHaveBeenCalledTimes(1)
   })
 
-  it('persists Ungrouped drag order in both modes without writing a Host Workspace account', async () => {
-    const insertSessionBefore = vi.fn(async () => {})
+  it('renders Ungrouped sessions newest-first with no drag affordance', async () => {
     const sessions = sessionState([summary('one', 3), summary('two', 2), summary('three', 1)])
-    const b = mount({
+    mount({
       useSessions: hook(sessions),
       useWorkspaces: hook(workspaceState([])),
-      insertSessionBefore,
     })
     fireEvent.click(screen.getByText('未分组'))
-
-    const dragAfter = (sourceTitle: string, targetTitle: string): void => {
-      const source = screen.getByText(sourceTitle).closest('[role="treeitem"]') as HTMLElement
-      const target = screen.getByText(targetTitle).closest('[role="treeitem"]') as HTMLElement
-      target.getBoundingClientRect = () => ({
-        top: 150, bottom: 184, left: 0, right: 200, width: 200, height: 34, x: 0, y: 150, toJSON: () => ({}),
-      })
-      fireEvent.dragStart(source, { dataTransfer: dragData() })
-      fireDrag(target, 'drop', 180)
-    }
-
-    dragAfter('one', 'three')
-    expect(b.store.getSnapshot().sessionOrderByAccount[UNGROUPED_KEY]).toEqual(['two', 'three', 'one'])
-    dragAfter('two', 'one')
-    expect(b.store.getSnapshot().sessionOrderByAccount[UNGROUPED_KEY]).toEqual(['three', 'one', 'two'])
-    expect(insertSessionBefore).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByRole('button', { name: '视图选项' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: '最近更新' }))
-    await waitFor(() => {
-      expect(b.store.getSnapshot().sessionOrderByAccount[UNGROUPED_KEY]).toEqual(['one', 'two', 'three'])
-    })
-    dragAfter('one', 'three')
-    expect(b.store.getSnapshot().sessionOrderByAccount[UNGROUPED_KEY]).toEqual(['two', 'three', 'one'])
-    expect(insertSessionBefore).not.toHaveBeenCalled()
-
-    b.view.unmount()
-    const restored = mount({
-      useSessions: hook(sessions),
-      useWorkspaces: hook(workspaceState([])),
-      insertSessionBefore,
-    })
-    expect(restored.store.getSnapshot().sessionOrderByAccount[UNGROUPED_KEY]).toEqual(['two', 'three', 'one'])
-    expect(screen.getAllByRole('treeitem').slice(1).map(row => row.textContent)).toEqual([
+    const rows = screen.getAllByRole('treeitem').slice(1)
+    expect(rows.map(row => row.textContent)).toEqual([
+      expect.stringContaining('one'),
       expect.stringContaining('two'),
       expect.stringContaining('three'),
-      expect.stringContaining('one'),
     ])
+    // Ungrouped sessions have no Host account to reorder into.
+    expect(rows.every(row => row.getAttribute('draggable') !== 'true')).toBe(true)
   })
 
   it('still sends the reorder when the dragged row left the group mid-drag', () => {

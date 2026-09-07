@@ -24,11 +24,6 @@
   min-width: 0;
 }
 
-.configureError {
-  color: var(--color-danger, #c62828);
-  font-size: 12px;
-}
-
 .configureButton {
   border: 1px solid var(--color-border, #e0e0e0);
   border-radius: 6px;
@@ -131,6 +126,74 @@
   font-size: 12px;
 }
 
+/* The tools toggle sits inside `.rowIdentity`, next to the transport line.
+   Clicking reveals the list of tools the server registers; the chevron flips
+   to mark the open state. Disabled when the server has no tools to show. */
+.toolsToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: var(--color-text-secondary, #666);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.toolsToggle:hover:not(:disabled) {
+  background: var(--color-background-hover, rgba(0, 0, 0, 0.05));
+  color: var(--color-text, #1f1f1f);
+}
+
+.toolsToggle:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.toolsToggle:focus-visible {
+  outline: 2px solid var(--color-primary, #1971c2);
+  outline-offset: 1px;
+}
+
+/* The expanded tool list: one chip-style entry per tool, the description
+   underneath the name. The name's `title` attribute carries the same text
+   so a hover surfaces it without expanding the row. */
+.toolsList {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.toolsItem {
+  border: 1px solid var(--color-border-soft, rgba(0, 0, 0, 0.08));
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--color-background-soft, rgba(0, 0, 0, 0.02));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toolsName {
+  font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  color: var(--color-text, #1f1f1f);
+  word-break: break-all;
+  cursor: help;
+}
+
+.toolsDescription {
+  font-size: 12px;
+  color: var(--color-text-secondary, #666);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .rowError {
   margin: 8px 0 0;
   color: var(--color-danger, #c62828);
@@ -198,8 +261,7 @@
 }
 
 .secondaryButton,
-.dangerButton,
-.addButton {
+.dangerButton {
   border: 1px solid var(--color-border, #e0e0e0);
   border-radius: 6px;
   padding: 4px 10px;
@@ -208,8 +270,7 @@
 }
 
 .secondaryButton:disabled,
-.dangerButton:disabled,
-.addButton:disabled {
+.dangerButton:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
@@ -217,16 +278,6 @@
 .dangerButton {
   color: var(--color-danger, #c62828);
   border-color: var(--color-danger, #c62828);
-}
-
-.addBlock {
-  display: flex;
-}
-
-.addButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .deleteConfirm {

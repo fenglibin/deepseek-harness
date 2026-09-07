@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-/** MCP section rendering: a failed connection surfaces its diagnostic error. */
+/** MCP section rendering: a failed connection surfaces its diagnostic error,
+ * and entering the section reconnects enabled servers that are not connected. */
 import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { McpServerStatusView } from '@deepseek-ai/dsh-api-remotes/client'
 import { McpSection } from '../src/client/McpSection.tsx'
 import type { McpSectionProps } from '../src/client/McpSection.tsx'
@@ -24,7 +25,10 @@ const server: McpServerEntry = {
 }
 
 /** Render the section with one server whose live status is `statuses.get(serverName)`. */
-function renderSection(statuses: Map<string, McpServerStatusView>): void {
+function renderSection(statuses: Map<string, McpServerStatusView>): {
+  refresh: ReturnType<typeof vi.fn>
+} {
+  const refresh = vi.fn(() => Promise.resolve())
   const props = {
     store: {
       add: () => Promise.resolve(true),
@@ -34,18 +38,20 @@ function renderSection(statuses: Map<string, McpServerStatusView>): void {
     },
     status: {
       load: () => Promise.resolve(),
-      refresh: () => Promise.resolve(),
+      refresh,
     },
     document: {
       load: () => Promise.resolve(),
-      open: () => Promise.resolve(),
+      read: () => Promise.resolve(),
+      write: () => Promise.resolve(true),
     },
     useMcp: () => ({ available: true, writable: true, servers: [server], saving: false, failed: false }),
     useStatus: () => ({ statuses, loading: false, refreshing: false }),
-    useDocument: () => ({ status: 'ready' as const, opening: false, error: null }),
+    useDocument: () => ({ status: 'ready' as const, opening: false, error: null, text: '' }),
     t,
   } as unknown as McpSectionProps
   render(<McpSection {...props} />)
+  return { refresh }
 }
 
 describe('McpSection connection error', () => {
@@ -63,7 +69,7 @@ describe('McpSection connection error', () => {
     renderSection(new Map([['mysql', {
       serverName: 'mysql',
       status: 'connected',
-      tools: ['mcp__mysql__query'],
+      tools: [{ name: 'mcp__mysql__query', description: '' }],
     }]]))
     expect(screen.queryByRole('alert')).toBeNull()
   })
@@ -75,5 +81,25 @@ describe('McpSection connection error', () => {
       tools: [],
     }]]))
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+})
+
+describe('McpSection auto-connect', () => {
+  it('reconnects an enabled server that is not connected', () => {
+    const { refresh } = renderSection(new Map([['mysql', {
+      serverName: 'mysql',
+      status: 'failed',
+      tools: [],
+    }]]))
+    expect(refresh).toHaveBeenCalledWith('mysql')
+  })
+
+  it('leaves a connected enabled server alone', () => {
+    const { refresh } = renderSection(new Map([['mysql', {
+      serverName: 'mysql',
+      status: 'connected',
+      tools: [],
+    }]]))
+    expect(refresh).not.toHaveBeenCalled()
   })
 })

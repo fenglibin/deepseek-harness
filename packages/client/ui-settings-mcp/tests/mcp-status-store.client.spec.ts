@@ -3,11 +3,11 @@
  * per-server lookup, and a refresh that re-pulls after forcing a reconnect.
  */
 import { describe, expect, it, vi } from 'vitest'
-import type { McpServerStatusView } from '@deepseek-ai/dsh-api-remotes/client'
+import type { McpServerStatusView, McpToolInfo } from '@deepseek-ai/dsh-api-remotes/client'
 import { McpStatusStore } from '../src/client/mcp-status-store.ts'
 
 /** One status view with the given name and lifecycle state. */
-function view(name: string, status: McpServerStatusView['status'], tools: string[] = []): McpServerStatusView {
+function view(name: string, status: McpServerStatusView['status'], tools: McpToolInfo[] = []): McpServerStatusView {
   return { serverName: name, status, tools }
 }
 
@@ -23,7 +23,7 @@ type RefreshAnswer =
 function build(options?: { list?: () => Promise<ListAnswer>; refresh?: () => Promise<RefreshAnswer> }) {
   const list = vi.fn(options?.list ?? (() => Promise.resolve({
     ok: true as const,
-    value: [view('srv', 'connected', ['mcp__srv__remote'])],
+    value: [view('srv', 'connected', [{ name: 'mcp__srv__remote', description: '' }])],
   })))
   const refresh = vi.fn(options?.refresh ?? (() => Promise.resolve({ ok: true as const, value: true })))
   const listeners = new Set<() => void>()

@@ -71,7 +71,7 @@ manager 为配置界面导出一个 `mcp` Remote 命名空间。`list()` 为每�
 
 ### mcp.json 文档
 
-manager 把一份 `mcp.json`（与其它主流 MCP 平台相同的跨厂商 `mcpServers` 结构）放在 settings 文档旁边，作为 MCP 的手动编辑入口。文件变化时，manager 先校验 JSON 格式，再把每个条目转换成 `servers` 数组，只在全部有效时才整体覆盖 `mcp` 命名空间；格式或条目非法时跳过同步并告警，settings 保留最后一份好文档。`disabled` 映射为 `enabled` 的取反，有 `command` 判为 stdio，有 `url` 判为 HTTP，`timeout` 与 `transportType` 被忽略。超出 `[A-Za-z0-9_-]{1,32}` 契约的服务器名会被哈希成稳定的 `mcp-<hex>` 名字，因此任何输入都能同步而不被拒绝。这份同步是单向且整节的：`mcp.json` 是手动编辑源，结构化表单的写入会在下一次 `mcp.json` 变化时被覆盖。
+manager 把一份 `mcp.json`（与其它主流 MCP 平台相同的跨厂商 `mcpServers` 结构）放在 settings 文档旁边，作为 MCP 的就地编辑入口。`readMcpDocument()` 返回文档文本（缺失时先播种）；`writeMcpDocument(text)` 先做完整校验——JSON 语法、`mcpServers` 结构、以及每条目的 `command`/`url`——再持久化，随后**立即**跑一遍同步，让变更当下生效而不是等文件监视器的去抖；`updateMcpServer(entry)` 把一条表单编辑合并进该文档的对应条目并同样立即同步。文件变化时，manager 先校验 JSON 格式，再把每个条目转换成 `servers` 数组，只在全部有效时才整体覆盖 `mcp` 命名空间；格式或条目非法时跳过同步并告警，settings 保留最后一份好文档。`disabled` 映射为 `enabled` 的取反，有 `command` 判为 stdio，有 `url` 判为 HTTP，`timeout` 与 `transportType` 被忽略。超出 `[A-Za-z0-9_-]{1,32}` 契约的服务器名会被哈希成稳定的 `mcp-<hex>` 名字，因此任何输入都能同步而不被拒绝。
 
 -----
 
@@ -97,7 +97,7 @@ manager 是建在两条 seam 上的一个服务：一条是它拥有的 settings
 
 ### mcp.json 同步
 
-当 settings provider 是文件类型时，manager 解析出 `mcp.json` 的路径（settings 文档同目录），先播种缺失的文档，再用 chokidar 监听它的变化。每次变化走一条单向路径：`readFile` → `parseMcpJson`（JSON 语法与 `mcpServers` 结构校验）→ `mcpJsonToSettings`（`mcpServers` map 到 `servers` 数组，`disabled` 取反、`command`/`url` 判别传输）→ `SettingsScope.replace`。任一步失败都会被记录并跳过，绝不会把半成品写进 settings；转换本身是纯函数，集中在 `mcp-json.ts`。文档缺失时，`bootstrapMcpJson` 从当前 `scope.get()` 反向渲染一份 `mcp.json`，因此首次手动编辑从 settings 已有的内容开始。
+当 settings provider 是文件类型时，manager 解析出 `mcp.json` 的路径（settings 文档同目录），先播种缺失的文档，再用 chokidar 监听它的变化。每次变化走一条单向路径：`readFile` → `parseMcpJson`（JSON 语法与 `mcpServers` 结构校验）→ `mcpJsonToSettings`（`mcpServers` map 到 `servers` 数组，`disabled` 取反、`command`/`url` 判别传输）→ `SettingsScope.replace`。任一步失败都会被记录并跳过，绝不会把半成品写进 settings；转换本身是纯函数，集中在 `mcp-json.ts`。文档缺失时，`bootstrapMcpJson` 从当前 `scope.get()` 反向渲染一份 `mcp.json`，因此首次手动编辑从 settings 已有的内容开始。`writeMcpDocument` 与 `updateMcpServer` 在 `writeFile` 之后直接 `await syncMcpJson()`，因此就地编辑立即生效；监视器随后读到同一份内容时，`deepEqualJson` 判等会跳过重复的 apply，不产生二次挂载。
 
 </details>
 

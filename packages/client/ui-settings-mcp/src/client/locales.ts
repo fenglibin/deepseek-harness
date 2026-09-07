@@ -12,6 +12,10 @@ export const zh = {
   cancel: '取消',
   save: '保存',
   saving: '保存中…',
+  format: '格式化',
+  editorTitle: '编辑 mcp.json',
+  invalidJson: 'JSON 语法错误',
+  saveFailed: '保存失败',
   readOnly: '当前部署的设置文档为只读。',
   empty: '尚未配置任何 MCP 服务器。',
   enabled: '已启用',
@@ -45,6 +49,9 @@ export const zh = {
   enabledLabel: '启用',
   refresh: '刷新',
   toolsCount: '{count} 个工具',
+  expandTools: '展开工具',
+  collapseTools: '收起工具',
+  noTools: '暂无可用工具',
 } satisfies Record<string, string>
 
 /** The settings.mcp namespace key union. */

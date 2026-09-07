@@ -4,15 +4,18 @@
  * module-level handle would pin the store identity across plugin reloads);
  * register() receives the factory and the browser derives its PropsStore
  * share from the return type.
+ *
+ * Session ordering is NOT persisted here: the Host owns every ordering fact
+ * (Workspace `sessionIds` manual order and per-Session `updatedAt`), so the
+ * derived row order is deterministic and identical across browsers. This
+ * store keeps only presentation preferences (grouping, ordering mode, and
+ * expansion state).
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
 
-/** Browser-local order account for the hierarchy-free flat Session list. */
-export const FLAT_SESSION_ORDER_KEY = '__flat_session_order__'
-
 /** Session-list grouping mode: workspace sections or one flat recency list. */
 export type SessionGroupBy = 'workspace' | 'flat'
-/** Session order: user-arranged only, or user-arranged plus activity promotion. */
+/** Session order: Host manual order, or a deterministic recency sort. */
 export type SessionOrderBy = 'manual' | 'updated'
 
 /** Workspace browser viewing state persisted across surface remounts and reloads. */
@@ -23,10 +26,6 @@ type WorkspaceViewState = {
   groupExpansion: Record<string, boolean>
   /** Whether the archive section shows its rows. */
   archivedExpanded: boolean
-  /** Shared editable order per Workspace group plus the browser-local flat-list account. */
-  sessionOrderByAccount: Record<string, string[]>
-  /** Last observed update timestamps per order account for one-time promotion events. */
-  sessionUpdatedAtByAccount: Record<string, Record<string, number>>
 }
 
 /**
@@ -38,14 +37,7 @@ type WorkspaceViewActions = {
   setOrderBy: (draft: WorkspaceViewState, mode: SessionOrderBy) => void
   setGroupExpanded: (draft: WorkspaceViewState, key: string, expanded: boolean) => void
   setArchivedExpanded: (draft: WorkspaceViewState, expanded: boolean) => void
-  retainAccountKeys: (draft: WorkspaceViewState, workspaceKeys: readonly string[]) => void
-  syncSessionOrderAccount: (
-    draft: WorkspaceViewState,
-    accountKey: string,
-    order: string[],
-    updatedAt: Record<string, number>,
-  ) => void
-  setSessionOrder: (draft: WorkspaceViewState, accountKey: string, order: string[]) => void
+  retainGroupExpansionKeys: (draft: WorkspaceViewState, workspaceKeys: readonly string[]) => void
 }
 
 /**
@@ -59,33 +51,18 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
       orderBy: 'updated',
       groupExpansion: {},
       archivedExpanded: false,
-      sessionOrderByAccount: {},
-      sessionUpdatedAtByAccount: {},
     }),
-    persist: 'dsh.workspace.view.v6',
+    persist: 'dsh.workspace.view.v7',
     actions: {
       setGroupBy: (d, mode: SessionGroupBy) => { d.groupBy = mode },
       setOrderBy: (d, mode: SessionOrderBy) => { d.orderBy = mode },
       setGroupExpanded: (d, key: string, expanded: boolean) => { d.groupExpansion[key] = expanded },
       setArchivedExpanded: (d, expanded: boolean) => { d.archivedExpanded = expanded },
-      retainAccountKeys: (d, workspaceKeys: readonly string[]) => {
+      retainGroupExpansionKeys: (d, workspaceKeys: readonly string[]) => {
         const retained = new Set(workspaceKeys)
         d.groupExpansion = Object.fromEntries(
           Object.entries(d.groupExpansion).filter(([key]) => retained.has(key)),
         )
-        d.sessionOrderByAccount = Object.fromEntries(
-          Object.entries(d.sessionOrderByAccount).filter(([key]) => retained.has(key)),
-        )
-        d.sessionUpdatedAtByAccount = Object.fromEntries(
-          Object.entries(d.sessionUpdatedAtByAccount).filter(([key]) => retained.has(key)),
-        )
-      },
-      syncSessionOrderAccount: (d, accountKey: string, order: string[], updatedAt: Record<string, number>) => {
-        d.sessionOrderByAccount[accountKey] = order
-        d.sessionUpdatedAtByAccount[accountKey] = updatedAt
-      },
-      setSessionOrder: (d, accountKey: string, order: string[]) => {
-        d.sessionOrderByAccount[accountKey] = order
       },
     },
   })

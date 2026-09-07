@@ -26,10 +26,7 @@ const workspace = (id: string, sessionIds: string[], title = id): WorkspaceView 
   workspaceId: wid(id), path: `/projects/${id}`, title,
   sessionIds: sessionIds.map(sid), createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
 })
-const view = (expandedGroups: readonly string[] = [], ungroupedOrder?: readonly string[]) => ({
-  expandedGroups,
-  ...(ungroupedOrder === undefined ? {} : { ungroupedOrder }),
-})
+const view = (expandedGroups: readonly string[] = []) => ({ expandedGroups })
 const noArchive: readonly SessionId[] = []
 /** No Session carries an unsent composer draft. */
 const noDrafts: ReadonlySet<SessionId> = new Set()
@@ -88,7 +85,7 @@ describe('deriveGroups', () => {
     expect(groups[1]!.sessions.map(session => session.id)).toEqual([sid('loose')])
   })
 
-  it('applies stored Ungrouped order and appends new loose Sessions by recency', () => {
+  it('orders loose Sessions newest-first without a browser-local account', () => {
     const sessions = list(summary('one', 3), summary('two', 2), summary('new', 4))
     const groups = deriveGroups(
       sessions,
@@ -96,10 +93,10 @@ describe('deriveGroups', () => {
       noArchive,
       noDrafts,
       noAttention,
-      view([UNGROUPED_KEY], ['two', 'stale', 'two']),
+      view([UNGROUPED_KEY]),
     )
     expect(groups[0]!.sessions.map(session => session.id)).toEqual([
-      sid('two'), sid('new'), sid('one'),
+      sid('new'), sid('one'), sid('two'),
     ])
   })
 
@@ -554,38 +551,18 @@ describe('deriveSearchResults', () => {
 })
 
 describe('createWorkspaceViewStore', () => {
-  it('stores grouping, ordering, Workspace expansion, and recent-session view order', () => {
+  it('stores grouping, ordering, and Workspace expansion preferences', () => {
     const store = createWorkspaceViewStore().create()
     expect(store.getSnapshot().groupBy).toBe('workspace')
     expect(store.getSnapshot().orderBy).toBe('updated')
     store.actions.setGroupBy('flat')
-    store.actions.setOrderBy('updated')
+    store.actions.setOrderBy('manual')
     store.actions.setGroupExpanded('alpha', true)
-    store.actions.syncSessionOrderAccount('alpha', ['two', 'one'], { one: 1, two: 2 })
-    store.actions.setSessionOrder('alpha', ['one', 'two'])
     expect(store.getSnapshot().groupBy).toBe('flat')
     expect(store.getSnapshot()).toMatchObject({
-      orderBy: 'updated',
+      orderBy: 'manual',
       groupExpansion: { alpha: true },
-      sessionOrderByAccount: { alpha: ['one', 'two'] },
-      sessionUpdatedAtByAccount: { alpha: { one: 1, two: 2 } },
     })
-  })
-
-  it('removes view state outside the retained Workspace key set', () => {
-    const store = createWorkspaceViewStore().create()
-    store.actions.setGroupExpanded('', true)
-    store.actions.setGroupExpanded('alpha', true)
-    store.actions.setGroupExpanded('deleted', true)
-    store.actions.syncSessionOrderAccount('alpha', ['alpha-session'], { 'alpha-session': 2 })
-    store.actions.syncSessionOrderAccount('deleted', ['deleted-session'], { 'deleted-session': 1 })
-
-    store.actions.retainAccountKeys(['', 'alpha'])
-
-    const snapshot = store.getSnapshot()
-    expect(snapshot.groupExpansion).toEqual({ '': true, alpha: true })
-    expect(snapshot.sessionOrderByAccount).toEqual({ alpha: ['alpha-session'] })
-    expect(snapshot.sessionUpdatedAtByAccount).toEqual({ alpha: { 'alpha-session': 2 } })
   })
 })
 

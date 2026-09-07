@@ -1,3 +1,10 @@
+/* Wider than the primitive's default 380px card (a 50% increase). `width`,
+   not `max-width`: the Modal primitive's own rule is `width: min(380px, 100%)`,
+   so a single-class rule loaded after the primitive wins the cascade. */
+.dialog {
+  width: min(570px, 100%);
+}
+
 .form {
   display: flex;
   flex-direction: column;
