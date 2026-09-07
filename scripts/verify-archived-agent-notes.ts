@@ -15,8 +15,12 @@ import {
 
 const args = process.argv.slice(2)
 const writeMode = args.length === 1 && args[0] === '--write'
-if (args.length > 0 && !writeMode) {
-  console.error('verify-archived-agent-notes: usage: tsx scripts/verify-archived-agent-notes.ts [--write]')
+// One-shot single-language migration: reseal the manifest to the current
+// Chinese-only archive without comparing against the pre-change baseline.
+// After this migration lands, normal and `--write` runs stay append-only.
+const rewriteMode = args.length === 1 && args[0] === '--rewrite'
+if (args.length > 0 && !writeMode && !rewriteMode) {
+  console.error('verify-archived-agent-notes: usage: tsx scripts/verify-archived-agent-notes.ts [--write|--rewrite]')
   process.exit(1)
 }
 
@@ -79,22 +83,32 @@ if (existsSync(manifestPath)) {
   } catch (error: unknown) {
     errors.push(`archived/manifest.json: ${error instanceof Error ? error.message : String(error)}`)
   }
-} else if (!writeMode) {
+} else if (!writeMode && !rewriteMode) {
   errors.push('archived/manifest.json is required; seal new artifacts with `pnpm run verify-archived-agent-notes --write`')
 }
 
-// CI supplies its trusted pre-change commit; local writes compare with committed HEAD.
-const baselineRef = process.env.DSH_ARCHIVE_BASE_REF ?? 'HEAD'
-try {
-  const baseline = readBaselineManifest(baselineRef)
-  errors.push(...validateArchiveManifestExtension(baseline, manifest))
-} catch (error: unknown) {
-  errors.push(`archived/manifest.json: cannot read baseline ${JSON.stringify(baselineRef)}: ${error instanceof Error ? error.message : String(error)}`)
+if (rewriteMode) {
+  // Single-language migration: drop every retired English sidecar entry and
+  // reseal the manifest against the current Chinese-only artifact set. The
+  // pre-change baseline carried the old bilingual hashes, so it is not
+  // comparable; afterwards the append-only rules apply to `.zh.md` only.
+  const fresh = extendArchiveManifest({ version: 1, files: {} }, artifacts)
+  errors.push(...fresh.errors)
+  manifest = { version: 1, files: fresh.files }
+} else {
+  // CI supplies its trusted pre-change commit; local writes compare with committed HEAD.
+  const baselineRef = process.env.DSH_ARCHIVE_BASE_REF ?? 'HEAD'
+  try {
+    const baseline = readBaselineManifest(baselineRef)
+    errors.push(...validateArchiveManifestExtension(baseline, manifest))
+  } catch (error: unknown) {
+    errors.push(`archived/manifest.json: cannot read baseline ${JSON.stringify(baselineRef)}: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 const extended = extendArchiveManifest(manifest, artifacts)
 errors.push(...extended.errors)
-if (!writeMode) {
+if (!writeMode && !rewriteMode) {
   for (const path of extended.added) errors.push(`${path}: archived artifact is not sealed in manifest.json`)
 }
 
@@ -104,7 +118,7 @@ if (errors.length > 0) {
   process.exit(1)
 }
 
-if (writeMode) {
+if (writeMode || rewriteMode) {
   const rendered = renderArchiveManifest(extended.files)
   if (!existsSync(manifestPath) || readFileSync(manifestPath, 'utf8') !== rendered) {
     writeFileSync(manifestPath, rendered)

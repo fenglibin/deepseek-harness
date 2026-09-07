@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-22
 
-[English](2026-08-11-plugin-settings-tabs.md) | 中文
-
 ## 问题
 
 插件配置与只读 Loader 清单各自注册了一个顶层 `settings.section`。两者描述同一个“插件”领域，却占据两行导航，把搜索与配置拆成互不相关的页面，也没有给 Settings 外壳一个有原则的聚合方式。若直接合并两者的组件，则会让一个功能插件 import 并拥有另一个功能的数据生命周期。

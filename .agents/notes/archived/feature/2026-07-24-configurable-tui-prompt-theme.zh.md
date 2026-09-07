@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-24-configurable-tui-prompt-theme.md) | 中文
-
 ## 问题
 
 终端提示符行与编辑器前缀原先在 TUI 内部由一组固定字段拼装而成，涵盖工作区、模型、用量、缓存、上下文与计时。部署方可以全局更改颜色，却无法调整字段顺序、替换输入前缀、加入插件状态，也无法构建 Powerline 风格的提示符。

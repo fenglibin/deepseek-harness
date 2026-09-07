@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-23-unified-session-query-service.md) | 中文
-
 ## 问题
 
 精确读取、语义过滤、关系追踪与全文搜索都作用于同一个实时源优先的会话语料库。将全文搜索暴露在第二个上下文键下，会让消费方与应用组合把同一项查询功能视为两个服务，尽管只有 SQLite 实现是后端特有的部分。

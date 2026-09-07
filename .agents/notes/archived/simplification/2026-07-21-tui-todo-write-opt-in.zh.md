@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-21-tui-todo-write-opt-in.md) | 中文
-
 ## Problem
 
 出厂的 tui-agent `cordis.yml` 加载了 `@deepseek-ai/dsh-tool-todo`，默认向模型暴露 `todo_write`。这个工具是一项任务追踪的便利功能，而非像 `bash` 或 `read`/`write`/`edit` 文件系统工具那样的核心编码能力；多数 TUI 会话从不调用它，但出厂加载它会让每一轮的协议工具列表和系统提示词都随之变大。而 TUI 的计划渲染是事件驱动的：`packages/ui/tui/src/index.ts` 监听 `todo/write` 会话事件，`TodoComponent.render` 在列表为空时不返回任何内容，因此这个入口本就能容忍该工具的缺席或存在，与该插件没有任何运行时耦合。

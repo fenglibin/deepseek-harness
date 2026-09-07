@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-22-installer-in-repo-skip-clone.md) | 中文
-
 ## 问题
 
 `scripts/install.sh`是为`curl ... | sh`路径编写的：它把 harness 克隆到`~/.dsh/source`，然后安装、软链接并启动。已经有检出的贡献者若直接运行同一脚本（`sh scripts/install.sh`），会在`~/.dsh/source`得到第二份无关的克隆——安装并软链接的是与他们正在工作的树不同的另一棵树，且无从用本地脚本验证本地源码。

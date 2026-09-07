@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-06-11-tsdown-over-dumble.md) | 中文
-
 ## 问题
 
 最初的构建使用 **dumble**，即 cordiverse 的零配置 esbuild 包装层——上游 Cordis 自身也用它构建——与 vendor 包（package）的约定最大程度对齐（它读取每个 package.json 并从 `exports` 字段推断入口/格式）。但 dumble 作为本仓库的承重工具存在隐患：v0.2.x，每周约 530 次 npm 下载，实质上只有一位维护者，而且由于它没有 workspace 模式，我们不得不通过自定义编排脚本（`scripts/build.ts`）来调用它。

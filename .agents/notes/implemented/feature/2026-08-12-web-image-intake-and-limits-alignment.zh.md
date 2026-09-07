@@ -1,6 +1,6 @@
-# Agent Note：整页图片拖放、上限投影预检与缩略图平铺
+# Agent Note: 整页图片拖放、上限投影预检与缩略图平铺
 
-状态：implemented
+Status: implemented
 
 ## 问题
 

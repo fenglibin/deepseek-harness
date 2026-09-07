@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-22-tui-interactive-extension-service.md) | 中文
-
 ## 问题
 
 Cordis 插件可以通过 `ctx.commands` 注册用户命令，但需要终端交互的命令没有受支持的呈现边界。它只能保持非交互，或者捕获 TUI 私有的 pi-tui 树、焦点状态、渲染器和关闭生命周期。此类耦合会使扩展依赖某个入口的内部实现，让各自独立开发的浮层争抢焦点，并导致插件卸载时无法可靠移除排队中或已显示的 UI。

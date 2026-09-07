@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-06-30-subagent-observe-enrich.md) | 中文
-
 ## 问题
 
 钩子子系统（[拦截 seam Agent Note](2026-06-30-interception-seams.md)）允许插件在生命周期节点观察和拦截 agent（智能体）。Claude Code 和 Codex 都暴露了 **SubagentStart / SubagentStop** 钩子，且 CC 的钩子携带 subagent 的最终消息。harness 已经发出 `subagent/start` 和 `subagent/end` 生命周期事件（[subagent 能力 seam](2026-06-21-subagent-capability-seam.md)），但其载荷极为精简（`provider`、`id`，以及 end 时的 `stopReason`），不足以让钩子桥接层在不单独访问活跃 run 的情况下报告 subagent 产出了什么。

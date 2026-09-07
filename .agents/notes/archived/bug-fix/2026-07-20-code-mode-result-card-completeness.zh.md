@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-20-code-mode-result-card-completeness.md) | 中文
-
 ## 问题
 
 外层 `run_code` 工具会持久化完整的渲染内容，但其 UI 展示器忽略了这些内容，转而根据仅含日志的 `presentationMeta` 投影重新构建卡片正文。仅有结果的运行看似正确，是因为展示器正文为空时，消费方会回退到 `tool/result.content`。只要程序输出一条日志，展示器就会提供非空内容，回退随即停止，返回值便会从完成态卡片中消失。当已捕获的日志使陈旧投影变为非空时，输出落盘策略最终生成的头尾预览也会受到同一职责拆分的影响。

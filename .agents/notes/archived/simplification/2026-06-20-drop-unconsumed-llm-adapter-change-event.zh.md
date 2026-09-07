@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-06-20-drop-unconsumed-llm-adapter-change-event.md) | 中文
-
 ## 问题
 
 `LlmService.registerAdapter()` 在注册和 dispose（资源释放）时发出 `llm/adapter-change` 事件（[packages/llm/llm/src/index.ts](../../../../packages/llm/llm/src/index.ts)）。在 `packages/*/src` 和 `examples/*/src` 中搜索 `llm/adapter-change`，只能找到声明、emit 站点、文档和测试；没有任何生产环境的监听器订阅它。

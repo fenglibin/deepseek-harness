@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-22
 
-[English](2026-08-11-web-export-command-and-dialog.md) | 中文
-
 ## Problem
 
 Session 导出需要一个稳定的 Session 级外显入口，以及语义等价的斜杠命令路径。第二套后端读取器或 Host 路径写入器会重复下载实现，并引入平台相关的文件权限和路径公开问题。

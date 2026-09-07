@@ -1,6 +1,6 @@
-# Agent Note：MCP 设置分区「配置MCP」打开单向同步的 mcp.json
+# Agent Note: MCP 设置分区「配置MCP」打开单向同步的 mcp.json
 
-状态：已实现
+Status: implemented
 
 ## 问题
 

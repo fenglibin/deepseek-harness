@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-20-generated-cordis-core-api.md) | 中文
-
 ## 问题
 
 插件作者需要了解 `ctx`、事件派发、Fiber、插件注册和 Service 背后的详细 Cordis API。已有的 [Harness 事件与服务目录](2026-06-20-generated-cordis-catalog.md)有意只简要概括继承自 Cordis 的成员，因此无法替代方法级 Cordis 参考文档。如果在网站下维护另一份手写副本，它会与 vendored 源码产生漂移，也会让渲染器成为额外的文档所有者。

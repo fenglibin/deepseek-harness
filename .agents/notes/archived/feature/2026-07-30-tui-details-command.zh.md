@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-30-tui-details-command.md) | 中文
-
 ## Problem
 
 TUI 的 transcript（文本记录）细节状态——工具卡片可见性（`collapsed`/`expanded`/`hidden`，见[整合的 TUI 展示](../architecture/2026-07-28-consolidated-tui-presentation.md)）与 reasoning 块显示——过去只能通过 Ctrl+O 循环和 Ctrl+R 切换来触达。想要某个特定模式的用户必须循环经过其他模式，无法一次操作同时设置两个维度，也无法查询当前状态；吞掉这些控制键的终端更是完全没有替代途径。

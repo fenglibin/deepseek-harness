@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-22-docked-web-goal-bar.md) | 中文
-
 ## 问题
 
 Web UI 此前没有任何目标相关的界面：目标栈已随模型工具、TUI/ACP 适配器和 `/goal` 命令交付，但浏览器客户端完全不接触它——既没有运行时动词，也没有指示器。本变更同时引入客户端目标动词（基于 RPC 的运行时会话方法）和第一个目标 UI。摆放位置遵循重新设计的前提：目标的存在感属于输入框的上下文——目标是用户即将提交的工作的属性，因此它的指示器属于 composer 上下文堆栈；[composer 上下文堆栈决策](../bug-fix/2026-07-30-composer-context-stack-order.md) 规定它在 Goal、Todo、Queue 与 composer 之间的位置。设计稿只保留一个闪光图标、一个阶段词（"Ongoing/Paused/Blocked Goal"）、截断后的目标内容，以及编辑／清除图标操作，恢复按钮仅在目标暂停时出现。

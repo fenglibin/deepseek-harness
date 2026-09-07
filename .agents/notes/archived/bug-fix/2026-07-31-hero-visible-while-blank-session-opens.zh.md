@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-31-hero-visible-while-blank-session-opens.md) | 中文
-
 ## 问题
 
 会话根节点为"正在打开且 composer 处于 `blank`"的会话保留了一个 `settling` 阶段：在历史记录返回之前，hero 与 docked 的归属不可知，因此宁可隐藏 composer 座位（`visibility:hidden`），也不要先闪出居中的 hero 再跳到底部输入条。启动时的自动选择把这道防护变成了它本要防止的缺陷。从无工作区的 hero 进入时，`WorkspacesService.startInitialSelection` 会连接最近的工作区并打开其空白会话；`open()` 一落地 `openState` 立即翻为 `loading`，中间栏因此在整个历史往返期间保持空白，随后重绘一次——每次启动看起来都像整页刷新。

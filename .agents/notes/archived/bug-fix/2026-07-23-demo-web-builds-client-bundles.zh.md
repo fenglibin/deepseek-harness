@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-23-demo-web-builds-client-bundles.md) | 中文
-
 ## Problem
 
 `dsh web` 通过 `GET /plugins/<id>/client.js` 提供每个 web 客户端插件的打包产物，其路径由包的 `exports["./client"]`（`lib/client.js`）解析得到。这些打包产物只由根目录的 `pnpm run build`（先 `tsc -b`，再执行各包的 `tsdown.client.ts` 配置）生成；Vite 的 `build:web` 步骤只构建前端外壳。`demo:web` 与 README 的 Web UI 说明只运行了 `build:web`，因此在未预先完整构建的检出上，每个插件的打包产物都返回 404，客户端 loader 将所有插件标记为失败，启动界面显示 "Failed to load plugins"。前端外壳能正常构建，把缺失的产物掩藏在浏览器运行时的失败背后。

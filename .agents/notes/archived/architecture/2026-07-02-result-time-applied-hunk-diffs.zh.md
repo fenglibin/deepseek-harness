@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-02-result-time-applied-hunk-diffs.md) | 中文
-
 ## 问题
 
 [带标签的 render-intent 联合类型](2026-07-02-tool-render-intent-union.md)为 `dsh-tool-fs` 的 write/edit 在调用时刻提供 `card:'diff'`，纯粹从工具参数推导：write ⇒ `{oldText:null, newText:content}`（整个新文件），edit ⇒ `{oldText:old_string, newText:new_string}`（裸替换片段）。UI 可以将其渲染为行内 diff，但这是一个**无上下文**的 diff：裸的 `old_string`→`new_string` 没有周围行，而一次触及五个分散位置的 `replace_all` 仍然渲染为一对片段。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-12
 
-[English](2026-08-12-collapsed-sidebar-shared-entry-motion.md) | 中文
-
 ## Problem
 
 收起侧栏轨道的四个上方控件由两个包渲染：外壳持有侧栏切换与新建会话，Workspace 区域持有添加和搜索。它们的透明度时序相同，但几何行为不同。右对齐控件会随栏变窄而移动，左对齐控件则保持不动，因此添加即使使用相同淡入，视觉上仍比搜索慢。

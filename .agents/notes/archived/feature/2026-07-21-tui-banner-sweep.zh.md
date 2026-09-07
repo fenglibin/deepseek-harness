@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-21-tui-banner-sweep.md) | 中文
-
 > **已被取代**：由[移除启动横幅 Agent Note](2026-07-21-tui-no-banner.md)取代：横幅本身已移除，扫入动画随之移除。
 
 ## Problem

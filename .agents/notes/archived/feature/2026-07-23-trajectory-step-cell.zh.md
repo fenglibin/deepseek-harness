@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-23-trajectory-step-cell.md) | 中文
-
 ## Problem
 
 trajectory 标签页需要可复用的步骤行与轮次列表 chrome，以展示展开后的 assistant 块、自身耗时、Message token 列，以及进行中的工作。若不将会话事件时间折叠进会话节点，并将块展开为单元格，UI 就无法对齐产品 chrome。

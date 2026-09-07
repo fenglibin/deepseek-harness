@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-26-intent-draft-same-tick-echo.md) | 中文
-
 ## Problem
 
 hero composer（「Let's start building」）是一个受控（controlled）的 textarea，它的值取自前端 Session Intent 保留下来的提示词，读自会话**列表**快照（`EmptyState` 通过 `useSessions` 绑定 `intent.prompt`）。输入经由 `SessionManager.updateIntent → Session.updatePendingPrompt`，后者会同步刷新 **Session 自身的** notifier——但 composer 实际渲染所依据的那份列表快照，只能通过 `startIntent` 中的 intent watch 订阅得知这次变更，而该订阅调用的是 `markDirty()`，即一次延迟到微任务的刷新。

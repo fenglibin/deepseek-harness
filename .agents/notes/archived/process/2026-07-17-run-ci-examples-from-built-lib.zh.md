@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-17-run-ci-examples-from-built-lib.md) | 中文
-
 ## 问题
 
 CI 通过 `node --import tsx` 和根 tsconfig 的 `paths` 映射启动示例与加载 Cordis 配置的测试项目。这种方式既增加了 TypeScript 转换开销，也改变了包解析行为：import 会解析到 workspace 源码，而不是经包的 `exports` 进入构建后的 `lib/`。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-27-user-message-icon-actions.md) | 中文
-
 ## 问题
 
 聊天用户气泡下方没有操作栏。Harness 设计稿（figma `User_Bubble/message_container`）在气泡下方右对齐展示三个 IconActions——复制、在新对话中分支、编辑——与产品其他位置使用的操作栏模式一致。

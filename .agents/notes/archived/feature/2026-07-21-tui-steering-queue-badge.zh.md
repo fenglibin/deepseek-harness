@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-21-tui-steering-queue-badge.md) | 中文
-
 ## Problem
 
 轮次运行期间，编辑器提交会调用 `agent.steer()`，在运行中的轮次后面加入 steering（中途引导）队列（[前门 Agent Note](2026-07-17-dedicated-full-screen-tui-front-door.md)）。运行时的状态行只以 `Enter sends steering, Esc cancels` 提示收尾，因此按下 Enter 后没有任何反馈表明消息已入队、也看不出有多少条正在等待送达模型。连续 steering 多次的用户无法把队列和被吞掉的按键区分开。

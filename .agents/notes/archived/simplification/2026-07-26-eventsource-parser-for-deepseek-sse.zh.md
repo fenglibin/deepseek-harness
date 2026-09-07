@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-26-eventsource-parser-for-deepseek-sse.md) | 中文
-
 ## 问题
 
 `packages/llm/llm-deepseek/src/sse.ts` 曾手写实现 SSE（Server-Sent Events）解析：一个流式 `TextDecoder`、按 `\r?\n\r?\n` 切分事件块、提取并拼接 `data:` 载荷、跳过注释与其他字段、`[DONE]` 哨兵、在未见哨兵即 EOF 时抛出 `STREAM_CLOSED` 错误，以及对最后一个未终结事件块的 flush。该文件约 67 行，另有约 108 行专属测试（`tests/sse.spec.ts`）重复验证 SSE 规范行为——UTF-8 字符被切分到多个分片、CRLF 处理、多条 `data:` 拼接、冒号后无空格——而这些行为，持续维护的解析器早已有保证。它唯一的消费方是 `adapter.ts`（`yield* translate(parseSse(response.body))`）。

@@ -5,55 +5,66 @@
   width: min(720px, 100%);
 }
 
-/* The editor: a colored token layer stacked behind a transparent-text textarea.
-   Both share font, line-height, padding, and box-sizing, so the caret and the
-   colored glyphs stay on the same row. The wrapper has no intrinsic height;
-   the textarea's `min-height` (320px) sets the floor and the resize handle
-   lifts it from there. */
-.editor {
-  position: relative;
-  display: block;
+/* The only scroll container. The border and background live here so the two
+   inner layers render a borderless, identically-sized text plane. */
+.scroller {
+  overflow: auto;
+  max-height: 480px;
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 6px;
+  background: var(--shiki-background, transparent);
 }
 
-/* One rule for both layers: same metric, same padding, same border. The
-   highlight is a `<div>`, not `<pre>`, because `<pre>` always renders a
-   trailing newline row that `<textarea>` does not reserve, which used to
-   drift the caret one row up from the colored text near the document end. */
+.scroller:focus-within {
+  border-color: var(--color-primary, #1971c2);
+}
+
+/* Position context for the absolutely-positioned highlight layer. */
+.content {
+  position: relative;
+}
+
+/* One rule for both layers: same metric, same padding, same wrapping. `pre-wrap`
+   + `break-all` soft-wraps a long line at the same column in both layers, so a
+   line never overflows and forces a horizontal scrollbar; that, in turn, means
+   the caret never drifts from the colored glyph behind it. */
 .highlight,
 .input {
   margin: 0;
-  border: 1px solid var(--color-border, #e0e0e0);
-  border-radius: 6px;
+  border: 0;
   padding: 10px 12px;
   font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 13px;
   line-height: 1.6;
   tab-size: 2;
-  white-space: pre;
-  overflow-wrap: normal;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: break-word;
   box-sizing: border-box;
 }
 
-/* The token layer sits behind the textarea; its scroll mirrors the textarea's
-   and its height tracks the textarea's via a ResizeObserver set from React. */
+/* The token layer covers the textarea exactly; it never scrolls or intercepts
+   input. */
 .highlight {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
   color: var(--shiki-foreground, inherit);
-  background: var(--shiki-background, transparent);
+  background: transparent;
 }
 
 /* The input: transparent glyphs so the token layer shows through, with a
-   visible caret and background. It owns the interaction and scrolling. */
+   visible caret. It hides its own scrollbars and grows to fit its content, so
+   the outer scroller owns every scroll and the two layers stay in lockstep. */
 .input {
   position: relative;
   z-index: 1;
   display: block;
   width: 100%;
   min-height: 320px;
-  resize: vertical;
+  overflow: hidden;
+  resize: none;
   background: transparent;
   color: transparent;
   caret-color: var(--color-text, #1f1f1f);
@@ -64,10 +75,6 @@
    text, so the selected run is visible without re-coloring the highlight. */
 .input::selection {
   background: var(--color-selection, rgba(25, 113, 194, 0.35));
-}
-
-.input:focus {
-  border-color: var(--color-primary, #1971c2);
 }
 
 /* Token colors ride the theme package's --shiki-* sheets. */
@@ -92,8 +99,7 @@
   color: var(--shiki-token-punctuation);
 }
 
-.tokPlain,
-.tokSentinel {
+.tokPlain {
   color: var(--shiki-foreground, inherit);
 }
 

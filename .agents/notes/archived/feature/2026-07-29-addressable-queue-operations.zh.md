@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-31
 
-[English](2026-07-29-addressable-queue-operations.md) | 中文
-
 ## 问题
 
 Web 队列能够渲染待处理消息，但无法编辑或删除其中某一行。`MessageId` 不足以充当寻址标识，因为调用方可以多次将同一条不可变消息加入队列。浏览器还会根据轮次和状态事件推断队列项已退役，因此当行操作与驱动器认领发生竞态时，系统无法给出权威结果。

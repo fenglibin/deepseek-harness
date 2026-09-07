@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-20-tui-startup-slogans.md) | 中文
-
 > **已被取代**：slogan/动画的那一半由[横幅扫入 Agent Note](2026-07-21-tui-banner-sweep.md)取代：slogan 库和打字机动画上线后实际使用中显得怪异，已替换为无副标题的横幅加整体扫入。移除示例配置中欢迎语的决定与动画生命周期基础设施（`ui.start()` 后启动、经 `detachListeners` 清除）保持不变。
 
 ## Problem

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-22-tui-titles-from-session-title-service.md) | 中文
-
 ## 问题
 
 每会话标题让终端窗格和标签页易于区分，但 TUI 本地模型调用会在[日志承载的会话标题](../feature/2026-07-21-log-backed-session-titles.md)旁形成第二条标题管线。本地路径需要自己的提示词、截断上限、一次性闩锁、恢复推导、取消和失败回退，而其进程本地结果仍对会话列表、fork、Web 消费方和回放不可见。若两条路径同时运行，同一会话还可能被不同策略命名两次。

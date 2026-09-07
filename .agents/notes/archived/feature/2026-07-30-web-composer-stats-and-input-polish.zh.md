@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-30-web-composer-stats-and-input-polish.md) | 中文
-
 ## Problem
 
 Web 编辑器页脚原本以独立 stack 行显示一条拼接的统计字符串（cache／tokens／turns／steps），视觉上与输入卡脱节，且缺少设计稿中的耗时与 token 拆分细节。输入区自身也积累了逐条目的间距补丁：dock 条各带自己的 margin，sticky 座位下是硬切消息流的纯色填充，「回到底部」控件用硬编码偏移躲避编辑器、草稿一长高就失效，goal 与 todo 条的底色和列宽也互不一致。

@@ -1,6 +1,6 @@
-# Agent Note：在模型请求中提供执行环境图片路径
+# Agent Note: 在模型请求中提供执行环境图片路径
 
-状态：已实现
+Status: implemented
 
 ## 问题
 

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-27-copyable-transcript-no-gutter-bar.md) | 中文
-
 ## Problem
 
 TUI 此前把用户提示词和工具卡片分组在一条彩色左侧 gutter bar（`▌ `）之后，该竖条被逐行加在每一行正文前面，并把 assistant 与系统块整体缩进一列。两者都是逐行前缀：在 transcript 上用鼠标框选时，每一行开头的 `▌ ` 或前导空格都会被一并选中，因此复制一条消息、一段工具输出或一个代码块时都会带上装饰字符，用户必须手动清理。该竖条又是 transcript 中唯一的逐条消息分隔标记，所以不能在没有其他区分方式的情况下直接删掉。

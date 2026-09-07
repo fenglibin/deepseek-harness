@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-24-tui-shell-prompt-editor.md) | 中文
-
 ## 问题
 
 上游 pi-tui 编辑器始终渲染横向边框行。这种呈现方式虽然把输入区与 transcript（文本记录）分隔开，却占用两行终端高度，也不像 shell 中面向命令的输入形态。

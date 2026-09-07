@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-30-compaction-progress-visibility.md) | 中文
-
 ## 问题
 
 独立手动压缩（compaction）在轮次之间运行，此时 agent（智能体）保持空闲。因此，在缓慢的摘要操作期间，TUI 的轮次阶段指示器始终显示普通的 `>` 光标；尝试失败时，由于没有替换检查点落地，也不会产生 transcript（文本记录）行。运行状态显示需要复用现有的状态指示器，不能再设置第二处带动画的状态显示。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-06-pin-request-header-content-in-one-scenario.md) | 中文
-
 ## 问题
 
 一个 ACP（Agent Client Protocol）快照测试套件需要证明每个 `request/header` 中实际发送的组合系统提示词与工具 schema 列表，但如果在每个 `session.jsonl` 中重复这些内容，一次提示词或 schema 编辑就会改写数十条巨大的单行 JSON 记录。保留一份原始 header 可以避免重复，但提示词的评审体验仍然很差：行文被 JSON 转义到一行中，与数千字符的工具 schema 混在一起。

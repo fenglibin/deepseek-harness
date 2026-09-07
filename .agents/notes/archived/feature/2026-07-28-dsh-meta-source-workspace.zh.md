@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-03
 
-[English](2026-07-28-dsh-meta-source-workspace.md) | 中文
-
 ## Problem
 
 `dsh` 把调用目录视为 workspace，这正是它能作用于任意项目的原因。但因此，开发 dsh 自身就得先 `cd` 到检出目录——而该目录并不是一个好记的路径：源码安装会把它放在一个容器目录下、作为带时间戳的 staging 工作树（`~/.dsh/source/staging-<timestamp>`），并由 `current` 符号链接指向，因此每次升级后目标都会变化。`harness:source` 提示词段已经*告知* agent 其源码位置，`cordis` 工具集也能修改该运行时，但人类仍需手工定位该目录才能在其中开始会话。

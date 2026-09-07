@@ -229,7 +229,7 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
                 failed: styles['statusDotFailed'],
                 unknown: styles['statusDotUnknown'],
               }[dot]
-              const transport = server.transport === 'stdio' ? server.command : server.url
+              const transport = server.transport === 'stdio' ? t('transportStdio') : t('transportStreamableHttp')
               const tools = view?.tools ?? []
               const isExpanded = expanded.has(server.serverName)
               const toggleExpanded = (): void => {

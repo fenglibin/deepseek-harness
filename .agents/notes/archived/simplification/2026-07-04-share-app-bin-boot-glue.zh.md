@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-04-share-app-bin-boot-glue.md) | 中文
-
 ## 问题
 
 stdio 和 ACP（Agent Client Protocol）两个 bin 各自重复了环境加载、fail-loud 处理、入口校验与启动逻辑，包括微妙的 Loader 失败行为。两份副本已经发生漂移，且位于自执行文件中、被排除在单元测试覆盖率之外，导致其导出的辅助函数无法被复用。

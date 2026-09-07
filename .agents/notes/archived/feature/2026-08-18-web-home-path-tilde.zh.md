@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-22
 
-[English](2026-08-18-web-home-path-tilde.md) | 中文
-
 ## Problem
 
 Workspace 悬停卡片和 Tool 调用摘要会显示完整的 POSIX 家目录路径。这些字符串很长，每行重复同一前缀，侧边栏和对话记录更难扫读。Windows 路径必须保持原样，因为 `~` 不是 Windows 文件系统约定。

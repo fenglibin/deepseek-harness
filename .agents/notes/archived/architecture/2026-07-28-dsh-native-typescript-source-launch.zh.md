@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-28-dsh-native-typescript-source-launch.md) | 中文
-
 > Node 原生启动方案已被 [dsh 通过 tsx ESM hook 源码启动](2026-07-29-dsh-source-launch-tsx-esm.md) 取代：Node 26.0.0 移除了 `--experimental-transform-types`，本文描述的 paths loader 已删除。Cordis 配置声明门禁（`verify-cordis-config`）、app-boot 的显式失败插件诊断以及 vendor 中的 `import type` 标注仍然有效。
 
 ## 问题

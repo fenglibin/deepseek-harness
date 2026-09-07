@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-10
 
-[English](2026-07-31-installer-adopts-existing-checkout.md) | 中文
-
 ## Problem
 
 `scripts/install.sh`会产生两种互不兼容的安装布局。`curl … | sh`安装会构建受管布局——`~/.dsh/source/master`处的 master 克隆、位于`dsh-staging/<时间戳>`分支上的 staging worktree，以及 PATH 启动器据以解析的稳定`current`符号链接。而从检出中运行同一脚本时，则依据此前的[检出内跳过克隆决策](../../archived/process/2026-07-22-installer-in-repo-skip-clone.md)，把`dsh`直接链接到该检出的`bin/dsh`。

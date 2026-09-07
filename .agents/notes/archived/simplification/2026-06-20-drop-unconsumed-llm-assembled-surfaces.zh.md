@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-06-20-drop-unconsumed-llm-assembled-surfaces.md) | 中文
-
 ## 问题
 
 `LlmService`（[packages/llm/llm/src/index.ts](../../../../packages/llm/llm/src/index.ts)）在模型之上暴露了三个调用接口：

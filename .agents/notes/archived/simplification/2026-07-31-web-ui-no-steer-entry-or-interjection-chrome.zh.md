@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-31-web-ui-no-steer-entry-or-interjection-chrome.md) | 中文
-
 ## 问题
 
 中途 steering 是 host／agent-loop 能力（`mode:'steer'`、持久 `user/message`）。Web 产品已在 turn 运行中锁定 composer，且从未交付排队／steer 菜单，但客户端仍把 `'queue' | 'steer'` 穿进 input machine、`conversation.send` 与 locale 键，并把已消费的 steering 渲染成带「插话」／「Interjection」徽章的气泡。这留下半成品 UI：用不到的提交 mode、用户做不到的手势却有产品文案，以及把产品并不拥有的 chrome 钉死在 e2e golden 上。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-30-web-context-injection-disclosure.md) | 中文
-
 ## 问题
 
 Web 会话原本通过通用 `JsonBlock` 渲染每条已记录的非用户消息。这种呈现使用文本三角符号、紧凑的标签字体、有边框的 JSON 面板和另一套间距，因此上下文注入与产品设计中的 Tool calls 展开项不一致。修改通用原语的样式还会影响未知事件和附件的兜底呈现。

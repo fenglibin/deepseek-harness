@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-21-dsh-system-prompt-source-path.md) | 中文
-
 ## Problem
 
 `dsh` CLI 是自我引用的接口：其 `cordis` 工具包让 agent（智能体）得以查看并修改它自身运行其上的 harness（智能体框架）运行时。但 agent 此前无从得知这份源码在磁盘上的位置。`dsh` 通常以符号链接的形式挂到 PATH 上，并从任意工作目录（正在处理的项目）启动，因此无论是 cwd 还是 `argv` 都无法可靠地指向 harness 检出目录。缺了这个路径，"读取你自己的源码"便只能靠猜。

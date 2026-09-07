@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-20
 
-[English](2026-08-13-safari-textarea-soft-wrap-reflow.md) | 中文
-
 ## 问题
 
 composer 把光标与选区留在透明的原生 textarea 中，由 backdrop 绘制可见字形，并由隐藏的镜像层决定完整草稿高度。因此，[单滚动容器决策](2026-07-31-composer-text-layers-share-one-scrollport.zh.md)依赖 textarea 不持有可滚动溢出：每次草稿提交后，它的 `scrollHeight` 与 `clientHeight` 相等，`scrollTop` 为零。

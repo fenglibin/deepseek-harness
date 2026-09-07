@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-21-tui-remove-cancel-command.md) | 中文
-
 ## Problem
 
 TUI 提供了两条完全相同的取消运行中轮次的方式：`Esc`（以及 `Ctrl+C`）键位绑定，和一条 `/cancel` 斜杠命令。两者都以相同的原因调用 `agent.cancel('cancelled from terminal')`；空闲时 `/cancel` 只打印一条 "The agent is already idle." 通知，而键位绑定保持静默。运行状态行本就标示了该键位绑定（`Enter sends steering, Esc cancels`），且按键取消无需提交编辑器，因此这条斜杠命令只是通往同一效果的第二条、且更难被发现的路径——一块本身不含任何行为的界面。

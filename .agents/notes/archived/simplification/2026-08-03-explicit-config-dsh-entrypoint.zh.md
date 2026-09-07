@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-08
 
-[English](2026-08-03-explicit-config-dsh-entrypoint.md) | 中文
-
 ## 问题
 
 裸 `dsh` 会隐式选择产品 TUI。这使一条命令负责终端生命周期、会话身份与恢复移交、onboarding、源码 workspace 快捷入口、引导式升级会话、个人配置监听，以及一整套规模庞大的应用级 PTY 和 transcript（文本记录）快照测试。该默认行为还隐藏了真实的组合边界：`--config` 是 TUI overlay 之上的可选第三层，而不是 raw 启动器所需的部署定义。

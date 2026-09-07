@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-31-web-cards-toolrow.md) | 中文
-
 ## 问题
 
 Web 客户端在连续几个 PR 里长出五种卡片渲染意图——terminal、diff、read、search、web，每一种都作为一个键控 toolview 注册项落在 `packages/client/ui-conversation/src/client/toolviews/` 下。它们在两处出现分歧，之前每个 PR 都承认却推迟处理：

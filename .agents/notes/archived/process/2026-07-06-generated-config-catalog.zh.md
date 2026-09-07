@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-06-generated-config-catalog.md) | 中文
-
 ## 问题
 
 仓库此前没有以源码为后盾的插件配置参考。各包（package）的 README 对字段的记录方式不一致，未列举哪些包可被加载，也未校验运行时 schema 与声明的配置类型是否一致。

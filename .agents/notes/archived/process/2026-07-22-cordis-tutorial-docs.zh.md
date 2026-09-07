@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-22-cordis-tutorial-docs.md) | 中文
-
 ## 问题
 
 本仓库从两个层面介绍 Cordis：精简的 [cordis-primer](../../../../docs/cordis-primer.md) 阐述概念，`docs/user/develop/` 下的页面则讲解如何基于 harness 服务编写 harness 插件。但二者都不适合初次接触 Cordis 的开发者：primer 假定读者已经会编写插件，开发页面则直接从 `defineTool` 讲起，没有展示上下文、fiber、服务和 dispatch 的实际行为。此前没有一条学习路径让读者运行原生 Cordis、观察 fiber 进入 PENDING 状态，或看到 waterfall（瀑布式事件）否决实际发生。

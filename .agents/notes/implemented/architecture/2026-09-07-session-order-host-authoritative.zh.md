@@ -1,4 +1,4 @@
-# Agent Note：会话列表顺序由 Host 权威化
+# Agent Note: 会话列表顺序由 Host 权威化
 
 Status: implemented
 

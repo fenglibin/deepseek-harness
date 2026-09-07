@@ -1,4 +1,4 @@
-# Agent Note：图片理解在提示词准入时附加
+# Agent Note: 图片理解在提示词准入时附加
 
 Status: implemented
 

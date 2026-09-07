@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-23-tui-file-reference-autocomplete.md) | 中文
-
 ## 问题
 
 TUI 提供结构化的 `@session` 引用，但用户在编辑提示词时无法可靠地发现工作区路径。要求用户记住准确路径会给面向文件的请求带来不必要的麻烦；如果直接附加每个选中文件，则会在模型判断其内容是否相关之前占用上下文，并在工具 transcript（文本记录）中隐藏常规的 `read` 观察结果。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-31-hover-card-click-copy.md) | 中文
-
 ## 问题
 
 Workspace 与 Session 行会截断对应悬浮卡片完整展示的两个值：Workspace 目录路径和 Session 标题。这张[可抵达的卡片](../bug-fix/2026-07-30-hover-popup-pointer-grace.md)支持文本选择，但复制单个已知值仍需精确选择，操作没有必要地繁琐；卡片也不会确认剪贴板是否接受了写入。

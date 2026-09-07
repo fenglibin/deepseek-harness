@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-10
 
-[English](2026-08-10-web-favicon-dark-mode.md) | 中文
-
 ## 问题
 
 `apps/web/public/favicon.svg` 把 DeepSeek 图标绘制为纯黑色（`fill="#000"`），而 `index.html` 只声明了这一个 SVG 图标。当操作系统或浏览器处于暗色配色方案时，标签栏同样是深色，黑色图标实际上不可见。Safari 26 之前的版本不渲染 SVG favicon，因此这些版本的 Safari 用户无论何种配色方案都看不到标签页图标。

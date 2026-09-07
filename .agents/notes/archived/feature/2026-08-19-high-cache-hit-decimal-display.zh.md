@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-22
 
-[English](2026-08-19-high-cache-hit-decimal-display.md) | 中文
-
 ## 问题
 
 Web 会话统计行会把所有非空缓存命中率舍入为整数。真实比率超过 99% 后，显示会隐藏后续提升；比率达到 99.5% 时，即使仍有未缓存输入或缓存写入，也会显示为 100%。

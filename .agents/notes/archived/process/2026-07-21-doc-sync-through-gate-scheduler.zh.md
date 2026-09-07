@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-21-doc-sync-through-gate-scheduler.md) | 中文
-
 ## 问题
 
 `pnpm run doc-sync` 原本是把 24 个 `pnpm run` 子命令用 `&&` 串起来的链。每一环都要先付一次完整的 pnpm 包装层启动（workspace 解析、脚本查找、tsx 启动）才轮到脚本本体；在开发机上实测，24 个脚本本体合计约 34 秒即可跑完，而链式形态耗时约 3 分钟，且包装层的停顿在本地磁盘上同样复现，因此每位开发者和每条 CI 车道都在付这笔开销，并非只有网络文件系统上的检出受影响。这条链还是串行执行的，尽管各成员门禁只读且相互独立；它也在悄悄偏离 [scripts/run-gates.ts](../../../../scripts/run-gates.ts)：运行时 API 目录落地时 `verify-cordis-api` 加入了链，却从未加进 `docSyncLeafGates`，导致 CI 从未把关该目录的新鲜度。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-23-tui-status-prompt-tools.md) | 中文
-
 ## 问题
 
 会话计数器可以描述活动情况，却无法显示下一次模型请求将收到的指令和能力。若要诊断按作用域贡献的提示词与工具限制，用户只能离开 TUI，或根据配置文件进行推断。

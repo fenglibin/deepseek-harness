@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-27
 
-[English](2026-08-04-websocket-downlink-carrier.md) | 中文
-
 ## Problem
 
 浏览器 Web GUI 的 `events.mux` 与 `events.host` 长期使用两条 SSE（Server-Sent Events）响应。HTTP/1.1 浏览器通常只允许每个来源约六条并发连接；每个页面永久占住两条会让同源多标签页、插件资源和普通 RPC 争抢连接槽，达到上限后不是降速而是排队阻塞。RPC 协议本身是通道无关的，约束来自浏览器物理载体，不应渗入会话/运行时对象层。

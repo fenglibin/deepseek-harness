@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-24-new-session-clears-to-empty-state.md) | 中文
-
 ## Problem
 
 侧栏「New Session」会立即创建并打开空白会话，因此中间栏显示带空 transcript（文本记录）与常驻 composer 的 `ConversationRoot`。Figma 的 NEW SESSION 屏（`EmptyState` + 共用的 `InputBar` hero）仅在 `sessions.current` 已为 undefined 时渲染，因而主创建控件无法到达启动页。

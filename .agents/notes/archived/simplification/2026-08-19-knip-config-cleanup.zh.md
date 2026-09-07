@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-22
 
-[English](2026-08-19-knip-config-cleanup.md) | 中文
-
 ## 问题
 
 `knip.json` 携带了大量不产生任何作用的 workspace 条目。其中一些指向已经不复存在的包，另一些与 `packages/*/*` 通配默认完全重复。这两类都让文件变大——790 行——并显现出配置已经超出了它所描述的包：读者无法分辨哪些条目在保护真实行为、哪些是惰性的。

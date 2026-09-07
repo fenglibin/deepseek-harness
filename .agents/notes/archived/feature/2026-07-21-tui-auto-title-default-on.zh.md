@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-21-tui-auto-title-default-on.md) | 中文
-
 > **已被取代**：见[标题归一 Agent Note](../simplification/2026-07-22-tui-titles-from-session-title-service.md)。TUI 本地的 `autoTitle` 生成已移除；标题来自日志承载的 session-title 服务，终端重命名消费 `session/title` 事件。
 
 ## Problem

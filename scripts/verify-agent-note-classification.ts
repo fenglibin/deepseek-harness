@@ -1,7 +1,7 @@
 /**
  * Enforce Agent Note lifecycle/class paths and dated filenames. Structural rules
  * are shared with `agent-note-tree.ts`; the closed classification rules live
- * in `.agents/notes/README.md`.
+ * in `.agents/notes/README.zh.md`.
  */
 
 import { existsSync } from 'node:fs'

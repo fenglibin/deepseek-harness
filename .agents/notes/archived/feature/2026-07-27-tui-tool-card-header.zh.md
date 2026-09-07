@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-27-tui-tool-card-header.md) | 中文
-
 ## Problem
 
 TUI 曾把每次工具调用渲染为 `{glyph} {title}`，其中 `title` 是 presenter 拼接的「动词加细节」字符串（`Read src/index.ts (1200-1360)`、`Edit files`，或 bash 卡片的模型描述），以状态色加粗并加下划线显示。单一扁平的槽位同时承载了工具身份、操作对象和状态，而样式又混用了加粗、下划线和颜色，前后不一致——表头读起来像噪声，「运行了哪个工具」在视觉上与「它操作了什么」无法区分。

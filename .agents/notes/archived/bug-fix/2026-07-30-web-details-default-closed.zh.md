@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-30-web-details-default-closed.md) | 中文
-
 ## 问题
 
 瞬时布局 store 原本将详情栏初始化为 360px 的契约宽度。因此，首个已连接会话以及每次完整重新加载都会在用户选择任何详情内容之前预留右侧栏。Chat 工具行有意保持内联，不会打开详情栏；Trajectory 行则会在选中事件时打开详情栏。因此，布局默认打开并不表示存在有效的详情选中项。

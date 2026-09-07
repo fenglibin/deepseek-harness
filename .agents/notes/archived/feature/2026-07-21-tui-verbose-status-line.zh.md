@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-21-tui-verbose-status-line.md) | 中文
-
 ## 问题
 
 在轮次运行期间，[全屏 TUI](2026-07-17-dedicated-full-screen-tui-front-door.md) 只显示一个静态的 "Working" loader 动画。它既不表明当前步骤已耗时多久，也不表明 agent（智能体）正在做什么——等待模型、思考、流式输出回复，还是运行工具——因此运行缓慢或卡住的轮次与运行很快的轮次无从区分。

@@ -1,4 +1,4 @@
-# Agent Note：内联图片 composer（rail 退役）
+# Agent Note: 内联图片 composer（rail 退役）
 
 Status: implemented
 

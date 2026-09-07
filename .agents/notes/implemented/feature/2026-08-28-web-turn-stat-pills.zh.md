@@ -1,6 +1,6 @@
-# Agent Note：Turn 尾部统计 pill 与锚定弹层
+# Agent Note: Turn 尾部统计 pill 与锚定弹层
 
-状态：已实现
+Status: implemented
 
 ## 问题
 

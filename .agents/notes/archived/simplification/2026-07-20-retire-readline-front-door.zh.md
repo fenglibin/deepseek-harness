@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-20-retire-readline-front-door.md) | 中文
-
 ## 问题
 
 仓库同时提供两个交互式终端前端：面向行的 readline 通道（`@deepseek-ai/dsh-stdio`）和全屏的 [`@deepseek-ai/dsh-tui`](../feature/2026-07-17-dedicated-full-screen-tui-front-door.md)。TUI 落地之后，readline 的交互角色已经冗余——`demo:tui` 作为编码 agent 体验取代了 `demo:repl`——而它剩下的真实角色（管道与自动化）已由单次任务的 `@deepseek-ai/dsh-cli-demo` 应用以更好的方式承担（任务输入、DSH 原生 `text`/`json`/`stream-json` 输出、持久化、信号处理）。

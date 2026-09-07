@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-06-20-remove-redundant-snapshot-log-expected-output.md) | 中文
-
 ## 问题
 
 驱动模型的 ACP（Agent Client Protocol）快照场景同时包含 `session.jsonl` 和 `session.expected.jsonl`。对于普通记录场景，`session.jsonl` 是从真实运行采集的重放 fixture（测试前置数据）；重放测试会规范化新持久化的日志，并将其与 `session.expected.jsonl` 比较。在当前 fixture 中，普通记录场景的两份规范化日志完全相同。

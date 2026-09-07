@@ -1,6 +1,6 @@
-# Agent Note：实验性 Agent Teams Web 控件
+# Agent Note: 实验性 Agent Teams Web 控件
 
-状态：已实现
+Status: implemented
 
 ## 问题
 

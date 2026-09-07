@@ -1,4 +1,4 @@
-# Agent Note：交付纪律客户端 UI
+# Agent Note: 交付纪律客户端 UI
 
 Status: implemented
 

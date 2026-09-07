@@ -1,4 +1,4 @@
-# Agent Note：交付纪律设计分级
+# Agent Note: 交付纪律设计分级
 
 Status: implemented
 

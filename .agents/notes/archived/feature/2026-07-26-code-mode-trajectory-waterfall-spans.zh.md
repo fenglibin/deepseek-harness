@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-28
 
-[English](2026-07-26-code-mode-trajectory-waterfall-spans.md) | 中文
-
 > 范围：Code Mode UI 堆叠 PR（Pull Request）链的最后一个 PR，涵盖两个非 chat 视图中的子分发渲染。chat 的嵌套归[子调用行 Agent Note](2026-07-26-code-mode-chat-subcall-rows.md)所有；本篇所消费的计时即[实时并行 Agent Note](2026-07-26-code-mode-live-parallel-dispatch.md)的 start/settle 事件对。
 
 ## 问题

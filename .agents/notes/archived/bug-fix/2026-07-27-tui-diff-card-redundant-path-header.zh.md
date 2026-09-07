@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-31
 
-[English](2026-07-27-tui-diff-card-redundant-path-header.md) | 中文
-
 ## Problem
 
 `edit` 与 `write` 工具卡片会把目标路径打印两次。两者的 `presentCall`/`presentResult` 返回的 diff 卡片，标题为 `Edit <path>`/`Write <path>`，而其唯一的 `FileDiff` 又携带相同的 `path`。TUI 的 `diffLines` 无条件地将 `palette.bold(diff.path)` 渲染为每文件的表头，因此单文件编辑会渲染成：

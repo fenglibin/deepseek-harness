@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-03-documentation-graph-atlas.md) | 中文
-
 ## 问题
 
 仓库已经有若干高可信文档表面，各自覆盖不同维度：[module-graph.md](../../../../docs/module-graph.md) 根据包（package）的 `peerDependencies` 生成；生成式 [Cordis 事件](../../../../docs/cordis-catalog/events.md)和[服务](../../../../docs/cordis-catalog/services.md)目录根据 Cordis `Events` 和 `Context` 声明生成；[tool-catalog.md](../../../../docs/tool-catalog.md) 通过启动已发布工具插件生成；[core-data-structures/](../../../../docs/core-data-structures/core.md) 则使用 `ts type-equiv` 块使粘贴的类型定义与源码保持同步。

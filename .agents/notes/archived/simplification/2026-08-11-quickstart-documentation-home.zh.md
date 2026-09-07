@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-22
 
-[English](2026-08-11-quickstart-documentation-home.md) | 中文
-
 ## 问题
 
 单独的文档首页会重复产品首页所维护的产品定位和功能摘要。这些重复声明需要同步与评审，却不能帮助读者查阅技术操作说明。

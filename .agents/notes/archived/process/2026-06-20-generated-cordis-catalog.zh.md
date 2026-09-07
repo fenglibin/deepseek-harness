@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-06-20-generated-cordis-catalog.md) | 中文
-
 ## 问题
 
 插件作者需要两类此前没有任何单一文档能同时提供的参考信息：他们可以监听的每一个 Cordis **事件**（含精确签名与分发模式），以及他们可以调用的每一个 `ctx.<key>` **服务**（含精确接口）。相关信息虽然存在，但散落各处：`docs/architecture.md` 中一张手工维护的事件分类体系*表格*（名称 + 行文描述的 Mode/Purpose，由 `verify-event-taxonomy` 做名称集合校验）、一张服务映射表（8 行角色描述），以及 `interface Events` / `interface Context` 声明本身。分类体系表格还有一个盲区：它无法捕获全新的*未记录*事件——名称集合校验器只检查两侧已有的名称。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-27-tui-step-timing-trails-tool-cards.md) | 中文
-
 ## 问题
 
 每步的计时摘要（`Model wait … · Completed …`）原本是助手消息组件的子节点，因此直接渲染在助手文本下方。当某一步触发 tool call 时，tool card（工具卡片）会在助手消息*之后*追加到聊天区，使计时行被搁在它们上方——落在该步骤真正的最后一条输出之前一条消息处。该摘要本意是收束一个步骤，因此在任何含 tool call 的步骤上都出现在了错误的位置。

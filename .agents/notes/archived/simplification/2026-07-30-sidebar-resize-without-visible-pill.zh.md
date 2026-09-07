@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-30-sidebar-resize-without-visible-pill.md) | 中文
-
 ## 问题
 
 AppFrame 在两个栏位边界都显示相同的浮动胶囊。左侧胶囊在主导航旁增加了不必要的视觉负担，但侧边栏的缩放交互仍有用。

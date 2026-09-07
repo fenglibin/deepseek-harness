@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-21-tui-borderless-banner.md) | 中文
-
 ## Problem
 
 一个中间的无横幅设计删掉了带框的启动横幅：它删除了 `HeaderComponent` 及其扫入动画，把模型移入页脚，丢弃了会话 id，并把 `welcome` 渲染为 transcript 的第一行。用户的裁决把这一切反转：把横幅拿回来——"just remove the border"。令人反感的装饰是那四行盒子边框，而不是它承载的识别信息（模型、会话 id），也不是扫入动效。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-27-question-composer-rows-do-not-shrink.md) | 中文
-
 ## 问题
 
 提问 composer 的卡片会按视口设上限（`max-height: min(60vh, 520px)`），并让选项列表自行滚动，这样在成批提问时头部和底部操作按钮始终可达。但当 composer 的可用区域变矮时（窗口较小，或视口偏矮且详情面板处于展开状态），选项行会互相叠在一起，也会叠到问题标题上。

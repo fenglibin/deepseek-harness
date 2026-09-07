@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-03
 
-[English](2026-07-31-experimental-subcommand-gate.md) | 中文
-
 ## Problem
 
 `meta` 与 `upgrade` 两个入口把实验性状态写在名字里：`dsh experimental-meta` 和 `dsh experimental-upgrade`。前缀让每次调用都变得冗长，而在稳定时重命名命令会破坏对它的所有引用——肌肉记忆、脚本与文档皆然。这种状态应当由一个显式选择加入的门槛承载，而不是由名字承载。

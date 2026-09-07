@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-21-tui-resume-command.md) | 中文
-
 ## Problem
 
 原有 `/resume` 只会打印 shell 命令。使用键盘操作的用户无法查看标题或结果、区分日志损坏与适配器缺失，也无法安全移交终端。退出 TUI 后手动启动命令还掩盖了必要的操作顺序：等待当前工作结束并将其刷写，释放 UI 和应用，再恢复持久化的原有身份，绝不能静默创建替代会话。

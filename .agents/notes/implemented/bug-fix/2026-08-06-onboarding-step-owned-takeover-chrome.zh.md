@@ -1,6 +1,6 @@
-# Agent Note：首次使用引导的接管界面框架移入步骤自身
+# Agent Note: 首次使用引导的接管界面框架移入步骤自身
 
-状态：已实现
+Status: implemented
 
 ## 问题
 

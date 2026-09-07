@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-23
 
-[English](2026-08-12-required-python-runtime-pull-request-ci.md) | 中文
-
 ## 问题
 
 普通拉取请求 CI 会针对 fake 运行时对端执行完整的 Python SDK pytest 套件，而 Node 快照使用不同的客户端与预期输出。真实 Python 客户端、打包后的 JSON-RPC 可执行文件、exe 专用快照、发布形态 wheel 包与干净安装只在可选的单文件可执行程序工作流或 Python 发布工作流中汇合。因此，运行时事件或闭包发生变化后，陈旧的 Python 投影或损坏的 wheel 包路径仍可能合并，直到后续有人构建 Python 发布候选版本时才失败。

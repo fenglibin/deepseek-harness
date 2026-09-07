@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-06-11-doc-sync-enforcement.md) | 中文
-
 ## 问题
 
 AGENTS.md 承诺文档与代码严格同步，但这一承诺此前仅靠人眼核查。评审曾两次发现漂移：一次是实操手册（cookbook）示例与类型策略矛盾，一次是 README 引用了错误的 `registerAdapter` 调用。失去同步的文档比没有文档更糟；而本代码库主要由 agent（智能体）构建，agent 遵守门禁远比遵守行文约定可靠（机械质量门禁）。有两类文档漂移可以被机械检查：不再能编译的代码块，以及与 `interface Events` 声明重复的事件分类体系表。

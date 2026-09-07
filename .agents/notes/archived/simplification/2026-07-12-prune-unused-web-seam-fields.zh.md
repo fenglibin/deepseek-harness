@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-12-prune-unused-web-seam-fields.md) | 中文
-
 ## 问题
 
 web 能力携带的 request/result/status 值，虽然每个已交付的实现都会填充，但没有任何生产环境的消费方读取它们。`WebSearchResult.providerId`、`query` 与 `WebFetchResult.providerId` 是结果回显；`tool-web` 只格式化 content/sources/truncation 或最终 URL/status/body/truncation，没有其他运行时读取这些字段。搜索提供方返回 `WebProviderStatus.reason`，但可用性检查只看 `available`，并有意输出一条通用的不可用诊断信息。

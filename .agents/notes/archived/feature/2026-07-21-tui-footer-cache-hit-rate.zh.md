@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-21-tui-footer-cache-hit-rate.md) | 中文
-
 ## Problem
 
 页脚原本把会话的 token 用量汇总为 `↑<input> ↓<output>`，其中 `↑` 是模型上报的未缓存输入。`TokenUsage` 的各项计数互不重叠：计费的输入 token 由 `inputTokens`（未缓存）加上 `cacheReadTokens` 与 `cacheWriteTokens` 构成。只暴露未缓存的那个数字，用户就无从判断每轮提示词有多少由提供方缓存承接——而这恰是最能反映复用的请求前缀是否奏效的信号。在以缓存读取为主的长会话里，`↑` 始终很小，掩盖了提示词其实很大但很便宜的事实。

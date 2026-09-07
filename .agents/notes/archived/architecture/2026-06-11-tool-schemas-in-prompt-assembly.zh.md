@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-06-11-tool-schemas-in-prompt-assembly.md) | 中文
-
 ## 问题
 
 在协议格式（wire format）层面，工具 schema 通过模型请求中专用的 `tools` 字段传输，而非嵌入提示词文本。然而从架构角度看，「模型被告知它能做什么」是一个统一的关注点：提示词段落与工具列表由相同的插件贡献组装，并在同一时刻被消费。

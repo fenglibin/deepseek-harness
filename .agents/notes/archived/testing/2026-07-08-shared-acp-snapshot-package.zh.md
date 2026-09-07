@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-08-shared-acp-snapshot-package.md) | 中文
-
 ## 问题
 
 ACP（Agent Client Protocol）快照层（[快照 Agent Note（agent 决策记录）](2026-06-19-acp-snapshot-tests.md)）由位于一个示例测试目录内的三个模块构建：`snapshot-harness.ts`（启动真实 bin 子进程，通过 ACP JSON-RPC 驱动它，采集持久化日志）、`snapshot-normalize.ts`（纯预期输出规范化器），以及 `acp.snapshot.ts` 中约 150 行的场景主体与 fixture（测试前置数据）守卫（记录/回放模式、stdout 预期输出与日志比较、固定请求头一致性守卫、孤立项/必需文件/单一固定项元测试）。

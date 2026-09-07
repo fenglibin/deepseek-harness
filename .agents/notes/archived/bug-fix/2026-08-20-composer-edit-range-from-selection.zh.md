@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-20
 
-[English](2026-08-20-composer-edit-range-from-selection.md) | 中文
-
 ## 问题
 
 输入机器靠一个编辑范围来对齐引用 occurrence：范围之前的条目右移，之后的条目不动，被范围相交的条目失去结构化身份、以普通草稿文本留在原地。最后一条是"在引用内部编辑"的刻意含义。

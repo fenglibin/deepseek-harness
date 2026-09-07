@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-22
 
-[English](2026-08-12-documentation-site-navigation-and-chrome.md) | 中文
-
 ## 问题
 
 参考侧边栏把 43 个子系统页排在了所有其他分组之前：VitePress 配置中的 `sectionOrder` 既没有为子系统分组、也没有为承载 Python SDK 页的分组声明位置，`indexOf` 返回 `-1`，于是它们排到了所有已排序分区的前面。点击 `参考` 导航项落在架构页，而该页自己的侧边栏条目是 62 条中的第 44 条，位于 2478px 侧边栏的 1549px 处——在视口之外。四个子系统页所用的 `order` 值已被同一分区内的其他页占用，只靠 `Array.prototype.sort` 的稳定性和 manifest 数组恰好的拼接顺序才没有错乱。

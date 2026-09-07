@@ -1,4 +1,4 @@
-# Agent Note：工具结果图片在结果落盘时描述
+# Agent Note: 工具结果图片在结果落盘时描述
 
 Status: implemented
 

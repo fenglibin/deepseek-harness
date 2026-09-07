@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-04-prune-producerless-vocabulary-variants.md) | 中文
-
 ## 问题
 
 可合并扩展的词汇映射表设计上通过声明合并来增长，代码库已在 `TurnEndReasonMap`（`packages/core/session/src/types.ts`）上明确了准入策略：像 `refusal` 这样的变体「在适配器或循环首次发出它之前，有意不纳入」。三个已声明的词汇项违反了该策略——每个都既无生产者也无消费方，其中两个甚至没有测试：

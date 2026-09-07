@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-05-windows-fs-permissions.md) | 中文
-
 本记录中关于替换文件的决策已由 [Windows DACL 保留机制](../bug-fix/2026-07-19-windows-atomic-write-dacl-preservation.md)取代。
 
 ## 问题

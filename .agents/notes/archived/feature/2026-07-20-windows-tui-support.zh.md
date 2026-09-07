@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-20-windows-tui-support.md) | 中文
-
 ## 问题
 
 全屏 TUI 将原始输入、ANSI 渲染、终端尺寸变更事件和终端恢复委托给 pi-tui 的 `ProcessTerminal`。该依赖已实现原生 Windows 控制台路径，但仓库的真实进程冒烟测试此前使用 Python 中仅适用于 POSIX 的 `pty` 和 `termios` 模块。若在 Windows 上跳过该测试，这条受支持的产品路径便会缺少针对启动、输入、交互、失败报告和终端恢复的测试覆盖率。

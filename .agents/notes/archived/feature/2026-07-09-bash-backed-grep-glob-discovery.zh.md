@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-09-bash-backed-grep-glob-discovery.md) | 中文
-
 ## 问题
 
 harness 需要面向模型的 `glob` 和 `grep` 工具，但如果将它们实现为 `ctx.fs` 提供方的方法，就会把本地产品便利功能变成所有文件系统后端都必须实现的契约。本地工作区发现天然适合由进程支持的 `rg` 工作流；远程或虚拟文件系统后端可能公开自己的搜索 API，可能无法共享本地 `ripgrep` 视图，也可能完全不支持发现。文件读取／写入／编辑 seam 尚未证明此需求前，v1 不应要求每个文件系统后端都实现搜索。

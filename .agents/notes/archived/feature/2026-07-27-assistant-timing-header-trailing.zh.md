@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-27-assistant-timing-header-trailing.md) | 中文
-
 ## Problem
 
 TUI 的助手消息此前以一行开头，把 `Assistant` 标签和步骤计时串拼在一起（`Assistant · Model wait 0.0s · Completed …`）。计时放在正文之前，使耗时数据远离它所描述的回答；一旦完成，回复的首行还被读者会略过的元数据行压在下面。

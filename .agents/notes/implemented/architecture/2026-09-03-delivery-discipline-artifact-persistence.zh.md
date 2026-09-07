@@ -1,4 +1,4 @@
-# Agent Note：交付纪律产物持久化
+# Agent Note: 交付纪律产物持久化
 
 Status: implemented
 

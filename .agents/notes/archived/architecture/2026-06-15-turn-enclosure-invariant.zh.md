@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-28
 
-[English](2026-06-15-turn-enclosure-invariant.md) | 中文
-
 ## 问题
 
 持久化的会话持久化后端（在配套变更中引入）以**轮次**作为崩溃恢复边界：崩溃可能留下一个未关闭的最终轮次，`load` 会用一个合成的 `turn/end {kind:'interrupted'}` 将其关闭，同时保留该轮次的真实事件（见[会话持久化](2026-06-14-session-persistence.md)）。这种恢复只有在没有任何*合法的*持久事件位于轮次之外（即上一个 `turn/end` 与下一个 `turn/start` 之间的间隙）时才是良定义的，否则这类事件会被卷入下一个轮次的中断关闭中。

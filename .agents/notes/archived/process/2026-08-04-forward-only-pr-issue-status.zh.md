@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-10
 
-[English](2026-08-04-forward-only-pr-issue-status.md) | 中文
-
 ## 问题
 
 Issue Project 状态表示工作所处阶段，同仓库内精确匹配的解决型关键字引用则建立权威的 PR（Pull Request）到 Issue 关系。若仅允许已处于 `Ready` 的 Issue 推进生命周期，即使实现已经明确开始，处于 `Inbox` 或 `Backlog` 的 Issue 仍会停留在原状态。只有 PR 元数据在其他方面均有效时才投射工作阶段，也会把政策合规性与可观察到的工作状态混为一谈。

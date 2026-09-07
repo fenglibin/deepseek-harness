@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-04-fold-stdio-ui-helper.md) | 中文
-
 后来的[冗余 agent（智能体）移除](2026-07-20-remove-stdio-and-echo-agents.md)取代了这项包放置决策，并完整移除合并后的包、应用和面向行的表面。
 
 ## 问题

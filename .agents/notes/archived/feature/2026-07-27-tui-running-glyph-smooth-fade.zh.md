@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-27-tui-running-glyph-smooth-fade.md) | 中文
-
 ## Problem
 
 回合运行时，TUI 会把 `>` 提示符替换为阶段字形（`◍`/`✻`/`●`/`⚙`）。此前的迭代用强调蓝为其亮度做动画（先是离散 SGR 波，后是 truecolor 呼吸）——一个持续脉动的彩色指示器。期望的效果保留持续脉动以示正在工作，但改为安静的暗灰而非颜色，并在两端做平滑的淡入淡出。

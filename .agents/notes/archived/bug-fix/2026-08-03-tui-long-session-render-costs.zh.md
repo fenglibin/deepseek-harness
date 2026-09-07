@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-08-03-tui-long-session-render-costs.md) | 中文
-
 ## 问题
 
 在一个恢复后的长会话（196k 条事件、2.2k 个步骤、1.8k 张工具卡片）中，TUI 渲染 transcript（文本记录）耗时约 12 秒，回显一次按键耗时约 800 毫秒。性能剖析表明，两项耗时都来自渲染路径，而非会话加载（zstd + 解析 + 表层播种约为 1.7 秒）：

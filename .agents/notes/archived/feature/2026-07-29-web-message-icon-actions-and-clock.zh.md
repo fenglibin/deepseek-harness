@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-29-web-message-icon-actions-and-clock.md) | 中文
-
 ## 问题
 
 Web 聊天的用户气泡已有复制、分支、编辑 IconActions，但没有时钟。已定稿的 assistant 叙述下方完全没有操作栏，尽管 harness 设计稿在回答结束后展示复制、分支、时钟。流式回复不得在逐 token 输出期间闪现该操作栏。经 memo 优化的行在跨午夜时仍保持稳定 props，因此一次性的 `Date.now()` 会让昨日消息一直卡在 `HH:mm`。

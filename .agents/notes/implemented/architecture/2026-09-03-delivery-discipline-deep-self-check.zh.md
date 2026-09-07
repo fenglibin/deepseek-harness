@@ -1,4 +1,4 @@
-# Agent Note：交付纪律深度自检
+# Agent Note: 交付纪律深度自检
 
 Status: implemented
 

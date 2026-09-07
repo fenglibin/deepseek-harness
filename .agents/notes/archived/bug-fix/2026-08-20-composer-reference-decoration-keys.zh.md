@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-20
 
-[English](2026-08-20-composer-reference-decoration-keys.md) | 中文
-
 ## 问题
 
 输入框 backdrop 把草稿渲染成一组片段：纯文本字符串、开头的 claim token 标记、每个结构化引用一个元素、每个纯文本引用范围一个标记。React 按 key 协调这个数组。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-04-persistence-log-catalog.md) | 中文
-
 ## 问题
 
 `SessionEventMap` 是磁盘格式的词汇，但其声明分散在所属的会话包（package）和声明合并中。生成式持久化目录是所有事件、各自完整 payload 声明与源码 JSDoc，以及共享 `SessionEvent` 信封的唯一参考；手工维护的表格会发生漂移，因此被移除。这些记录不是 Cordis 事件——观察者通过唯一的 `session/event` 总线事件接收它们——所以 Cordis 目录无法覆盖。生成器会发现所有声明，文档同步新鲜度门禁会拒绝遗漏或陈旧输出。

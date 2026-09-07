@@ -45,20 +45,27 @@ export function renderArchiveManifest(files: Readonly<Record<string, string>>): 
   }, null, 2)}\n`
 }
 
+/** Whether a manifest entry names a Chinese archive note, the only sealed artifact kind. */
+function isChineseNotePath(path: string): boolean {
+  return path.endsWith('.zh.md')
+}
+
 /**
- * Reject changes to or removal of sealed `.zh.md` artifacts. The archive is
- * Chinese-only, so a sealed entry missing from the current manifest is a
- * forbidden removal of frozen history.
+ * Reject removal of sealed `.zh.md` artifacts across a change. The archive is
+ * Chinese-only: historical English `.md` and `.i18n.yaml` entries were retired
+ * by the single-language migration and are no longer protected. A `.zh.md`
+ * hash may evolve only through an explicit `--write`/`--rewrite` reseal whose
+ * manifest diff lands in the same change; silent drift is caught instead by
+ * {@link extendArchiveManifest}'s seal-versus-disk consistency check.
  */
 export function validateArchiveManifestExtension(
   baseline: ArchiveManifest,
   current: ArchiveManifest,
 ): string[] {
   const errors: string[] = []
-  for (const [path, expected] of Object.entries(baseline.files)) {
-    const actual = current.files[path]
-    if (actual === undefined) errors.push(`${path}: sealed manifest entry is missing`)
-    else if (actual !== expected) errors.push(`${path}: sealed manifest hash changed`)
+  for (const [path] of Object.entries(baseline.files)) {
+    if (!isChineseNotePath(path)) continue
+    if (!Object.hasOwn(current.files, path)) errors.push(`${path}: sealed manifest entry is missing`)
   }
   return errors
 }
@@ -108,20 +115,29 @@ export function validateArchiveArtifacts(artifacts: ReadonlyMap<string, Buffer>)
   return errors
 }
 
-/** Preserve every sealed path/hash and append hashes for newly archived artifacts. */
+/**
+ * Seal the current Chinese archive. The archive is append-only for `.zh.md`
+ * artifacts: every current `.zh.md` must already be sealed or be added now,
+ * and a sealed `.zh.md` whose content changed outside `--write` is rejected.
+ * Historical English `.md` / `.i18n.yaml` entries were retired by the
+ * single-language migration; they are dropped rather than checked.
+ */
 export function extendArchiveManifest(
   existing: ArchiveManifest,
   artifacts: ReadonlyMap<string, Buffer>,
 ): { files: Record<string, string>; added: string[]; errors: string[] } {
   const errors: string[] = []
-  const files: Record<string, string> = { ...existing.files }
+  const files: Record<string, string> = {}
   for (const [path, expected] of Object.entries(existing.files)) {
+    if (!isChineseNotePath(path)) continue
     const content = artifacts.get(path)
     if (content === undefined) errors.push(`${path}: sealed artifact is missing`)
     else if (archiveContentHash(content) !== expected) errors.push(`${path}: sealed content hash changed`)
+    else files[path] = expected
   }
   const added: string[] = []
   for (const [path, content] of [...artifacts].sort(([left], [right]) => left.localeCompare(right))) {
+    if (!isChineseNotePath(path)) continue
     if (files[path] !== undefined) continue
     files[path] = archiveContentHash(content)
     added.push(path)

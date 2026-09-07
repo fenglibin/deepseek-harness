@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-14-time-context-plugin.md) | 中文
-
 ## 问题
 
 本记录中的动态系统提示词存储和刷新决策已由[持久的逐步骤时间上下文](2026-07-16-durable-per-step-time-context.md)取代。需要显式启用的包（package）、分区时间格式和校验仍然保留；后续 Agent Note 负责当前的模型可见与持久性契约。

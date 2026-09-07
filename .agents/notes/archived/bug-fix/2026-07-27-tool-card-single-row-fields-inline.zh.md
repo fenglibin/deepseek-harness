@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-27-tool-card-single-row-fields-inline.md) | 中文
-
 ## Problem
 
 工具卡片的标题、描述、cwd 以及待执行的 `$ <command>` 回显各自都是一个逻辑行。bash 工具直接用模型给出的命令与描述来设置卡片标题（和描述），而对于多行 bash 脚本，这些内容包含真实换行。这些字段此前用 `displayText` 转义，而 `displayText` 会刻意保留 `\n` 作为结构性布局。于是多行标题会换到卡片行数核算未预留的额外终端行上，标题后续的行便覆盖了描述、输出，或编辑器的 steering 提示——卡片渲染成互相重叠的乱码文本。移除 gutter bar（见[可复制 transcript 的 note](../simplification/2026-07-27-copyable-transcript-no-gutter-bar.md)）后，这些行不再位于逐行前缀之后，因而暴露了这一冲突。

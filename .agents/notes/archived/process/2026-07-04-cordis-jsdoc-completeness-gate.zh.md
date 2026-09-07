@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-04-cordis-jsdoc-completeness-gate.md) | 中文
-
 ## 问题
 
 生成的 Cordis 目录此前强制了事件分发模式，但未强制要求完整的服务与事件契约。方法可以缺少描述，参数或返回值可以在跨插件 API 接口上不写文档——而这恰恰是 IDE 引导最重要的地方。

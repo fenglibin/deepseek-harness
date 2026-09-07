@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-26-gui-pr-gif-evidence-and-assets-branch.md) | 中文
-
 ## 问题
 
 改变产品用户在 GUI 中所见行为的 PR（Pull Request），此前只能通过文字描述和测试名称接受评审，两者都无法展示渲染结果。[浏览器演示 GIF 录制](../../../skills/record-browser-gif/SKILL.md)对应的 skill（技能）能生成真实可信的本地 GIF，但刻意止步于本地产物，于是每个想展示 GIF 的 PR 都得各自重新摸索发布方式；而把 GIF 提交到 PR 分支从来不可接受：进入历史的二进制媒体会永久增大之后每一次克隆的体积。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-29-tui-hidden-mode-assistant-fold.md) | 中文
-
 ## 问题
 
 Ctrl+O 的隐藏阶段（[整合的 TUI 展示](../architecture/2026-07-28-consolidated-tui-presentation.md)）去掉工具卡片，让 transcript（文本记录）读作一段对话，但每个模型步骤仍渲染自己的 `Assistant` 标题。因此一个多步骤轮次（文本 → 工具 → 文本）会显示多个连续、之间空无一物的 `Assistant` 区块——被移除的工具卡片正是重复标题曾经的唯一理由。Codex 风格的纯对话阅读需要每轮次一条 assistant 消息。

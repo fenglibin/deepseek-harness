@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-26-execa-for-test-subprocess-plumbing.md) | 中文
-
 ## 问题
 
 大约十个 e2e/冒烟测试文件各自手工重写过同一套「spawn、收集输出、超时终止」编排：用 `setEncoding` 加 `data` 处理器做 `let stdout = ''` 式累积，用 `setTimeout` → `kill('SIGKILL')` 设定超时截止，再以 `once('exit')`/`once('error')` 结算结果，各处只有细微差别。这些位置是：`runLoaderSmoke` 的内层 spawn 代码块（`packages/support/loader-smoke/src/index.ts`）、`apps/cli/tests/built-bin.e2e.ts` 与 `packages/examples/cli-demo/tests/built-bin.e2e.ts` 中的 `runBuiltBin`、`packages/examples/acp-demo/tests/built-bin.e2e.ts` 中的 `runBinExpectingExit`、`lsp-local` 与 `code-runtime-worker` 中基于构建产物的 e2e 辅助函数、`examples/tui-agent/tests/pty-harness.ts` 的外层收集器、`examples/jsonrpc-agent/tests/keyless-smoke.e2e.ts`，以及部分涉及的 `apps/web/tests/smoke-real.e2e.ts` 和 `session-checkpoint-policy/tests/crash-recovery.e2e.ts`。

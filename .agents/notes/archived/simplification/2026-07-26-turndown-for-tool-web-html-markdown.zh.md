@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-07
 
-[English](2026-07-26-turndown-for-tool-web-html-markdown.md) | 中文
-
 ## 问题
 
 `dsh-tool-web` 的 `src/html.ts`（约 86 行，另有约 40 行专属测试；已由本变更删除）曾用正则表达式把抓取到的 HTML 转成 markdown：剥离 script、style、noscript 标签与注释，转换 `<a>`/`<h1-6>`/`<li>`，解码数字实体外加一张 12 项的命名实体表，并折叠空白。该模块自身的 JSDoc 写明「A richer converter can replace it without changing the seam or tool schema」，README 的 Known Limitations 章节也把它记载为「a minimal regex converter, not an HTML parser — tables, images, and nested formatting are lost」。[web 能力 seam 决策记录](../architecture/2026-06-24-web-capability-seam.md)把 HTML 转 markdown 作为呈现职责划归本包，因此替换点恰好就在这里。每个抓取到的 HTML 页面上，该转换器的输出都对模型可见；此前没有任何无密钥快照执行到 `web_fetch`，因此没有预期输出固定它的行为。

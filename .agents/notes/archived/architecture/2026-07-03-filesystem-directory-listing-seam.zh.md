@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-03-filesystem-directory-listing-seam.md) | 中文
-
 ## 问题
 
 `@deepseek-ai/dsh-fs` 是文件系统访问的提供方 seam，本地后端与未来的非本地后端共享同一个 `ctx.fs` 契约。在本次变更之前，它能解析路径、stat 目标、读取文本、流式读取文本、写入文本和编辑文本。这对面向模型的文件工具已经足够，但对于需要枚举目录而又不想直接导入 `node:fs` 的非模型侧消费方来说还不够。

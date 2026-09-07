@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-06-18-acp-terminal-and-tool-rendering.md) | 中文
-
 > 就 ACP 而言已被 [ACP 作为仅面向自动化的协议](../simplification/2026-07-23-acp-automation-only-protocol.md)取代。工具渲染意图对 UI 传输层仍然可用，但 ACP 不再将其投影为终端卡片。
 
 ## 问题

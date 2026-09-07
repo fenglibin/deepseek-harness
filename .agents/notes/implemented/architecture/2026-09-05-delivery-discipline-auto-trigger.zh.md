@@ -1,6 +1,6 @@
-# Agent Note：交付纪律自动触发
+# Agent Note: 交付纪律自动触发
 
-状态：已实现
+Status: implemented
 
 ## 问题
 

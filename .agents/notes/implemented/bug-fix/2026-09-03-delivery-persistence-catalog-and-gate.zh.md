@@ -1,4 +1,4 @@
-# Agent Note：交付纪律 — 持久化目录与推进门禁修复
+# Agent Note: 交付纪律 — 持久化目录与推进门禁修复
 
 Status: implemented
 

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-06-parallel-github-ci-gates.md) | 中文
-
 ## 问题
 
 无密钥 GitHub CI 门禁大多相互正交：类型检查、lint、文档新鲜度、覆盖率、快照重放、构建、包（package）的发布卫生检查、demo 冒烟和已构建二进制冒烟会因不同原因失败，也不需要彼此的运行时状态。将它们作为一条有序命令链运行，会使工作流墙钟时间等于所有门禁耗时之和；而把每个短小叶子拆成独立 GitHub job，又会反复执行 checkout、Node 设置、pnpm 恢复和安装，直到编排开销成为瓶颈。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-12-drop-unconsumed-skill-provider-events.md) | 中文
-
 ## 问题
 
 skill（技能）注册表产出两个通知事件，但没有生产环境的监听方。生成的生产者/消费方矩阵以及对事件名的精确搜索表明，`skill/provider-added` 与 `skill/provider-removed` 仅出现在声明、emit 站点、测试、生成的 catalog 和行文中。

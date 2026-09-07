@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-06-20-extract-example-app-packages.md) | 中文
-
 ## 问题
 
 示例目录本应是*精简的*——只包含演示的可变接线，而非演示的基础设施。在此次变更之前，它是臃肿的。每个示例都携带一份手写的 `start.ts` 启动引导、一段基础设施前导（`timer`，以及 stdio 演示所需的 `logger` + `hmr`（热模块替换））、三个共享 YAML 片段的嵌套引用（`base.yml` / `base-core.yml` / `acp-agent/acp-tail.yml`），还有各示例自身的 `agent-loop`/持久化/系统提示词配置。真正的应用——每个 agent（智能体）都需要的服务主干——散落在叶子配置和那些 include 中。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-04-remove-agent-steering-mirror.md) | 中文
-
 ## 问题
 
 `agent/steering` 是最后一个仍存在的、对持久会话事件的瞬态镜像。agent loop（智能体循环）的 steering（中途引导）drain 逻辑先追加持久事件 `steering/message { turn, content, source }`，紧接着下一行就 emit `agent/steering(agent, turn, content, source)`——同一个事实以 fire-and-forget 事件的形式重复发出（`packages/core/agent-loop/src/loop.ts`，`drainSteering`）。它在生产环境中没有任何监听者：唯一的订阅方是一个 agent loop 回归测试，断言 emit 携带了 `source`——而这同一个事实已经由上一行的持久事件记录。

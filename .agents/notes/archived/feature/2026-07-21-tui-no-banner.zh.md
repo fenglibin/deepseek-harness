@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-21-tui-no-banner.md) | 中文
-
 > **已被取代**，见[无边框横幅 Agent Note](2026-07-21-tui-borderless-banner.md)：横幅及其扫入动画回归，只是去掉了盒子。本 note 为模型设立的页脚归宿得以保留。
 
 ## Problem

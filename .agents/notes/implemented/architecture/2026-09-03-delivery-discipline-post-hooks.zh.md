@@ -1,4 +1,4 @@
-# Agent Note：交付纪律后置命令
+# Agent Note: 交付纪律后置命令
 
 Status: implemented
 

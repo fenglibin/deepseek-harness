@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-31-tui-diff-context-line-accounting.md) | 中文
-
 ## 问题
 
 文件系统 diff 返回结果时，每个 `FileDiff.oldText` 和 `FileDiff.newText` 都会包含已应用的变更及其前后各 3 行上下文。TUI 将旧侧的每一行都渲染为删除行，将新侧的每一行都渲染为新增行，其中包括两侧相同的上下文。因此，一行编辑会显示为删除 7 行并新增 7 行，页脚还会重复这些虚高的合计值。

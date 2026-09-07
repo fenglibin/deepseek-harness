@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-19-retire-subagent-mock-package.md) | 中文
-
 ## 问题
 
 `@deepseek-ai/dsh-subagent-mock` 曾是一个以工作区插件形式发布的可配置测试替身。它仅有两个外部消费方：`tool-subagent` 单元测试和工具目录生成器；运行时包、示例、快照配置和真实提供方都不会加载它。

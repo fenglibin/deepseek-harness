@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-08-repeat-tool-guard.md) | 中文
-
 ## 问题
 
 模型陷入循环时，会以字节级相同的参数反复发起同一个工具调用——重新运行一条失败的 grep、重新读取一个未变化的文件、轮询一条已经给出答案的命令——每一轮往返都消耗 token、挂钟时间以及（对付费 API 而言）金钱，却不带来新信息。harness 目前没有任何机制能察觉这一点：循环没有步骤预算，没有插件追踪调用重复，模型只有在碰巧改变自身行为时才能跳出。这种失败模式真实存在且检测成本极低——[pi-repeat-tool-guard](https://github.com/Kingwl/pi-repeat-tool-guard) 正是以 pi coding-agent 扩展的形式提供了这一功能：统计连续相同调用次数，超过阈值后追加一条 `<system-reminder>` 告诉模型停止重复并换个方向。

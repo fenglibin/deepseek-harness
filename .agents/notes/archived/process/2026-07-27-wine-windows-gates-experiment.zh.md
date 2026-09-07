@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-08
 
-[English](2026-07-27-wine-windows-gates-experiment.md) | 中文
-
 ## 问题
 
 Pull request 的 Windows 通道旨在验证两个阻断性 win32 表面，即 workspace 构建与生产站点。该通道此前运行在托管 `windows-2025` 上，是必需矩阵中最慢的作业：耗时 7–9 分钟，而 Linux 作业耗时 1.5–2.5 分钟，因此 Windows VM 的启动、准备与文件系统开销主导了每个 pull request 的关键路径。

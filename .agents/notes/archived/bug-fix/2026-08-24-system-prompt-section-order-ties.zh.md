@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-25
 
-[English](2026-08-24-system-prompt-section-order-ties.md) | 中文
-
 ## Problem
 
 `SystemPromptRegistry` 使用稳定排序按 `order` 排列分段，因此相同 order 的分段会按插件激活顺序渲染。`tool:cordis` 与 `tool:workflow` 都声明了 `order: 115`，但两者在不同平台的全新组合中激活顺序不同。因此，ACP（Agent Client Protocol）与 SDK 的快照回放可能把相同分段组装成不同于已提交 `system-prompt.expected.md` 文件的顺序。

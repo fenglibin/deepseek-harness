@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-24-tui-question-dialog-multiline.md) | 中文
-
 ## 问题
 
 `ctx.userInteraction.ask()` 必须确保问题正文、`detail` 补充内容、选项标签、描述、校验信息和控件在已配置的宽度与高度边界内均可读。问题面板也直接位于编辑器上方：若将其置于终端边缘，待处理决策就会同时脱离触发该决策的 transcript（文本记录）和后续输入。

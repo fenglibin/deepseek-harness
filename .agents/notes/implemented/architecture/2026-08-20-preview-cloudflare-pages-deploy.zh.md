@@ -1,6 +1,6 @@
-# Agent Note：每 PR 预览部署上 Cloudflare Pages
+# Agent Note: 每 PR 预览部署上 Cloudflare Pages
 
-状态：已实现
+Status: implemented
 
 ## 问题
 

@@ -1,4 +1,4 @@
-# Agent Note：交付纪律工具接入 Web 预设
+# Agent Note: 交付纪律工具接入 Web 预设
 
 Status: implemented
 

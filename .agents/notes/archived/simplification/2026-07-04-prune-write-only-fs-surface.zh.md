@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-04-prune-write-only-fs-surface.md) | 中文
-
 ## 问题
 
 [fs seam 拆分](2026-06-26-fsspec-style-fs-seam.md)将读取路由与策略从后端移至 `dsh-tool-fs` 和 `dsh-fs-policy`。有四处接口保留了拆分前的形态——每次调用都填充，却无人读取：

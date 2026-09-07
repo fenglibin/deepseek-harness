@@ -1,16 +1,15 @@
 /**
- * In-place `mcp.json` editor: a highlighted textarea (a colored token layer
- * behind a transparent-text textarea) with a format action and a validated
- * save. The editor stages what the user types; nothing reaches the Host until
- * save, which parses the JSON locally, refuses a malformed document in place,
- * and only then writes through the document store.
+ * In-place `mcp.json` editor: a lightweight highlighted textarea. The colored
+ * token layer and the transparent-text textarea share one font metric AND one
+ * line-breaking rule (`white-space: pre-wrap` + `word-break: break-all`), so
+ * soft-wrapping happens at the same column in both layers and the caret always
+ * sits on the glyph it edits.
  *
- * The highlight layer mirrors the textarea's content and metrics: the two
- * layers share font, line-height, padding, and box-sizing, and the highlight
- * layer renders a trailing newline sentinel when the draft does not end in
- * one, so its scroll height matches the textarea's and the caret stays aligned
- * with the colored text on every cursor move. A `ResizeObserver` resyncs the
- * highlight layer when the user drags the textarea's resize handle.
+ * Scrolling is owned by the outer `scroller`, not the textarea: the textarea
+ * hides its own scrollbars (`overflow: hidden`) and expands to its content
+ * height, so the two layers never drift by a scrollbar width — the exact
+ * failure that used to leave the caret short of a line end and drop typed
+ * characters a row below where they were aimed.
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -20,7 +19,7 @@ import type { McpKey } from './locales.ts'
 import styles from './McpJsonEditor.module.css'
 
 /** One highlighted run of JSON text. */
-type JsonTokenKind = 'key' | 'string' | 'number' | 'boolean' | 'null' | 'punct' | 'plain' | 'sentinel'
+type JsonTokenKind = 'key' | 'string' | 'number' | 'boolean' | 'null' | 'punct' | 'plain'
 
 /** One classified slice of the JSON source. */
 interface JsonToken {
@@ -33,11 +32,6 @@ interface JsonToken {
  * deliberately forgiving: unparseable text still tokenizes (as strings and
  * plain runs) so the highlight layer stays aligned with the textarea even
  * while the user edits; validation is the save path's job, not the highlight's.
- *
- * When the text does not end in a newline, a final `plain` token carrying one
- * `\n` is appended: a `<textarea>` reserves a trailing row for the caret, so
- * the highlight layer must reserve the same row or the caret drifts up one
- * line as the user moves the cursor through the last actual row.
  * @param text - the JSON source.
  * @returns one token per classified slice, covering the whole text in order.
  */
@@ -83,25 +77,13 @@ function tokenizeJson(text: string): JsonToken[] {
     tokens.push({ kind, text: word })
     i += word.length
   }
-  // Sentinel: keep the highlight layer's last row aligned with the textarea's
-  // reserved caret row when the draft has no trailing newline. The kind is
-  // `sentinel`, not `plain`, so the highlight layer can give it the same
-  // foreground color (it carries no semantic coloring of its own) while a
-  // test can prove it was appended by counting `sentinel` tokens.
-  if (text.length === 0 || text.charAt(text.length - 1) !== '\n') {
-    tokens.push({ kind: 'sentinel', text: '\n' })
-  }
   return tokens
 }
 
 /** The highlight layer content for one token list, one span per token. */
 function Highlight({ tokens }: { tokens: JsonToken[] }): ReactNode {
   return tokens.map((token, index) => (
-    <span
-      key={index}
-      className={styles[`tok${token.kind.charAt(0).toUpperCase()}${token.kind.slice(1)}`]}
-      {...(token.kind === 'sentinel' ? { 'data-sentinel': 'true' } : {})}
-    >
+    <span key={index} className={styles[`tok${token.kind.charAt(0).toUpperCase()}${token.kind.slice(1)}`]}>
       {token.text}
     </span>
   ))
@@ -132,7 +114,6 @@ export function McpJsonEditor(props: McpJsonEditorProps): ReactNode {
   const { text, opening, error, onSave, onClose, t } = props
   const [draft, setDraft] = useState(text)
   const [invalid, setInvalid] = useState<string | undefined>(undefined)
-  const highlightRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
   // Pull the freshly read text once the read settles; a later save closes the
@@ -141,33 +122,16 @@ export function McpJsonEditor(props: McpJsonEditorProps): ReactNode {
     setDraft(text)
   }, [text])
 
-  /**
-   * Mirror the textarea's scroll position on the highlight layer. Mouse wheel
-   * and scroll-bar drags fire `onScroll`; arrow keys, clicks, and `Ctrl+End`
-   * re-anchor the caret without scrolling, so a follow-up `onKeyUp` / `onClick`
-   * pulls the caret row into view on the highlight layer too.
-   */
-  const syncScroll = (): void => {
-    const input = inputRef.current
-    const highlight = highlightRef.current
-    if (input === null || highlight === null) return
-    highlight.scrollTop = input.scrollTop
-    highlight.scrollLeft = input.scrollLeft
-  }
-
-  // Dragging the textarea's resize handle changes its rendered height but
-  // not its scrollTop, so the highlight layer would fall behind. Watch the
-  // textarea's `clientHeight` and pin the highlight's `height` to match.
+  // Expand the textarea to its content height so it never scrolls internally.
+  // The outer scroller owns all scrolling, which keeps the highlight layer
+  // (absolutely positioned over the textarea) at the exact same row as the
+  // caret — no scrollbar-width drift, no trailing-row mismatch.
   useLayoutEffect(() => {
     const input = inputRef.current
-    const highlight = highlightRef.current
-    if (input === null || highlight === null) return
-    const sync = (): void => { highlight.style.height = `${input.clientHeight}px` }
-    sync()
-    const observer = new ResizeObserver(sync)
-    observer.observe(input)
-    return () => { observer.disconnect() }
-  }, [])
+    if (input === null) return
+    input.style.height = 'auto'
+    input.style.height = `${input.scrollHeight}px`
+  }, [draft])
 
   /** Format the current draft, reporting the parse failure in place when it cannot. */
   const format = (): void => {
@@ -217,24 +181,23 @@ export function McpJsonEditor(props: McpJsonEditorProps): ReactNode {
         </>
       )}
     >
-      <div className={styles['editor']}>
-        <div ref={highlightRef} className={styles['highlight']} aria-hidden="true" data-testid="mcp-json-highlight">
-          <Highlight tokens={tokens} />
+      <div className={styles['scroller']}>
+        <div className={styles['content']}>
+          <div className={styles['highlight']} aria-hidden="true" data-testid="mcp-json-highlight">
+            <Highlight tokens={tokens} />
+          </div>
+          <textarea
+            ref={inputRef}
+            className={styles['input']}
+            value={draft}
+            wrap="soft"
+            spellCheck={false}
+            onChange={(event) => {
+              setDraft(event.target.value)
+              setInvalid(undefined)
+            }}
+          />
         </div>
-        <textarea
-          ref={inputRef}
-          className={styles['input']}
-          value={draft}
-          wrap="off"
-          spellCheck={false}
-          onChange={(event) => {
-            setDraft(event.target.value)
-            setInvalid(undefined)
-          }}
-          onScroll={syncScroll}
-          onKeyUp={syncScroll}
-          onClick={syncScroll}
-        />
       </div>
       {invalid === undefined ? null : <p className={styles['error']} role="alert">{invalid}</p>}
       {error === null || invalid !== undefined ? null : <p className={styles['error']} role="alert">{t('saveFailed')}: {error}</p>}

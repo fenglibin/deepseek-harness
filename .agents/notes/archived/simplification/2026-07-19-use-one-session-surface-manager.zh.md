@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-19-use-one-session-surface-manager.md) | 中文
-
 ## 问题
 
 `Session` 曾针对同一份仅追加事件日志维护两个 `SurfaceManager` 实例。一个实例负责校验种子事件和追加候选事件，另一个延迟创建的实例则独立折叠已提交事件，供 `session.surface`、派生消息、压缩（compaction）和工作区上下文使用。一旦读取公共表层，之后的每个事件都会推进两份重复的节点状态与替换代数状态，却没有形成独立真源或失败边界。

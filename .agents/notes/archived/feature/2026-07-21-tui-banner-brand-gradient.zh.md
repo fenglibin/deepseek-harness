@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-21-tui-banner-brand-gradient.md) | 中文
-
 ## 问题
 
 TUI 启动横幅原本用调色板的扁平强调色渲染产品名 `DEEPSEEK`，它不承载任何品牌标识，也不像 deepseek.com 上的字标。需求明确是让横幅匹配站点 logo 的蓝色渐变——而不是给整个 coding harness 重新上色。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-17-dedicated-full-screen-tui-front-door.md) | 中文
-
 ## 问题
 
 可复用的 TUI 包（package）仍然保留实现，但 [`dsh` 不再将其作为应用入口交付](../simplification/2026-08-03-explicit-config-dsh-entrypoint.md)。本记录继续负责包边界和终端行为；后续记录负责产品组合。

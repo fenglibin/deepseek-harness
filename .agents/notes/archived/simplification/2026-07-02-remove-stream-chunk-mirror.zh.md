@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-02-remove-stream-chunk-mirror.md) | 中文
-
 ## 问题
 
 agent loop（智能体循环）将模型的每个 token delta 同时记录为持久的 `assistant/chunk` 会话事件，并发射一个携带相同数据的并行实时 `agent/stream-chunk` Cordis 事件。在 `packages/core/agent-loop/src/agent.ts` 中，二者仅相隔一行：

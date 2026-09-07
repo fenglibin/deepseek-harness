@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-22
 
-[English](2026-08-06-plan-narrow-viewport-regression.md) | 中文
-
 ## 问题
 
 外部报告 dsh-external/issues#107（内部聚类为 deepseek-harness#1406）测得视口宽度在 760px 到 850px 之间时 Plan 控件与模型选择器发生重叠，模型选择器覆盖 Plan 控件的点击区域，导致在 800×720 下无法用鼠标退出 Plan 模式。其验收清单要求增加浏览器回归测试，断言 Plan 中心命中 Plan 按钮。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-10
 
-[English](2026-08-08-review-driven-issue-lifecycle-triggers.md) | 中文
-
 ## 问题
 
 Issue 生命周期工作流会在每个已订阅的仓库事件发生后读取当前 PR（Pull Request），并将解决型 Issue 的状态向前推进到 `In progress` 或 `In review`。解决型草稿 PR 已通过其 `opened` 事件进入 `In progress`。在请求评审人或评审人提交评审之前，把该草稿转为可评审状态不会产生新的生命周期结果；但订阅 `ready_for_review` 仍会启动另一个托管作业，并创建另一个 GitHub App token。

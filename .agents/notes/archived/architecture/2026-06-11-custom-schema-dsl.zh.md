@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-06-11-custom-schema-dsl.md) | 中文
-
 ## 问题
 
 工具参数必须以标准 JSON Schema 形式到达模型，同时让工具作者在 `execute(args)` 中获得类型化的参数而无需类型断言。Schemastery 已用于插件配置，但工具作者 API 需要逐属性的 `required: true` 布尔值，而非 JSON Schema 的独立 `required` 数组。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-22
 
-[English](2026-08-11-preset-card-description-clamp.md) | 中文
-
 ## 问题
 
 preset 自行发布 `description`，长度不限，而设置分区把名单渲染为卡片网格。描述只有 `min-height` 没有上限，网格则以 `grid-auto-rows: 1fr` 排布行——该取值让每一个隐式行等高，而不只是承载高卡片的那一行。因此一条长描述决定了整份名单的高度：自定义组里放入一条 250 字的描述后，四张卡片全部量得 421px，短描述卡片被大片空白填满。

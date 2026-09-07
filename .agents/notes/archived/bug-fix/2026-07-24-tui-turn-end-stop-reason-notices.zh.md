@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-24-tui-turn-end-stop-reason-notices.md) | 中文
-
 ## 问题
 
 TUI 会为 `error`、`aborted`、`max-tokens`、`rejected`、`interrupted` 这几种轮次结束渲染 transcript（文本记录）通知，但 `disposed` 轮次结束和任何插件新增的 `TurnEndReasonMap` kind 不渲染任何内容。此类轮次结束时，无论实时发生还是从持久化日志回放，agent（智能体）都会在没有任何可见原因的情况下停止工作，违背了「每次停止都要向用户解释」的产品预期。

@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-03
 
-[English](2026-07-28-dsh-guided-skill-session-commands.md) | 中文
-
 ## 问题
 
 有两个反复出现的流程都以用户手动调用某个 skill 并回答其问题开始：从其他编码 agent 迁移，以及升级本 checkout。二者都要求用户知道该 skill 存在，并把 `/skill:dsh-migrate` 或 `/skill:dsh-upgrade` 作为会话首轮键入。一个专用入口命令若能让用户直接进入该引导式会话，便可省去这一发现步骤。

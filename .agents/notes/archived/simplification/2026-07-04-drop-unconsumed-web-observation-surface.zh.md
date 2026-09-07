@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-04-drop-unconsumed-web-observation-surface.md) | 中文
-
 ## 问题
 
 `WebService` 暴露了一组没有任何生产代码观测的观测接口：

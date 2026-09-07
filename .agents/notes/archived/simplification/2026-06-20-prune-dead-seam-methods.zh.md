@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-06-20-prune-dead-seam-methods.md) | 中文
-
 > **实现说明：** 仅移除了 `SessionPersistence.has()` 和 `.delete()`。`BashExecutor.get()` 和 `.list()` 仍然保留，因为删除它们的单行查找表面会要求消费方增加显著更多的完成跟踪机制。其 id 品牌化由[品牌化 id Agent Note（agent 决策记录）](../architecture/2026-06-20-branded-ids.md)负责。
 
 ## 问题

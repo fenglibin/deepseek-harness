@@ -105,7 +105,7 @@ Reject consolidation when the removal is only one transport, default, implementa
 
 ## Write The Agent Note
 
-Create one file per durable proposal under `.agents/notes/<lifecycle>/<class>/yyyy-mm-dd-topic.md`, following the lifecycle and classification rules in `.agents/notes/README.md`. Keep prose paragraphs on one physical line and use relative Markdown links.
+Create one file per durable proposal under `.agents/notes/<lifecycle>/<class>/yyyy-mm-dd-topic.zh.md`, following the lifecycle and classification rules in `.agents/notes/README.zh.md`. Agent Notes are Chinese-only; keep prose paragraphs on one physical line and use relative Markdown links.
 
 Prefer this structure, adjusting when the idea needs it:
 

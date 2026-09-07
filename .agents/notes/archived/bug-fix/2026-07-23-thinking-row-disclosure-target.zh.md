@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-23-thinking-row-disclosure-target.md) | 中文
-
 ## 问题
 
 折叠的推理（reasoning）条目在同一视觉行中呈现 `Think` 和单行推理摘要，但仅图标可展开会让两个可见标签都无法交互。若让所有工具行均可通过标题展开，又会破坏通用工具行的契约：整行负责打开详情，只有前导控件负责展开参数。

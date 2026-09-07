@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-03
 
-[English](2026-07-30-versioned-tui-first-run-welcome.md) | 中文
-
 ## 问题
 
 已交付的 `dsh` 终端会直接进入编辑器，没有为首次使用的内部测试者提供持久的产品成熟度说明或反馈渠道指引。现有单行 `welcome` banner 副标题无法容纳指定通知，否则会挤占正常的会话 header；如果把 onboarding 写入会话日志，还会创建一个与用户工作无关的用户轮次或模型可见上下文。

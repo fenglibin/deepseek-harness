@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-23-tui-generic-card-markdown.md) | 中文
-
 ## Problem
 
 工具展示器可以在通用卡片（generic card）内容中写入 Markdown，其中包括用于后台任务确认和执行错误的围栏 `console` 输出。把这些内容按纯文本渲染会暴露围栏标记，并与同一 transcript（文本记录）中的助手内容和用户内容显示不一致。

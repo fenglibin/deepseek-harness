@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-06-14-acp-agent-client-protocol.md) | 中文
-
 > 已被 [ACP 作为仅面向自动化的协议](../simplification/2026-07-23-acp-automation-only-protocol.md)取代。本 Agent Note 记录已退役的面向编辑器的桥接层设计。
 
 ## 问题

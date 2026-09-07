@@ -1,6 +1,6 @@
 /**
  * Shared structural source of truth for the Agent Note tree. Lifecycle and class
- * sets are closed under `.agents/notes/README.md`; importing this module is pure.
+ * sets are closed under `.agents/notes/README.zh.md`; importing this module is pure.
  */
 
 import { globSync, readdirSync } from 'node:fs'
@@ -59,21 +59,24 @@ export function walkAgentNoteTree(): { notes: AgentNote[]; errors: string[] } {
       const segs = match.split('/')
       // Allowlisted file directly at the lifecycle root (e.g. implemented/AGENTS.md).
       if (segs.length === 2 && ROOT_ALLOWLIST.has(segs[1] ?? '')) continue
-      // A Chinese counterpart (foo.zh.md, docs/i18n/README.md) is the SAME Agent Note,
-      // indexed via its English filename; the pairing gate owns its consistency.
-      if (match.endsWith('.zh.md')) continue
+      // Agent Notes are Chinese-only: the `.zh.md` file IS the note. A bare
+      // `.md` file is a retired English original and must not exist.
+      if (!match.endsWith('.zh.md')) {
+        errors.push(`structure: ${match} — Agent Notes are Chinese-only; expected yyyy-mm-dd-topic.zh.md, found a bare .md file`)
+        continue
+      }
       const cls = segs[1]
       const base = segs[2]
       if (segs.length !== 3 || cls === undefined || base === undefined) {
-        errors.push(`structure: ${match} — expected {lifecycle}/{class}/file.md (got depth ${segs.length})`)
+        errors.push(`structure: ${match} — expected {lifecycle}/{class}/file.zh.md (got depth ${segs.length})`)
         continue
       }
       if (!(AGENT_NOTE_CLASSES as readonly string[]).includes(cls)) {
         errors.push(`structure: ${match} — unknown class folder "${cls}" (allowed: ${AGENT_NOTE_CLASSES.join(', ')})`)
         continue
       }
-      if (!/^\d{4}-\d{2}-\d{2}-.+\.md$/.test(base)) {
-        errors.push(`structure: ${match} — filename must be yyyy-mm-dd-topic.md`)
+      if (!/^\d{4}-\d{2}-\d{2}-.+\.zh\.md$/.test(base)) {
+        errors.push(`structure: ${match} — filename must be yyyy-mm-dd-topic.zh.md`)
         continue
       }
       notes.push({ lifecycle, rel: match, date: base.slice(0, 10) })

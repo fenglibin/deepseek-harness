@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-04-drop-inert-request-knobs.md) | 中文
-
 ## 问题
 
 两个请求契约旋钮贯穿了整条请求流水线，却都无法产生任何效果：

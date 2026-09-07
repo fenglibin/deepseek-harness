@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-04-single-source-acp-replay-config.md) | 中文
-
 ## 问题
 
 `examples/acp-agent` 发布了两份手工维护的配置：`cordis.yml`（实时树）和逐条镜像它、只替换 llm 后端的 `cordis.snapshot.yml`——去除注释后，两者的全部差异就是八行 `llm-deepseek` stanza 与两行 `llm-replay` stanza。每次应用形状变化都必须修改两遍，也没有任何机制约束对称性：如果副本发生漂移，快照层会悄然覆盖与已发布应用不同的应用——快照层本就是为了弥合[“单元测试绿色，产品损坏”这类缺口](../../../../docs/postmortem/0001-acp-default-export-drops-inject.md)，如今同类缺口在上一层重新出现，只能依靠评审者警惕。

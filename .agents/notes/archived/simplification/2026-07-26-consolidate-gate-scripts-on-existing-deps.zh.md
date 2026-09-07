@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-27
 
-[English](2026-07-26-consolidate-gate-scripts-on-existing-deps.md) | 中文
-
 ## 问题
 
 `scripts/` 下的门禁大多本已在用正确的工具（15 个以上的门禁使用 `node:fs` 的 `globSync`，markdown 门禁使用 mdast/micromark），但少数几个掉队的脚本曾手写同类门禁早已用既有依赖或内置模块完成的事情：

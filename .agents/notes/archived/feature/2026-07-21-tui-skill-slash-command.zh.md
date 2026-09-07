@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-04
 
-[English](2026-07-21-tui-skill-slash-command.md) | 中文
-
 ## Problem
 
 [skill 系统](2026-07-05-skill-system.md)交付时只有模型发起加载这一条路径：`skill({ name })` 工具让模型把某个 skill 正文拉进一个轮次，但操作 TUI 的人无法按需加载 skill。其他编码 agent（智能体）正是为此提供了 `/skill:<name>` 斜杠命令——由用户而非模型判断某个任务与某个 skill 匹配，并注入其指令。skill 系统 note 把直接的用户发起调用列为待办工作，而交互式前门正是它该落地的地方。

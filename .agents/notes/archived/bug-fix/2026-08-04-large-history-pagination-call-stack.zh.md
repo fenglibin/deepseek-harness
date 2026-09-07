@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-08-22
 
-[English](2026-08-04-large-history-pagination-call-stack.md) | 中文
-
 ## 问题
 
 一条已定稿的 assistant 消息可以通过 `sourceEventSeqs` 引用数十万个流式分片。历史记录分页使用 `Math.min(event.seq, ...sourceEventSeqs)` 查找消息组的首个事件，因此，有效会话可能超出 JavaScript 引擎的函数参数数量上限，导致 `session.history` 以 HTTP 500 失败。

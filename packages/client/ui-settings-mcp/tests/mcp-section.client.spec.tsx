@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 /** MCP section rendering: a failed connection surfaces its diagnostic error,
- * and entering the section reconnects enabled servers that are not connected. */
-import { cleanup, render, screen } from '@testing-library/react'
+ * entering the section reconnects enabled servers that are not connected, and
+ * the per-server tool list expands to reveal each tool's name and description. */
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { McpServerStatusView } from '@deepseek-ai/dsh-api-remotes/client'
 import { McpSection } from '../src/client/McpSection.tsx'
@@ -101,5 +102,60 @@ describe('McpSection auto-connect', () => {
       tools: [],
     }]]))
     expect(refresh).not.toHaveBeenCalled()
+  })
+})
+
+describe('McpSection tools disclosure', () => {
+  it('hides the tool list by default until the toggle is clicked', () => {
+    renderSection(new Map([['mysql', {
+      serverName: 'mysql',
+      status: 'connected',
+      tools: [
+        { name: 'query', description: 'Run a SQL query' },
+        { name: 'list', description: 'List rows' },
+      ],
+    }]]))
+    expect(screen.getByRole('button', { name: '2 个工具' })).toBeTruthy()
+    expect(screen.queryByText('Run a SQL query')).toBeNull()
+  })
+
+  it('reveals each tool with its description and hover tooltip when expanded', () => {
+    renderSection(new Map([['mysql', {
+      serverName: 'mysql',
+      status: 'connected',
+      tools: [
+        { name: 'query', description: 'Run a SQL query' },
+        { name: 'list', description: 'List rows' },
+      ],
+    }]]))
+    fireEvent.click(screen.getByRole('button', { name: '2 个工具' }))
+    expect(screen.getByText('query')).toBeTruthy()
+    expect(screen.getByText('list')).toBeTruthy()
+    expect(screen.getByText('Run a SQL query')).toBeTruthy()
+    expect(screen.getByText('List rows')).toBeTruthy()
+    expect(screen.getByText('query').getAttribute('title')).toBe('Run a SQL query')
+  })
+
+  it('collapses the tool list on a second click of the toggle', () => {
+    renderSection(new Map([['mysql', {
+      serverName: 'mysql',
+      status: 'connected',
+      tools: [{ name: 'query', description: 'Run a SQL query' }],
+    }]]))
+    const toggle = screen.getByRole('button', { name: '1 个工具' })
+    fireEvent.click(toggle)
+    expect(screen.getByText('query')).toBeTruthy()
+    fireEvent.click(toggle)
+    expect(screen.queryByText('query')).toBeNull()
+  })
+
+  it('disables the toggle when the server has no tools to show', () => {
+    renderSection(new Map([['mysql', {
+      serverName: 'mysql',
+      status: 'connected',
+      tools: [],
+    }]]))
+    const toggle = screen.getByRole('button', { name: '0 个工具' })
+    expect((toggle as HTMLButtonElement).disabled).toBe(true)
   })
 })

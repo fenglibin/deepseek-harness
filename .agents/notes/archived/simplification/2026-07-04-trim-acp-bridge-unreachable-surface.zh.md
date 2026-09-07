@@ -3,8 +3,6 @@
 Status: implemented
 Archived: 2026-07-26
 
-[English](2026-07-04-trim-acp-bridge-unreachable-surface.md) | 中文
-
 > 握手标识简化仍然有效。通用卡片回退已随 [ACP 转为仅面向自动化](2026-07-23-acp-automation-only-protocol.md)一并移除；UI 传输层保留提供方无关的展示契约。
 
 ## 问题

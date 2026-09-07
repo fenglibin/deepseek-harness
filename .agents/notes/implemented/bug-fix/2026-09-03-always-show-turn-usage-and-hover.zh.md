@@ -1,6 +1,6 @@
-# Agent Note：Turn 尾部始终披露用量与用时，弹层 hover 展开、展示缓存命中率，且运行计时不再重置
+# Agent Note: Turn 尾部始终披露用量与用时，弹层 hover 展开、展示缓存命中率，且运行计时不再重置
 
-状态：已实现
+Status: implemented
 
 ## 问题
 
