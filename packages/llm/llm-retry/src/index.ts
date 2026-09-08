@@ -10,8 +10,10 @@ import type { Context, Events } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { z as zod } from 'zod'
 import type { Agent, RequestErrorAction } from '@deepseek-ai/dsh-agent'
+import { RATE_LIMIT_CODE } from '@deepseek-ai/dsh-llm'
 import type { LlmFailure, ResolvedRetryPolicy } from '@deepseek-ai/dsh-llm'
-import type {} from '@deepseek-ai/dsh-session-projection'
+import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
+import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import { RetryId } from './brand.ts'
 import type { LlmRetryEventData } from './types.ts'
 
@@ -63,9 +65,54 @@ function localDelay(config: ResolvedRetryPolicy, retry: number, random: () => nu
   return Math.min(exponential * jitter, config.maxDelayMs)
 }
 
+/**
+ * Wait before retrying a throttled request. A throttle names a quota window, so
+ * the fixed rate-limit wait replaces the exponential delay that a shorter
+ * failure would use; a provider instruction naming a longer window still wins.
+ * `maxDelayMs` caps neither, because waiting less than the window repeats the
+ * failure. Returns `undefined` when a provider instruction exceeds both bounds,
+ * which leaves a bounded policy's decision to downstream recovery.
+ * @param policy - resolved policy of the adapter route that served the failure.
+ * @param providerDelay - validated provider `Retry-After`, when present.
+ * @returns the delay to schedule, or `undefined` to decline the retry.
+ */
+function rateLimitDelay(policy: ResolvedRetryPolicy, providerDelay: number | undefined): number | undefined {
+  if (providerDelay !== undefined && providerDelay > Math.max(policy.maxDelayMs, policy.rateLimitDelayMs)) {
+    return policy.mode === 'normal' ? undefined : policy.rateLimitDelayMs
+  }
+  return Math.max(policy.rateLimitDelayMs, providerDelay ?? 0)
+}
+
+/**
+ * Wait before retrying a failure that is not a throttle: a provider
+ * `Retry-After` inside the cap verbatim, otherwise local exponential backoff.
+ * Returns `undefined` for an over-cap instruction under a bounded policy.
+ * @param policy - resolved policy of the adapter route that served the failure.
+ * @param retry - one-based retry number this delay belongs to.
+ * @param providerDelay - validated provider `Retry-After`, when present.
+ * @param random - jitter sample source.
+ * @returns the delay to schedule, or `undefined` to decline the retry.
+ */
+function standardDelay(
+  policy: ResolvedRetryPolicy,
+  retry: number,
+  providerDelay: number | undefined,
+  random: () => number,
+): number | undefined {
+  if (providerDelay === undefined) return localDelay(policy, retry, random)
+  if (providerDelay <= policy.maxDelayMs) return providerDelay
+  return policy.mode === 'normal' ? undefined : localDelay(policy, retry, random)
+}
+
 function retryPolicyKey(policy: ResolvedRetryPolicy): string {
   return policy.mode === 'always'
-    ? JSON.stringify([policy.mode, policy.initialDelayMs, policy.maxDelayMs, policy.jitterRatio])
+    ? JSON.stringify([
+      policy.mode,
+      policy.initialDelayMs,
+      policy.maxDelayMs,
+      policy.jitterRatio,
+      policy.rateLimitDelayMs,
+    ])
     : JSON.stringify([
       policy.mode,
       policy.maxRetries,
@@ -73,6 +120,7 @@ function retryPolicyKey(policy: ResolvedRetryPolicy): string {
       policy.initialDelayMs,
       policy.maxDelayMs,
       policy.jitterRatio,
+      policy.rateLimitDelayMs,
     ])
 }
 
@@ -108,20 +156,68 @@ interface RetryStateEntry {
 
 type LlmRetryState = Record<string, RetryStateEntry>
 
+/** Whether this session has ever observed a provider rate-limit failure. */
+interface LlmRateLimitState {
+  tripped: boolean
+}
+
 // The cast bridges the branded retry id, which Zod cannot express directly.
 const llmRetryStateSchema: zod.ZodType<LlmRetryState> = zod.record(zod.string(), zod.object({
   retry: zod.number().int().nonnegative(),
   retryId: zod.string(),
 })) as unknown as zod.ZodType<LlmRetryState>
+
+const llmRateLimitStateSchema = zod.object({ tripped: zod.boolean() })
+
+/**
+ * Session-wide latch over the log's rate-limit history. A retry records the
+ * throttled failure it waits out; a throttled request that ended the turn
+ * records it in the turn's terminal reason. Both are durable, so the latch
+ * survives a cold resume with no live state.
+ */
+const llmRateLimitProjection = {
+  key: 'llmRateLimit',
+  stateVersion: 1,
+  stateSchema: llmRateLimitStateSchema,
+  init: () => ({ tripped: false }),
+  apply: (state: LlmRateLimitState, event: SessionEvent): LlmRateLimitState => {
+    if (state.tripped) return state
+    if (event.type === 'llm/retry') {
+      return event.data.failure.code === RATE_LIMIT_CODE ? { tripped: true } : state
+    }
+    if (event.type === 'turn/end') {
+      const { reason } = event.data
+      return reason.kind === 'error' && reason.error.code === RATE_LIMIT_CODE ? { tripped: true } : state
+    }
+    return state
+  },
+} satisfies ProjectionDefinition<'llmRateLimit', LlmRateLimitState>
+
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
     /** Retry state for the current step by provider and policy. */
     llmRetry: LlmRetryState
+    /** Whether this session has already observed a provider rate-limit failure. */
+    llmRateLimit: LlmRateLimitState
   }
+}
+
+/**
+ * Report whether the session has already observed a provider rate-limit
+ * failure. Consumers use it to stop work that would add concurrent model
+ * requests to a route the provider is already throttling. The answer is
+ * `false` in a composition without this plugin, which owns the fold.
+ * @param ctx - context carrying the projection registry.
+ * @param session - session whose durable log is folded.
+ * @returns true once a rate-limit failure is in the log.
+ */
+export function isRateLimited(ctx: Context, session: Session): boolean {
+  return ctx.sessionProjections.stateOf(session, 'llmRateLimit')?.tripped === true
 }
 
 export function apply(ctx: Context, config: Config = {}, internals: RetryInternals = {}): void {
   validateConfig(config)
+  ctx.sessionProjections.register(llmRateLimitProjection)
   ctx.sessionProjections.register({
     key: 'llmRetry',
     stateVersion: 1,
@@ -223,19 +319,17 @@ export function apply(ctx: Context, config: Config = {}, internals: RetryInterna
     if (policy.mode === 'normal' && previousRetry >= policy.maxRetries) return next()
     const retry = previousRetry + 1
     const retryId = previous?.retryId ?? RetryId(randomUUID())
-    let delayMs: number
-    if (failure.providerRetryAfterMs !== undefined
+    const providerDelay = failure.providerRetryAfterMs !== undefined
       && Number.isFinite(failure.providerRetryAfterMs)
-      && failure.providerRetryAfterMs > 0) {
-      if (failure.providerRetryAfterMs > policy.maxDelayMs) {
-        if (policy.mode === 'normal') return next()
-        delayMs = localDelay(policy, retry, random)
-      } else {
-        delayMs = failure.providerRetryAfterMs
-      }
-    } else {
-      delayMs = localDelay(policy, retry, random)
-    }
+      && failure.providerRetryAfterMs > 0
+      ? failure.providerRetryAfterMs
+      : undefined
+    const delayMs = failure.code === RATE_LIMIT_CODE
+      ? rateLimitDelay(policy, providerDelay)
+      : standardDelay(policy, retry, providerDelay, random)
+    // A throttle the policy refuses to wait out is terminal for a bounded
+    // policy: `next()` lets a downstream or default recovery decide.
+    if (delayMs === undefined) return next()
 
     return backoff(agent, turn, step, failure, provider, policy, policyKey, retry, retryId, delayMs, signal)
   }

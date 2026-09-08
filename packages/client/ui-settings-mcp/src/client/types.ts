@@ -44,3 +44,22 @@ export interface McpSettings {
   /** Ordered server entries; `serverName` must be unique across the list. */
   servers: McpServerEntry[]
 }
+
+/**
+ * One `mcp.json` server entry in the cross-vendor shape the JSON editor shows.
+ * stdio and http fields share one nullable object; the discriminator is the
+ * presence of `command` (stdio) versus `url` (http), mirroring the Host
+ * `dsh-mcp-manager` document model exactly.
+ */
+export interface McpJsonServer {
+  type?: string
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+  cwd?: string
+  url?: string
+  headers?: Record<string, string>
+  transportType?: string
+  timeout?: number
+  disabled?: boolean
+}

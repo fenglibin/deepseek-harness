@@ -37,7 +37,7 @@ kind: "package-reference"
 
 ### 会话投影
 
-`DeliveryService` 要求 `ctx.sessionProjections`（[`@deepseek-ai/dsh-session-projection`](../../session/session-projection/README.zh.md)），并在启动时注册 `delivery` 投影单元；未组合投影注册表的组合无法激活 `ctx.delivery`。
+`DeliveryService` 要求 `ctx.sessionProjections`（[`@deepseek-ai/dsh-session-projection`](../../session/session-projection/README.zh.md)），并在启动时注册 `delivery` 与 `delivery-tasks` 两个投影单元；未组合投影注册表的组合无法激活 `ctx.delivery`。`delivery-tasks` 承载实施清单及其分阶段完成计数，与 `delivery` 彼此独立，因此写入清单不会扩大任务快照的字段集合——后者的解码器会拒绝未知字段。
 
 ### 任务生命周期
 
@@ -62,7 +62,7 @@ kind: "package-reference"
 
 ### 观察任务
 
-消费者通过 `ctx.delivery.get(agent)` 读取当前任务并得到一个分离视图：目标、阶段、分级、变更数、设计数与 spec 数及时间戳。变更必须携带该视图返回的精确 `{ id, revision }`，因此持有较旧状态的消费者会收到明确的陈旧 revision 错误，而不是静默覆盖更新的状态：
+消费者通过 `ctx.delivery.get(agent)` 读取当前任务并得到一个分离视图：目标、阶段、分级、变更数、设计数与 spec 数及时间戳。变更必须携带该视图返回的精确 `{ id, revision }`，因此持有较旧状态的消费者会收到明确的陈旧 revision 错误，而不是静默覆盖更新的状态。`ctx.delivery.getTasks(agent)` 读取该会话记录的实施清单；`recordTasks(agent, ref, changeId, items)` 写入一份清单并整体替换此前的一份，清单项须内容唯一且阶段合法，写入时即用重放所用的解码器校验，因此写不进一份重放不了的记录：
 
 ```text
 const view = ctx.delivery.get(agent)      // undefined when no task is current

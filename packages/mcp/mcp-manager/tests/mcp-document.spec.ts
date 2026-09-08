@@ -214,4 +214,32 @@ describe('mcp-manager mcp.json document', () => {
     expect((ctx.settings.get('mcp') as McpSettings).servers).toHaveLength(1)
     await ctx.fiber.dispose()
   })
+
+  it('removes one server entry through removeMcpServer and unmounts it', async () => {
+    const ctx = await boot()
+    await ctx.mcpManager!.updateMcpServer(stdio('srv'), signal())
+    await vi.waitFor(() => { expect(ctx.tools.get('mcp__srv__remote')).toBeDefined() })
+
+    await ctx.mcpManager!.removeMcpServer('srv', signal())
+    await vi.waitFor(() => { expect(ctx.tools.get('mcp__srv__remote')).toBeUndefined() })
+    const text = fsFiles.get(MCP_JSON_PATH)!
+    expect(text).not.toContain('"srv"')
+    expect((ctx.settings.get('mcp') as McpSettings).servers).toHaveLength(0)
+    await ctx.fiber.dispose()
+  })
+
+  it('removes a hashed raw key through removeMcpServer', async () => {
+    const ctx = await boot()
+    await ctx.mcpManager!.writeMcpDocument(
+      '{"mcpServers":{"我的服务器":{"type":"stdio","command":"echo","args":[],"env":{}}}}',
+      signal(),
+    )
+    const hashed = (ctx.settings.get('mcp') as McpSettings).servers[0]!.serverName
+
+    await ctx.mcpManager!.removeMcpServer(hashed, signal())
+    const text = fsFiles.get(MCP_JSON_PATH)!
+    expect(text).not.toContain('我的服务器')
+    expect((ctx.settings.get('mcp') as McpSettings).servers).toHaveLength(0)
+    await ctx.fiber.dispose()
+  })
 })

@@ -8,7 +8,7 @@ MCP 设置分区只有结构化表单，唯一能提供的手动编辑入口是�
 
 ## 决策
 
-新增一个 **配置MCP** 按钮，打开一份放在 `settings.yaml` 旁边的专用 `mcp.json`（跨厂商 `mcpServers` map），并把它单向同步进 `mcp` settings 命名空间。文件变化时，manager 解析该文件、转换成命名空间的 `servers` 数组，并且只有在 JSON 格式正确、每个条目都能转换时，才通过 `SettingsScope.replace` 整体覆盖该命名空间。缺失的文档会在首次打开时从当前 settings 分区播种。`disabled` 映射为 `enabled` 的取反；有 `command` 是 stdio 条目，有 `url` 是 HTTP 条目；`timeout` 与 `transportType` 是 dsh 不管理的字段，予以忽略。超出 `[A-Za-z0-9_-]{1,32}` 契约的服务器名会被哈希成一个稳定的 `mcp-<sha256 hex>` 名字，而不是拒绝整个文档，因此每个用户的输入都能运行。同步是单向且整节的：`mcp.json` 是手动编辑源，下一次 `mcp.json` 变化会覆盖结构化表单的写入。
+新增一个 **配置MCP** 按钮，打开一份放在 `settings.yaml` 旁边的专用 `mcp.json`（跨厂商 `mcpServers` map），并把它单向同步进 `mcp` settings 命名空间。文件变化时，manager 解析该文件、转换成命名空间的 `servers` 数组，并且只有在 JSON 格式正确、每个条目都能转换时，才通过 `SettingsScope.replace` 整体覆盖该命名空间。缺失的文档会在首次打开时从当前 settings 分区播种。`disabled` 映射为 `enabled` 的取反；有 `command` 是 stdio 条目，有 `url` 是 HTTP 条目；`timeout` 与 `transportType` 是 dsh 不管理的字段，予以忽略。超出 `[A-Za-z0-9_-]{1,32}` 契约的服务器名会被哈希成一个稳定的 `mcp-<sha256 hex>` 名字，而不是拒绝整个文档，因此每个用户的输入都能运行。同步是单向且整节的：`mcp.json` 是唯一的手动编辑源，增加、编辑、删除与启用都经 Host 写回它（见 [2026-09-08-mcp-settings-json-add-edit](2026-09-08-mcp-settings-json-add-edit.zh.md)），下一次 `mcp.json` 变化会覆盖上一次的写入。
 
 ## 考虑过的替代方案
 
@@ -22,5 +22,4 @@ MCP 现在有一个聚焦的、符合业界惯例的编辑入口，而 `settings
 
 ## 风险
 
-- 单向覆盖意味着通过结构化表单新增的服务器，会在下一次编辑并保存一份过期的 `mcp.json` 时丢失。
 - 超出 dsh `[A-Za-z0-9_-]{1,32}` 契约的服务器名会被哈希成稳定的 `mcp-<hex>` 名字而非保留，因此 settings 里的映射名字与用户在 `mcp.json` 里写的不同。

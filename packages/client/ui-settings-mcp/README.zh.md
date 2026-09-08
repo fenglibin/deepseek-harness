@@ -1,5 +1,5 @@
 ---
-description: "dsh Web 客户端的 MCP 服务器设置分区：在 Host 拥有的 mcp settings 命名空间上，对用户管理的 MCP 服务器列表执行添加、编辑、删除与启用。"
+description: "dsh Web 客户端的 MCP 服务器设置分区：在 Host 拥有的 mcp settings 命名空间上，对用户管理的 MCP 服务器列表执行编辑、删除与启用。"
 kind: "package-reference"
 ---
 
@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-client-ui-settings-mcp` 是 dsh Web 客户端的 **MCP** 设置分区：用户在此编辑、删除并启用模型可以调用其工具的 MCP 服务器，新增则直接写入 `mcp.json`。这份列表是 Host 端 `dsh-mcp-manager` 插件所拥有的 `mcp` settings 命名空间中的一个 `servers` 数组，因此本包不注册自己的命名空间——它绑定该命名空间，而每次添加、删除与启用变更都以一次受修订号栅栏保护的 mutation 整体重写这个数组。每一行展示服务器的名称、传输方式、一个实时状态圆点，以及 manager 当前为它报告的工具数量；编辑打开一个表单弹窗，暂存单个条目、仅在保存时写回 `mcp.json`，而行内的开关则立即写入，因为启用是一个单一的可见决定。进入分区时，已启用但尚未连接的服务器会被强制重连。当 MCP 服务器应由用户在浏览器中管理时选择本包；每个条目最终挂载什么，只有 Host manager 说了算。
+`dsh-client-ui-settings-mcp` 是 dsh Web 客户端的 **MCP** 设置分区：用户在此增加、编辑、删除并启用模型可以调用其工具的 MCP 服务器。这份列表是 Host 端 `dsh-mcp-manager` 插件所拥有的 `mcp` settings 命名空间中的一个 `servers` 数组，因此本包不注册自己的命名空间——它绑定该命名空间只读展示列表，而每次增加、编辑、删除与启用变更都经由 Host 的 `mcp.json` 写入落地，再立即同步回该命名空间。每一行展示服务器的名称、传输方式、一个实时状态圆点，以及 manager 当前为它报告的工具数量；增加与编辑都打开同一个 JSON 编辑器——增加粘贴跨厂商 MCP 配置（支持 `mcpServers` 包裹），编辑展示单个条目的跨厂商对象，均仅在保存时写回 `mcp.json`；行内的开关则立即写入，因为启用是一个单一的可见决定。进入分区时，已启用但尚未连接的服务器会被强制重连。当 MCP 服务器应由用户在浏览器中管理时选择本包；每个条目最终挂载什么，只有 Host manager 说了算。
 
 ## 目录
 
@@ -23,7 +23,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-打开设置中的 **MCP**，即可看到每个已配置的服务器、它的传输方式、实时连接状态，以及它注册了多少工具。进入分区时，每个已启用但尚未连接的服务器会被逐个强制重连。**编辑**在已有条目上打开一个表单弹窗，保存时把该条目写回独立的 `mcp.json`（跨厂商 `mcpServers` 结构）而不是 settings 文档；**删除**在确认后移除条目，行内开关启用或禁用它，**刷新**则强制一个正在运行的服务器重连；**配置MCP** 在本页弹出 `mcp.json` 的就地编辑器，带 JSON 语法高亮、格式化与保存前校验。
+打开设置中的 **MCP**，即可看到每个已配置的服务器、它的传输方式、实时连接状态，以及它注册了多少工具。进入分区时，每个已启用但尚未连接的服务器会被逐个强制重连。**增加MCP** 打开一个空的 JSON 编辑器，供粘贴跨厂商 MCP 配置（`mcpServers` 包裹或裸的服务器 map），保存时并入独立的 `mcp.json`；**编辑**在同一个 JSON 编辑器里展示单个条目的跨厂商对象，保存时替换该条目；**删除**在确认后从 `mcp.json` 移除该条目，行内开关启用或禁用它（同样写回 `mcp.json`），**刷新**则强制一个正在运行的服务器重连；**配置MCP** 在本页弹出整份 `mcp.json` 的就地编辑器，带 JSON 语法高亮、格式化与保存前校验。
 
 ### 何时选择它
 
@@ -41,7 +41,7 @@ kind: "package-reference"
 
 ### 编辑与保存
 
-编辑弹窗暂存单个条目，只有保存时才写入。保存通过 Host 的 `updateMcpServer()` 把该条目写回 `mcp.json` 并立即同步，因此变更当下生效，且 `mcp.json` 始终是那份手工编辑源。条目一旦存在，其 `serverName` 即为只读，因为 manager 与每个工具名都以它为键。stdio 条目需要命令、空格分隔的参数、工作目录，以及每行一个 `KEY=value` 的环境变量；Streamable HTTP 条目需要 URL，以及每行一个 `Header: value` 的请求头。这两个映射是普通字段而非 secret 角色字段。新增服务器没有独立表单：用户直接在 `mcp.json` 编辑器里粘贴新的 `mcpServers` 条目。
+增加与编辑都经由同一个 JSON 编辑器，只有保存时才写入。**增加MCP** 打开一个空编辑器，用户粘贴跨厂商 MCP 配置——`{"mcpServers":{…}}` 包裹或裸的 `{"name":{…}}` map 均可，保存时先解析出服务器名，再与 `mcp.json` 中已有的名字比对：存在同名则弹确认框，同意后覆盖，随后经 Host 的 `writeMcpDocument()` 把合并结果写回 `mcp.json` 并立即同步。**编辑**在编辑器里展示单个条目的跨厂商对象（`command`/`url`/`args`/`env`/`headers`/`cwd`/`disabled`），保存时经 `updateMcpServer()` 替换该条目。删除与行内启用开关同样经 Host 写回 `mcp.json`：删除通过 `removeMcpServer()` 移除条目，启用开关通过 `updateMcpServer()` 翻转该条目的 `disabled` 字段。条目一旦存在，其 `serverName` 即为只读，因为 manager 与每个工具名都以它为键。`env` 与 `headers` 是普通字段而非 secret 角色字段。两个编辑器共享同一份 JSON 语法高亮、格式化与保存前校验。
 
 ### 实时状态
 
@@ -63,7 +63,7 @@ kind: "package-reference"
 
 ### 写入路径
 
-添加、删除与启用都归结为对 `servers` 的一次 `set`，以 store 最近读到的命名空间 revision 设栅；落在已移动 revision 上的写入、面向只读文档的写入，或在另一次保存正在过线时到达的写入，都会被拒绝并报告。编辑不同：它经由 Host 的 `updateMcpServer()` 写 `mcp.json`，由 Host 立即同步回 `mcp` 命名空间，再通过 `settings/document-updated` 推送刷新本分区的列表。store 自己维护 `saving` 与 `failed` 两个标志，并在每次变化时重新发布一份快照，因此行内容、进行中状态与失败提示都读自同一来源。
+增加、编辑、删除与启用都经由 Host 写 `mcp.json`：增加通过 `writeMcpDocument()` 把合并后的整份文档写回，编辑与启用通过 `updateMcpServer()` 写回（或翻转）单个条目，删除通过 `removeMcpServer()` 移除条目。Host 每次写入后立即同步回 `mcp` 命名空间，再通过 `settings/document-updated` 推送刷新本分区的列表；在另一次保存正在过线时、或面向只读文档时，store 会拒绝新的写入并报告。store 自己维护 `saving` 与 `failed` 两个标志，并在每次变化时重新发布一份快照，因此行内容、进行中状态与失败提示都读自同一来源。
 
 ### 状态叠加层
 
@@ -71,7 +71,7 @@ kind: "package-reference"
 
 ### 配置文档动作
 
-**配置MCP** 按钮由配置文档 store 驱动：它以 loopback 事实推导可用性（远程部署没有本地文件），并在可用时在本页打开 `mcp.json` 的就地编辑器。编辑器经 Host `mcp` Remote 命名空间的 `readMcpDocument()` 拉取文本，保存前先在本地用 `JSON.parse` 校验语法，再经 `writeMcpDocument()` 交由 Host 做结构校验、持久化并立即同步。store 维护 `opening`、`text` 与失败诊断，因此并发点击、打开失败与保存失败都被就地处理。JSON 语法高亮由本包内的轻量 tokenizer 着色，颜色沿用主题包的 `--shiki-*` 令牌。
+**配置MCP**、**增加MCP** 与 **编辑** 三个动作都由配置文档 store 驱动：它以 loopback 事实推导可用性（远程部署没有本地文件），并在可用时在本页打开同一个 JSON 编辑器——配置打开整份 `mcp.json`，增加打开空编辑器，编辑打开单个条目的跨厂商对象。编辑器经 Host `mcp` Remote 命名空间的 `readMcpDocument()` 拉取文本，保存前先在本地用 `JSON.parse` 校验语法，再经 `writeMcpDocument()`（配置/增加）或 `updateMcpServer()`（编辑）交由 Host 做结构校验、持久化并立即同步。store 维护 `opening`、`text` 与失败诊断，因此并发点击、打开失败与保存失败都被就地处理。JSON 语法高亮由本包内的轻量 tokenizer 着色，颜色沿用主题包的 `--shiki-*` 令牌。
 
 </details>
 
@@ -107,7 +107,7 @@ kind: "package-reference"
 这些限制定义了本分区能展示什么、以及何时拒绝写入；它们是当前包约束。
 
 - **命名空间归 Host 所有**——本包只渲染 `mcp` 分区中的内容并经由它写入，因此从未挂载 `dsh-mcp-manager` 的组装会看到空列表，而不是一份本地草稿。
-- **没有 secret 角色字段**——`env` 与 `headers` 以纯文本编辑与存储，因为列表是从线缆视图整体重写的；需要这些值在静态存储时脱敏的部署，必须不把它们放进本分区。
+- **没有 secret 角色字段**——`env` 与 `headers` 以纯文本编辑与存储，因为它们在 `mcp.json` 与 `mcp` 命名空间中都按普通字段声明；需要这些值在静态存储时脱敏的部署，必须不把它们放进本分区。
 - **状态靠重新拉取，而非流式推送**——`mcp/status` 事件不携带载荷，因此分区在列表变化或收到推送事件后重读每个服务器的状态；manager 从未推送的状态迁移，要等下一次重新拉取或手动刷新才可见。
 - **一次只能一次写入**——另一次保存正在过线时，store 会拒绝新的变更，因此两次快速编辑由先到达线缆的那一次串行决定。
 

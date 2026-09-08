@@ -466,6 +466,7 @@ describe('provider profile lifecycle', () => {
       initialDelayMs: 25,
       maxDelayMs: 100,
       jitterRatio: 0.2,
+      rateLimitDelayMs: 30_000,
     })
     expect(ctx.llm.providerRetryPolicy('anthropic')).toMatchObject({
       mode: 'normal',

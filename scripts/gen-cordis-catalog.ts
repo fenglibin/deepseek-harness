@@ -481,6 +481,8 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   DeliveryPhase: 'delivery.md',
   DeliveryTaskRef: 'delivery.md',
   DeliveryView: 'delivery.md',
+  DeliveryTaskItem: 'delivery.md',
+  DeliveryTasksView: 'delivery.md',
   CreateDeliveryRequest: 'delivery.md',
   SubagentDescendantListEntry: 'subagent.md',
   SubagentFollowupOptions: 'subagent.md',

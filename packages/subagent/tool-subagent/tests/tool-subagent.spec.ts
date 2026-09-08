@@ -19,6 +19,7 @@ import LocalJobRegistry from '@deepseek-ai/dsh-jobs-local'
 import * as SubagentSpawn from '@deepseek-ai/dsh-subagent-spawn-in-process'
 import * as ToolTasks from '@deepseek-ai/dsh-tool-jobs'
 import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
+import * as retry from '@deepseek-ai/dsh-llm-retry'
 import * as mock from './scripted-provider.ts'
 import * as tool from '../src/index.ts'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
@@ -86,6 +87,62 @@ describe('dsh-tool-subagent', () => {
       output: [{ type: 'text', text: 'child says hi' }],
     })
     expect(text(result)).toBe('child says hi')
+  })
+
+  it('closes delegation for the rest of a session that already hit a rate limit', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(Object.assign((inner: Context) => {
+      retry.apply(inner, {}, {})
+    }, { inject: retry.inject }))
+    await ctx.plugin(SubagentRuntime)
+    const provider = await mock.mountScriptedProvider(ctx, { name: 'mock', reply: 'child says hi' })
+    await ctx.plugin(tool, { provider: 'mock' })
+
+    const parent = fakeAgent('rate-limited-parent')
+    parent.session.append('turn/start', { turn: 1 })
+    parent.session.append('turn/end', {
+      turn: 1,
+      reason: { kind: 'error', error: { message: 'throttled', code: 'RATE_LIMIT', status: 429 } },
+    })
+
+    const result = await callSubagent(ctx, { description: 'd', prompt: 'p', run_in_background: false }, { agent: parent })
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain('rate limit')
+
+    await provider.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('delegates from a child whose live parent is not throttled, even though the parent id is not live', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(Object.assign((inner: Context) => {
+      retry.apply(inner, {}, {})
+    }, { inject: retry.inject }))
+    await ctx.plugin(SubagentRuntime)
+    const provider = await mock.mountScriptedProvider(ctx, { name: 'mock', reply: 'child says hi' })
+    await ctx.plugin(tool, { provider: 'mock' })
+
+    // A child session whose recorded parent is not a live agent: the real
+    // Agent registry answers `undefined`, so the gate must not veto delegation.
+    const child = Session.create(SessionId('child-of-offline-parent'), undefined, {
+      version: 0,
+      id: SessionId('child-of-offline-parent'),
+      createdAt: 0,
+      parentSession: SessionId('offline-parent'),
+      origin: 'subagent',
+      delegationDepth: 1,
+    })
+    const childAgent = { id: child.id, options: {}, session: child } as unknown as Agent
+
+    const result = await callSubagent(ctx, { description: 'd', prompt: 'p', run_in_background: false }, { agent: childAgent })
+    expect(result.isError).toBe(false)
+
+    await provider.dispose()
+    await ctx.fiber.dispose()
   })
 
   it('omits run_in_background entirely when the instance disables it (schema and capability never disagree)', async () => {
@@ -1440,6 +1497,53 @@ describe('depth budget configuration', () => {
       .rejects.toThrow(/provider-managed/)
   })
 
+  it('closes delegation from a child whose live parent already hit a rate limit', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(Object.assign((inner: Context) => {
+      retry.apply(inner, {}, {})
+    }, { inject: retry.inject }))
+    await ctx.plugin(SubagentRuntime)
+    const provider = await mock.mountScriptedProvider(ctx, { name: 'mock', reply: 'child says hi' })
+    await ctx.plugin(tool, { provider: 'mock' })
+
+    // A live, throttled parent agent registered in the real Agent registry.
+    const parentId = SessionId('throttled-live-parent')
+    const parentScope = ctx.plugin(() => {})
+    const parentSession = Session.create(parentId)
+    parentSession.append('turn/start', { turn: 1 })
+    parentSession.append('turn/end', {
+      turn: 1,
+      reason: { kind: 'error', error: { message: 'throttled', code: 'RATE_LIMIT', status: 429 } },
+    })
+    ctx.agents.register({
+      id: parentId,
+      ctx: parentScope.ctx,
+      inject: () => {},
+      options: {},
+      session: parentSession,
+    } as unknown as Agent)
+
+    const childId = SessionId('child-of-live-parent')
+    const child = Session.create(childId, undefined, {
+      version: 0,
+      id: childId,
+      createdAt: 0,
+      parentSession: parentId,
+      origin: 'subagent',
+      delegationDepth: 1,
+    })
+    const childAgent = { id: childId, options: {}, session: child } as unknown as Agent
+
+    const result = await callSubagent(ctx, { description: 'd', prompt: 'p', run_in_background: false }, { agent: childAgent })
+    expect(result.isError).toBe(true)
+    expect(text(result)).toContain('rate limit')
+
+    await provider.dispose()
+    await ctx.fiber.dispose()
+  })
+
   it("'provider-managed' omits the cap so a capability-less provider mounts and starts", async () => {
     const requests: SubagentStartRequest[] = []
     const ctx = await projectedContext()
@@ -1464,5 +1568,91 @@ describe('depth budget configuration', () => {
     await callSubagent(ctx, { description: 'd', prompt: 'p' })
     expect(requests[0]?.maxDepth).toBeUndefined()
     expect(requests[0]?.toolFilter).toBeUndefined()
+  })
+})
+
+describe('rate-limited delegation gate (pure)', () => {
+  /** Mount just the rate-limit projection so the pure gate can be driven directly. */
+  async function latchContext(): Promise<Context> {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(Object.assign((inner: Context) => {
+      retry.apply(inner, {}, {})
+    }, { inject: retry.inject }))
+    return ctx
+  }
+
+  function throttledSession(id: string): Session {
+    const session = Session.create(SessionId(id))
+    session.append('turn/start', { turn: 1 })
+    session.append('turn/end', {
+      turn: 1,
+      reason: { kind: 'error', error: { message: 'throttled', code: 'RATE_LIMIT', status: 429 } },
+    })
+    return session
+  }
+
+  function childSession(id: string, parentId: string): Session {
+    return Session.create(SessionId(id), undefined, {
+      version: 0,
+      id: SessionId(id),
+      createdAt: 0,
+      parentSession: SessionId(parentId),
+      origin: 'subagent',
+      delegationDepth: 1,
+    })
+  }
+
+  it('closes a session that itself hit a rate limit', async () => {
+    const ctx = await latchContext()
+    expect(tool.rateLimitedDelegation(ctx, throttledSession('self'), undefined)).toBe(true)
+    await ctx.fiber.dispose()
+  })
+
+  it('allows any session when no live-agent registry is available', async () => {
+    const ctx = await latchContext()
+    expect(tool.rateLimitedDelegation(ctx, childSession('child', 'parent'), undefined)).toBe(false)
+    await ctx.fiber.dispose()
+  })
+
+  it('allows a top-level session even with a registry present', async () => {
+    const ctx = await latchContext()
+    const agents = { get: () => { throw new Error('must not resolve a parent for a top-level session') } }
+    expect(tool.rateLimitedDelegation(ctx, Session.create(SessionId('top')), agents)).toBe(false)
+    await ctx.fiber.dispose()
+  })
+
+  it('allows a subagent whose recorded parent id is missing', async () => {
+    const ctx = await latchContext()
+    const orphan = Session.create(SessionId('orphan'), undefined, {
+      version: 0,
+      id: SessionId('orphan'),
+      createdAt: 0,
+      origin: 'subagent',
+    })
+    const agents = { get: () => { throw new Error('must not resolve a missing parent id') } }
+    expect(tool.rateLimitedDelegation(ctx, orphan, agents)).toBe(false)
+    await ctx.fiber.dispose()
+  })
+
+  it('allows a subagent whose live parent is offline', async () => {
+    const ctx = await latchContext()
+    expect(tool.rateLimitedDelegation(ctx, childSession('child', 'offline'), { get: () => undefined })).toBe(false)
+    await ctx.fiber.dispose()
+  })
+
+  it('allows a subagent whose live parent is not throttled', async () => {
+    const ctx = await latchContext()
+    const parent = Session.create(SessionId('clean-parent'))
+    expect(tool.rateLimitedDelegation(ctx, childSession('child', 'clean-parent'), { get: () => ({ session: parent }) })).toBe(false)
+    await ctx.fiber.dispose()
+  })
+
+  it('closes a subagent whose live parent already hit a rate limit', async () => {
+    const ctx = await latchContext()
+    const parent = throttledSession('throttled-parent')
+    expect(tool.rateLimitedDelegation(ctx, childSession('child', 'throttled-parent'), { get: () => ({ session: parent }) })).toBe(true)
+    await ctx.fiber.dispose()
   })
 })

@@ -32,12 +32,18 @@ export const LEVEL_PHASES: Record<DeliveryLevel, readonly DeliveryPhase[]> = {
   l2: ['created', 'designed', 'specified', 'implemented', 'verified', 'accepted'],
 }
 
-/** Derive the artifact paths a task's record counts imply (the record tools write these). */
-export function deliveryArtifacts(task: DeliverySnapshot): readonly string[] {
+/**
+ * Derive the artifact paths a task's record counts imply. The OpenSpec change
+ * lives under its own change id rather than the task id, so that path is only
+ * listed once a checklist has named the change.
+ * @param task - current task snapshot.
+ * @param changeId - change id recorded with the checklist, if any.
+ */
+export function deliveryArtifacts(task: DeliverySnapshot, changeId?: string): readonly string[] {
   const artifacts: string[] = []
   if (task.changeCount > 0) artifacts.push(`.dsh/changes/${task.id}.md`)
   if (task.designCount > 0) artifacts.push(`.dsh/design/${task.id}.md`)
-  if (task.specCount > 0) artifacts.push(`openspec/changes/${task.id}/spec.md`)
+  if (task.specCount > 0 && changeId !== undefined) artifacts.push(`openspec/changes/${changeId}/`)
   return artifacts
 }
 

@@ -1,9 +1,9 @@
 /**
- * Staged store over the `mcp` settings namespace. The server list is one array,
- * so every operation rewrites the whole list in a single revision-fenced
- * mutation; the `env`/`headers` values are ordinary (non-secret) fields, so a
- * wholesale write cannot drop a field the wire never returned. A write that
- * lands on a moved revision fails rather than clobbering the newer answer.
+ * Staged store over the `mcp` settings namespace. Every mutation — edit, toggle,
+ * and remove — writes the user-editable `mcp.json` through a Host single-server
+ * update, so the manual-edit source stays the authority and the settings mirror
+ * only ever refreshes from it. The section reads the mirror through the bound
+ * scope and never mutates the namespace directly.
  */
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -11,7 +11,6 @@ import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { McpServerEntry, McpSettings } from './types.ts'
 
 /** State rendered by the MCP servers section. */
@@ -40,8 +39,8 @@ export class McpStore {
 
   /**
    * @param ctx - the page plugin's context, whose `remote.mcp` writes the
-   * user-editable `mcp.json` for single-server edits.
-   * @param scope - bound `mcp` settings scope.
+   * user-editable `mcp.json` for single-server edits, toggles, and removals.
+   * @param scope - bound `mcp` settings scope, read-only from this store.
    */
   constructor(
     private readonly ctx: ClientContext,
@@ -62,35 +61,59 @@ export class McpStore {
   }
 
   /**
-   * Append one server. A duplicate name is refused rather than written.
-   * @param server - the entry to append.
-   * @returns whether the write landed.
-   */
-  add(server: McpServerEntry): Promise<boolean> {
-    if (this.has(server.serverName)) return Promise.resolve(false)
-    return this.write([...this.servers(), server])
-  }
-
-  /**
-   * Remove one server by name (idempotent when already absent).
+   * Remove one server by name (idempotent when already absent). The Host drops
+   * the entry from `mcp.json` and immediately syncs, so the mirror — and the
+   * mounted client — both lose the server in the same step.
    * @param serverName - the entry to remove.
-   * @returns whether the write landed.
+   * @returns whether the write landed and synced.
    */
   remove(serverName: string): Promise<boolean> {
     if (!this.has(serverName)) return Promise.resolve(true)
-    return this.write(this.servers().filter(server => server.serverName !== serverName))
+    return this.writeMcpServer(() => this.ctx.remote.mcp.removeMcpServer(serverName))
   }
 
   /**
-   * Replace one server's entry in place. Unlike add/remove/toggle, an edit
-   * writes the user-editable `mcp.json` (through the Host's single-server
-   * update) rather than the settings namespace, so the document that is the
-   * manual-edit source stays the authority and the change applies immediately.
+   * Replace one server's entry in place. Like toggle and remove, an edit writes
+   * the user-editable `mcp.json` (through the Host's single-server update)
+   * rather than the settings namespace, so the document that is the manual-edit
+   * source stays the authority and the change applies immediately.
    * @param server - the entry, keyed by its `serverName`.
    * @returns whether the write landed and synced.
    */
   async update(server: McpServerEntry): Promise<boolean> {
     if (!this.has(server.serverName)) return Promise.resolve(false)
+    return this.writeMcpServer(() => this.ctx.remote.mcp.updateMcpServer(server))
+  }
+
+  /**
+   * Flip one server's `enabled` flag. Like an edit, a toggle writes the
+   * user-editable `mcp.json` (through the Host's single-server update) rather
+   * than the settings namespace, so the enabled state and the manual-edit
+   * source never drift.
+   * @param serverName - the entry to toggle.
+   * @param enabled - the target enabled state.
+   * @returns whether the write landed (already in the target state counts as landed).
+   */
+  setEnabled(serverName: string, enabled: boolean): Promise<boolean> {
+    const current = this.servers().find(server => server.serverName === serverName)
+    if (current === undefined || current.enabled === enabled) return Promise.resolve(true)
+    return this.update({ ...current, enabled })
+  }
+
+  /** Stop observing the scope and suppress late write settlements. */
+  dispose(): void {
+    this.saveGeneration += 1
+    this.unsubscribe()
+  }
+
+  /**
+   * Run one Host `mcp.json` single-server write and settle the shared
+   * saving/failed flags. A read that has not answered yet, a read-only
+   * document, or a write still in flight refuses rather than clobbering.
+   * @param action - the Remote write to invoke.
+   * @returns whether the write landed and synced.
+   */
+  private async writeMcpServer(action: () => Promise<{ ok: boolean }>): Promise<boolean> {
     const snapshot = this.scope.getSnapshot()
     if (snapshot.status !== 'ready' || !snapshot.writable || this.saving) return false
     const generation = ++this.saveGeneration
@@ -98,7 +121,7 @@ export class McpStore {
     this.failed = false
     this.publish()
     try {
-      const result = await this.ctx.remote.mcp.updateMcpServer(server)
+      const result = await action()
       if (generation !== this.saveGeneration) return false
       this.saving = false
       this.failed = !result.ok
@@ -113,58 +136,6 @@ export class McpStore {
       this.publish()
       return false
     }
-  }
-
-  /**
-   * Flip one server's `enabled` flag.
-   * @param serverName - the entry to toggle.
-   * @param enabled - the target enabled state.
-   * @returns whether the write landed (already in the target state counts as landed).
-   */
-  setEnabled(serverName: string, enabled: boolean): Promise<boolean> {
-    const current = this.servers().find(server => server.serverName === serverName)
-    if (current === undefined || current.enabled === enabled) return Promise.resolve(true)
-    return this.write(this.servers().map(server => server.serverName === serverName ? { ...server, enabled } : server))
-  }
-
-  /** Stop observing the scope and suppress late write settlements. */
-  dispose(): void {
-    this.saveGeneration += 1
-    this.unsubscribe()
-  }
-
-  /**
-   * Write the whole server list as one revision-fenced mutation, then re-read
-   * the section the Host accepted. A moved revision or a refused write reports
-   * failure rather than predicting success.
-   * @param servers - the desired server list.
-   * @returns whether the stored list matches the desired length after the write.
-   */
-  private async write(servers: McpServerEntry[]): Promise<boolean> {
-    const snapshot = this.scope.getSnapshot()
-    if (snapshot.status !== 'ready' || !snapshot.writable || this.saving) return false
-    const generation = ++this.saveGeneration
-    this.saving = true
-    this.failed = false
-    this.publish()
-    try {
-      // The server entries are JSON-compatible interfaces; the cast records
-      // only the wire's `JsonValue` bound, which a plain interface lacks the
-      // index signature to satisfy structurally.
-      await this.scope.mutate([{ op: 'set', path: ['servers'], value: servers as unknown as JsonValue }], snapshot.revision)
-    } catch {
-      if (generation !== this.saveGeneration) return false
-      this.saving = false
-      this.failed = true
-      this.publish()
-      return false
-    }
-    if (generation !== this.saveGeneration) return false
-    this.saving = false
-    const landed = this.servers().length === servers.length
-    this.failed = !landed
-    this.publish()
-    return landed
   }
 
   private projection(): McpState {

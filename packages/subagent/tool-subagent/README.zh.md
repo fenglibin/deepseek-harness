@@ -60,6 +60,8 @@ kind: "package-reference"
 
 `maxDepth` 限制递归深度（默认 `3`；`0` 禁止委派），并要求提供方具备 `depthLimit` 能力；`'provider-managed'` 把预算留给进程外提供方。当提供方支持时，`persona` 与 `toolFilter` 会配置每个子 agent；工具在达到上限时仍然可见——每次尝试启动都会检查调用 agent 的当前深度，被拒绝时返回出错的工具结果。
 
+一个子 agent 是朝同一条已被限流路由发出的第二路并发请求：当 `dsh-llm-retry` 判定本 Session 已经撞上过一次提供方速率限制（HTTP 429）后，本工具会拒绝后续委派并返回错误，让模型在当前对话里直接完成工作，而不是在已被限流的路由上再开一路并发。由于限流是账号级的，一个子 agent 的 live 直接父 Session 已限流时，该子 agent 也会被拒绝继续开孙子 agent。该闩锁随 Session 持久，直到 Session 结束。
+
 ### 选择子级 LLM
 
 设置 `modelSelectionSettings: true`，即可在组合每个顶层 Session 时读取宿主的 `subagent-model-selection` 偏好。启用后，非空的精确 provider/model 路由列表会记录进 Session、由子 Session 继承，后续设置编辑不会改变它。工具随后公开可选的 `provider`、`model` 与 `reasoning_effort` 字段，并注册共享的 `list_subagent_models` 工具。此模式要求后端声明 `agentOptions`；两个进程内后端和 DSH SDK 支持该能力，而 ACP、Codex 与 Claude Code 会拒绝它，而不是忽略它。

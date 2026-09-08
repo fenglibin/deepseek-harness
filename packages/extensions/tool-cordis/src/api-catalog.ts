@@ -818,6 +818,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the view with the incremented spec count.',
       },
       {
+        signature: 'recordTasks(agent: Agent, ref: DeliveryTaskRef, changeId: string, items: readonly DeliveryTaskItem[]): void',
+        description: 'Record the implementation checklist for the current task, replacing any earlier list. The write is checked with the decoder the replay uses, so a checklist that could not be replayed is rejected at the write instead.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'ref', description: 'expected current revision.' }, { name: 'changeId', description: 'OpenSpec change id carrying the checklist.' }, { name: 'items', description: 'complete checklist; a later write replaces an earlier one.' }],
+        throws: ['{@link DeliveryError} when no task is current, the ref is stale, or the checklist is empty, malformed, or repeats one item\'s content.'],
+      },
+      {
+        signature: 'getTasks(agent: Agent): DeliveryTasksView | undefined',
+        description: 'Read the checklist recorded for the agent\'s session, if any.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }],
+        returns: 'the latest checklist view, or `undefined` before the first write.',
+        throws: ['{@link DeliveryError} when the agent is not the registry\'s live instance, or when the checklist projection retained a replay failure.'],
+      },
+      {
         signature: 'clear(agent: Agent, ref: DeliveryTaskRef): DeliveryTaskRef',
         description: 'Clear the current task while retaining a durable tombstone and history.',
         parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'ref', description: 'expected current revision.' }],
@@ -4063,6 +4076,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type DeliveryPhase = \'created\' | \'designed\' | \'specified\' | \'implemented\' | \'verified\' | \'accepted\';',
   },
   {
+    name: 'DeliveryPhaseProgress',
+    declaration: 'export interface DeliveryPhaseProgress {\n    readonly done: number;\n    readonly total: number;\n}',
+  },
+  {
     name: 'DeliverySnapshot',
     declaration: 'export interface DeliverySnapshot extends DeliveryTaskRef {\n    readonly objective: string;\n    readonly phase: DeliveryPhase;\n    readonly level: DeliveryLevel;\n    readonly changeCount: number;\n    readonly designCount: number;\n    readonly specCount: number;\n}',
   },
@@ -4071,8 +4088,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type DeliveryTaskId = Branded<\'DeliveryTaskId\'>;',
   },
   {
+    name: 'DeliveryTaskItem',
+    declaration: 'export interface DeliveryTaskItem {\n    readonly content: string;\n    readonly phase: DeliveryPhase;\n    readonly done: boolean;\n}',
+  },
+  {
     name: 'DeliveryTaskRef',
     declaration: 'export interface DeliveryTaskRef {\n    readonly id: DeliveryTaskId;\n    readonly revision: number;\n}',
+  },
+  {
+    name: 'DeliveryTasksView',
+    declaration: 'export interface DeliveryTasksView {\n    readonly changeId: string;\n    readonly items: readonly DeliveryTaskItem[];\n    readonly progress: Readonly<Record<DeliveryPhase, DeliveryPhaseProgress>>;\n}',
   },
   {
     name: 'DeliveryView',

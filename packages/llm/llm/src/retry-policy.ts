@@ -9,28 +9,40 @@
 
 import z from '@deepseek-ai/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
-import { EMPTY_RESPONSE_CODE } from './error.ts'
+import { EMPTY_RESPONSE_CODE, RATE_LIMIT_CODE } from './error.ts'
 
 const DEFAULT_MAX_RETRIES = 5
 const DEFAULT_INITIAL_DELAY_MS = 500
 const DEFAULT_MAX_DELAY_MS = 10_000
 const DEFAULT_JITTER_RATIO = 0.1
+const DEFAULT_RATE_LIMIT_DELAY_MS = 30_000
 const DEFAULT_RETRYABLE_CODES = Object.freeze([
   EMPTY_RESPONSE_CODE,
-  'RATE_LIMIT',
+  RATE_LIMIT_CODE,
   'SERVER',
   'TIMEOUT',
   'TRANSPORT',
 ])
 
-/** Bounded exponential backoff with symmetric jitter around each local delay. */
+/** Local delay configuration: exponential backoff with jitter, plus the fixed rate-limit wait. */
 export interface BackoffConfig {
   /** Initial local exponential-backoff delay in milliseconds (default 500). */
   initialDelayMs?: number
-  /** Maximum locally scheduled or accepted provider delay in milliseconds (default 10000). */
+  /**
+   * Maximum exponential-backoff delay, and the largest provider `Retry-After`
+   * a policy accepts, in milliseconds (default 10000). It does not cap
+   * {@link rateLimitDelayMs}.
+   */
   maxDelayMs?: number
   /** Symmetric random multiplier range around one (default 0.1). */
   jitterRatio?: number
+  /**
+   * Wait before retrying a rate-limit failure, in milliseconds (default 30000).
+   * A throttle names a quota window, so a shorter exponential delay would
+   * spend the next attempt inside the window the provider just rejected. A
+   * provider `Retry-After` longer than this wait still wins.
+   */
+  rateLimitDelayMs?: number
 }
 
 /** Current bounded transient retry behavior for one provider route. */
@@ -61,6 +73,8 @@ export interface ResolvedRetryBackoff {
   readonly initialDelayMs: number
   readonly maxDelayMs: number
   readonly jitterRatio: number
+  /** Fixed wait before retrying a rate-limit failure, in milliseconds. */
+  readonly rateLimitDelayMs: number
 }
 
 /** Fully resolved bounded transient retry policy. */
@@ -82,6 +96,7 @@ const backoffSchema: z<BackoffConfig> = z.object({
   initialDelayMs: z.number().max(MAX_TIMER_DELAY_MS).default(DEFAULT_INITIAL_DELAY_MS),
   maxDelayMs: z.number().max(MAX_TIMER_DELAY_MS).default(DEFAULT_MAX_DELAY_MS),
   jitterRatio: z.number().min(0).max(1).default(DEFAULT_JITTER_RATIO),
+  rateLimitDelayMs: z.number().max(MAX_TIMER_DELAY_MS).default(DEFAULT_RATE_LIMIT_DELAY_MS),
 })
 
 const normalPolicySchema: z<NormalRetryPolicyConfig> = z.object({
@@ -110,7 +125,9 @@ const NORMAL_POLICY_KEYS: ReadonlySet<string> = new Set([
 const ALWAYS_POLICY_KEYS: ReadonlySet<string> = new Set([
   'mode', 'maxRetries', 'retryableCodes', 'backoff',
 ])
-const BACKOFF_KEYS: ReadonlySet<string> = new Set(['initialDelayMs', 'maxDelayMs', 'jitterRatio'])
+const BACKOFF_KEYS: ReadonlySet<string> = new Set([
+  'initialDelayMs', 'maxDelayMs', 'jitterRatio', 'rateLimitDelayMs',
+])
 
 function validateKeys(value: object, allowed: ReadonlySet<string>, path: string): void {
   for (const key of Object.keys(value)) {
@@ -123,6 +140,7 @@ function resolveBackoff(config: BackoffConfig | undefined, path: string): Resolv
   const initialDelayMs = config?.initialDelayMs ?? DEFAULT_INITIAL_DELAY_MS
   const maxDelayMs = config?.maxDelayMs ?? DEFAULT_MAX_DELAY_MS
   const jitterRatio = config?.jitterRatio ?? DEFAULT_JITTER_RATIO
+  const rateLimitDelayMs = config?.rateLimitDelayMs ?? DEFAULT_RATE_LIMIT_DELAY_MS
 
   if (!Number.isFinite(initialDelayMs) || initialDelayMs <= 0 || initialDelayMs > MAX_TIMER_DELAY_MS) {
     throw new Error(`${path}.initialDelayMs must be a positive finite number no greater than ${MAX_TIMER_DELAY_MS}`)
@@ -136,8 +154,11 @@ function resolveBackoff(config: BackoffConfig | undefined, path: string): Resolv
   if (!Number.isFinite(jitterRatio) || jitterRatio < 0 || jitterRatio > 1) {
     throw new Error(`${path}.jitterRatio must be between 0 and 1`)
   }
+  if (!Number.isFinite(rateLimitDelayMs) || rateLimitDelayMs <= 0 || rateLimitDelayMs > MAX_TIMER_DELAY_MS) {
+    throw new Error(`${path}.rateLimitDelayMs must be a positive finite number no greater than ${MAX_TIMER_DELAY_MS}`)
+  }
 
-  return Object.freeze({ initialDelayMs, maxDelayMs, jitterRatio })
+  return Object.freeze({ initialDelayMs, maxDelayMs, jitterRatio, rateLimitDelayMs })
 }
 
 /**

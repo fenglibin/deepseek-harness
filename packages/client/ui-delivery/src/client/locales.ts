@@ -12,6 +12,7 @@ export const zh = {
   'phase.verified': '已验证',
   'phase.accepted': '已验收',
   'artifacts.label': '{count} 个产物',
+  'progress.counts': '{done}/{total} 已完成',
   'gate.change': '下一步需要变更记录',
   'gate.design': '下一步需要设计记录',
   'gate.spec': '下一步需要 spec 记录',

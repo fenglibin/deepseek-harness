@@ -6,7 +6,7 @@
  * Read-only: the task advances through the model-facing tools, never here.
  */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   IconChevronDownOutline14, IconChevronUpOutline14,
 } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -21,13 +21,24 @@ export type DeliveryFloatCardProps =
 /** Render the current task as a floating card pinned to the body's left edge. */
 export function DeliveryFloatCard({ useProjection, t }: DeliveryFloatCardProps) {
   const projection = useProjection('delivery')
+  const checklist = useProjection('delivery-tasks')
   const [expanded, setExpanded] = useState(false)
+  // A task that reaches a new phase opens itself, so the checklist for the
+  // phase now in progress is visible without an extra click.
+  const phase = projection?.task.phase
+  const phaseRef = useRef(phase)
+  useEffect(() => {
+    if (phase === undefined || phaseRef.current === phase) return
+    phaseRef.current = phase
+    setExpanded(true)
+  }, [phase])
   if (projection === undefined || projection === null) return null
   const task = projection.task
   const phases = LEVEL_PHASES[task.level]
   const currentIndex = phases.indexOf(task.phase)
-  const artifacts = deliveryArtifacts(task)
+  const artifacts = deliveryArtifacts(task, checklist?.changeId)
   const gate = nextGate(task)
+  const progress = checklist === undefined || checklist === null ? undefined : checklist.progress
   return (
     <section className={css.root} data-delivery-float data-level={task.level} data-phase={task.phase}>
       <button
@@ -48,9 +59,15 @@ export function DeliveryFloatCard({ useProjection, t }: DeliveryFloatCardProps) 
           <div className={css.progress} data-testid="delivery-float-progress">
             {phases.map((phase, index) => {
               const state = index < currentIndex ? 'done' : index === currentIndex ? 'current' : 'todo'
+              const counts = progress?.[phase]
               return (
                 <span key={phase} className={css.step} data-state={state} data-phase={phase}>
                   {t(PHASE_LABELS[phase])}
+                  {counts !== undefined && counts.total > 0 && (
+                    <span className={css.stepCounts} data-testid={`delivery-float-counts-${phase}`}>
+                      {t('progress.counts', { done: counts.done, total: counts.total })}
+                    </span>
+                  )}
                 </span>
               )
             })}

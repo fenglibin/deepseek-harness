@@ -14,7 +14,9 @@
 
 ## 持久事件
 
-`delivery/change` 是承载每次变更的会话事件：`create` 与 `advance` 携带完整快照，`record-change`、`record-design` 与 `record-spec` 携带增量记录，`clear` 则携带一个墓碑。`delivery/changed` 是在一次持久变更提交后发出的 Host 侧通知；它按 agent 划定作用域，因此为某个 agent 注册的监听器绝不会看到另一个 agent 的任务。
+`DeliveryTaskItem` 是实施清单的一项：描述文本 `content`、所属生命周期阶段 `phase`、以及是否完成 `done`。`DeliveryTasksView` 把整份清单与按阶段聚合的 `progress`（每个阶段的 done 与 total）一起暴露，正是 `delivery-tasks` 投影发布的值。该投影独立于 `delivery` 投影，因此写入清单不会扩大 `DeliverySnapshot` 的字段集合——后者的解码器会拒绝未知字段。
+
+`delivery/change` 是承载每次变更的会话事件：`create` 与 `advance` 携带完整快照，`record-change`、`record-design` 与 `record-spec` 携带增量记录，`clear` 则携带一个墓碑。`delivery/tasks` 单独承载一次清单写入，携带 change id 与完整清单，后一次写入整体替换前一次。`delivery/changed` 是在一次持久变更提交后发出的 Host 侧通知；它按 agent 划定作用域，因此为某个 agent 注册的监听器绝不会看到另一个 agent 的任务。
 
 ## 服务行为
 
@@ -89,6 +91,28 @@ recordDesign(agent: Agent, ref: DeliveryTaskRef, text: string): DeliveryView
  * @returns the view with the incremented spec count.
  */
 recordSpec(agent: Agent, ref: DeliveryTaskRef, text: string): DeliveryView
+
+/**
+ * Record the implementation checklist for the current task, replacing any
+ * earlier list. The write is checked with the decoder the replay uses, so a
+ * checklist that could not be replayed is rejected at the write instead.
+ * @param agent - owning live agent.
+ * @param ref - expected current revision.
+ * @param changeId - OpenSpec change id carrying the checklist.
+ * @param items - complete checklist; a later write replaces an earlier one.
+ * @throws {@link DeliveryError} when no task is current, the ref is stale, or
+ * the checklist is empty, malformed, or repeats one item's content.
+ */
+recordTasks(agent: Agent, ref: DeliveryTaskRef, changeId: string, items: readonly DeliveryTaskItem[]): void
+
+/**
+ * Read the checklist recorded for the agent's session, if any.
+ * @param agent - owning live agent.
+ * @returns the latest checklist view, or `undefined` before the first write.
+ * @throws {@link DeliveryError} when the agent is not the registry's live
+ * instance, or when the checklist projection retained a replay failure.
+ */
+getTasks(agent: Agent): DeliveryTasksView | undefined
 
 /**
  * Clear the current task while retaining a durable tombstone and history.

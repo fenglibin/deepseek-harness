@@ -1,13 +1,14 @@
 /**
  * MCP servers settings section: the user-managed server list with an
- * enable/disable toggle and edit/delete flows. An edit opens a dialog over the
- * section and writes the single server back into the user-editable `mcp.json`;
- * the "configure" action opens an in-place `mcp.json` editor with syntax
- * highlighting, formatting, and a validated save. An enable toggle writes
- * immediately (it is a single visible decision). The status dot reflects the
- * live connection status the Host manager reports over the `mcp` Remote
- * namespace, and entering the section reconnects every enabled server that is
- * not connected yet.
+ * enable/disable toggle and edit/delete flows. Add and edit both open a JSON
+ * editor over the section — add pastes cross-vendor MCP config (a bare server
+ * map or a `{ "mcpServers": … }` wrapper) and merges it into the user-editable
+ * `mcp.json`, while edit shows one server's cross-vendor object and replaces it
+ * in place; the "configure" action opens the whole `mcp.json` in the same
+ * editor. An enable toggle writes immediately (it is a single visible decision).
+ * The status dot reflects the live connection status the Host manager reports
+ * over the `mcp` Remote namespace, and entering the section reconnects every
+ * enabled server that is not connected yet.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -15,9 +16,9 @@ import type { ReactNode } from 'react'
 import { Button, IconChevronDownOutline14, IconChevronRightOutline14, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
 import type { McpServerStatusView } from '@deepseek-ai/dsh-api-remotes/client'
-import { McpServerDialog } from './McpServerDialog.tsx'
 import { McpJsonEditor } from './McpJsonEditor.tsx'
-import type { McpServerEntry } from './types.ts'
+import { entryToServerJson, parseDocument, parsePastedServers, parseSingleServer, renderDocument, serverJsonToEntry } from './mcp-server-json.ts'
+import type { McpJsonServer, McpServerEntry } from './types.ts'
 import type { McpStore } from './mcp-store.ts'
 import type { McpStatusStore } from './mcp-status-store.ts'
 import type { McpDocumentStore } from './mcp-document-store.ts'
@@ -81,8 +82,13 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
   const state = useMcp(snapshot => snapshot)
   const statusState = useStatus(snapshot => snapshot)
   const doc = useDocument(snapshot => snapshot)
-  const [editing, setEditing] = useState<McpServerEntry | undefined>(undefined)
+  const [adding, setAdding] = useState(false)
+  const [editingServer, setEditingServer] = useState<McpServerEntry | undefined>(undefined)
   const [editingDocument, setEditingDocument] = useState(false)
+  /** Pasted config awaiting a same-name overwrite confirmation. */
+  const [overwrite, setOverwrite] = useState<Record<string, McpJsonServer> | undefined>(undefined)
+  /** The pasted server names that already exist and would be overwritten. */
+  const [overwriteNames, setOverwriteNames] = useState<readonly string[]>([])
   const [deleteTarget, setDeleteTarget] = useState<string | undefined>(undefined)
   const [deleting, setDeleting] = useState(false)
   const [savedName, setSavedName] = useState<string | undefined>(undefined)
@@ -123,25 +129,6 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
     })()
   }, [status, state.available, state.servers, statusState.statuses])
 
-  /** The names of every server except the one the dialog is editing. */
-  const existingNames = state.servers
-    .filter(server => editing === undefined || server.serverName !== editing.serverName)
-    .map(server => server.serverName)
-
-  // The section has no add flow anymore: new servers are pasted into the
-  // `mcp.json` editor, so the dialog always edits an existing entry.
-  const saveEntry = (entry: McpServerEntry): void => {
-    void store.update(entry).then((landed) => {
-      if (!landed) {
-        setFailure(t('failed'))
-        return
-      }
-      setFailure(undefined)
-      setSavedName(entry.serverName)
-      setEditing(undefined)
-    })
-  }
-
   /** Open the `mcp.json` editor after pulling the latest document text. */
   const openDocumentEditor = (): void => {
     setSavedName(undefined)
@@ -154,6 +141,103 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
   const saveDocument = (text: string): void => {
     void document.write(text).then((landed) => {
       if (landed) setEditingDocument(false)
+      else setFailure(t('failed'))
+    })
+  }
+
+  /** Open the add editor after pulling the latest document text for the merge. */
+  const openAdd = (): void => {
+    setSavedName(undefined)
+    setFailure(undefined)
+    setAdding(true)
+    void document.read()
+  }
+
+  /**
+   * Parse the pasted config, detect same-name conflicts, and either ask for an
+   * overwrite confirmation or merge into the current document.
+   */
+  const saveAdd = (text: string): void => {
+    let pasted: Record<string, McpJsonServer>
+    try {
+      pasted = parsePastedServers(text)
+    } catch {
+      setFailure(t('addInvalid'))
+      return
+    }
+    let current: Record<string, McpJsonServer>
+    try {
+      current = parseDocument(doc.text)
+    } catch {
+      setFailure(t('failed'))
+      return
+    }
+    const conflicts = Object.keys(pasted).filter(name => name in current)
+    if (conflicts.length > 0) {
+      setOverwrite(pasted)
+      setOverwriteNames(conflicts)
+      return
+    }
+    void document.write(renderDocument({ ...current, ...pasted })).then((landed) => {
+      if (landed) setAdding(false)
+      else setFailure(t('failed'))
+    })
+  }
+
+  /** Confirm the overwrite and merge the pasted config over the same names. */
+  const confirmOverwrite = (): void => {
+    if (overwrite === undefined) return
+    let current: Record<string, McpJsonServer>
+    try {
+      current = parseDocument(doc.text)
+    } catch {
+      setFailure(t('failed'))
+      return
+    }
+    void document.write(renderDocument({ ...current, ...overwrite })).then((landed) => {
+      if (!landed) {
+        setFailure(t('failed'))
+        return
+      }
+      setOverwrite(undefined)
+      setOverwriteNames([])
+      setAdding(false)
+    })
+  }
+
+  /** Open the edit editor for one server, seeded from its cross-vendor object. */
+  const openEdit = (server: McpServerEntry): void => {
+    setSavedName(undefined)
+    setFailure(undefined)
+    setEditingServer(server)
+    void document.read()
+  }
+
+  /** Persist one edited server back through the Host single-server update. */
+  const saveEdit = (text: string): void => {
+    if (editingServer === undefined) return
+    let server: McpJsonServer
+    try {
+      server = parseSingleServer(text)
+    } catch {
+      setFailure(t('failed'))
+      return
+    }
+    let entry: McpServerEntry
+    try {
+      entry = serverJsonToEntry(editingServer.serverName, server)
+    } catch {
+      setFailure(t('failed'))
+      return
+    }
+    void store.update(entry).then((landed) => {
+      if (!landed) {
+        setFailure(t('failed'))
+        return
+      }
+      setFailure(undefined)
+      setSavedName(entry.serverName)
+      setEditingServer(undefined)
     })
   }
 
@@ -176,19 +260,6 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
     }).finally(() => { setDeleting(false) })
   }
 
-  const dialog = editing !== undefined
-    ? (
-      <McpServerDialog
-        entry={editing}
-        existingNames={existingNames}
-        saving={state.saving}
-        onSave={saveEntry}
-        onClose={() => { setEditing(undefined) }}
-        t={t}
-      />
-    )
-    : null
-
   return (
     <div className={styles['section']}>
       <div className={styles['head']}>
@@ -197,6 +268,14 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
           ? null
           : (
             <div className={styles['configure']}>
+              <button
+                type="button"
+                className={styles['configureButton']}
+                disabled={doc.opening || !state.writable}
+                onClick={openAdd}
+              >
+                {t('addMCP')}
+              </button>
               <button
                 type="button"
                 className={styles['configureButton']}
@@ -292,11 +371,7 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
                         type="button"
                         className={styles['secondaryButton']}
                         disabled={!state.writable}
-                        onClick={() => {
-                          setSavedName(undefined)
-                          setFailure(undefined)
-                          setEditing(server)
-                        }}
+                        onClick={() => { openEdit(server) }}
                       >
                         {t('edit')}
                       </button>
@@ -340,7 +415,32 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
             })}
           </ul>
         )}
-      {dialog}
+      {adding
+        ? (
+          <McpJsonEditor
+            text=""
+            opening={doc.opening}
+            error={null}
+            title={t('addServerTitle')}
+            onSave={saveAdd}
+            onClose={() => { setAdding(false) }}
+            t={t}
+          />
+        )
+        : null}
+      {editingServer !== undefined
+        ? (
+          <McpJsonEditor
+            text={entryToServerJson(editingServer)}
+            opening={state.saving}
+            error={null}
+            title={t('editTitle').replace('{server}', editingServer.serverName)}
+            onSave={saveEdit}
+            onClose={() => { setEditingServer(undefined) }}
+            t={t}
+          />
+        )
+        : null}
       {editingDocument
         ? (
           <McpJsonEditor
@@ -353,6 +453,29 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
           />
         )
         : null}
+      <Modal
+        open={overwrite !== undefined}
+        onClose={() => { setOverwrite(undefined); setOverwriteNames([]) }}
+        title={t('overwriteTitle')}
+        closeLabel={t('close')}
+        description={t('overwriteDescription').replace('{servers}', overwriteNames.join(', '))}
+        className={styles['deleteDialog'] as string}
+        footer={(
+          <>
+            <Button variant="outline" autoFocus onClick={() => { setOverwrite(undefined); setOverwriteNames([]) }}>
+              {t('cancel')}
+            </Button>
+            <Button
+              variant="outline"
+              className={styles['deleteConfirm']}
+              disabled={doc.opening}
+              onClick={confirmOverwrite}
+            >
+              {t('overwriteConfirm')}
+            </Button>
+          </>
+        )}
+      />
       <Modal
         open={deleteTarget !== undefined}
         onClose={() => {

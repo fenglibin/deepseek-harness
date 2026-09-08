@@ -28,6 +28,14 @@ export const CONTEXT_WINDOW_EXCEEDED_CODE = 'CONTEXT_WINDOW_EXCEEDED'
 export const QUOTA_EXCEEDED_CODE = 'QUOTA'
 
 /**
+ * Canonical provider-neutral code for a request the provider throttled because
+ * the caller exceeded a request-rate or concurrency limit (HTTP 429). Distinct
+ * from {@link QUOTA_EXCEEDED_CODE}: a throttle clears on its own, so recovery
+ * policy waits the window out instead of ending the turn.
+ */
+export const RATE_LIMIT_CODE = 'RATE_LIMIT'
+
+/**
  * Canonical provider-neutral code for a response that completed normally but
  * carried no content blocks at all. Providers occasionally emit a degenerate
  * completion (a terminal stop with zero output); adapters classify it as this

@@ -329,6 +329,39 @@ export class McpManager extends TypertRemoteService {
     return this.writeMcpDocument(renderMcpJson(document), signal)
   }
 
+  /**
+   * Remove one server's entry from `mcp.json` and immediately sync it. Any raw
+   * key that hashes into `serverName` is dropped, so a non-contract name the
+   * sync hashed still removes cleanly; an absent name writes the unchanged
+   * document. Fields outside the removed server are preserved.
+   * @param serverName - the entry to remove.
+   * @param signal - caller lifetime; abort terminates the write.
+   * @returns confirmation after the document is persisted and synced.
+   * @throws RemoteError when no local document exists or the write fails.
+   */
+  @Remote
+  async removeMcpServer(serverName: string, signal: AbortSignal): Promise<McpDocumentWriteValue> {
+    const path = this.mcpJsonPath
+    if (path === undefined) {
+      throw new RemoteError('gateway/internal', 'this deployment has no local MCP document', {})
+    }
+    let document: McpJson
+    try {
+      const text = await this.readMcpDocument(signal)
+      document = parseMcpJson(text.text)
+    } catch (error) {
+      if (error instanceof RemoteError) throw error
+      throw new RemoteError('gateway/internal', `mcp.json read failed: ${messageOf(error)}`, {}, { cause: error })
+    }
+    const mcpServers: McpJson['mcpServers'] = {}
+    for (const [rawName, raw] of Object.entries(document.mcpServers)) {
+      if (sanitizeServerName(rawName) === serverName) continue
+      mcpServers[rawName] = raw
+    }
+    document.mcpServers = mcpServers
+    return this.writeMcpDocument(renderMcpJson(document), signal)
+  }
+
   /** Seed a missing `mcp.json` from the current settings section, then watch it. */
   private installMcpJsonSync(): void {
     const path = this.mcpJsonPath as string

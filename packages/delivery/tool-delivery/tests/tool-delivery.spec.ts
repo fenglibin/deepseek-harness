@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mkdtempSync, readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
@@ -13,7 +13,7 @@ import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { ShellExecutor } from '@deepseek-ai/dsh-shell'
 import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult } from '@deepseek-ai/dsh-shell'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
-import ToolRuntime from '@deepseek-ai/dsh-tools'
+import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import * as toolDelivery from '@deepseek-ai/dsh-tool-delivery'
 
@@ -72,7 +72,29 @@ function stubAgent(rawId: string, supplied?: Session): Agent {
   }
 }
 
-async function harness(config: toolDelivery.Config = {}, shellOutcome: Partial<ShellRunResult> = {}) {
+/** Minimal settings provider that resolves one overridden policy section. */
+class StubSettings {
+  constructor(private readonly override: Record<string, unknown>) {}
+
+  installSection<T>(
+    _owner: Context,
+    ns: string,
+    _schema: unknown,
+    entry: T,
+    hooks: { setSource(current: () => T): void; onChange(): void },
+  ): void {
+    expect(ns).toBe('delivery')
+    const merged = { ...(entry as Record<string, unknown>), ...this.override } as T
+    hooks.setSource(() => merged)
+    hooks.onChange()
+  }
+}
+
+async function harness(
+  config: toolDelivery.Config = {},
+  shellOutcome: Partial<ShellRunResult> = {},
+  settings?: StubSettings,
+) {
   const ctx = new Context()
   const cwd = mkdtempSync(join(tmpdir(), 'dsh-delivery-'))
   await ctx.plugin(SystemPrompt)
@@ -81,6 +103,7 @@ async function harness(config: toolDelivery.Config = {}, shellOutcome: Partial<S
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(LocalFileSystem, { cwd })
   await ctx.plugin(StubShell, shellOutcome)
+  if (settings !== undefined) ctx.provide('settings', settings)
   await ctx.plugin(DeliveryService)
   const fiber = await ctx.plugin(toolDelivery, config)
   const agent = stubAgent(`delivery-tool-${Math.random()}`)
@@ -270,7 +293,9 @@ describe('tool-delivery presentation and authority', () => {
     expect(ctx.tools.get('record_design')?.presentCall?.({ task_id: 'task-1', revision: 1, text: 'the design' })).toEqual({
       card: 'generic', title: 'Record design', kind: 'other', rawInput: 'the design',
     })
-    expect(ctx.tools.get('record_spec')?.presentCall?.({ task_id: 'task-1', revision: 1, text: 'the spec' })).toEqual({
+    expect(ctx.tools.get('record_spec')?.presentCall?.({
+      task_id: 'task-1', revision: 1, change_id: 'add-thing', kind: 'spec', capability: 'thing', text: 'the spec',
+    })).toEqual({
       card: 'generic', title: 'Record spec', kind: 'other', rawInput: 'the spec',
     })
     expect(ctx.tools.get('advance_delivery_task')?.presentCall?.({ task_id: 'task-1', revision: 1, phase: 'implemented' })).toEqual({
@@ -433,6 +458,9 @@ describe('tool-delivery spec discipline', () => {
     const spec = resultTask(await execute(ctx, 'record_spec', {
       task_id: designed['id'],
       revision: designed['revision'],
+      change_id: 'add-thing',
+      kind: 'spec',
+      capability: 'thing',
       text: 'the spec',
     }, agent))
     expect(spec).toMatchObject({ specCount: 1, revision: 4 })
@@ -511,10 +539,12 @@ describe('tool-delivery artifact persistence', () => {
       task_id: created['id'], revision: created['revision'], text: 'the design',
     }, agent))
     await execute(ctx, 'record_spec', {
-      task_id: design['id'], revision: design['revision'], text: 'the spec',
+      task_id: design['id'], revision: design['revision'],
+      change_id: 'add-thing', kind: 'spec', capability: 'thing', text: 'the spec',
     }, agent)
     expect(readFileSync(join(cwd, '.dsh', 'design', `${created['id']}.md`), 'utf8')).toContain('the design')
-    expect(readFileSync(join(cwd, 'openspec', 'changes', `${created['id']}`, 'spec.md'), 'utf8')).toContain('the spec')
+    expect(readFileSync(join(cwd, 'openspec', 'changes', 'add-thing', 'specs', 'thing', 'spec.md'), 'utf8'))
+      .toContain('the spec')
   })
 
   it('resolves artifact paths under the session cwd when set', async () => {
@@ -654,7 +684,9 @@ describe('tool-delivery post-hooks', () => {
 })
 
 describe('tool-delivery auto-detect', () => {
-  it('creates an l1 task at pre-step for a long direct human request', async () => {
+  // The character floor dropped from 1200 to 200, so a 400-character request
+  // is now an l2 task instead of an l1 one.
+  it('creates an l2 task at pre-step for a request above the character floor', async () => {
     const { ctx, agent } = await harness()
     await preStep(ctx, agent, [createUserMessage({
       content: [{ type: 'text', text: 'x'.repeat(400) }],
@@ -662,7 +694,7 @@ describe('tool-delivery auto-detect', () => {
     })])
     const view = ctx.delivery.get(agent)
     expect(view).toBeDefined()
-    expect(view?.level).toBe('l1')
+    expect(view?.level).toBe('l2')
   })
 
   it('does not create a task for a short request', async () => {
@@ -697,6 +729,347 @@ describe('tool-delivery auto-detect', () => {
     const { ctx, agent } = await harness({ autoDetect: false })
     await preStep(ctx, agent, [createUserMessage({
       content: [{ type: 'text', text: 'x'.repeat(400) }],
+      source: { kind: 'user' },
+    })])
+    expect(ctx.delivery.get(agent)).toBeUndefined()
+  })
+
+  const MULTI_PART_REQUEST = '“设置”中 MCP 页面配置服务细节优化：\n'
+    + '1、去掉底部的“添加服务器”按钮；\n'
+    + '2、进入页面时全部启动的 MCP 服务要自动连接；\n'
+    + '3、点击“编辑”时针对 mcp.json 编辑而不是 settings.yml；\n'
+    + '4、点击“配置 MCP”时在当前页面弹出 mcp.json 编辑页并支持高亮；\n'
+    + '5、编辑后配置要立即生效。'
+
+  it('creates an l2 task for a multi-part request the old rule graded as l1', async () => {
+    const { ctx, agent } = await harness()
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: MULTI_PART_REQUEST }],
+      source: { kind: 'user' },
+    })])
+    expect(ctx.delivery.get(agent)?.level).toBe('l2')
+  })
+
+  it('creates an l2 task when a short request hits a strong signal', async () => {
+    const { ctx, agent } = await harness()
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: '重构这个模块的内部实现' }],
+      source: { kind: 'user' },
+    })])
+    expect(ctx.delivery.get(agent)?.level).toBe('l2')
+  })
+
+  it('creates an l1 task when a short request hits one medium signal', async () => {
+    const { ctx, agent } = await harness()
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: '新增一个小能力' }],
+      source: { kind: 'user' },
+    })])
+    expect(ctx.delivery.get(agent)?.level).toBe('l1')
+  })
+
+  it('injects the grading rubric once per turn when no signal matches', async () => {
+    const { ctx, agent } = await harness()
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'fix the typo' }],
+      source: { kind: 'user' },
+    })])
+    expect(ctx.delivery.get(agent)).toBeUndefined()
+    const injected = agent.inbox.nextStep
+    expect(injected.some(message => message.source.kind === 'plugin'
+      && message.source.plugin === 'tool-delivery')).toBe(true)
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'fix the typo again' }],
+      source: { kind: 'user' },
+    })])
+    expect(agent.inbox.nextStep.length).toBe(injected.length)
+  })
+})
+
+describe('tool-delivery openspec change layout', () => {
+  /** Create an l2 task and return its first ref. */
+  async function l2Task(ctx: Context, agent: Agent): Promise<Record<string, unknown>> {
+    return resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l2 task', level: 'l2' }, agent))
+  }
+
+  it('writes each of the three non-delta artifacts to its own path', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const created = await l2Task(ctx, agent)
+    let revision = created['revision']
+    for (const kind of ['proposal', 'design', 'tasks'] as const) {
+      const after = resultTask(await execute(ctx, 'record_spec', {
+        task_id: created['id'], revision, change_id: 'add-thing', kind, text: `the ${kind}`,
+      }, agent))
+      revision = after['revision']
+      expect(readFileSync(join(cwd, 'openspec', 'changes', 'add-thing', `${kind}.md`), 'utf8'))
+        .toBe(`the ${kind}`)
+    }
+  })
+
+  it('writes tasks.md without a revision prefix so OpenSpec can parse it', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const created = await l2Task(ctx, agent)
+    await execute(ctx, 'record_spec', {
+      task_id: created['id'], revision: created['revision'], change_id: 'add-thing', kind: 'tasks',
+      text: '- [ ] 1.1 do the thing\n',
+    }, agent)
+    expect(readFileSync(join(cwd, 'openspec', 'changes', 'add-thing', 'tasks.md'), 'utf8'))
+      .toBe('- [ ] 1.1 do the thing\n')
+  })
+
+  it('rejects a change id that is not verb-led kebab-case', async () => {
+    const { ctx, agent } = await harness()
+    const created = await l2Task(ctx, agent)
+    const result = await execute(ctx, 'record_spec', {
+      task_id: created['id'], revision: created['revision'], change_id: 'task-3cc0ca7f', kind: 'proposal', text: 'x',
+    }, agent)
+    expect(result.isError).toBe(true)
+  })
+
+  it('rejects a spec delta without a kebab-case capability', async () => {
+    const { ctx, agent } = await harness()
+    const created = await l2Task(ctx, agent)
+    const result = await execute(ctx, 'record_spec', {
+      task_id: created['id'], revision: created['revision'], change_id: 'add-thing', kind: 'spec', text: 'x',
+    }, agent)
+    expect(result.isError).toBe(true)
+  })
+})
+
+describe('tool-delivery l2 task source', () => {
+  /** Register a stand-in for the lightweight todo list this gate refuses. */
+  function registerTodo(ctx: Context): void {
+    ctx.tools.register(defineTool({
+      name: 'todo_write',
+      description: 'stub todo list used to prove the l2 gate',
+      parameters: {},
+      output: {
+        schema: { type: 'string' },
+        render: (_args: unknown, value: string) => [{ type: 'text' as const, text: value }],
+      },
+      execute: () => Promise.resolve('ok'),
+    }))
+  }
+
+  it('denies todo_write while the current task is l2', async () => {
+    const { ctx, agent } = await harness()
+    registerTodo(ctx)
+    await execute(ctx, 'create_delivery_task', { objective: 'l2 task', level: 'l2' }, agent)
+    expect((await execute(ctx, 'todo_write', {}, agent)).isError).toBe(true)
+  })
+
+  it('allows todo_write for an l1 task', async () => {
+    const { ctx, agent } = await harness()
+    registerTodo(ctx)
+    await execute(ctx, 'create_delivery_task', { objective: 'l1 task', level: 'l1' }, agent)
+    expect((await execute(ctx, 'todo_write', {}, agent)).isError).toBe(false)
+  })
+})
+
+/** Walk an l2 task through designed into specified. */
+async function toSpecified(ctx: Context, agent: Agent): Promise<Record<string, unknown>> {
+  let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l2 task', level: 'l2' }, agent))
+  task = resultTask(await execute(ctx, 'record_design', {
+    task_id: task['id'], revision: task['revision'], text: 'the design',
+  }, agent))
+  task = resultTask(await execute(ctx, 'advance_delivery_task', {
+    task_id: task['id'], revision: task['revision'], phase: 'designed',
+  }, agent))
+  task = resultTask(await execute(ctx, 'record_spec', {
+    task_id: task['id'], revision: task['revision'], change_id: 'add-thing', kind: 'proposal', text: 'why',
+  }, agent))
+  return resultTask(await execute(ctx, 'advance_delivery_task', {
+    task_id: task['id'], revision: task['revision'], phase: 'specified',
+  }, agent))
+}
+
+describe('tool-delivery checklist cross-check', () => {
+
+  /**
+   * Record the change and return the ref that follows it. A change record is a
+   * gate of its own, so these cases must satisfy it to reach the cross-check.
+   */
+  async function withChange(
+    ctx: Context,
+    agent: Agent,
+    task: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    return resultTask(await execute(ctx, 'record_change', {
+      task_id: task['id'], revision: task['revision'], text: 'the fix',
+    }, agent))
+  }
+
+  it('rejects implementing when the recorded checklist is ahead of tasks.md', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const task = await toSpecified(ctx, agent)
+    const dir = join(cwd, 'openspec', 'changes', 'add-thing')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'tasks.md'), '- [ ] 1.1 build it\n')
+    const after = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [{ content: 'build it', phase: 'implemented', done: true }],
+    }, agent))
+    const changed = await withChange(ctx, agent, after)
+    const blocked = await execute(ctx, 'advance_delivery_task', {
+      task_id: changed['id'], revision: changed['revision'], phase: 'implemented',
+    }, agent)
+    expect(blocked.isError).toBe(true)
+  })
+
+  it('allows implementing once tasks.md and the recorded checklist agree', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const task = await toSpecified(ctx, agent)
+    const dir = join(cwd, 'openspec', 'changes', 'add-thing')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'tasks.md'), '- [x] 1.1 build it\n')
+    const after = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [{ content: 'build it', phase: 'implemented', done: true }],
+    }, agent))
+    const changed = await withChange(ctx, agent, after)
+    const advanced = await execute(ctx, 'advance_delivery_task', {
+      task_id: changed['id'], revision: changed['revision'], phase: 'implemented',
+    }, agent)
+    expect(advanced.isError).toBe(false)
+  })
+})
+
+describe('tool-delivery task checklist', () => {
+  /** Create an l2 task and return its ref fields. */
+  async function l2(ctx: Context, agent: Agent): Promise<Record<string, unknown>> {
+    return resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l2 task', level: 'l2' }, agent))
+  }
+
+  /** Read the `delivery-tasks` projection value for the agent's session. */
+  function checklist(ctx: Context, agent: Agent): {
+    changeId: string
+    progress: Record<string, { done: number; total: number }>
+  } {
+    return ctx.sessionProjections.snapshot(agent.session).values['delivery-tasks'] as never
+  }
+
+  it('records a checklist and exposes per-phase progress', async () => {
+    const { ctx, agent } = await harness()
+    const created = await l2(ctx, agent)
+    await execute(ctx, 'record_tasks', {
+      task_id: created['id'], revision: created['revision'], change_id: 'add-thing',
+      items: [
+        { content: 'build it', phase: 'implemented', done: false },
+        { content: 'test it', phase: 'verified', done: true },
+      ],
+    }, agent)
+    const view = checklist(ctx, agent)
+    expect(view.changeId).toBe('add-thing')
+    expect(view.progress.implemented).toEqual({ done: 0, total: 1 })
+    expect(view.progress.verified).toEqual({ done: 1, total: 1 })
+  })
+
+  it('rejects a checklist item whose phase is unknown', async () => {
+    const { ctx, agent } = await harness()
+    const created = await l2(ctx, agent)
+    const result = await execute(ctx, 'record_tasks', {
+      task_id: created['id'], revision: created['revision'], change_id: 'add-thing',
+      items: [{ content: 'x', phase: 'nope', done: false }],
+    }, agent)
+    expect(result.isError).toBe(true)
+  })
+
+  it('rejects a change id that is not verb-led kebab-case', async () => {
+    const { ctx, agent } = await harness()
+    const created = await l2(ctx, agent)
+    const result = await execute(ctx, 'record_tasks', {
+      task_id: created['id'], revision: created['revision'], change_id: 'x; rm -rf /',
+      items: [{ content: 'x', phase: 'implemented', done: false }],
+    }, agent)
+    expect(result.isError).toBe(true)
+  })
+})
+
+describe('tool-delivery coverage review', () => {
+  /** A stubbed `openspec show --json` result naming one capability. */
+  const SHOW = { stdout: { text: '{"deltas":[{"spec":"cap"}]}', truncated: false } }
+
+  /** Write a change declaring two scenarios and one design decision. */
+  function writeChange(cwd: string, tasks: string): void {
+    const dir = join(cwd, 'openspec', 'changes', 'add-thing')
+    mkdirSync(join(dir, 'specs', 'cap'), { recursive: true })
+    writeFileSync(join(dir, 'specs', 'cap', 'spec.md'), [
+      '## ADDED Requirements',
+      '### Requirement: 覆盖检查',
+      '#### Scenario: 已覆盖的场景',
+      '#### Scenario: 未覆盖的场景',
+    ].join('\n'))
+    writeFileSync(join(dir, 'design.md'), '## D1 决策\n')
+    writeFileSync(join(dir, 'tasks.md'), tasks)
+  }
+
+  /** Reach implemented with a checklist that agrees with tasks.md. */
+  async function toImplemented(ctx: Context, agent: Agent): Promise<Record<string, unknown>> {
+    const task = await toSpecified(ctx, agent)
+    const after = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [{ content: '1.1 已覆盖的场景', phase: 'implemented', done: true }],
+    }, agent))
+    const changed = resultTask(await execute(ctx, 'record_change', {
+      task_id: after['id'], revision: after['revision'], text: 'the fix',
+    }, agent))
+    return resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: changed['id'], revision: changed['revision'], phase: 'implemented',
+    }, agent))
+  }
+
+  /** A checklist that claims one scenario and leaves the other unclaimed. */
+  const PARTIAL = '- [x] 1.1 已覆盖的场景 (covers: cap/已覆盖的场景)\n'
+
+  it('blocks verifying while a declared scenario has no checklist item', async () => {
+    const { ctx, agent, cwd } = await harness({}, SHOW)
+    writeChange(cwd, PARTIAL)
+    const implemented = await toImplemented(ctx, agent)
+    const blocked = await execute(ctx, 'advance_delivery_task', {
+      task_id: implemented['id'], revision: implemented['revision'], phase: 'verified',
+    }, agent)
+    expect(blocked.isError).toBe(true)
+  })
+
+  it('releases the gap when the model confirms it specifically', async () => {
+    const { ctx, agent, cwd } = await harness({}, SHOW)
+    writeChange(cwd, PARTIAL)
+    const implemented = await toImplemented(ctx, agent)
+    const allowed = await execute(ctx, 'advance_delivery_task', {
+      task_id: implemented['id'], revision: implemented['revision'], phase: 'verified',
+      coverage_confirmation: '未覆盖的场景 ships inside the same grading.ts change and needs no separate task',
+    }, agent)
+    expect(allowed.isError).toBe(false)
+  })
+
+  it('rejects a bare confirmation that only says done', async () => {
+    const { ctx, agent, cwd } = await harness({}, SHOW)
+    writeChange(cwd, PARTIAL)
+    const implemented = await toImplemented(ctx, agent)
+    const blocked = await execute(ctx, 'advance_delivery_task', {
+      task_id: implemented['id'], revision: implemented['revision'], phase: 'verified',
+      coverage_confirmation: 'done',
+    }, agent)
+    expect(blocked.isError).toBe(true)
+  })
+})
+
+describe('tool-delivery settings wiring', () => {
+  it('grades with the settings-resolved policy when a provider is mounted', async () => {
+    const { ctx, agent } = await harness({}, {}, new StubSettings({
+      openspecThreshold: { todoCount: 15, descriptionChars: 20 },
+    }))
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'a'.repeat(25) }],
+      source: { kind: 'user' },
+    })])
+    expect(ctx.delivery.get(agent)?.level).toBe('l2')
+  })
+
+  it('keeps the composition policy when no provider is mounted', async () => {
+    const { ctx, agent } = await harness()
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'a'.repeat(25) }],
       source: { kind: 'user' },
     })])
     expect(ctx.delivery.get(agent)).toBeUndefined()

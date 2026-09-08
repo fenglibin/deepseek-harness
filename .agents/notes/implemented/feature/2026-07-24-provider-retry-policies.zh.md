@@ -36,7 +36,7 @@ providers:
 
 always 模式先请求下游恢复，使上下文溢出压缩（compaction）之类的专用策略有机会取得进展。下游若决定重试，则以该决定为准。下游若决定失败或恢复过程抛出错误，则回退为无界重试同一提供方请求；抛出的错误会写入日志。重试监听器会持有并排空已委托的恢复，轮次取消或插件 dispose 只能在其结束后完成；随后监听器会执行相应的中止操作，而不会采用迟到的下游决定。成功、轮次取消和插件 dispose 是仅有的终止路径。
 
-两种模式的本地延迟都按指数增长，从 `initialDelayMs` 增至 `maxDelayMs`。`jitterRatio` 用 `[1 - jitterRatio, 1 + jitterRatio]` 区间内的均匀随机样本乘以每次目标值，再应用上限。提供方给出的正数 `Retry-After` 若未超过上限，则保持精确且不加抖动。若提供方延迟超过上限，normal 模式会委托后续处理；always 模式则改用配置的本地退避，以维持无限重试保证。
+两种模式的本地延迟都按指数增长，从 `initialDelayMs` 增至 `maxDelayMs`。`jitterRatio` 用 `[1 - jitterRatio, 1 + jitterRatio]` 区间内的均匀随机样本乘以每次目标值，再应用上限。提供方给出的正数 `Retry-After` 若未超过上限，则保持精确且不加抖动。若提供方延迟超过上限，normal 模式会委托后续处理；always 模式则改用配置的本地退避，以维持无限重试保证。速率限制（`RATE_LIMIT`）是唯一的例外：它不套用指数退避，改等 `backoff.rateLimitDelayMs`（默认 30 秒），除非提供方 `Retry-After` 给出更长的窗口；两者都不受 `maxDelayMs` 封顶，规范键也随之把 `rateLimitDelayMs` 纳入（见[限流节奏与子 agent 闩锁](2026-09-07-rate-limit-pacing-and-subagent-gate.zh.md)）。
 
 每次安排重试都会追加一条不进入表层的 `llm/retry` 事件，其中包含失败的提供方、策略模式、已解析策略的规范键、提供方策略内的重试编号、延迟和失败事实。normal 事件包含有限的 `maxRetries`；always 事件省略该字段，UI 将上限渲染为 `∞`。该事件与失败的 `assistant/chunk` 记录都不会生成表层消息，因此除非其他恢复策略有意改变表层，否则下一次请求包含的派生上下文与失败请求相同。
 

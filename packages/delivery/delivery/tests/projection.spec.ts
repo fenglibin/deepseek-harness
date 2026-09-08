@@ -22,6 +22,9 @@ import type {
   DeliveryProjection,
   DeliveryProjectionState,
   DeliverySnapshotChangeMeta,
+  DeliveryTaskItem,
+  DeliveryTaskRef,
+  DeliveryTasksView,
 } from '@deepseek-ai/dsh-delivery'
 
 interface Bench {
@@ -78,7 +81,7 @@ const createMeta: DeliverySnapshotChangeMeta = {
 describe('delivery projection unit', () => {
   it('serves null before the first create and the whole task after', async () => {
     const bench = await harness()
-    expect(bench.tailValues()).toEqual({ delivery: null })
+    expect(bench.tailValues()).toEqual({ delivery: null, 'delivery-tasks': null })
     const created = bench.ctx.delivery.create(bench.agent, { objective: 'ship it' })
     expect(bench.tailValues().delivery).toMatchObject({
       task: { id: created.id, objective: 'ship it', phase: 'created' },
@@ -163,5 +166,72 @@ describe('delivery projection unit', () => {
   it('has no delivery key when the delivery service is not composed', async () => {
     const bench = await harness(false)
     expect('delivery' in (bench.tailValues() ?? {})).toBe(false)
+  })
+})
+
+describe('delivery tasks projection', () => {
+  /** Compose the service, create an l2 task, and return its compare-and-set ref. */
+  async function benchWithTask(): Promise<{ bench: Bench; ref: DeliveryTaskRef }> {
+    const bench = await harness()
+    const created = bench.ctx.delivery.create(bench.agent, { objective: 'ship it', level: 'l2' })
+    return { bench, ref: { id: created.id, revision: created.revision } }
+  }
+
+  /** Read the checklist projection value. */
+  function tasksView(bench: Bench): DeliveryTasksView {
+    return bench.tailValues()['delivery-tasks'] as DeliveryTasksView
+  }
+
+  it('serves null before the first checklist write', async () => {
+    const { bench } = await benchWithTask()
+    expect(bench.tailValues()['delivery-tasks']).toBeNull()
+  })
+
+  it('serves the recorded checklist with per-phase progress', async () => {
+    const { bench, ref } = await benchWithTask()
+    bench.ctx.delivery.recordTasks(bench.agent, ref, 'add-thing', [
+      { content: 'design the thing', phase: 'designed', done: true },
+      { content: 'build the thing', phase: 'implemented', done: false },
+      { content: 'verify the thing', phase: 'verified', done: false },
+    ])
+    const view = tasksView(bench)
+    expect(view.changeId).toBe('add-thing')
+    expect(view.items).toHaveLength(3)
+    expect(view.progress.designed).toEqual({ done: 1, total: 1 })
+    expect(view.progress.implemented).toEqual({ done: 0, total: 1 })
+    expect(view.progress.created).toEqual({ done: 0, total: 0 })
+  })
+
+  it('replaces the checklist on a later write', async () => {
+    const { bench, ref } = await benchWithTask()
+    bench.ctx.delivery.recordTasks(bench.agent, ref, 'add-thing', [
+      { content: 'a', phase: 'implemented', done: false },
+    ])
+    bench.ctx.delivery.recordTasks(bench.agent, ref, 'add-thing', [
+      { content: 'a', phase: 'implemented', done: true },
+    ])
+    expect(tasksView(bench).progress.implemented).toEqual({ done: 1, total: 1 })
+  })
+
+  it('rejects a checklist with duplicate content', async () => {
+    const { bench, ref } = await benchWithTask()
+    expect(() => {
+      bench.ctx.delivery.recordTasks(bench.agent, ref, 'add-thing', [
+        { content: 'same', phase: 'implemented', done: false },
+        { content: 'same', phase: 'implemented', done: true },
+      ])
+    }).toThrow(/unique/)
+  })
+
+  it('rejects an item whose phase is not a lifecycle phase', async () => {
+    const { bench, ref } = await benchWithTask()
+    expect(() => {
+      bench.ctx.delivery.recordTasks(
+        bench.agent,
+        ref,
+        'add-thing',
+        [{ content: 'x', phase: 'nonsense', done: false }] as unknown as DeliveryTaskItem[],
+      )
+    }).toThrow(/phase/)
   })
 })

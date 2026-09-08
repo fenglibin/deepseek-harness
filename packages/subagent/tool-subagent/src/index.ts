@@ -15,6 +15,8 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import { isRateLimited } from '@deepseek-ai/dsh-llm-retry'
+import type { Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import {
   assertSubagentMaxDepth,
@@ -304,6 +306,37 @@ function resolveDelegationRun(
   }
 }
 
+/** Minimal live-agent lookup used to inspect a child's direct parent session. */
+export interface ParentSessionLookup {
+  get(id: SessionId): { session: Session } | undefined
+}
+
+/**
+ * Report whether delegating from `session` must close because the session — or
+ * its live direct parent subagent session — has already observed a provider
+ * rate limit. A throttle is account-wide, so a child widening its throttled
+ * parent's burst would repeat the failure. Only the direct live parent is
+ * inspected: an offline parent cannot be read, and deeper ancestry is already
+ * the in-flight concurrency this gate stops growing.
+ * @param ctx - context carrying the rate-limit projection registry.
+ * @param session - session of the agent that would delegate.
+ * @param agents - live-agent registry resolving the direct parent session.
+ * @returns true once this session or its live direct parent is rate-limited.
+ */
+export function rateLimitedDelegation(
+  ctx: Context,
+  session: Session,
+  agents: ParentSessionLookup | undefined,
+): boolean {
+  if (isRateLimited(ctx, session)) return true
+  if (agents === undefined) return false
+  const parentId = session.header.origin === 'subagent' ? session.header.parentSession : undefined
+  if (parentId === undefined) return false
+  const parent = agents.get(parentId)
+  if (parent === undefined) return false
+  return isRateLimited(ctx, parent.session)
+}
+
 export function apply(ctx: Context, config: Config): void {
   // Direct apply() bypasses Schemastery's numeric constraints. A direct-apply
   // omission stays capless (the schema default only runs through the loader).
@@ -467,6 +500,14 @@ export function apply(ctx: Context, config: Config): void {
           if (!parent) {
             // Non-agent callers provide no parent for delegation ownership.
             throw new Error('subagent tool requires a calling agent (exec.agent was undefined)')
+          }
+          // A child is a second concurrent request stream against a route the
+          // provider already throttled: every later delegation in this session
+          // — or from a child of an already-throttled session — stays in the
+          // parent instead of widening the burst.
+          if (rateLimitedDelegation(ctx, parent.session, ctx.get('agents'))) {
+            throw new Error('subagent delegation is closed for the rest of this session: a model request already hit '
+              + 'a provider rate limit (HTTP 429). Do this work in the main conversation instead of delegating it.')
           }
 
           const modelRequest = args as DelegationModelRequest

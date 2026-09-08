@@ -2829,6 +2829,16 @@ export interface Config {
   requireOpenspecForBugs?: boolean
   /** Post-execution commands run before a task may reach accepted. */
   postHooks?: string[]
+  /** Auto-create a task at pre-step when a direct human request meets the size proxy. */
+  autoDetect?: boolean
+  /** Patterns whose first hit classifies a request as `l2`. */
+  strongSignals?: string[]
+  /** Patterns whose second hit classifies as `l2` and whose first hit classifies as `l1`. */
+  mediumSignals?: string[]
+  /** Patterns whose second hit classifies as `l1`. */
+  weakSignals?: string[]
+  /** How many review rounds a blocked gate allows before it hard-blocks. */
+  maxReviewRounds?: number
 }
 
 /** Size proxy that auto-tiers a task to `l1` when the model omits one. */

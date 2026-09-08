@@ -17,6 +17,7 @@ describe('provider retry policy', () => {
       initialDelayMs: 500,
       maxDelayMs: 10_000,
       jitterRatio: 0.1,
+      rateLimitDelayMs: 30_000,
     })
     expect(Object.isFrozen(policy)).toBe(true)
     if (policy.mode !== 'normal') throw new Error('expected normal policy')
@@ -46,7 +47,17 @@ describe('provider retry policy', () => {
       initialDelayMs: 25,
       maxDelayMs: 100,
       jitterRatio: 0,
+      rateLimitDelayMs: 30_000,
     })
+  })
+
+  it('resolves a configured rate-limit wait', () => {
+    const policy = resolveRetryPolicy({
+      mode: 'normal',
+      backoff: { rateLimitDelayMs: 45_000 },
+    }, 'provider.retryPolicy')
+
+    expect(policy.rateLimitDelayMs).toBe(45_000)
   })
 
   it('resolves always mode with default backoff', () => {
@@ -55,6 +66,7 @@ describe('provider retry policy', () => {
       initialDelayMs: 500,
       maxDelayMs: 10_000,
       jitterRatio: 0.1,
+      rateLimitDelayMs: 30_000,
     })
     expect(RetryPolicySchema).toBeDefined()
   })
@@ -71,6 +83,7 @@ describe('provider retry policy', () => {
       initialDelayMs: 500,
       maxDelayMs: 10_000,
       jitterRatio: 0.1,
+      rateLimitDelayMs: 30_000,
     })
   })
 
@@ -84,6 +97,10 @@ describe('provider retry policy', () => {
     [{ mode: 'always', backoff: { maxDelayMs: MAX_TIMER_DELAY_MS + 1 } }, /maxDelayMs/],
     [{ mode: 'normal', backoff: { initialDelayMs: 20, maxDelayMs: 10 } }, /less than or equal/],
     [{ mode: 'always', backoff: { jitterRatio: 1.1 } }, /jitterRatio/],
+    [{ mode: 'always', backoff: { rateLimitDelayMs: 0 } }, /rateLimitDelayMs/],
+    [{ mode: 'always', backoff: { rateLimitDelayMs: Number.NaN } }, /rateLimitDelayMs/],
+    [{ mode: 'always', backoff: { rateLimitDelayMs: MAX_TIMER_DELAY_MS + 1 } }, /rateLimitDelayMs/],
+    [{ mode: 'always', backoff: { rateLimitDelay: 1 } }, /unknown key "rateLimitDelay"/],
     [{ mode: 'normal', retryableCodes: [] }, /must not be empty/],
     [{ mode: 'normal', retryableCodes: ['SERVER', 'SERVER'] }, /duplicates/],
     [{ mode: 'normal', retryableCodes: [''] }, /non-empty strings/],

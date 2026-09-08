@@ -46,19 +46,26 @@ kind: "package-reference"
 | `enabled` | `true` | 是否注册工具 |
 | `enforcement` | `stateful` | `stateful` 阻止、`advisory` 提醒、`off` 不注册 |
 | `designThreshold.todoCount` | `5` | 预估 todo 数达到或超过该值时自动分级为 `l1` |
-| `designThreshold.descriptionChars` | `300` | 目标长度达到或超过该值时自动分级为 `l1` |
+| `designThreshold.descriptionChars` | `60` | 目标长度达到或超过该值时自动分级为 `l1` |
 | `designThreshold.touchedFiles` | `3` | 预估改动文件数达到或超过该值时自动分级为 `l1` |
 | `openspecThreshold.todoCount` | `15` | 预估 todo 数达到或超过该值时自动分级为 `l2` |
-| `openspecThreshold.descriptionChars` | `1200` | 目标长度达到或超过该值时自动分级为 `l2` |
+| `openspecThreshold.descriptionChars` | `200` | 目标长度超过该值时直接分级为 `l2`，不再扫描信号 |
 | `requireOpenspecForBugs` | `true` | 非小微 bug 修复（超过 design 阈值）强制 `l2` |
 | `postHooks` | `[]` | 任务到达 accepted 之前按序执行的后置命令 |
+| `strongSignals` | 内置词表 | 命中任一即分级为 `l2` 的模式（关键词或路径片段） |
+| `mediumSignals` | 内置词表 | 命中两个分级为 `l2`、命中一个分级为 `l1` 的模式 |
+| `weakSignals` | 内置词表 | 命中两个分级为 `l1` 的模式 |
+| `maxReviewRounds` | `2` | 门禁差异允许的模型复核轮次，超过即硬阻断 |
+
+阈值与信号清单同时注册为设置服务的 `delivery` namespace：组合配置作为 `base` 层，用户覆盖优先且实时生效；未挂载设置服务时回退到组合配置，行为不变。
 
 ### 每次调用的作用
 
-- `create_delivery_task` 以目标和可选 `level`（`l0`/`l1`/`l2`）在 `created` 阶段启动一个任务；省略 `level` 时，根据目标长度以及可选的 `todo_count`、`touched_files` 预估值推断，bug（`is_bug`）可能强制 `l2`。
+- `create_delivery_task` 以目标和可选 `level`（`l0`/`l1`/`l2`）在 `created` 阶段启动一个任务；省略 `level` 时按三层判定推断：目标长度超过 `openspecThreshold.descriptionChars` 直接为 `l2`，否则扫描强/中/弱信号——命中任一强信号为 `l2`，命中一个中等信号或两个弱信号为 `l1`，都不命中为 `l0`；bug（`is_bug`）可能强制 `l2`。
 - `record_change` 针对精确的 `{ task_id, revision }` 记录一条变更（`text`），递增变更数，并把记录追加到 `.dsh/changes/<task-id>.md`。
 - `record_design` 针对精确的 `{ task_id, revision }` 记录一条设计（`text`），递增设计数，并把记录追加到 `.dsh/design/<task-id>.md`。
-- `record_spec` 针对精确的 `{ task_id, revision }` 记录一条 spec（`text`），递增 spec 数，并把记录追加到 `openspec/changes/<task-id>/spec.md`。
+- `record_spec` 针对精确的 `{ task_id, revision }` 记录一份 OpenSpec 变更产物（`text`），递增 spec 数，并覆盖写入 `openspec/changes/<change_id>/` 下的 `proposal.md`、`design.md`、`tasks.md` 或 `specs/<capability>/spec.md`（由 `kind` 决定）；`change_id` 必须是动词开头的 kebab-case。四件套以覆盖方式写入，因为 OpenSpec 会结构化解析 `tasks.md` 与增量 spec。
+- `record_tasks` 针对精确的 `{ task_id, revision }` 记录完整的实施清单（`items`），整体替换此前记录过的清单；每项为 `{ content, phase, done }`。该清单驱动分阶段进度展示，并在推进 `implemented` 前与 `openspec/changes/<change_id>/tasks.md` 交叉核对。
 - `advance_delivery_task` 把任务推进到其分级唯一合法的下一阶段；跳步会被拒绝。
 - `get_delivery_task` 读取当前任务，包含其精确的 id/revision。
 
@@ -114,7 +121,7 @@ kind: "package-reference"
 
 这些限制定义了这些工具何时不适用。它们是当前的包约束，不是任务待办。
 
-- **记录以 durable 事件 + `.dsh/`/`openspec/` 文件持久化** — 每条记录追加到 `.dsh/changes/<task-id>.md`、`.dsh/design/<task-id>.md` 或 `openspec/changes/<task-id>/spec.md`；完整的 openspec change 布局（proposal/design/tasks/specs）与 `openspec validate` CLI 是后续批次的工作。
+- **记录以 durable 事件 + `.dsh/`/`openspec/` 文件持久化** — `record_change` 与 `record_design` 追加到 `.dsh/changes/<task-id>.md` 与 `.dsh/design/<task-id>.md`；`record_spec` 覆盖写入 `openspec/changes/<change_id>/` 下的四件套；`record_tasks` 把实施清单写入 durable `delivery/tasks` 事件，后者整体替换前一份清单。
 - **门禁是逐次 advance 而非持续监控** — 在门禁策略变更之前创建的任务，只在其下一次 `advance` 时被重新检查。
 - **仅单一 owner 作用域** — 任务属于一个 agent 会话；子代理与共享作用域不在范围内。
 

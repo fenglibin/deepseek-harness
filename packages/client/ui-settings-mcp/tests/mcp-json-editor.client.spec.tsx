@@ -71,4 +71,24 @@ describe('McpJsonEditor', () => {
     const highlight = screen.getByTestId('mcp-json-highlight')
     expect(highlight.textContent).toBe('{"mcpServers":{"a":{}}}')
   })
+
+  it('uses the default title when none is provided', () => {
+    renderEditor()
+    expect(screen.getByRole('heading', { name: '编辑 mcp.json' })).toBeTruthy()
+  })
+
+  it('renders a custom title when one is provided', () => {
+    render(
+      <McpJsonEditor
+        text="{}"
+        opening={false}
+        error={null}
+        onSave={() => {}}
+        onClose={() => {}}
+        title="增加 MCP 服务器"
+        t={t}
+      />,
+    )
+    expect(screen.getByRole('heading', { name: '增加 MCP 服务器' })).toBeTruthy()
+  })
 })

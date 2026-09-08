@@ -18,6 +18,8 @@ import {
   nextDeliveryPhase,
 } from './fold.ts'
 import type { DeliveryFoldState } from './fold.ts'
+import { decodeDeliveryTasks, deliveryTasksProjectionDefinition } from './tasks-fold.ts'
+import type { DeliveryTaskItem, DeliveryTasksChangeMeta, DeliveryTasksView } from './types.ts'
 import {
   DELIVERY_CHANGE_VERSION,
   DeliveryError,
@@ -46,6 +48,11 @@ export type * from './types.ts'
 export type * from './domain.ts'
 export { DELIVERY_CHANGE_VERSION, DeliveryError, DeliveryTaskId } from './runtime.ts'
 export { decodeDeliveryChange, foldDelivery, nextDeliveryPhase } from './fold.ts'
+export {
+  decodeDeliveryTasks,
+  deliveryTasksProjectionDefinition,
+  tasksProgress,
+} from './tasks-fold.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -191,6 +198,7 @@ export class DeliveryService extends Service {
   constructor(ctx: Context) {
     super(ctx, 'delivery')
     ctx.sessionProjections.register(deliveryProjectionDefinition)
+    ctx.sessionProjections.register(deliveryTasksProjectionDefinition)
   }
 
   /**
@@ -339,6 +347,62 @@ export class DeliveryService extends Service {
     }
     this.commit(agent, change)
     return this.view(this.state(agent.session)) as DeliveryView
+  }
+
+  /**
+   * Record the implementation checklist for the current task, replacing any
+   * earlier list. The write is checked with the decoder the replay uses, so a
+   * checklist that could not be replayed is rejected at the write instead.
+   * @param agent - owning live agent.
+   * @param ref - expected current revision.
+   * @param changeId - OpenSpec change id carrying the checklist.
+   * @param items - complete checklist; a later write replaces an earlier one.
+   * @throws {@link DeliveryError} when no task is current, the ref is stale, or
+   * the checklist is empty, malformed, or repeats one item's content.
+   */
+  recordTasks(agent: Agent, ref: DeliveryTaskRef, changeId: string, items: readonly DeliveryTaskItem[]): void {
+    this.expectCurrent(agent, ref)
+    // Tool input arrives across the model boundary, so shapes are narrowed
+    // before the strict decoder judges them rather than trusted here.
+    const raw: readonly unknown[] = Array.isArray(items) ? items : []
+    const candidates: DeliveryTasksChangeMeta = {
+      kind: 'delivery/tasks',
+      version: 1,
+      ref,
+      changeId: typeof changeId === 'string' ? changeId.trim() : '',
+      items: raw.map((item) => {
+        const record = (item ?? {}) as Record<string, unknown>
+        return {
+          content: typeof record['content'] === 'string' ? record['content'].trim() : '',
+          phase: record['phase'],
+          done: record['done'] === true,
+        }
+      }) as unknown as DeliveryTaskItem[],
+      updatedAt: Date.now(),
+    }
+    try {
+      decodeDeliveryTasks(candidates)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      throw new DeliveryError(message, 'DELIVERY_INVALID_TASKS')
+    }
+    agent.session.append('delivery/tasks', candidates)
+  }
+
+  /**
+   * Read the checklist recorded for the agent's session, if any.
+   * @param agent - owning live agent.
+   * @returns the latest checklist view, or `undefined` before the first write.
+   * @throws {@link DeliveryError} when the agent is not the registry's live
+   * instance, or when the checklist projection retained a replay failure.
+   */
+  getTasks(agent: Agent): DeliveryTasksView | undefined {
+    this.assertLive(agent)
+    const state = this.ctx.sessionProjections.stateOf(agent.session, 'delivery-tasks')
+    /* v8 ignore next -- the service registers its own projection before any state read */
+    if (state === undefined) throw new Error('delivery-tasks projection is not registered')
+    if (state.failure !== null) throw new Error(state.failure)
+    return state.current ?? undefined
   }
 
   /**

@@ -77,10 +77,19 @@
 
 .step {
   flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
   padding: 1px 6px;
   border-radius: 10px;
   font-size: 11px;
   line-height: 1.5;
+}
+
+.stepCounts {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .step[data-state='done'] {

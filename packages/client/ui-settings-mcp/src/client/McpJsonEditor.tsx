@@ -101,6 +101,8 @@ export interface McpJsonEditorProps {
   onSave: (text: string) => void
   /** Close the editor without saving. */
   onClose: () => void
+  /** Dialog title; defaults to the whole-document title. */
+  title?: string
   /** Section copy. */
   t: (key: McpKey) => string
 }
@@ -111,7 +113,7 @@ export interface McpJsonEditorProps {
  * @returns the editor dialog.
  */
 export function McpJsonEditor(props: McpJsonEditorProps): ReactNode {
-  const { text, opening, error, onSave, onClose, t } = props
+  const { text, opening, error, onSave, onClose, title, t } = props
   const [draft, setDraft] = useState(text)
   const [invalid, setInvalid] = useState<string | undefined>(undefined)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
@@ -164,7 +166,7 @@ export function McpJsonEditor(props: McpJsonEditorProps): ReactNode {
     <Modal
       open
       onClose={onClose}
-      title={t('editorTitle')}
+      title={title ?? t('editorTitle')}
       closeLabel={t('close')}
       className={styles['dialog'] as string}
       footer={(

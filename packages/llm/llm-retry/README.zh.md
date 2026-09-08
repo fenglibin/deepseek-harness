@@ -41,11 +41,14 @@ kind: "package-reference"
         initialDelayMs: 1000
         maxDelayMs: 30000
         jitterRatio: 0.2
+        rateLimitDelayMs: 30000
 
 - name: '@deepseek-ai/dsh-llm-retry'
 ```
 
 省略 `retryPolicy` 时使用 normal mode：对 `EMPTY_RESPONSE`、`RATE_LIMIT`、`SERVER`、`TIMEOUT` 与 `TRANSPORT` 最多重试五次，退避从 500 毫秒到 10 秒、带 10% 抖动。normal mode 可以更改其有界预算、合格 code 与退避；always mode 先询问下游恢复，然后无尝试上限地重试每个模型请求失败，只在成功、取消或插件释放时停止。
+
+速率限制（`RATE_LIMIT`）失败不套用指数退避：它改等 `backoff.rateLimitDelayMs`（默认 30 秒）——一个限流意味着一个配额窗口，更短的延迟只会把下一次尝试投进刚被拒绝的窗口；比该等待更长的提供方 `Retry-After` 仍然生效，且两者都不受 `maxDelayMs` 封顶。发生速率限制后，本插件还会给 Session 打上持久闩锁，供委派类消费方（如 `dsh-tool-subagent`）据此停止在该 Session 内再开启子 agent。
 
 ### 你可以观察到什么
 

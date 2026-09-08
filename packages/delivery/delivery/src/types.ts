@@ -90,6 +90,7 @@ export interface DeliveryProjectionState {
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
     delivery: DeliveryProjectionState
+    'delivery-tasks': DeliveryTasksState
   }
   interface SessionProjectionMap {
     /**
@@ -97,6 +98,11 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
      * and after the task is accepted and replaced.
      */
     delivery: DeliveryProjection | null
+    /**
+     * The implementation checklist recorded for the current task, or `null`
+     * before the first write.
+     */
+    'delivery-tasks': DeliveryTasksView | null
   }
 }
 
@@ -175,6 +181,55 @@ export type DeliveryChangeMeta =
   | DeliveryRecordSpecMeta
   | DeliveryClearChangeMeta
 
+/** One item of a change's implementation checklist. */
+export interface DeliveryTaskItem {
+  /** Text identifying the item; unique within one checklist. */
+  readonly content: string
+  /** Lifecycle phase the item is carried out in. */
+  readonly phase: DeliveryPhase
+  /** Whether the item is complete. */
+  readonly done: boolean
+}
+
+/** Completed and total counts for one lifecycle phase. */
+export interface DeliveryPhaseProgress {
+  /** Completed items in this phase. */
+  readonly done: number
+  /** Items in this phase, complete or not. */
+  readonly total: number
+}
+
+/** Durable checklist write; a later write replaces any earlier list. */
+export interface DeliveryTasksChangeMeta {
+  readonly kind: 'delivery/tasks'
+  readonly version: 1
+  /** Task the checklist belongs to. */
+  readonly ref: DeliveryTaskRef
+  /** OpenSpec change id the checklist was recorded for. */
+  readonly changeId: string
+  /** Complete checklist; later writes replace earlier ones. */
+  readonly items: readonly DeliveryTaskItem[]
+  readonly updatedAt: number
+}
+
+/** Client value of the `delivery-tasks` projection. */
+export interface DeliveryTasksView {
+  /** OpenSpec change id carrying this checklist. */
+  readonly changeId: string
+  /** The recorded checklist. */
+  readonly items: readonly DeliveryTaskItem[]
+  /** Per-phase counts derived from the checklist. */
+  readonly progress: Readonly<Record<DeliveryPhase, DeliveryPhaseProgress>>
+}
+
+/** Host state of the `delivery-tasks` projection. */
+export interface DeliveryTasksState {
+  /** Latest checklist, or null before the first write. */
+  readonly current: DeliveryTasksView | null
+  /** First strict replay failure, or null while the durable stream is valid. */
+  readonly failure: string | null
+}
+
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
     /**
@@ -182,6 +237,8 @@ declare module '@deepseek-ai/dsh-session/types' {
      * clear tombstone.
      */
     'delivery/change': DeliveryChangeMeta
+    /** Full implementation checklist written for the current task. */
+    'delivery/tasks': DeliveryTasksChangeMeta
   }
 }
 
@@ -209,4 +266,5 @@ export type DeliveryErrorCode =
   | 'DELIVERY_INVALID_CHANGE_TEXT'
   | 'DELIVERY_INVALID_DESIGN_TEXT'
   | 'DELIVERY_INVALID_SPEC_TEXT'
+  | 'DELIVERY_INVALID_TASKS'
   | 'DELIVERY_INVALID_TRANSITION'
