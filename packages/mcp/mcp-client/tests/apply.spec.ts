@@ -143,6 +143,23 @@ describe('mcp-client plugin module exports', () => {
     expect(partial.reconnect).toEqual({ enabled: true, initialDelayMs: 100, maxDelayMs: 30_000, maxAttempts: 10 })
   })
 
+  it('Config schema leaves allowedTools absent unless configured', () => {
+    const omitted = ConfigSchema({
+      transport: 'stdio',
+      serverName: 'srv',
+      command: 'echo',
+    } as never)
+    expect(omitted.allowedTools).toBeUndefined()
+
+    const configured = ConfigSchema({
+      transport: 'stdio',
+      serverName: 'srv',
+      command: 'echo',
+      allowedTools: ['search', 'read_file'],
+    } as never)
+    expect(configured.allowedTools).toEqual(['search', 'read_file'])
+  })
+
   it('Config schema rejects an invalid reconnect block', () => {
     // schemastery unions wrap branch errors, so assert the throw only.
     expect(() => ConfigSchema({
@@ -327,6 +344,58 @@ describe('apply (plugin lifecycle)', () => {
     expect(mockListTools).toHaveBeenCalledTimes(2)
     expect(ctx.tools.get('mcp__srv__remote')?.description).toBe('Foreign squatter')
     await ctx.fiber.dispose()
+  })
+
+  it('registers only the allowlisted tools from the server list', async () => {
+    mockListTools.mockResolvedValue({
+      tools: [
+        { name: 'search', description: 'Search', inputSchema: { type: 'object' } },
+        { name: 'index', description: 'Index', inputSchema: { type: 'object' } },
+      ],
+      nextCursor: undefined,
+    })
+
+    await apply(ctx, { ...stdioConfig, allowedTools: ['search'] })
+
+    expect(ctx.tools.get('mcp__srv__search')).toBeDefined()
+    expect(ctx.tools.get('mcp__srv__index')).toBeUndefined()
+  })
+
+  it('keeps applying the allowlist across a tool-list-changed re-sync', async () => {
+    mockListTools.mockResolvedValue({
+      tools: [
+        { name: 'search', description: 'Search', inputSchema: { type: 'object' } },
+        { name: 'index', description: 'Index', inputSchema: { type: 'object' } },
+      ],
+      nextCursor: undefined,
+    })
+    await apply(ctx, { ...stdioConfig, allowedTools: ['search'] })
+    expect(ctx.tools.get('mcp__srv__search')).toBeDefined()
+
+    mockListTools.mockResolvedValue({
+      tools: [
+        { name: 'search', description: 'Search', inputSchema: { type: 'object' } },
+        { name: 'reindex', description: 'Reindex', inputSchema: { type: 'object' } },
+      ],
+      nextCursor: undefined,
+    })
+    const handler = mockSetNotificationHandler.mock.calls[0]![1] as () => Promise<void>
+    await handler()
+
+    expect(ctx.tools.get('mcp__srv__search')).toBeDefined()
+    expect(ctx.tools.get('mcp__srv__reindex')).toBeUndefined()
+  })
+
+  it('rejects an empty allowedTools at load before any effect registers', async () => {
+    await expect(apply(ctx, { ...stdioConfig, allowedTools: [] })).rejects.toThrow(/allowedTools is empty/)
+
+    expect(mockConnect).not.toHaveBeenCalled()
+    expect(ctx.tools.get('mcp__srv__remote')).toBeUndefined()
+  })
+
+  it('rejects a repeated allowedTools entry at load', async () => {
+    await expect(apply(ctx, { ...stdioConfig, allowedTools: ['search', 'search'] }))
+      .rejects.toThrow(/allowedTools lists "search" more than once/)
   })
 
   it('re-syncs tools on ToolListChanged notification', async () => {

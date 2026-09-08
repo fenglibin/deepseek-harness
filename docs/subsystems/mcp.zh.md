@@ -4,7 +4,7 @@
 
 ## 服务器列表
 
-`mcp` settings 命名空间持有一个 `servers` 数组，并以 `applies: 'live'` 注册，因此一次编辑会在运行中的进程里生效。每个 `McpServerEntry` 要么是 stdio 服务器（`command`、`args`、`env`、`cwd`），要么是 Streamable HTTP 服务器（`url`、`headers`），由 `transport` 判别；每个条目还带有稳定的 `serverName`——它为工具划出命名空间——以及决定 manager 是否挂载它的 `enabled` 标志。`serverName` 必须匹配 `[A-Za-z0-9_-]{1,32}` 且在列表内唯一——这一约束 schema 自身无法表达，因此命名空间的 validate 钩子会在任何东西持久化之前拒绝重名的分节。
+`mcp` settings 命名空间持有一个 `servers` 数组，并以 `applies: 'live'` 注册，因此一次编辑会在运行中的进程里生效。每个 `McpServerEntry` 要么是 stdio 服务器（`command`、`args`、`env`、`cwd`），要么是 Streamable HTTP 服务器（`url`、`headers`），由 `transport` 判别；每个条目还带有稳定的 `serverName`——它为工具划出命名空间——决定 manager 是否挂载它的 `enabled` 标志，以及可选的 `allowedTools`——一份只桥接这些原始工具名的白名单。`serverName` 必须匹配 `[A-Za-z0-9_-]{1,32}` 且在列表内唯一——这一约束 schema 自身无法表达，因此命名空间的 validate 钩子会在任何东西持久化之前拒绝重名的分节。
 
 ## 协调过程
 

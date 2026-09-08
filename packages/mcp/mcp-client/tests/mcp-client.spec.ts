@@ -11,7 +11,7 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import type { PostToolDecision } from '@deepseek-ai/dsh-tools'
-import { publicToolName, syncTools, type ToolBridgeOptions } from '@deepseek-ai/dsh-mcp-client/src/tools.ts'
+import { publicToolName, resolveAllowedTools, syncTools, type ToolBridgeOptions } from '@deepseek-ai/dsh-mcp-client/src/tools.ts'
 import { createTransport } from '@deepseek-ai/dsh-mcp-client/src/transport.ts'
 import type { Config } from '@deepseek-ai/dsh-mcp-client'
 
@@ -181,6 +181,30 @@ describe('publicToolName', () => {
   })
 })
 
+describe('resolveAllowedTools', () => {
+  it('admits every listed tool when the allowlist is omitted', () => {
+    expect(resolveAllowedTools(undefined, 'path')).toBeUndefined()
+  })
+
+  it('compiles one entry per configured raw name', () => {
+    const resolved = resolveAllowedTools(['search', 'read_file'], 'path')
+    expect([...(resolved ?? [])]).toEqual(['search', 'read_file'])
+  })
+
+  it('refuses an empty allowlist', () => {
+    expect(() => resolveAllowedTools([], 'mcp-client(srv): allowedTools')).toThrow(/is empty/)
+  })
+
+  it('refuses blank and repeated entries', () => {
+    expect(() => resolveAllowedTools(['search', ''], 'path')).toThrow(/non-empty tool names/)
+    expect(() => resolveAllowedTools(['search', 'search'], 'path')).toThrow(/lists "search" more than once/)
+  })
+
+  it('refuses a non-array value from programmatic construction', () => {
+    expect(() => resolveAllowedTools('search' as never, 'path')).toThrow(/must be an array/)
+  })
+})
+
 describe('syncTools', () => {
   let ctx: Context
 
@@ -307,6 +331,118 @@ describe('syncTools', () => {
     expect(disposers.size).toBe(2)
     expect(ctx.tools.get('mcp__srv__page1')).toBeDefined()
     expect(ctx.tools.get('mcp__srv__page2')).toBeDefined()
+  })
+
+  it('registers only the allowlisted raw tools', async () => {
+    const client = createMockClient([
+      { name: 'greet', description: 'Say hello', inputSchema: { type: 'object' } },
+      { name: 'add', description: 'Add numbers', inputSchema: { type: 'object' } },
+    ])
+    const opts: ToolBridgeOptions = { ...defaultOpts, allowedTools: new Set(['add']) }
+
+    const disposers = await syncTools(client as never, ctx, opts, new Map())
+
+    expect(disposers.size).toBe(1)
+    expect(ctx.tools.get('mcp__srv__add')).toBeDefined()
+    expect(ctx.tools.get('mcp__srv__greet')).toBeUndefined()
+  })
+
+  it('applies the allowlist across paginated pages', async () => {
+    const client = createMockClient([])
+    client.listTools
+      .mockResolvedValueOnce({ tools: [{ name: 'page1', inputSchema: { type: 'object' } }], nextCursor: 'cursor1' })
+      .mockResolvedValueOnce({ tools: [{ name: 'page2', inputSchema: { type: 'object' } }], nextCursor: undefined })
+
+    const disposers = await syncTools(
+      client as never, ctx, { ...defaultOpts, allowedTools: new Set(['page2']) }, new Map(),
+    )
+
+    expect(disposers.size).toBe(1)
+    expect(ctx.tools.get('mcp__srv__page1')).toBeUndefined()
+    expect(ctx.tools.get('mcp__srv__page2')).toBeDefined()
+  })
+
+  it('drops the whole generation when the allowlist matches no listed tool', async () => {
+    const client = createMockClient([{ name: 'listed', inputSchema: { type: 'object' } }])
+
+    const disposers = await syncTools(
+      client as never, ctx, { ...defaultOpts, allowedTools: new Set(['absent']) }, new Map(),
+    )
+
+    expect(disposers.size).toBe(0)
+    expect(ctx.tools.get('mcp__srv__listed')).toBeUndefined()
+  })
+
+  it('unregisters a tool the allowlist drops on re-sync', async () => {
+    const client = createMockClient([
+      { name: 'keep', inputSchema: { type: 'object' } },
+      { name: 'drop', inputSchema: { type: 'object' } },
+    ])
+    const first = await syncTools(client as never, ctx, defaultOpts, new Map())
+    expect(ctx.tools.get('mcp__srv__drop')).toBeDefined()
+
+    const second = await syncTools(
+      client as never, ctx, { ...defaultOpts, allowedTools: new Set(['keep']) }, first,
+    )
+
+    expect(second.size).toBe(1)
+    expect(ctx.tools.get('mcp__srv__keep')).toBeDefined()
+    expect(ctx.tools.get('mcp__srv__drop')).toBeUndefined()
+  })
+
+  it('leaves a masked tool uncallable, not merely hidden', async () => {
+    const client = createMockClient([
+      { name: 'listed', inputSchema: { type: 'object' } },
+      { name: 'masked', inputSchema: { type: 'object' } },
+    ])
+    await syncTools(client as never, ctx, { ...defaultOpts, allowedTools: new Set(['listed']) }, new Map())
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal, callId: ToolCallId('c1'), name: 'mcp__srv__masked', arguments: {},
+    })
+
+    expect(result.isError).toBe(true)
+    expect(result.error?.info).toMatchObject({ code: 'UNKNOWN_TOOL' })
+  })
+
+  it('warns when the allowlist names tools the server did not list', async () => {
+    const warns: string[] = []
+    ctx.logger.warn = ((message: unknown) => { warns.push(String(message)) }) as typeof ctx.logger.warn
+    const client = createMockClient([{ name: 'listed', inputSchema: { type: 'object' } }])
+
+    await syncTools(
+      client as never, ctx, { ...defaultOpts, allowedTools: new Set(['listed', 'gone']) }, new Map(),
+    )
+
+    expect(warns).toHaveLength(1)
+    expect(warns[0]).toContain('"gone"')
+    expect(warns[0]).not.toContain('"listed"')
+  })
+
+  it('warns once per sync, not once per page', async () => {
+    const warns: string[] = []
+    ctx.logger.warn = ((message: unknown) => { warns.push(String(message)) }) as typeof ctx.logger.warn
+    const client = createMockClient([])
+    client.listTools
+      .mockResolvedValueOnce({ tools: [{ name: 'page1', inputSchema: { type: 'object' } }], nextCursor: 'c1' })
+      .mockResolvedValueOnce({ tools: [{ name: 'page2', inputSchema: { type: 'object' } }], nextCursor: undefined })
+
+    await syncTools(
+      client as never, ctx, { ...defaultOpts, allowedTools: new Set(['page1', 'gone']) }, new Map(),
+    )
+
+    expect(warns).toHaveLength(1)
+    expect(warns[0]).toContain('"gone"')
+  })
+
+  it('logs no allowlist warning when the mask is omitted', async () => {
+    const warns: string[] = []
+    ctx.logger.warn = ((message: unknown) => { warns.push(String(message)) }) as typeof ctx.logger.warn
+    const client = createMockClient([{ name: 'listed', inputSchema: { type: 'object' } }])
+
+    await syncTools(client as never, ctx, defaultOpts, new Map())
+
+    expect(warns).toEqual([])
   })
 
   it('owns output validation independently of the SDK per-page cache', async () => {

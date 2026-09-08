@@ -20,6 +20,8 @@ export interface McpStdioServer {
   env: Record<string, string>
   /** Working directory for the child process. */
   cwd: string
+  /** Raw MCP tool names admitted to registration; omission registers every tool the server lists. */
+  allowedTools?: string[]
 }
 
 /** One Streamable HTTP MCP server. */
@@ -34,6 +36,8 @@ export interface McpHttpServer {
   url: string
   /** Additional headers attached to MCP requests. */
   headers: Record<string, string>
+  /** Raw MCP tool names admitted to registration; omission registers every tool the server lists. */
+  allowedTools?: string[]
 }
 
 /** One user-managed MCP server, either stdio or Streamable HTTP. */
@@ -59,6 +63,8 @@ export interface McpJsonServer {
   cwd?: string
   url?: string
   headers?: Record<string, string>
+  /** dsh extension: raw tool names admitted from this server; omission admits every tool. */
+  allowedTools?: string[]
   transportType?: string
   timeout?: number
   disabled?: boolean

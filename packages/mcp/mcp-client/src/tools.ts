@@ -32,6 +32,8 @@ export interface ToolBridgeOptions {
   registrationFailure: 'contain' | 'throw'
   serverName: string
   toolCallTimeoutMs: number
+  /** Raw MCP tool names admitted to registration; omission admits every listed tool. */
+  allowedTools?: ReadonlySet<string>
 }
 
 /** State for one sync generation: the current set of disposers keyed by public name. */
@@ -118,6 +120,61 @@ export function publicToolName(serverName: string, rawName: string): string {
 }
 
 /**
+ * Compile the configured raw-tool allowlist into the set the bridge filters on.
+ *
+ * The one explicit resolve step from raw config to the filter the bridge runs.
+ * Programmatic construction may bypass Schemastery normalization, so every
+ * bound is re-judged here and misconfiguration fails this instance at load.
+ * An omitted allowlist admits every tool the server lists; an empty one is a
+ * materialized-empty config rather than a request for zero tools, so it is
+ * refused — a deployment that wants no tools mounts no server.
+ *
+ * @param allowed - Raw `allowedTools` config, entries being MCP wire tool names.
+ * @param path - Diagnostic prefix naming the config location in thrown messages.
+ * @returns The allowlist, or `undefined` to admit every tool the server lists.
+ * @throws Error when the value is not an array, is empty, or holds a blank or repeated name.
+ */
+export function resolveAllowedTools(
+  allowed: readonly string[] | undefined,
+  path: string,
+): ReadonlySet<string> | undefined {
+  if (allowed === undefined) return undefined
+  if (!Array.isArray(allowed)) throw new Error(`${path} must be an array of MCP tool names`)
+  if (allowed.length === 0) {
+    throw new Error(`${path} is empty — omit it to admit every tool the server lists, or name at least one tool`)
+  }
+  const resolved = new Set<string>()
+  for (const name of allowed) {
+    if (typeof name !== 'string' || name.length === 0) throw new Error(`${path} entries must be non-empty tool names`)
+    if (resolved.has(name)) throw new Error(`${path} lists "${name}" more than once`)
+    resolved.add(name)
+  }
+  return resolved
+}
+
+/**
+ * Log allowlist entries the fetched tool list did not contain. A missing name
+ * is a stale or misspelled entry, so the generation still registers whatever
+ * the server did list and the discrepancy is reported instead of dropped.
+ *
+ * @param ctx - Cordis context whose logger records the discrepancy.
+ * @param opts - Bridge options carrying the mask and the server namespace.
+ * @param listed - Every raw tool name the server advertised in this fetch.
+ */
+function reportUnlistedAllowlist(ctx: Context, opts: ToolBridgeOptions, listed: ReadonlySet<string>): void {
+  if (opts.allowedTools === undefined) return
+  const missing = [...opts.allowedTools].filter(name => !listed.has(name))
+  if (missing.length === 0) return
+  const quoted = missing.map(name => `"${name}"`).join(', ')
+  // Naming the public `mcp__<serverName>__` form is the likeliest cause of an
+  // unmatched entry, so the diagnostic says which names the mask compares.
+  ctx.logger.warn(
+    `mcp-client(${opts.serverName}): allowedTools names ${missing.length} tool(s) the server did not list: ${quoted}`
+    + ` — entries are raw MCP tool names, not "mcp__${opts.serverName}__…" public names`,
+  )
+}
+
+/**
  * Sync the MCP server's tool list into the harness ToolRuntime.
  *
  * Two phases keep the swap safe:
@@ -125,7 +182,9 @@ export function publicToolName(serverName: string, rawName: string): string {
  * 1. Fetch: drain uncached `tools/list` pagination and build the full next
  *    generation of `ToolDefinition`s under public names. Any failure here
  *    (network error, duplicate raw name in the server's list) rejects and
- *    leaves the previous generation registered untouched.
+ *    leaves the previous generation registered untouched. An
+ *    {@link ToolBridgeOptions.allowedTools} mask drops unlisted raw names
+ *    here, so a masked tool is never registered and never reaches the model.
  * 2. Swap: dispose the previous generation, register the new one. A registry
  *    conflict here can only mean a foreign registration squats on this
  *    server's `mcp__<serverName>__` namespace — the partial generation is
@@ -135,7 +194,8 @@ export function publicToolName(serverName: string, rawName: string): string {
  *
  * @param client - Connected MCP Client instance used to list and call tools.
  * @param ctx - Cordis context providing the `tools` service for registration.
- * @param opts - Bridge options: server namespace and per-call timeout.
+ * @param opts - Bridge options: server namespace, per-call timeout, and the
+ *   optional raw-tool mask.
  * @param previous - Disposer map from the prior sync generation; disposed
  *   during the swap phase (only after the fetch phase succeeded).
  * @returns A map of registered public tool names to their unregister
@@ -149,10 +209,15 @@ export async function syncTools(
 ): Promise<ToolDisposers> {
   // Phase 1: fetch and build the next generation without touching the registry.
   const definitions = new Map<string, ToolDefinition>()
+  // Every raw name the server listed, across all pages: the mask reports the
+  // names it names but the server does not advertise.
+  const listed = new Set<string>()
   let cursor: string | undefined
   do {
     const response = await listToolsUncached(client, cursor)
     for (const tool of response.tools) {
+      listed.add(tool.name)
+      if (opts.allowedTools !== undefined && !opts.allowedTools.has(tool.name)) continue
       const publicName = publicToolName(opts.serverName, tool.name)
       if (definitions.has(publicName)) {
         throw new Error(
@@ -173,6 +238,8 @@ export async function syncTools(
     }
     cursor = response.nextCursor
   } while (cursor)
+
+  reportUnlistedAllowlist(ctx, opts, listed)
 
   // Phase 2: swap generations.
   for (const dispose of previous.values()) dispose()

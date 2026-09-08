@@ -33,6 +33,8 @@ export interface McpJsonServer {
   cwd?: string
   url?: string
   headers?: Record<string, string>
+  /** dsh extension: raw tool names admitted from this server; omission admits every tool. */
+  allowedTools?: string[]
   transportType?: string
   timeout?: number
   disabled?: boolean
@@ -51,6 +53,15 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 /** Read an optional string-array field, rejecting non-string entries. */
 function stringArray(value: unknown, serverName: string, field: string): string[] {
   if (value === undefined) return []
+  if (!Array.isArray(value) || value.some(entry => typeof entry !== 'string')) {
+    throw new Error(`mcp.json server "${serverName}" ${field} must be an array of strings`)
+  }
+  return value as string[]
+}
+
+/** Read an optional string-array field, rejecting non-string entries and staying absent when unlisted. */
+function optionalStringArray(value: unknown, serverName: string, field: string): string[] | undefined {
+  if (value === undefined) return undefined
   if (!Array.isArray(value) || value.some(entry => typeof entry !== 'string')) {
     throw new Error(`mcp.json server "${serverName}" ${field} must be an array of strings`)
   }
@@ -126,6 +137,7 @@ export function mcpJsonToSettings(json: McpJson): McpSettings {
     }
     const serverName = sanitizeServerName(rawName)
     const enabled = raw.disabled !== true
+    const allowed = optionalStringArray(raw.allowedTools, rawName, 'allowedTools')
     if (raw.command !== undefined) {
       if (typeof raw.command !== 'string' || raw.command.length === 0) {
         throw new Error(`mcp.json server "${rawName}" command must be a non-empty string`)
@@ -138,6 +150,7 @@ export function mcpJsonToSettings(json: McpJson): McpSettings {
         args: stringArray(raw.args, rawName, 'args'),
         env: stringRecord(raw.env, rawName, 'env'),
         cwd: typeof raw.cwd === 'string' ? raw.cwd : '',
+        ...allowed === undefined ? {} : { allowedTools: allowed },
       })
     } else if (raw.url !== undefined) {
       if (typeof raw.url !== 'string' || raw.url.length === 0) {
@@ -149,6 +162,7 @@ export function mcpJsonToSettings(json: McpJson): McpSettings {
         transport: 'streamable-http',
         url: raw.url,
         headers: stringRecord(raw.headers, rawName, 'headers'),
+        ...allowed === undefined ? {} : { allowedTools: allowed },
       })
     } else {
       throw new Error(`mcp.json server "${rawName}" needs a "command" (stdio) or "url" (http)`)
@@ -161,7 +175,9 @@ export function mcpJsonToSettings(json: McpJson): McpSettings {
  * Render the manager's settings section back into `mcp.json` shape. Used to
  * seed a missing `mcp.json` so the first hand-edit starts from what settings
  * already holds. `timeout`/`transportType` are dsh-unmanaged and therefore
- * omitted, keeping the document to the fields the sync reads back.
+ * omitted, keeping the document to the fields the sync reads back;
+ * `allowedTools` is a dsh extension the sync reads back and is written only
+ * when the entry carries one.
  * @param settings - the manager's current server list.
  * @returns the equivalent `mcp.json` document.
  */
@@ -169,6 +185,7 @@ export function settingsToMcpJson(settings: McpSettings): McpJson {
   const mcpServers: Record<string, McpJsonServer> = {}
   for (const server of settings.servers) {
     const base: McpJsonServer = server.enabled ? {} : { disabled: true }
+    const allowed = server.allowedTools === undefined ? {} : { allowedTools: server.allowedTools }
     mcpServers[server.serverName] = server.transport === 'stdio'
       ? {
         ...base,
@@ -177,11 +194,13 @@ export function settingsToMcpJson(settings: McpSettings): McpJson {
         args: server.args,
         env: server.env,
         ...(server.cwd === '' ? {} : { cwd: server.cwd }),
+        ...allowed,
       }
       : {
         ...base,
         url: server.url,
         headers: server.headers,
+        ...allowed,
       }
   }
   return { mcpServers }

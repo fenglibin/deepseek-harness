@@ -87,6 +87,16 @@ describe('entryToServerJson', () => {
     const json = JSON.parse(entryToServerJson(stdio('github'))) as McpJsonServer
     expect(json).toEqual({ type: 'stdio', command: 'echo', args: [], env: {} })
   })
+
+  it('renders the allowlist for both transports and omits it when absent', () => {
+    const maskedStdio: McpServerEntry = { ...stdio('github'), allowedTools: ['search'] }
+    const http: McpServerEntry = {
+      serverName: 'web', enabled: true, transport: 'streamable-http', url: 'http://x', headers: {}, allowedTools: ['ping'],
+    }
+    expect((JSON.parse(entryToServerJson(maskedStdio)) as McpJsonServer).allowedTools).toEqual(['search'])
+    expect((JSON.parse(entryToServerJson(http)) as McpJsonServer).allowedTools).toEqual(['ping'])
+    expect('allowedTools' in (JSON.parse(entryToServerJson(stdio('github'))) as McpJsonServer)).toBe(false)
+  })
 })
 
 describe('serverJsonToEntry', () => {
@@ -98,6 +108,20 @@ describe('serverJsonToEntry', () => {
   it('converts a url object back to an http entry', () => {
     const entry = serverJsonToEntry('web', { url: 'http://x', headers: { A: 'b' } })
     expect(entry).toEqual({ serverName: 'web', enabled: true, transport: 'streamable-http', url: 'http://x', headers: { A: 'b' } })
+  })
+
+  it('carries the allowlist back into both transports and leaves it absent when unlisted', () => {
+    const stdio = serverJsonToEntry('github', { command: 'echo', allowedTools: ['search'] })
+    const http = serverJsonToEntry('web', { url: 'http://x', allowedTools: ['ping'] })
+    expect(stdio).toMatchObject({ transport: 'stdio', allowedTools: ['search'] })
+    expect(http).toMatchObject({ transport: 'streamable-http', allowedTools: ['ping'] })
+    expect('allowedTools' in serverJsonToEntry('plain', { command: 'echo' })).toBe(false)
+  })
+
+  it('round-trips an allowlist through the edit editor shape', () => {
+    const entry: McpServerEntry = { ...stdio('github'), allowedTools: ['search'] }
+    const again = serverJsonToEntry('github', JSON.parse(entryToServerJson(entry)) as McpJsonServer)
+    expect(again).toEqual(entry)
   })
 
   it('throws when neither command nor url is present', () => {

@@ -41,7 +41,7 @@ kind: "package-reference"
 
 ### 编辑与保存
 
-增加与编辑都经由同一个 JSON 编辑器，只有保存时才写入。**增加MCP** 打开一个空编辑器，用户粘贴跨厂商 MCP 配置——`{"mcpServers":{…}}` 包裹或裸的 `{"name":{…}}` map 均可，保存时先解析出服务器名，再与 `mcp.json` 中已有的名字比对：存在同名则弹确认框，同意后覆盖，随后经 Host 的 `writeMcpDocument()` 把合并结果写回 `mcp.json` 并立即同步。**编辑**在编辑器里展示单个条目的跨厂商对象（`command`/`url`/`args`/`env`/`headers`/`cwd`/`disabled`），保存时经 `updateMcpServer()` 替换该条目。删除与行内启用开关同样经 Host 写回 `mcp.json`：删除通过 `removeMcpServer()` 移除条目，启用开关通过 `updateMcpServer()` 翻转该条目的 `disabled` 字段。条目一旦存在，其 `serverName` 即为只读，因为 manager 与每个工具名都以它为键。`env` 与 `headers` 是普通字段而非 secret 角色字段。两个编辑器共享同一份 JSON 语法高亮、格式化与保存前校验。
+增加与编辑都经由同一个 JSON 编辑器，只有保存时才写入。**增加MCP** 打开一个空编辑器，用户粘贴跨厂商 MCP 配置——`{"mcpServers":{…}}` 包裹或裸的 `{"name":{…}}` map 均可，保存时先解析出服务器名，再与 `mcp.json` 中已有的名字比对：存在同名则弹确认框，同意后覆盖，随后经 Host 的 `writeMcpDocument()` 把合并结果写回 `mcp.json` 并立即同步。**编辑**在编辑器里展示单个条目的跨厂商对象（`command`/`url`/`args`/`env`/`headers`/`cwd`/`allowedTools`/`disabled`），保存时经 `updateMcpServer()` 替换该条目；`allowedTools` 是 dsh 的扩展字段，写原始 MCP 工具名即只桥接这些工具。删除与行内启用开关同样经 Host 写回 `mcp.json`：删除通过 `removeMcpServer()` 移除条目，启用开关通过 `updateMcpServer()` 翻转该条目的 `disabled` 字段。条目一旦存在，其 `serverName` 即为只读，因为 manager 与每个工具名都以它为键。`env` 与 `headers` 是普通字段而非 secret 角色字段。两个编辑器共享同一份 JSON 语法高亮、格式化与保存前校验。
 
 ### 实时状态
 

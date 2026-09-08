@@ -50,7 +50,7 @@ vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
 // vi.mock is hoisted above static imports, so the manager and its mcp-client
 // dependency see the mocked SDK even through a static import.
 import McpManager, { MCP_SETTINGS_NAMESPACE } from '@deepseek-ai/dsh-mcp-manager/src/index.ts'
-import type { McpSettings, McpStdioServer } from '@deepseek-ai/dsh-mcp-manager'
+import type { McpServerEntry, McpSettings, McpStdioServer } from '@deepseek-ai/dsh-mcp-manager'
 
 // ---- Helpers ----
 
@@ -170,6 +170,64 @@ describe('mcp-manager', () => {
     // (which stays `mcp__srv__remote` across both generations).
     await vi.waitFor(() => { expect(instances.length).toBeGreaterThan(firstCount) })
     expect(ctx.tools.get('mcp__srv__remote')).toBeDefined()
+    await ctx.fiber.dispose()
+  })
+
+  it('mounts an allowlisted server and registers only its listed tools', async () => {
+    mockListTools.mockResolvedValue(listing('remote', 'other'))
+    const ctx = await boot({
+      [MCP_SETTINGS_NAMESPACE]: { servers: [{ ...stdio('srv'), allowedTools: ['remote'] }] },
+    })
+
+    await vi.waitFor(() => { expect(ctx.tools.get('mcp__srv__remote')).toBeDefined() })
+    expect(ctx.tools.get('mcp__srv__other')).toBeUndefined()
+    await ctx.fiber.dispose()
+  })
+
+  it('mounts an allowlisted http server and registers only its listed tools', async () => {
+    mockListTools.mockResolvedValue(listing('remote', 'other'))
+    const server: McpServerEntry = {
+      serverName: 'web', enabled: true, transport: 'streamable-http', url: 'http://localhost/mcp', headers: {}, allowedTools: ['remote'],
+    }
+    const ctx = await boot({ [MCP_SETTINGS_NAMESPACE]: { servers: [server] } })
+
+    await vi.waitFor(() => { expect(ctx.tools.get('mcp__web__remote')).toBeDefined() })
+    expect(ctx.tools.get('mcp__web__other')).toBeUndefined()
+    await ctx.fiber.dispose()
+  })
+
+  it('registers every listed tool when the entry carries no allowlist', async () => {
+    mockListTools.mockResolvedValue(listing('remote', 'other'))
+    const ctx = await boot({ [MCP_SETTINGS_NAMESPACE]: { servers: [stdio('srv')] } })
+
+    await vi.waitFor(() => { expect(ctx.tools.get('mcp__srv__other')).toBeDefined() })
+    expect(ctx.tools.get('mcp__srv__remote')).toBeDefined()
+    await ctx.fiber.dispose()
+  })
+
+  it('re-mounts a server whose allowlist changed', async () => {
+    mockListTools.mockResolvedValue(listing('remote', 'other'))
+    const ctx = await boot({ [MCP_SETTINGS_NAMESPACE]: { servers: [stdio('srv')] } })
+    await vi.waitFor(() => { expect(ctx.tools.get('mcp__srv__other')).toBeDefined() })
+    const firstCount = instances.length
+
+    await replaceServers(ctx, [{ ...stdio('srv'), allowedTools: ['remote'] }])
+    await vi.waitFor(() => {
+      expect(instances.length).toBeGreaterThan(firstCount)
+      expect(ctx.tools.get('mcp__srv__other')).toBeUndefined()
+    })
+    expect(ctx.tools.get('mcp__srv__remote')).toBeDefined()
+    await ctx.fiber.dispose()
+  })
+
+  it('reports a failed mount and spawns no client when the allowlist is empty', async () => {
+    const ctx = await boot({
+      [MCP_SETTINGS_NAMESPACE]: { servers: [{ ...stdio('srv'), allowedTools: [] }] },
+    })
+
+    await vi.waitFor(() => { expect(ctx.mcpManager?.statusOf('srv')?.status).toBe('failed') })
+    expect(ctx.mcpManager?.statusOf('srv')?.detail?.error).toMatch(/allowedTools is empty/)
+    expect(instances).toHaveLength(0)
     await ctx.fiber.dispose()
   })
 

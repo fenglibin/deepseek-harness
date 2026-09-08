@@ -162,6 +162,7 @@ export interface ConnectionHandle {
  * @param config - Resolved plugin config selecting the transport and server identity.
  * @param policy - Resolved reconnect policy from {@link resolveReconnectPolicy}.
  * @param sink - Optional status sink; when absent the supervisor reports nothing.
+ * @param allowedTools - Resolved raw-tool mask; omission admits every listed tool.
  * @returns Handle with a `ready` promise for startup-await and a `dispose` for teardown.
  */
 export function startConnection(
@@ -169,12 +170,14 @@ export function startConnection(
   config: Config,
   policy: ResolvedReconnectPolicy,
   sink?: McpStatusSink,
+  allowedTools?: ReadonlySet<string>,
 ): ConnectionHandle {
   const label = `mcp-client(${config.serverName})`
   const opts: ToolBridgeOptions = {
     registrationFailure: 'contain',
     serverName: config.serverName,
     toolCallTimeoutMs: config.toolCallTimeoutMs,
+    ...allowedTools === undefined ? {} : { allowedTools },
   }
   // The initial sync uses 'throw' when failOnStartupError is configured, so
   // a registration conflict propagates to the startup-await path. Re-syncs

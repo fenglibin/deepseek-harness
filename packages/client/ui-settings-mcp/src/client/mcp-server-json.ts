@@ -103,12 +103,14 @@ export function parseSingleServer(text: string): McpJsonServer {
  * Render one server entry as pretty cross-vendor JSON for the edit editor.
  * `enabled: false` maps to `disabled: true` (the inverse of the Host's
  * `disabled !== true` read), and `cwd` is omitted when empty so the shape stays
- * the fields the document sync reads back.
+ * the fields the document sync reads back. `allowedTools` is a dsh extension
+ * and is written only when the entry carries one.
  * @param entry - the server entry to render.
  * @returns the pretty JSON text with a trailing newline.
  */
 export function entryToServerJson(entry: McpServerEntry): string {
   const base: McpJsonServer = entry.enabled ? {} : { disabled: true }
+  const allowed = entry.allowedTools === undefined ? {} : { allowedTools: entry.allowedTools }
   const server: McpJsonServer = entry.transport === 'stdio'
     ? {
       ...base,
@@ -117,11 +119,13 @@ export function entryToServerJson(entry: McpServerEntry): string {
       args: entry.args,
       env: entry.env,
       ...(entry.cwd === '' ? {} : { cwd: entry.cwd }),
+      ...allowed,
     }
     : {
       ...base,
       url: entry.url,
       headers: entry.headers,
+      ...allowed,
     }
   return `${JSON.stringify(server, null, 2)}\n`
 }
@@ -148,6 +152,7 @@ export function renderDocument(servers: Record<string, McpJsonServer>): string {
  */
 export function serverJsonToEntry(name: string, json: McpJsonServer): McpServerEntry {
   const enabled = json.disabled !== true
+  const allowed = json.allowedTools === undefined ? {} : { allowedTools: json.allowedTools }
   if (json.command !== undefined) {
     return {
       serverName: name,
@@ -157,6 +162,7 @@ export function serverJsonToEntry(name: string, json: McpJsonServer): McpServerE
       args: json.args ?? [],
       env: json.env ?? {},
       cwd: typeof json.cwd === 'string' ? json.cwd : '',
+      ...allowed,
     }
   }
   if (json.url !== undefined) {
@@ -166,6 +172,7 @@ export function serverJsonToEntry(name: string, json: McpJsonServer): McpServerE
       transport: 'streamable-http',
       url: json.url,
       headers: json.headers ?? {},
+      ...allowed,
     }
   }
   throw new Error(`server "${name}" needs a "command" (stdio) or "url" (http)`)

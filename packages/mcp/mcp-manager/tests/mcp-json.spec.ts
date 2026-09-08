@@ -117,6 +117,29 @@ describe('mcpJsonToSettings', () => {
     expect(first).not.toBe(second)
   })
 
+  it('carries an allowlist from mcp.json into both transports', () => {
+    const settings = mcpJsonToSettings({
+      mcpServers: {
+        'my-server': { ...STDIO, allowedTools: ['search', 'read'] },
+        remote: { ...HTTP, allowedTools: ['ping'] },
+      },
+    })
+    expect(settings.servers[0]).toMatchObject({ serverName: 'my-server', allowedTools: ['search', 'read'] })
+    expect(settings.servers[1]).toMatchObject({ serverName: 'remote', allowedTools: ['ping'] })
+  })
+
+  it('leaves the allowlist absent when mcp.json omits it', () => {
+    const settings = mcpJsonToSettings({ mcpServers: { 'my-server': STDIO } })
+    expect('allowedTools' in settings.servers[0]!).toBe(false)
+  })
+
+  it('rejects an allowlist that is not an array of strings', () => {
+    const bad = { mcpServers: { a: { command: 'x', allowedTools: 'search' } } } as unknown as McpJson
+    const nested = { mcpServers: { a: { command: 'x', allowedTools: [1] } } } as unknown as McpJson
+    expect(() => mcpJsonToSettings(bad)).toThrow(/allowedTools must be an array of strings/)
+    expect(() => mcpJsonToSettings(nested)).toThrow(/allowedTools must be an array of strings/)
+  })
+
   it('rejects a non-string args or env field', () => {
     const badArgs = { mcpServers: { a: { command: 'x', args: [1] } } } as unknown as McpJson
     const badEnv = { mcpServers: { a: { command: 'x', env: { K: 1 } } } } as unknown as McpJson
@@ -137,6 +160,19 @@ describe('settingsToMcpJson and renderMcpJson', () => {
     expect(json.mcpServers['a']).toEqual({ type: 'stdio', command: 'npx', args: ['-y'], env: {} })
     expect(json.mcpServers['b']).toEqual({ url: 'https://example.com', headers: { A: 'b' }, disabled: true })
     // A full round-trip preserves every managed field.
+    expect(mcpJsonToSettings(parseMcpJson(renderMcpJson(json)))).toEqual(settings)
+  })
+
+  it('round-trips an allowlist through the document', () => {
+    const settings: McpSettings = {
+      servers: [
+        { serverName: 'a', enabled: true, transport: 'stdio', command: 'npx', args: [], env: {}, cwd: '', allowedTools: ['search'] },
+        { serverName: 'b', enabled: true, transport: 'streamable-http', url: 'https://example.com', headers: {} },
+      ],
+    }
+    const json = settingsToMcpJson(settings)
+    expect(json.mcpServers['a']).toMatchObject({ allowedTools: ['search'] })
+    expect('allowedTools' in json.mcpServers['b']!).toBe(false)
     expect(mcpJsonToSettings(parseMcpJson(renderMcpJson(json)))).toEqual(settings)
   })
 

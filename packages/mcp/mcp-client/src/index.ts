@@ -19,6 +19,7 @@ import { scopeOf } from '@deepseek-ai/dsh-scope'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { RECONNECT_DEFAULTS, resolveReconnectPolicy, startConnection } from './connection.ts'
 import type { ReconnectConfig } from './connection.ts'
+import { resolveAllowedTools } from './tools.ts'
 // Side-effect type import: declaration-merges `ctx.tools` onto Context.
 import type {} from '@deepseek-ai/dsh-tools'
 
@@ -70,6 +71,12 @@ export interface StdioConfig {
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
   failOnStartupError: boolean
+  /**
+   * Raw MCP tool names admitted to registration; omission registers every tool
+   * the server lists. Entries are the server's own wire names — never the
+   * `mcp__<serverName>__` public names — and an empty list is refused.
+   */
+  allowedTools?: string[]
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
 }
@@ -92,6 +99,12 @@ export interface StreamableHttpConfig {
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
   failOnStartupError: boolean
+  /**
+   * Raw MCP tool names admitted to registration; omission registers every tool
+   * the server lists. Entries are the server's own wire names — never the
+   * `mcp__<serverName>__` public names — and an empty list is refused.
+   */
+  allowedTools?: string[]
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
 }
@@ -122,6 +135,8 @@ export const Config = z.union([
     cwd: z.string().default(''),
     toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
     failOnStartupError: z.boolean().default(false),
+    // Preserve omission; Schemastery's `[]` default would admit no tool.
+    allowedTools: z.array(String).default(undefined as unknown as string[]),
     reconnect: Reconnect,
   }),
   z.object({
@@ -131,6 +146,8 @@ export const Config = z.union([
     headers: z.dict(String).default({}),
     toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
     failOnStartupError: z.boolean().default(false),
+    // Preserve omission; Schemastery's `[]` default would admit no tool.
+    allowedTools: z.array(String).default(undefined as unknown as string[]),
     reconnect: Reconnect,
   }),
 ]) as unknown as z<ConfigInput, Config>
@@ -150,6 +167,10 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   // construction that bypassed Schemastery) rejects THIS instance before any
   // effect registers.
   const reconnect = resolveReconnectPolicy(config.reconnect, `mcp-client(${config.serverName}): reconnect`)
+
+  // Same reasoning for the tool mask: an empty or malformed allowlist is a
+  // configuration error, not a request for a server with no tools.
+  const allowedTools = resolveAllowedTools(config.allowedTools, `mcp-client(${config.serverName}): allowedTools`)
 
   // Reserve the namespace next: a duplicate `serverName` fails THIS instance
   // at load with an actionable error and leaves the earlier instance intact.
@@ -174,7 +195,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   // quiesces in-flight work, and unregisters the current generation.
   // Status reporting is opt-in: a management surface provides one sink for
   // every instance it mounts; without one the supervisor is unchanged.
-  const connection = startConnection(ctx, config, reconnect, ctx.get('mcpStatusSink'))
+  const connection = startConnection(ctx, config, reconnect, ctx.get('mcpStatusSink'), allowedTools)
 
   ctx.effect(() => {
     return () => connection.dispose()

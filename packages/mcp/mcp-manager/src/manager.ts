@@ -51,9 +51,12 @@ function statusKindOf(status: McpConnectionStatus | undefined): McpServerStatusK
  * The settings document returns a frozen snapshot, and Schemastery's dict and
  * array resolvers mutate their input while normalizing. The `args`, `env`, and
  * `headers` collections are therefore shallow-copied so the config parse never
- * writes through a frozen reference and fails the union.
+ * writes through a frozen reference and fails the union. `allowedTools` is
+ * copied for the same reason and stays absent when the entry omits it, so an
+ * unmasked server keeps admitting every tool the server lists.
  */
 function toMcpClientConfig(server: McpServerEntry): McpClient.Config {
+  const allowed = server.allowedTools === undefined ? {} : { allowedTools: [...server.allowedTools] }
   if (server.transport === 'stdio') {
     return McpClient.Config({
       transport: 'stdio',
@@ -62,6 +65,7 @@ function toMcpClientConfig(server: McpServerEntry): McpClient.Config {
       args: [...server.args],
       env: { ...server.env },
       cwd: server.cwd,
+      ...allowed,
     })
   }
   return McpClient.Config({
@@ -69,6 +73,7 @@ function toMcpClientConfig(server: McpServerEntry): McpClient.Config {
     serverName: server.serverName,
     url: server.url,
     headers: { ...server.headers },
+    ...allowed,
   })
 }
 

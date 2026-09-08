@@ -193,6 +193,38 @@ describe('fixture server — controlled scenarios', () => {
   })
 })
 
+describe('fixture server — allowedTools', () => {
+  it('registers only the allowlisted tools over the real protocol', async () => {
+    const ctx = await mountRegistry()
+    await apply(ctx, {
+      transport: 'stdio',
+      serverName: 'masked',
+      command: process.execPath,
+      args: [fixtureServerPath],
+      env: {},
+      cwd: packageDir,
+      toolCallTimeoutMs: 15_000,
+      failOnStartupError: false,
+      allowedTools: ['add', 'greet'],
+    })
+
+    const names = ctx.tools.schemas().map(s => s.name)
+    expect(names).toContain('mcp__masked__add')
+    expect(names).toContain('mcp__masked__greet')
+    expect(names).not.toContain('mcp__masked__fail')
+    expect(ctx.tools.get('mcp__masked__fail')).toBeUndefined()
+
+    const result = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: nextCallId(), name: 'mcp__masked__add', arguments: { a: 2, b: 3 },
+    })
+    expect(result.isError).toBe(false)
+    expect(result.content[0]).toEqual({ type: 'text', text: '5' })
+
+    await ctx.fiber.dispose()
+  }, 30_000)
+})
+
 describe('fixture server — duplicate serverName', () => {
   it('rejects a second instance with the same serverName on one root', async () => {
     const ctx = await mountRegistry()

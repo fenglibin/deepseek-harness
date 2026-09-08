@@ -57,9 +57,12 @@ mcp:
       url: http://localhost:3000/mcp
       headers:
         Authorization: 'Bearer token'
+      allowedTools: ['search', 'fetch']
 ```
 
 `serverName` 必须匹配 `[A-Za-z0-9_-]{1,32}` 且在列表内唯一；重名会在写入时、在任何东西持久化之前拒绝该分节。被禁用的条目保留其配置但不挂载实例，因此重新启用会恢复完全相同的工具集。`env` 与 `headers` 是普通字段而非 secret 角色字段，因为列表是从 settings 线缆视图整体编辑的，脱敏字段会在每次写入时被静默丢弃。重连策略、单次调用超时与启动语义沿用 mcp-client 的默认值。
+
+`allowedTools` 是可选的原始工具名白名单，语义与 [mcp-client](../mcp-client/README.zh.md) 的同名字段完全一致：只注册名单内的工具，其余工具既不出现在模型的工具列表里也不可调用；省略则注册该服务器列出的全部工具。空列表会在挂载时被拒绝——manager 收容该失败并把该服务器记为带诊断文本的 `failed`，因此一台配错了白名单的服务器不会拖垮它的同伴。改动它会触发重新挂载，因为那是条目值的变化。
 
 ### 协调过程
 
@@ -71,7 +74,7 @@ manager 为配置界面导出一个 `mcp` Remote 命名空间。`list()` 为每�
 
 ### mcp.json 文档
 
-manager 把一份 `mcp.json`（与其它主流 MCP 平台相同的跨厂商 `mcpServers` 结构）放在 settings 文档旁边，作为 MCP 的就地编辑入口。`readMcpDocument()` 返回文档文本（缺失时先播种）；`writeMcpDocument(text)` 先做完整校验——JSON 语法、`mcpServers` 结构、以及每条目的 `command`/`url`——再持久化，随后**立即**跑一遍同步，让变更当下生效而不是等文件监视器的去抖；`updateMcpServer(entry)` 把一条表单编辑合并进该文档的对应条目并同样立即同步；`removeMcpServer(name)` 从该文档删除一条目（含任何哈希成该名字的原始键）并同样立即同步。文件变化时，manager 先校验 JSON 格式，再把每个条目转换成 `servers` 数组，只在全部有效时才整体覆盖 `mcp` 命名空间；格式或条目非法时跳过同步并告警，settings 保留最后一份好文档。`disabled` 映射为 `enabled` 的取反，有 `command` 判为 stdio，有 `url` 判为 HTTP，`timeout` 与 `transportType` 被忽略。超出 `[A-Za-z0-9_-]{1,32}` 契约的服务器名会被哈希成稳定的 `mcp-<hex>` 名字，因此任何输入都能同步而不被拒绝。
+manager 把一份 `mcp.json`（与其它主流 MCP 平台相同的跨厂商 `mcpServers` 结构）放在 settings 文档旁边，作为 MCP 的就地编辑入口。`readMcpDocument()` 返回文档文本（缺失时先播种）；`writeMcpDocument(text)` 先做完整校验——JSON 语法、`mcpServers` 结构、以及每条目的 `command`/`url`——再持久化，随后**立即**跑一遍同步，让变更当下生效而不是等文件监视器的去抖；`updateMcpServer(entry)` 把一条表单编辑合并进该文档的对应条目并同样立即同步；`removeMcpServer(name)` 从该文档删除一条目（含任何哈希成该名字的原始键）并同样立即同步。文件变化时，manager 先校验 JSON 格式，再把每个条目转换成 `servers` 数组，只在全部有效时才整体覆盖 `mcp` 命名空间；格式或条目非法时跳过同步并告警，settings 保留最后一份好文档。`disabled` 映射为 `enabled` 的取反，有 `command` 判为 stdio，有 `url` 判为 HTTP，`timeout` 与 `transportType` 被忽略。超出 `[A-Za-z0-9_-]{1,32}` 契约的服务器名会被哈希成稳定的 `mcp-<hex>` 名字，因此任何输入都能同步而不被拒绝。`allowedTools` 是 dsh 在跨厂商格式之外的扩展字段，同步时会读入、写回，其他平台读它时按未知字段忽略。
 
 -----
 

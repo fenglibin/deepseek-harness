@@ -188,6 +188,27 @@ describe('mcp-manager mcp.json document', () => {
     await ctx.fiber.dispose()
   })
 
+  it('mounts only the allowlisted tools when updateMcpServer carries a mask', async () => {
+    const ctx = await boot()
+    mockListTools.mockResolvedValue({
+      tools: [
+        { name: 'remote', description: 'Run a remote command', inputSchema: { type: 'object' } },
+        { name: 'other', description: 'Another tool', inputSchema: { type: 'object' } },
+      ],
+      nextCursor: undefined,
+    })
+
+    await ctx.mcpManager!.updateMcpServer({ ...stdio('srv'), allowedTools: ['remote'] }, signal())
+
+    await vi.waitFor(() => { expect(ctx.tools.get('mcp__srv__remote')).toBeDefined() })
+    expect(ctx.tools.get('mcp__srv__other')).toBeUndefined()
+    // The mask survives the round-trip through the persisted document, so a
+    // later re-read remounts the same restricted set.
+    const document = JSON.parse(fsFiles.get(MCP_JSON_PATH)!) as { mcpServers: Record<string, { allowedTools?: string[] }> }
+    expect(document.mcpServers['srv']?.allowedTools).toEqual(['remote'])
+    await ctx.fiber.dispose()
+  })
+
   it('reports each mounted tool with its raw name and description through list()', async () => {
     const ctx = await boot()
     await ctx.mcpManager!.updateMcpServer(stdio('srv'), signal())

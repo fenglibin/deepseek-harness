@@ -31,6 +31,8 @@ export interface McpStdioServer {
   env: Record<string, string>
   /** Working directory for the child process. */
   cwd: string
+  /** Raw MCP tool names admitted to registration; omission registers every tool the server lists. */
+  allowedTools?: string[]
 }
 
 /** One Streamable HTTP MCP server. */
@@ -45,6 +47,8 @@ export interface McpHttpServer {
   url: string
   /** Additional headers attached to MCP requests; shown and edited in the UI. */
   headers: Record<string, string>
+  /** Raw MCP tool names admitted to registration; omission registers every tool the server lists. */
+  allowedTools?: string[]
 }
 
 /** One user-managed MCP server, either stdio or Streamable HTTP. */
@@ -69,6 +73,8 @@ const StdioServerSchema = z.object({
   // which silently drops any redacted field it never received.
   env: z.dict(String).default({}),
   cwd: z.string().default(''),
+  // Preserve omission; Schemastery's `[]` default would admit no tool.
+  allowedTools: z.array(String).default(undefined as unknown as string[]),
 })
 
 /** Schema of one Streamable HTTP server entry; header values never ride a wire read. */
@@ -79,6 +85,8 @@ const HttpServerSchema = z.object({
   url: z.string().required(),
   // Not role('secret'): see the stdio env field — the list is edited wholesale.
   headers: z.dict(String).default({}),
+  // Preserve omission; Schemastery's `[]` default would admit no tool.
+  allowedTools: z.array(String).default(undefined as unknown as string[]),
 })
 
 /** Settings schema for {@link MCP_SETTINGS_NAMESPACE}, typed to {@link McpSettings}. */

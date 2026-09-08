@@ -58,6 +58,7 @@ kind: "package-reference"
 | `url` / `headers` | — | streamable-http：端点 URL 与额外请求标头 |
 | `toolCallTimeoutMs` | `60,000` | 每次 `tools/call` 调用的超时 |
 | `failOnStartupError` | `false` | 初始连接或工具同步失败时拒绝插件激活 |
+| `allowedTools` | 未设置 | 只桥接这些 MCP 原始工具名；省略则桥接服务器列出的全部工具 |
 | `reconnect.enabled` | `true` | 连接丢失后自动重新连接 |
 | `reconnect.initialDelayMs` | `500` | 首次重连延迟；每次连续失败尝试翻倍 |
 | `reconnect.maxDelayMs` | `30,000` | 退避上限；同时是重置尝试预算所需的正常运行时长 |
@@ -75,6 +76,23 @@ kind: "package-reference"
 - 两条配置项使用相同的服务器名称时，后加载的一条会在加载时以明确错误失败。
 - 服务器在工具列表中两次列出同一工具时，其工具列表会被作为无效列表拒绝，上一组工具保持可用。
 - 工具更新与已有工具名称冲突时，该更新会被整体拒绝——绝不会得到该服务器的部分工具集。
+
+### 只桥接部分工具
+
+一台服务器往往暴露几十个工具，而每个工具的定义都会进入每次请求。用 `allowedTools` 列出要桥接的 MCP 原始工具名，其余工具根本不会被注册——它们既不出现在模型的工具列表里，也无法被调用：
+
+```yaml
+- id: mcp-codegraph
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: codegraph
+    transport: stdio
+    command: codegraph
+    args: ['serve', '--mcp']
+    allowedTools: ['codegraph_search', 'codegraph_context']
+```
+
+名称是服务器自己 `tools/list` 里的原始名，不是 `mcp__<serverName>__` 公开名。省略该字段则桥接服务器的全部工具；空列表在加载时就会报错，因为那是配置错误，而不是"不要任何工具"——想要没有工具就别挂载这台服务器。服务器未列出的名字会在每次同步时记录一条警告，已列出的工具照常注册。名单是静态的：服务器后来新增的工具不会自动桥接，必须把它加进名单。
 
 ### 调用工具与读取结果
 
@@ -159,7 +177,7 @@ kind: "package-reference"
 
 #### Token 影响
 
-工具注册期间，工具描述与输入 schema 会进入每次请求；重新同步会替换而非累积 schema，服务器限定名称也会为每个工具定义和调用增加 token。
+工具注册期间，工具描述与输入 schema 会进入每次请求；重新同步会替换而非累积 schema，服务器限定名称也会为每个工具定义和调用增加 token。用 `allowedTools` 收敛桥接的工具可削减这部分开销。
 
 #### KV Cache 影响
 
