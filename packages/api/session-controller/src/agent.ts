@@ -313,25 +313,15 @@ export class ApiSessionAgentController {
     const selection: InstalledSelection = {
       get current(): AgentModelSelection {
         if (picked !== undefined) return picked
-        // The user's last authored choice, read live so a selection made after
-        // this Agent resumed still resolves. A failover reroute records a
-        // request header under the borrowed candidate; reading that header here
-        // would silently promote the candidate to the session's model.
+        // The session's model, read live so a selection made after this Agent
+        // resumed still resolves: the last authored choice, or the model
+        // recorded by the first request header. A reroute (failover/round-robin)
+        // never advances it, so a borrowed candidate cannot become the session's
+        // model. With no authored choice and no request yet, the deployment
+        // default is it.
         const chosen = sessionProjections.stateOf(agent.session, 'modelSelection')?.chosen ?? null
         if (chosen !== null) return agentModelSelection(chosen)
-        const loggedHeader = agent.session.requestHeader()
-        if (loggedHeader === undefined) return defaultModel.currentSelection()
-        const logged = loggedHeader.config
-        return {
-          provider: logged.provider,
-          model: logged.model,
-          // An effort the adapter defaulted is not a conversation choice: restoring
-          // it as one would make an unchanged default read as a request change.
-          ...(logged.reasoningEffort === undefined
-            || loggedHeader.adapterDefaults?.reasoningEffort === true
-            ? {}
-            : { reasoningEffort: logged.reasoningEffort }),
-        }
+        return defaultModel.currentSelection()
       },
       set current(next: AgentModelSelection) {
         picked = next

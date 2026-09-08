@@ -92,9 +92,10 @@ export interface ModelSelectionProjectionState {
   /** Later user selection not yet consumed by a matching model request. */
   readonly pending: ModelSelection | null
   /**
-   * Last user-authored selection, retained after its request consumed it so a
-   * failover reroute (a request served by a different model) never displaces
-   * the user's choice as the session's model.
+   * The session's model: the last authored selection, or — for a session whose
+   * log names no selection — the model recorded by its first request header.
+   * Reroute headers (failover/round-robin) never advance it, so a request
+   * served by a borrowed candidate cannot displace the session's model.
    */
   readonly chosen: ModelSelection | null
 }
@@ -103,7 +104,12 @@ export interface ModelSelectionProjectionState {
 export interface ModelSelectionProjection {
   /** Selection consumed by the latest recorded model request. */
   readonly lastUsed: ModelSelection | null
-  /** Selection the next request should use, falling back to {@link lastUsed}. */
+  /**
+   * The authored choice the next request should use. Null when the session has
+   * no authored selection, so the consumer falls back to the deployment
+   * default rather than to {@link lastUsed} (which a failover/round-robin
+   * reroute may have served under a borrowed candidate).
+   */
   readonly next: ModelSelection | null
 }
 

@@ -4,6 +4,7 @@
  * `deliverables` vocabulary — which `ui-deliverables` already accumulates
  * from successful first-party mutation calls — into one session-wide,
  * first-seen list, read through the session standard `useConversation` seat.
+ * Each row shows the file's full path and opens it on the Host desktop.
  * Accepting a file clears it from the surface only (component-local state);
  * nothing on disk changes.
  */
@@ -16,12 +17,18 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the Session standard useConversation seat.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
-import { SessionChangesDock } from './SessionChangesDock.tsx'
+// Type-only: pulls the Session Controller's Context merge (ctx.sessions).
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+// Type-only: pulls the Session Remote's Context merge (ctx.remote.session).
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionChangesDock, type SessionChangesInjected } from './SessionChangesDock.tsx'
 import { zh, type SessionChangesKey } from './locales.ts'
 
 export {
-  SessionChangesDock, SessionChangesPanel, sessionChanges,
-  type ProducedChange, type SessionChangesDockProps, type SessionChangesPanelProps,
+  SessionChangesDock, SessionChangesPanel, canonicalMutationPath, displayPath, sessionChanges,
+  type ProducedChange, type SessionChangesDockProps, type SessionChangesInjected,
+  type SessionChangesPanelProps,
 } from './SessionChangesDock.tsx'
 export type { SessionChangesKey } from './locales.ts'
 
@@ -35,8 +42,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 /** Dictionary namespace owned by this plugin. */
 const NS = 'session-changes'
 
-/** Required services for the dock registration and its dictionaries. */
-export const inject = ['slots', 'locale']
+/** Required services for the dock registration, its opener, and its dictionaries. */
+export const inject = ['slots', 'locale', 'sessions', 'remote', 'remote.session']
 
 /**
  * Client plugin body: register the dictionaries and the input-dock entry.
@@ -51,5 +58,12 @@ export function apply(ctx: ClientContext): void {
     // broadest summary, so they sit first in the strip.
     order: -10,
     locale: NS,
+    inject: (sessionId: SessionId): SessionChangesInjected => ({
+      cwd: ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd,
+      openFile: async (path) => {
+        const result = await ctx.remote.session.openWorkspacePath({ path })
+        if (!result.ok) throw new Error(result.error.message)
+      },
+    }),
   }, SessionChangesDock))
 }

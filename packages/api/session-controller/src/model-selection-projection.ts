@@ -43,17 +43,33 @@ function applyModelSelectionProjection(
       : { lastUsed: state.lastUsed, pending: event.data, chosen: event.data }
   }
   if (event.type !== 'request/header') return state
+  const config = event.data.header.config
   const lastUsed: ModelSelection = {
-    provider: event.data.header.config.provider,
-    model: event.data.header.config.model,
-    ...(event.data.header.config.reasoningEffort === undefined
+    provider: config.provider,
+    model: config.model,
+    ...(config.reasoningEffort === undefined
       ? {}
-      : { reasoningEffort: String(event.data.header.config.reasoningEffort) }),
+      : { reasoningEffort: String(config.reasoningEffort) }),
   }
   const pending = sameSelection(state.pending, lastUsed) ? null : state.pending
-  return sameSelection(state.lastUsed, lastUsed) && pending === state.pending
+  // The first request header (`reason: 'initial'`) records the session's model —
+  // the deployment default, or the user's authored choice. Later reroute
+  // headers (failover/round-robin, `reason: 'change'`) must not displace it,
+  // so `chosen` is only advanced on the initial header, with an
+  // adapter-defaulted reasoning effort dropped (it is not a conversation
+  // choice).
+  const chosen = event.data.reason === 'initial'
+    ? {
+      provider: config.provider,
+      model: config.model,
+      ...(config.reasoningEffort === undefined || event.data.header.adapterDefaults?.reasoningEffort === true
+        ? {}
+        : { reasoningEffort: String(config.reasoningEffort) }),
+    }
+    : state.chosen
+  return sameSelection(state.lastUsed, lastUsed) && pending === state.pending && sameSelection(state.chosen, chosen)
     ? state
-    : { lastUsed, pending, chosen: state.chosen }
+    : { lastUsed, pending, chosen }
 }
 
 const modelSelectionProjection = {
@@ -63,7 +79,11 @@ const modelSelectionProjection = {
   apply: applyModelSelectionProjection,
   wire: {
     viewSchema: modelSelectionProjectionSchema,
-    view: state => ({ lastUsed: state.lastUsed, next: state.pending ?? state.chosen ?? state.lastUsed }),
+    // `next` is the authored choice only: pending then chosen. It deliberately
+    // omits lastUsed so a request served by a rerouted (failover/round-robin)
+    // candidate never reads as the session's model; a null next lets the
+    // consumer fall back to the deployment default.
+    view: state => ({ lastUsed: state.lastUsed, next: state.pending ?? state.chosen }),
   },
   stateVersion: 3,
 } satisfies ProjectionDefinition<'modelSelection', ModelSelectionProjectionState>

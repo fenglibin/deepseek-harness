@@ -20,7 +20,7 @@ Status: implemented
 
 插件在 `packages/bundle/base/cordis.patch.yml` 中以 `candidates: []` 挂载在 `llm-retry` 之前，并作为 `@deepseek-ai/dsh-base` 的依赖声明。候选路由不做目录成员关系预校验：指向未注册提供方的候选会在使用时以 `NO_ADAPTER` 大声失败。
 
-故障转移只改请求路由、不改用户选择：`dsh-api-session-controller` 的 `modelSelection` 投影新增 `chosen` 字段（只由 `model/selection` 事件更新、不随 `request/header` 变化），页面的 `next` 视图与 `selectionFor` 的模型解析都优先用 `chosen`，因此候选顶替过一次请求后，会话的主模型仍是用户的选择，页面也不会把候选显示为主模型。投影 `stateVersion` 相应从 2 升到 3（旧缓存自动丢弃重建）。
+故障转移只改请求路由、不改会话模型：`dsh-api-session-controller` 的 `modelSelection` 投影新增 `chosen` 字段，记录「会话的模型」——用户显式选择（`model/selection`）或首次请求头（`reason: 'initial'`）记录的默认模型；后续 `reason: 'change'` 的重路由头（failover/round-robin）不再推进它，适配器默认的推理强度也不计入。页面的 `next` 视图（`pending ?? chosen`，不再回退 `lastUsed`）与 `selectionFor` 的模型解析（`picked → chosen → 部署默认`，不再回退最新请求头）都优先用 `chosen`，因此候选顶替过一次请求后，会话模型与页面展示都保持主模型，不会被候选顶替。投影 `stateVersion` 相应从 2 升到 3（旧缓存自动丢弃重建）。该修复同样作用于 `dsh-llm-round-robin`：它的锚点取自 `selection.assembled`（即 `selection.current`），`chosen` 稳定后锚点不再随轮换漂移。
 
 ## Alternatives considered
 

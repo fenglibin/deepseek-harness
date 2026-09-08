@@ -127,12 +127,48 @@
 }
 
 .path {
+  display: flex;
+  align-items: baseline;
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: left;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 20px;
+  font-family: var(--dsw-font-family-mono, inherit);
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.path:hover {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+/* The directory gives the row its context, so it is the part that gives way;
+   the file name is what the reader came for and never truncates. */
+.dirName {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.baseName {
+  flex: 0 0 auto;
+}
+
+.openError {
+  margin: 6px 0 0;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-state-error-primary);
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--dsw-font-family-mono, inherit);
 }
 
 .operation {

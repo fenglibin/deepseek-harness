@@ -6,6 +6,8 @@ export const zh = {
   'summary': '{count} 处变更',
   'accept': '接受',
   'acceptAll': '全部接受',
+  'open': '打开 {name}',
+  'openFailed': '打开失败：{message}',
   'operation.write': '写入',
   'operation.edit': '修改',
 } satisfies Record<string, string>

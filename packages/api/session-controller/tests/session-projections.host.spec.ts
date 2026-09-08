@@ -168,8 +168,26 @@ describe('session.history projections block', () => {
     const candidate = { provider: 'p', model: 'candidate' }
     session.append('model/selection', primary)
     session.append('request/header', { header: { config: primary }, reason: 'initial' })
-    // A failover reroute records a header under the borrowed candidate; the
-    // user's choice must still win as the next model.
+    // A reroute (failover or round-robin) records a header under the borrowed
+    // candidate; the user's authored choice must still win as the next model.
+    session.append('request/header', { header: { config: candidate }, reason: 'change' })
+
+    expect(ctx.sessionProjections.snapshot(session).values.modelSelection).toEqual({
+      lastUsed: candidate,
+      next: primary,
+    })
+  })
+
+  it('locks the session model on the first header and ignores a later reroute when no choice was authored', async () => {
+    const { ctx, session } = await harness(true)
+    remote(ctx)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    const primary = { provider: 'p', model: 'primary' }
+    const candidate = { provider: 'p', model: 'candidate' }
+    // No model/selection: the session model comes from its first request header.
+    session.append('request/header', { header: { config: primary }, reason: 'initial' })
+    // A round-robin reroute later serves a borrowed candidate; it must not
+    // displace the session model.
     session.append('request/header', { header: { config: candidate }, reason: 'change' })
 
     expect(ctx.sessionProjections.snapshot(session).values.modelSelection).toEqual({

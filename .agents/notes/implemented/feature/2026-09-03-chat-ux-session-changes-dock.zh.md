@@ -28,14 +28,14 @@ Status: implemented
 
 ## Consequences
 
-改动过文件的会话现在会显示一个停靠的「本次修改的文件 / Changed files」卡片：折叠时显示数量，展开时逐行列出每个文件（basename + 操作 + 接受），带「全部接受」。接受把该条目从表面清除而不动磁盘；全部接受后 dock 消失。列表把「先写入后又编辑」的文件去重为一条首次出现的条目，保留最早的操作类型。
+改动过文件的会话现在会显示一个停靠的「本次修改的文件 / Changed files」卡片：折叠时显示数量，展开时逐行列出每个文件（操作 + 接受），带「全部接受」。接受把该条目从表面清除而不动磁盘；全部接受后 dock 消失。列表把「先写入后又编辑」的文件去重为一条首次出现的条目，保留最早的操作类型。每行显示完整路径并可点击打开宿主桌面，折叠键是规范化后的路径——见 [2026-09-08-session-changes-dock-paths](2026-09-08-session-changes-dock-paths.zh.md)。
 
 代价是 composer 上方多了一个 input-dock entry，以及一个组件本地的接受集合——页面刷新后重置（刷新后会重新显示已接受的文件）。这两点都是 v1 的既定取舍。
 
 ## Testing
 
 - `ui-deliverables/tests/produced-files.client.spec.tsx` —— 新增测试验证 `producedChangesForClosing` 对 `write`、`edit`、`str_replace_editor` 分别记录 `write` / `edit` / `edit`，且对缺失数据返回 `[]`。该包 32 条测试。
-- `ui-session-changes/tests/session-changes-dock.client.spec.tsx` —— 7 条测试：折叠（跨 turn 首次顺序、保留最早操作、无 chat view / 空 timeline / 无 deliverables）、默认折叠后展开、逐个接受、全部接受后隐藏 dock。
+- `ui-session-changes/tests/session-changes-dock.client.spec.tsx` —— 首版 7 条测试：折叠（跨 turn 首次顺序、保留最早操作、无 chat view / 空 timeline / 无 deliverables）、默认折叠后展开、逐个接受、全部接受后隐藏 dock。该文件的后续扩展（路径规范化、点击打开、注册注入）见 [2026-09-08-session-changes-dock-paths](2026-09-08-session-changes-dock-paths.zh.md)。
 - 两个包合计：39 通过，0 失败；lint 0 警告/错误；`tsc -b tsconfig.client.json` 对新包干净。
 
 ## Deferred

@@ -418,7 +418,8 @@ describe('ApiSession model selection', () => {
       header: { config: { provider: 'mock', model: 'primary' } }, reason: 'initial',
     })
     agents.consumeSelection(live, 'mock', 'primary', undefined)
-    // A failover reroute then records a header under a borrowed candidate.
+    // A reroute (failover or round-robin) then records a header under a
+    // borrowed candidate; the authored choice must still be the session model.
     live.session.append('request/header', {
       header: { config: { provider: 'mock', model: 'candidate' } }, reason: 'change',
     })
