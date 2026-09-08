@@ -97,6 +97,9 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
   const [models, setModels] = useState<readonly ModelDraft[]>([])
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | undefined>(undefined)
+  const [validating, setValidating] = useState(false)
+  const [validateFailure, setValidateFailure] = useState<string | undefined>(undefined)
+  const [validateOk, setValidateOk] = useState(false)
   /**
    * The profile write landed. Only the key write can still be outstanding, so
    * the fields that describe the provider are settled and the retry path is
@@ -196,6 +199,38 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
     }
   }
 
+  /**
+   * Drop a reported connection-check verdict: on a create card every field is
+   * still being chosen, so a verdict about a route that does not exist yet must
+   * not outlive the edit that changed it.
+   */
+  const clearCheck = (): void => {
+    setValidateFailure(undefined)
+    setValidateOk(false)
+  }
+
+  const validate = async (): Promise<void> => {
+    setValidating(true)
+    clearCheck()
+    try {
+      const firstId = models[0]?.id
+      const model = typeof firstId === 'string' && firstId.length > 0 ? firstId : undefined
+      const answer = await operations.validateConnection(NS, {
+        baseURL,
+        api: protocol,
+        ...keyValue.length === 0 ? {} : { apiKey: keyValue },
+        ...model === undefined ? {} : { model },
+      })
+      if (answer.kind === 'refused') {
+        setValidateFailure(answer.message)
+        return
+      }
+      setValidateOk(true)
+    } finally {
+      setValidating(false)
+    }
+  }
+
   return (
     <div className={styles['editor']}>
       <div className={styles['editorHeader']}>
@@ -239,7 +274,10 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           placeholder={t('customBaseUrlPlaceholder')}
           aria-label={t('baseUrl')}
           disabled={profileDisabled}
-          onChange={(event) => { setBaseURL(event.target.value) }}
+          onChange={(event) => {
+            clearCheck()
+            setBaseURL(event.target.value)
+          }}
         />
       </div>
       <div className={styles['field']}>
@@ -249,7 +287,10 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           value={protocol}
           aria-label={t('customApi')}
           disabled={profileDisabled}
-          onChange={(event) => { setProtocol(event.target.value) }}
+          onChange={(event) => {
+            clearCheck()
+            setProtocol(event.target.value)
+          }}
         >
           {protocols.map(choice => <option key={choice} value={choice}>{choice}</option>)}
         </select>
@@ -264,7 +305,10 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
           placeholder={t('keyPlaceholder')}
           aria-label={t('keyInput')}
           disabled={disabled}
-          onChange={(event) => { setKeyDraft(event.target.value) }}
+          onChange={(event) => {
+            clearCheck()
+            setKeyDraft(event.target.value)
+          }}
         />
         {/* A create card has no stored key to keep, so the blank case says
             what a blank field means here instead: this route may authenticate
@@ -275,7 +319,10 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
       </div>
       <ModelListEditor
         models={models}
-        onChange={setModels}
+        onChange={(next) => {
+          clearCheck()
+          setModels(next)
+        }}
         probe={{
           settingsNs: NS,
           baseURL,
@@ -291,6 +338,10 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
       {/* Only the gates with something to say render; the route-id gate has its
           own field-level hint, so its blocked state would print an empty line. */}
       {hint === undefined ? null : <p className={styles['advancedHint']}>{hint}</p>}
+      {validateFailure !== undefined ? <p className={styles['error']}>{validateFailure}</p> : null}
+      {validateOk
+        ? <p className={styles['savedNotice']} role="status" aria-live="polite">{t('validateSuccess')}</p>
+        : null}
       <EditorFooter
         t={t}
         busy={busy}
@@ -299,6 +350,9 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
         submitBusyLabelKey="creating"
         onCancel={() => { props.onClose(committed, committed ? route : undefined) }}
         onSubmit={() => { void create() }}
+        validating={validating}
+        validateDisabled={baseURL.length === 0 || models.length === 0 || keyFailure !== undefined}
+        onValidate={() => { void validate() }}
       />
     </div>
   )

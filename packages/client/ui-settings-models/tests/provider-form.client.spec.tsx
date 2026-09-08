@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 import { bindSnapshotSelector, RemoteError } from '@deepseek-ai/dsh-client-test-runtime'
-import type { SettingsNamespaceView } from '@deepseek-ai/dsh-api-remotes/client'
+import type { RemoteResult, SettingsNamespaceView } from '@deepseek-ai/dsh-api-remotes/client'
 import type { JsonValue } from '@deepseek-ai/dsh-util-values'
 import { SettingsSchemaService } from '@deepseek-ai/dsh-client-ui-settings/src/client/schema.ts'
 import { SettingsScopeController } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-scope.ts'
@@ -138,6 +138,8 @@ function scriptedFace(options: {
         })),
       ))),
       discoverModels: discover,
+      validateConnection: vi.fn((): Promise<RemoteResult<{ baseURL: string; model: string }>> =>
+        Promise.resolve(remoteOk({ baseURL: 'https://gateway.acme.example/v1', model: 'acme-large' }))),
     },
     settings: {
       describe: vi.fn(() => Promise.resolve(remoteOk({ writable: true, namespaces: [namespace] }))),
@@ -304,7 +306,7 @@ function within_(scope: HTMLElement, label: string): HTMLElement {
 
 /** Open the add dialog and reach the hand-declared card by naming an endpoint. */
 async function openManualCard(url = 'https://acme.test/v1'): Promise<HTMLElement> {
-  fireEvent.click(screen.getByRole('button', { name: zh.add }))
+  fireEvent.click(screen.getByRole('button', { name: zh.addShort }))
   const dialog = await screen.findByRole('dialog')
   fireEvent.change(within(dialog).getByLabelText(zh.addManualUrl), { target: { value: url } })
   fireEvent.click(within_(dialog, zh.addManualContinue))
@@ -313,7 +315,7 @@ async function openManualCard(url = 'https://acme.test/v1'): Promise<HTMLElement
 
 /** The add dialog's resting state: a provider to pick and a URL to type. */
 async function openAddDialog(): Promise<HTMLElement> {
-  fireEvent.click(screen.getByRole('button', { name: zh.add }))
+  fireEvent.click(screen.getByRole('button', { name: zh.addShort }))
   return await screen.findByRole('dialog')
 }
 
@@ -1470,7 +1472,7 @@ describe('hand-declared providers', () => {
 
     fireEvent.click(screen.getByRole('button', { name: zh.close }))
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(screen.getByRole('button', { name: zh.add })).toBeTruthy()
+    expect(screen.getByRole('button', { name: zh.addShort })).toBeTruthy()
   })
 
   it('refuses an unusable key on the field and blocks creation', () => {
@@ -1535,6 +1537,70 @@ describe('hand-declared providers', () => {
 
     await waitFor(() => { expect(onClose).toHaveBeenCalledWith(true, 'ambient-gateway') })
     expect(set).not.toHaveBeenCalled()
+  })
+
+  it('verifies the draft connection and reports success', async () => {
+    const { face } = mountCard()
+
+    fireEvent.change(screen.getByLabelText(zh.customRoute), { target: { value: 'acme-gateway' } })
+    fireEvent.change(screen.getByLabelText(zh.baseUrl), { target: { value: 'https://gateway.acme.example/v1' } })
+    fireEvent.click(screen.getByRole('button', { name: zh.addModel }))
+    fireEvent.change(screen.getByLabelText(`${zh.modelId} 1`), { target: { value: 'acme-large' } })
+    fireEvent.change(screen.getByLabelText(zh.keyInput), { target: { value: 'gw-key' } })
+
+    const validateButton = screen.getByRole('button', { name: zh.validate })
+    expect(validateButton).toBeTruthy()
+    fireEvent.click(validateButton)
+
+    await waitFor(() => { expect(face.llm.validateConnection).toHaveBeenCalledOnce() })
+    expect(face.llm.validateConnection.mock.calls[0]).toEqual([
+      'llm-pi-ai',
+      { baseURL: 'https://gateway.acme.example/v1', api: 'openai-completions', apiKey: 'gw-key', model: 'acme-large' },
+    ])
+    expect((await screen.findByRole('status')).textContent).toBe(zh.validateSuccess)
+  })
+
+  it('reports a refused connection check as a fault', async () => {
+    const { face } = mountCard()
+    face.llm.validateConnection.mockImplementation(() => Promise.resolve(remoteFail('gateway down', 'credential/rejected')))
+
+    fireEvent.change(screen.getByLabelText(zh.baseUrl), { target: { value: 'https://gateway.acme.example/v1' } })
+    fireEvent.click(screen.getByRole('button', { name: zh.addModel }))
+    fireEvent.change(screen.getByLabelText(`${zh.modelId} 1`), { target: { value: 'acme-large' } })
+
+    fireEvent.click(screen.getByRole('button', { name: zh.validate }))
+
+    expect(await screen.findByText('gateway down')).toBeTruthy()
+  })
+
+  it('clears the verdict when the endpoint changes', async () => {
+    const { face } = mountCard()
+
+    fireEvent.change(screen.getByLabelText(zh.baseUrl), { target: { value: 'https://gateway.acme.example/v1' } })
+    fireEvent.click(screen.getByRole('button', { name: zh.addModel }))
+    fireEvent.change(screen.getByLabelText(`${zh.modelId} 1`), { target: { value: 'acme-large' } })
+    fireEvent.click(screen.getByRole('button', { name: zh.validate }))
+    await screen.findByRole('status')
+
+    fireEvent.change(screen.getByLabelText(zh.baseUrl), { target: { value: 'https://next.example/v1' } })
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(face.llm.validateConnection).toHaveBeenCalledOnce()
+  })
+
+  it('omits the model from the check when the first row has no usable id', async () => {
+    const { face } = mountCard()
+
+    fireEvent.change(screen.getByLabelText(zh.baseUrl), { target: { value: 'https://gateway.acme.example/v1' } })
+    fireEvent.change(screen.getByLabelText(zh.keyInput), { target: { value: 'gw-key' } })
+    // A freshly added row carries an empty id; the check must not invent one.
+    fireEvent.click(screen.getByRole('button', { name: zh.addModel }))
+    fireEvent.click(screen.getByRole('button', { name: zh.validate }))
+
+    await waitFor(() => { expect(face.llm.validateConnection).toHaveBeenCalledOnce() })
+    expect(face.llm.validateConnection.mock.calls[0]).toEqual([
+      'llm-pi-ai',
+      { baseURL: 'https://gateway.acme.example/v1', api: 'openai-completions', apiKey: 'gw-key' },
+    ])
   })
 })
 

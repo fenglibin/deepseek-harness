@@ -11,6 +11,23 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* The heading row: the title block takes the width, and the page's one add
+   action sits at its trailing edge instead of below the provider list, where
+   it read as one more row. */
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pageHeading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
 .title {
   margin: 0;
   font-size: 16px;
@@ -147,6 +164,18 @@
 
 .primaryButton:hover:not(:disabled) {
   background: var(--dsw-alias-button-primary-hover);
+}
+
+/* The heading's add action is a dense capsule: it sits beside a 24px title
+   line, so the 36px control the page's other buttons use would stand taller
+   than the heading it belongs to. */
+.pageHeader .addButton {
+  flex: none;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 14px;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .secondaryButton,

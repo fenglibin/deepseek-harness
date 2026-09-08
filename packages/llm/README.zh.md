@@ -29,6 +29,7 @@ llm 组提供 harness 的模型调用能力：一个提供方无关的服务，�
 | [`plugin-package-inventory-deepseek/`](plugin-package-inventory-deepseek/README.zh.md) | 为官方 DeepSeek 请求贡献活跃 Loader 包清单 | 贡献 `dsh_plugin_packages` |
 | [`llm-retry/`](llm-retry/README.zh.md) | 在持久 agent 步骤边界上按各提供方策略重试失败的模型请求 | 监听 `agent/request-error` |
 | [`llm-failover/`](llm-failover/README.zh.md) | 请求被限流时轮流切换候选模型，跳过固定等待 | 监听 `agent/request-error` / `agent/request` |
+| [`llm-round-robin/`](llm-round-robin/README.zh.md) | 每个步骤在会话所选模型与候选模型之间轮流切换，主动分散负载降低限流概率 | 监听 `agent/pre-step` / `agent/request` |
 | [`token-meter/`](token-meter/README.zh.md) | 用固定启发式规则从持久会话日志测量请求与上下文压力 | `ctx.tokenMeter` |
 
 -----

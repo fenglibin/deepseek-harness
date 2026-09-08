@@ -223,6 +223,8 @@ function scriptedFace(overrides: {
         { provider: 'plain', displayName: 'plain', settingsNs: 'llm-plain', settingsPath: ['profiles', 'plain'], active: false },
       ].map(({ active: _active, ...entry }) => entry)))),
       discoverModels: vi.fn(() => Promise.resolve(remoteOk([]))),
+      validateConnection: vi.fn((): Promise<RemoteResult<{ baseURL: string; model: string }>> =>
+        Promise.resolve(remoteOk({ baseURL: 'https://base', model: 'deepseek-v4-flash' }))),
     },
     settings: {
       describe: vi.fn(() => Promise.resolve(remoteOk({ writable: true, hasDocument: false, namespaces: wireNamespaces() }))),
@@ -402,7 +404,7 @@ async function lockedLightweight(face: object) {
 
 /** Open the add dialog on the chooser. */
 async function addDialog(): Promise<HTMLElement> {
-  fireEvent.click(screen.getByRole('button', { name: zh.add }))
+  fireEvent.click(screen.getByRole('button', { name: zh.addShort }))
   return await screen.findByRole('dialog')
 }
 
@@ -523,7 +525,7 @@ describe('ModelsSection', () => {
     expect(screen.getByText('openai')).toBeTruthy()
     expect(screen.queryByText('Active')).toBeNull()
     expect(screen.queryByText('未运行')).toBeNull()
-    expect(screen.getByText(zh.add)).toBeTruthy()
+    expect(screen.getByText(zh.addShort)).toBeTruthy()
   })
 
   it('leaves the unkeyed provider a plain row once another provider is usable', async () => {
@@ -647,7 +649,7 @@ describe('ModelsSection', () => {
     expect((await screen.findByRole('status')).textContent).toBe(
       providerCopy(zh.savedProvider, { provider: 'deepseek-official', displayName: 'DeepSeek' }),
     )
-    fireEvent.click(screen.getByText(zh.add))
+    fireEvent.click(screen.getByText(zh.addShort))
     expect(screen.queryByRole('status')).toBeNull()
   })
 
@@ -1529,7 +1531,7 @@ describe('ModelsSection', () => {
     />)
     expect(screen.getByText(zh.readOnly)).toBeTruthy()
     expect(screen.getAllByText<HTMLButtonElement>(zh.remove).every(button => button.disabled)).toBe(true)
-    expect(screen.getByText<HTMLButtonElement>(zh.add).disabled).toBe(true)
+    expect(screen.getByText<HTMLButtonElement>(zh.addShort).disabled).toBe(true)
   })
 
   it('opens one row\'s card as a dialog and closes it without writing', async () => {
@@ -1703,6 +1705,71 @@ describe('ModelsSection', () => {
     )
     expect(failure).toBe('credential is read-only')
     expect(mutate).not.toHaveBeenCalled()
+  })
+
+  it('verifies the draft connection from the DeepSeek card', async () => {
+    const { face } = await mountDeepSeekCard()
+    const dialog = screen.getByRole('dialog')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: zh.validate }))
+
+    await waitFor(() => { expect(face.llm.validateConnection).toHaveBeenCalledOnce() })
+    expect(face.llm.validateConnection.mock.calls[0]).toEqual([
+      'llm-deepseek',
+      { provider: 'deepseek-official', baseURL: 'https://base', model: 'deepseek-v4-flash' },
+    ])
+    expect((await within(dialog).findByRole('status')).textContent).toBe(zh.validateSuccess)
+  })
+
+  it('reports a refused connection check on the DeepSeek card', async () => {
+    const { face } = await mountDeepSeekCard()
+    face.llm.validateConnection.mockImplementation(() => Promise.resolve({
+      ok: false as const,
+      error: new RemoteError('llm/connection-check-rejected', 'gateway down', { settingsNs: 'llm-deepseek' }),
+    }))
+    const dialog = screen.getByRole('dialog')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: zh.validate }))
+
+    expect(await within(dialog).findByText('gateway down')).toBeTruthy()
+    expect(within(dialog).queryByRole('status')).toBeNull()
+  })
+
+  it('labels the connection check while it is in flight', async () => {
+    const { face } = await mountDeepSeekCard()
+    let finish: ((value: { ok: true; value: { baseURL: string } }) => void) | undefined
+    face.llm.validateConnection.mockImplementation(() => new Promise((resolve) => {
+      finish = resolve as typeof finish
+    }))
+    const dialog = screen.getByRole('dialog')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: zh.validate }))
+
+    const busy = await within(dialog).findByRole('button', { name: zh.validating })
+    expect(busy.getAttribute('disabled')).not.toBeNull()
+    await act(async () => {
+      finish?.({ ok: true, value: { baseURL: 'https://base' } })
+      await Promise.resolve()
+    })
+    expect(within(dialog).getByRole('button', { name: zh.validate })).toBeTruthy()
+  })
+
+  it('shows no separate route label when the display name is the route id', async () => {
+    const { face } = scriptedFace()
+    const { ProviderEditor } = await import('../src/client/ProviderEditor.tsx')
+    render(<ProviderEditor
+      provider="deepseek-official"
+      displayName="deepseek-official"
+      namespace={wireNamespaces()[0]!}
+      schema={settingsSchema}
+      settingsPath={[]}
+      operations={operationsWith(face)}
+      t={t}
+      readOnly={false}
+      onClose={() => {}}
+    />)
+    // The heading already says the route id, so the card does not repeat it.
+    expect(screen.getAllByText('deepseek-official').length).toBe(1)
   })
 
 })

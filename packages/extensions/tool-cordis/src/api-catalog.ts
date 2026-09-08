@@ -1251,6 +1251,26 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['RemoteError with `llm/model-discovery-rejected` when discovery refuses or fails.'],
       },
       {
+        signature: 'registerConnectionCheck( settingsNs: string, check: (request: LlmConnectionCheckOperation) => Promise<LlmConnectionCheckResult>, ): () => void',
+        description: 'Offer to probe provider configurations on behalf of the settings namespace this plugin owns. Registration is keyed by namespace for the same reason discovery is: a configuration surface already holds one per family, and a route being added has no identity of its own yet. Disposed with the fiber.',
+        parameters: [{ name: 'settingsNs', description: 'the namespace whose profiles this check serves.' }, { name: 'check', description: 'probes one draft configuration and must honor the supplied signal.' }],
+        returns: 'the disposer that withdraws the offer.',
+      },
+      {
+        signature: 'async validateConnection( settingsNs: string, request: LlmConnectionCheckRequest, signal?: AbortSignal, ): Promise<LlmConnectionCheckResult>',
+        description: 'Probe whether one draft provider configuration can serve a request. Unlike discovery this always reaches the endpoint: a catalog many answer "which models exist" without a network call, which says nothing about whether the stored key and endpoint work.',
+        parameters: [{ name: 'settingsNs', description: 'namespace whose registered check serves this draft.' }, { name: 'request', description: 'the endpoint, protocol, model, and one-shot credential to use.' }, { name: 'signal', description: 'caller cancellation.' }],
+        returns: 'the endpoint and model that answered.',
+        throws: ['LlmError when no check is registered for the namespace, nothing identifies what to probe, or the endpoint refuses or fails the request.'],
+      },
+      {
+        signature: '@Remote(\'validateConnection\') async remoteValidateConnection( settingsNs: string, request: LlmConnectionCheckRequest, signal: AbortSignal, ): Promise<LlmConnectionCheckResult>',
+        description: 'Remote adapter for one draft provider connection check.',
+        parameters: [{ name: 'settingsNs', description: 'namespace whose registered check serves this draft.' }, { name: 'request', description: 'endpoint, protocol, model, and one-shot credential to use.' }, { name: 'signal', description: 'caller cancellation supplied by the Remote carrier.' }],
+        returns: 'the endpoint and model that answered.',
+        throws: ['RemoteError with `llm/connection-check-rejected` when the check refuses or fails.'],
+      },
+      {
         signature: 'providerRetryPolicy(provider: string): ResolvedRetryPolicy',
         description: 'Resolve the retry policy captured when one provider route was registered.',
         parameters: [{ name: 'provider', description: 'registered provider route to inspect.' }],
@@ -4532,6 +4552,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface LlmConfigurableProvider {\n    provider: string;\n    displayName: string;\n    settingsNs: string;\n    settingsPath: readonly string[];\n    declared?: boolean;\n}',
   },
   {
+    name: 'LlmConnectionCheckOperation',
+    declaration: 'export interface LlmConnectionCheckOperation extends LlmConnectionCheckRequest {\n    signal?: AbortSignal;\n}',
+  },
+  {
+    name: 'LlmConnectionCheckRequest',
+    declaration: 'export interface LlmConnectionCheckRequest {\n    provider?: string;\n    baseURL?: string;\n    api?: string;\n    apiKey?: string;\n    model?: string;\n}',
+  },
+  {
+    name: 'LlmConnectionCheckResult',
+    declaration: 'export interface LlmConnectionCheckResult {\n    baseURL: string;\n    model: string;\n}',
+  },
+  {
     name: 'LlmDiscoveredModel',
     declaration: 'export interface LlmDiscoveredModel {\n    id: string;\n    name?: string;\n    contextWindow?: number;\n    maxTokens?: number;\n}',
   },
@@ -4577,7 +4609,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmRuntime',
-    declaration: 'export class LlmRuntime extends TypertRemoteService {\n    constructor(ctx: Context);\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    @Remote\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    @Remote\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest, signal?: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal?: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    @Remote(\'discoverModels\')\n    async remoteDiscoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    imageRequestPricing(provider: string, model: string): LlmImageRequestPricing | undefined;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>;\n    async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>;\n    stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
+    declaration: 'export class LlmRuntime extends TypertRemoteService {\n    constructor(ctx: Context);\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    @Remote\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    @Remote\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest, signal?: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal?: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    @Remote(\'discoverModels\')\n    async remoteDiscoverModels(settingsNs: string, request: LlmModelDiscoveryRequest, signal: AbortSignal): Promise<LlmDiscoveredModel[]>;\n    registerConnectionCheck(settingsNs: string, check: (request: LlmConnectionCheckOperation) => Promise<LlmConnectionCheckResult>): () => void;\n    async validateConnection(settingsNs: string, request: LlmConnectionCheckRequest, signal?: AbortSignal): Promise<LlmConnectionCheckResult>;\n    @Remote(\'validateConnection\')\n    async remoteValidateConnection(settingsNs: string, request: LlmConnectionCheckRequest, signal: AbortSignal): Promise<LlmConnectionCheckResult>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    imageRequestPricing(provider: string, model: string): LlmImageRequestPricing | u /* …truncated — full shape in source */',
   },
   {
     name: 'LspHover',
@@ -4945,7 +4977,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResolvedRetryBackoff',
-    declaration: 'export interface ResolvedRetryBackoff {\n    readonly initialDelayMs: number;\n    readonly maxDelayMs: number;\n    readonly jitterRatio: number;\n}',
+    declaration: 'export interface ResolvedRetryBackoff {\n    readonly initialDelayMs: number;\n    readonly maxDelayMs: number;\n    readonly jitterRatio: number;\n    readonly rateLimitDelayMs: number;\n}',
   },
   {
     name: 'ResolvedRetryPolicy',

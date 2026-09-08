@@ -20,6 +20,8 @@ Status: implemented
 
 插件在 `packages/bundle/base/cordis.patch.yml` 中以 `candidates: []` 挂载在 `llm-retry` 之前，并作为 `@deepseek-ai/dsh-base` 的依赖声明。候选路由不做目录成员关系预校验：指向未注册提供方的候选会在使用时以 `NO_ADAPTER` 大声失败。
 
+故障转移只改请求路由、不改用户选择：`dsh-api-session-controller` 的 `modelSelection` 投影新增 `chosen` 字段（只由 `model/selection` 事件更新、不随 `request/header` 变化），页面的 `next` 视图与 `selectionFor` 的模型解析都优先用 `chosen`，因此候选顶替过一次请求后，会话的主模型仍是用户的选择，页面也不会把候选显示为主模型。投影 `stateVersion` 相应从 2 升到 3（旧缓存自动丢弃重建）。
+
 ## Alternatives considered
 
 **在「设置 → 模型」页面给每个模型加「候选」开关（方案 B）。** 更贴合用户在 UI 上的心智模型，但需要改 `ui-settings-models` 的 UI、新增 settings namespace 与 wire 协议透传，工作量比纯配置大一个数量级。本方案选择先做配置驱动的 MVP，UI 包装留作后续；两者共享同一份 `candidates` 数据，UI 只是多一个可视化编辑入口。

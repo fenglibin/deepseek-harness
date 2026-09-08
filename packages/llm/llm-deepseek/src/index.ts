@@ -59,6 +59,7 @@ export {
   DEFAULT_STREAM_IDLE_TIMEOUT_MS,
   DeepSeekAdapter,
 } from './adapter.ts'
+import { checkConnection } from './connection-check.ts'
 export type { DeepSeekAdapterOptions, DeepSeekCatalogModel, DeepSeekConnectionOptions } from './adapter.ts'
 export {
   DEFAULT_LOW_DETAIL_IMAGE_PIXEL_BUDGET,
@@ -474,6 +475,16 @@ export function apply(ctx: Context, config: Config): void {
   // Route effects bind to this apply fiber via the stable `ctx` reference,
   // even when a swap runs inside the scoped settings callback below.
   const registration = ctx.llm.registerAdapter([PROVIDER], adapter)
+  // Probing a configuration answers a different question than serving a
+  // request — whether the draft works, before anything is stored — so it takes
+  // its own offer over the same resolved facts. A missing credential is left to
+  // reject here rather than falling back to an unauthenticated probe: the
+  // refusal names the reference the user has to fill, which a 401 cannot.
+  ctx.llm.registerConnectionCheck(NS, request => checkConnection(
+    request,
+    options(),
+    () => resolveApiKey(options()),
+  ))
   let registeredPolicy = options().retryPolicy
   const ensureRegistrationFacts = (): void => {
     const policy = options().retryPolicy

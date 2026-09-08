@@ -84,6 +84,7 @@ function normalConfig(): RetryPolicyConfig {
 async function harness(
   candidates: failover.CandidateRoute[],
   adapter: ScriptedAdapter,
+  when?: failover.CandidateRoute[],
   policies: Readonly<Record<string, RetryPolicyConfig | undefined>> = { mock: normalConfig() },
 ): Promise<{ ctx: Context; disposeAdapter: () => void }> {
   const ctx = new Context()
@@ -97,7 +98,9 @@ async function harness(
   // Failover first, then retry, matching the production cordis row order. The
   // retry executor declares its service injections, so its plugin record must
   // carry them for `ctx.plugin` to provision the projection registry.
-  await ctx.plugin((inner: Context) => { failover.apply(inner, { candidates }) })
+  await ctx.plugin((inner: Context) => {
+    failover.apply(inner, when === undefined ? { candidates } : { when, candidates })
+  })
   await ctx.plugin(Object.assign(
     (inner: Context) => { retry.apply(inner, {}, { random: () => 0.5 }) },
     { inject: retry.inject },
@@ -356,11 +359,91 @@ describe('rate-limit failover', () => {
     ])
   })
 
+  it('fails over only when the anchor model is listed in the `when` filter', async () => {
+    const adapter = new ScriptedAdapter([
+      new LlmError('throttled', RATE_LIMIT_CODE, { status: 429 }),
+      textResponse('recovered via candidate'),
+    ])
+    ;({ ctx: context } = await harness(
+      [route('mock', 'candidate')],
+      adapter,
+      [route('mock', 'primary')],
+    ))
+    const agent = context.agentLoop.create(SessionId('failover-when-match'), { provider: 'mock', model: 'primary' })
+
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+    await waitForIdle(agent)
+
+    expect(adapter.requests.map(request => ({ provider: request.provider, model: request.model }))).toEqual([
+      { provider: 'mock', model: 'primary' },
+      { provider: 'mock', model: 'candidate' },
+    ])
+    expect(agent.session.events.some(event => event.type === 'llm/retry')).toBe(false)
+  })
+
+  it('delegates to the retry policy when the anchor model is outside the `when` filter', async () => {
+    vi.useFakeTimers()
+    const adapter = new ScriptedAdapter([
+      new LlmError('throttled', RATE_LIMIT_CODE, { status: 429 }),
+      textResponse('recovered after wait'),
+    ])
+    ;({ ctx: context } = await harness(
+      [route('mock', 'candidate')],
+      adapter,
+      [route('mock', 'unrelated')],
+    ))
+    const agent = context.agentLoop.create(SessionId('failover-when-miss'), { provider: 'mock', model: 'primary' })
+
+    const idle = waitForIdle(agent)
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+    await vi.advanceTimersByTimeAsync(1)
+    await idle
+
+    expect(adapter.requests.map(request => ({ provider: request.provider, model: request.model }))).toEqual([
+      { provider: 'mock', model: 'primary' },
+      { provider: 'mock', model: 'primary' },
+    ])
+    expect(agent.session.events.filter(event => event.type === 'llm/retry')).toHaveLength(1)
+  })
+
+  it('keeps rotating through candidates once armed, even when a candidate throttles', async () => {
+    const adapter = new ScriptedAdapter([
+      new LlmError('throttled primary', RATE_LIMIT_CODE, { status: 429 }),
+      new LlmError('throttled candidate one', RATE_LIMIT_CODE, { status: 429 }),
+      textResponse('recovered via candidate two'),
+    ])
+    ;({ ctx: context } = await harness(
+      [route('mock', 'candidate-one'), route('mock', 'candidate-two')],
+      adapter,
+      [route('mock', 'primary')],
+    ))
+    const agent = context.agentLoop.create(SessionId('failover-when-armed'), { provider: 'mock', model: 'primary' })
+
+    agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+    await waitForIdle(agent)
+
+    expect(adapter.requests.map(request => ({ provider: request.provider, model: request.model }))).toEqual([
+      { provider: 'mock', model: 'primary' },
+      { provider: 'mock', model: 'candidate-one' },
+      { provider: 'mock', model: 'candidate-two' },
+    ])
+    expect(agent.session.events.some(event => event.type === 'llm/retry')).toBe(false)
+  })
+
   it('rejects a duplicate candidate route', () => {
     expect(() => {
       failover.apply(new Context(), {
         candidates: [route('mock', 'a'), route('mock', 'a')],
       })
     }).toThrow(/duplicate candidate route/)
+  })
+
+  it('rejects a duplicate `when` route', () => {
+    expect(() => {
+      failover.apply(new Context(), {
+        when: [route('mock', 'a'), route('mock', 'a')],
+        candidates: [route('mock', 'b')],
+      })
+    }).toThrow(/duplicate when route/)
   })
 })

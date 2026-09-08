@@ -1133,6 +1133,8 @@ export interface CandidateRoute {
  * failure then falls through to the provider's retry policy unchanged.
  */
 export interface Config {
+  /** Anchor models the failover applies to; empty matches every anchor model. */
+  when?: CandidateRoute[]
   /** Ordered failover routes, tried in order after a rate-limit failure. */
   candidates?: CandidateRoute[]
 }
@@ -1495,6 +1497,35 @@ export type Config = Readonly<Record<string, never>>
 ```
 
 来源：[`packages/llm/llm-retry/src/index.ts:25`](../packages/llm/llm-retry/src/index.ts)
+
+<a id="deepseek-aidsh-llm-round-robin"></a>
+
+## `@deepseek-ai/dsh-llm-round-robin`
+
+需要：无
+
+```ts config-catalog
+/** One exact provider/model route the rotation can step through. */
+export interface CandidateRoute {
+  /** Registered provider route. */
+  provider: string
+  /** Provider-owned model id. */
+  model: string
+}
+
+/**
+ * Plugin config. The session-selected model always anchors the rotation; an
+ * empty candidate list disables rotation, leaving the selection unchanged.
+ */
+export interface Config {
+  /** Anchor models the rotation applies to; empty matches every anchor model. */
+  when?: CandidateRoute[]
+  /** Ordered rotation routes, stepped through after the anchor each step. */
+  candidates?: CandidateRoute[]
+}
+```
+
+来源：[`packages/llm/llm-round-robin/src/index.ts:23`](../packages/llm/llm-round-robin/src/index.ts)
 
 <a id="deepseek-aidsh-lsp-stdio"></a>
 

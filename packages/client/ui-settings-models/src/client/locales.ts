@@ -13,6 +13,7 @@ export const zh = {
   deleteConfirm: '删除 {provider}',
   deleting: '正在删除 {provider}…',
   add: '添加模型',
+  addShort: '添加',
   addDescription: '选择一个提供方，或手动输入 API 地址来自定义提供方。',
   addProviderPlaceholder: '选择提供方…',
   addManualUrl: '或手动输入 API 地址',
@@ -125,6 +126,9 @@ export const zh = {
   imageUnderstandingFailed: '图片理解模型保存失败。',
   imageUnderstandingEmpty: '暂无可选模型。',
   imageUnderstandingRetrying: '正在加载模型目录…',
+  validate: '连接验证',
+  validating: '验证中…',
+  validateSuccess: '连接验证通过。',
 } satisfies Record<string, string>
 
 /** The settings.models namespace key union. */

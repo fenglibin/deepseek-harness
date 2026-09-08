@@ -396,10 +396,34 @@ describe('ApiSession model selection', () => {
     expect(agents.consumeSelection(pending, 'selected-provider', 'other-model', 'high')).toBe(false)
     expect(agents.consumeSelection(pending, 'selected-provider', 'selected-model', 'low')).toBe(false)
     expect(agents.consumeSelection(pending, 'selected-provider', 'selected-model', 'high')).toBe(true)
-    expect(selection.current).toEqual({ provider: 'fixture', model: 'fixture-model' })
+    // After the picked selection is consumed, the user's last choice — not the
+    // unset request header — is the session model.
+    expect(selection.current).toEqual({
+      provider: 'selected-provider',
+      model: 'selected-model',
+      reasoningEffort: 'high',
+    })
 
     const untouched = agent(ctx, header('uninstalled-model'))
     expect(agents.consumeSelection(untouched, 'fixture', 'fixture-model', undefined)).toBe(false)
+  })
+
+  it('keeps the user choice after a failover request header records a different model', async () => {
+    const { ctx, agents } = await harness()
+    const live = agent(ctx, header('failover-model'))
+    const selection = agents.selectionFor(live)
+    agents.selectForNextRequest(live, { provider: 'mock', model: 'primary' })
+    // The primary request header consumes the picked selection.
+    live.session.append('request/header', {
+      header: { config: { provider: 'mock', model: 'primary' } }, reason: 'initial',
+    })
+    agents.consumeSelection(live, 'mock', 'primary', undefined)
+    // A failover reroute then records a header under a borrowed candidate.
+    live.session.append('request/header', {
+      header: { config: { provider: 'mock', model: 'candidate' } }, reason: 'change',
+    })
+
+    expect(selection.current).toEqual({ provider: 'mock', model: 'primary' })
   })
 })
 

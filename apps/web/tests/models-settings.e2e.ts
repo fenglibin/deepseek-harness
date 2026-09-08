@@ -65,7 +65,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
     await dialog.getByText('填入各提供方的 API 密钥即可使用其模型。').waitFor({ timeout: 10_000 })
     // The dormant pi-ai adapter contributes its whole installed catalog; no
     // provider is configured yet, so the page is one add button.
-    const add = dialog.getByRole('button', { name: '添加模型' })
+    const add = dialog.getByRole('button', { name: '添加', exact: true })
     await add.waitFor({ timeout: 10_000 })
     // The button enables once the dormant catalog lands in the join.
     await expect.poll(async () => add.isEnabled(), { timeout: 10_000 }).toBe(true)
@@ -241,7 +241,7 @@ describe('web e2e: Models settings page configures a dormant provider', () => {
   it('declares a route the adapter does not ship', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-models-declare'))
     const dialog = page.getByRole('dialog', { name: '设置' })
-    const add = dialog.getByRole('button', { name: '添加模型' })
+    const add = dialog.getByRole('button', { name: '添加', exact: true })
     await expect.poll(async () => add.isEnabled(), { timeout: 10_000 }).toBe(true)
     await add.click()
     // The other way in: an API address opens the hand-declared card seeded

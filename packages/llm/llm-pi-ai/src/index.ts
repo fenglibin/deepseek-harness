@@ -67,6 +67,7 @@ import { authContextFrom, credentialStoreFrom } from './auth.ts'
 import { catalogProviderIds } from './catalog.ts'
 import { assertServiceable, Config, resolveProfiles } from './config.ts'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
+import { checkConnection } from './connection-check.ts'
 import { discoverModels } from './discovery.ts'
 import { registerPiAiFlows } from './login.ts'
 
@@ -262,6 +263,13 @@ export function apply(ctx: Context, config: Config): void {
     { ...request, ...signal === undefined ? {} : { signal } },
     () => storedApiKey(request.provider),
   ))
+  // Probing a configuration answers a different question than interrogating
+  // its endpoint — whether the whole draft works, not which models exist — so
+  // it takes its own offer over the same draft and the same stored credential.
+  ctx.llm.registerConnectionCheck(NS, request => checkConnection(request, {
+    profile: request.provider === undefined ? undefined : profiles().get(request.provider),
+    storedApiKey: () => storedApiKey(request.provider),
+  }))
   // Route effects bind to this apply fiber via the stable `ctx` reference,
   // even when a swap runs inside the scoped settings callback below. A bare
   // mount (zero routes) is the dormant posture: nothing registers until a

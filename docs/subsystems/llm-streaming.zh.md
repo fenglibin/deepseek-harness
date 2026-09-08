@@ -998,6 +998,41 @@ async discoverModels( settingsNs: string, request: LlmModelDiscoveryRequest, sig
 @Remote('discoverModels') async remoteDiscoverModels( settingsNs: string, request: LlmModelDiscoveryRequest, signal: AbortSignal, ): Promise<LlmDiscoveredModel[]>
 
 /**
+ * Offer to probe provider configurations on behalf of the settings namespace
+ * this plugin owns. Registration is keyed by namespace for the same reason
+ * discovery is: a configuration surface already holds one per family, and a
+ * route being added has no identity of its own yet. Disposed with the fiber.
+ * @param settingsNs - the namespace whose profiles this check serves.
+ * @param check - probes one draft configuration and must honor the supplied signal.
+ * @returns the disposer that withdraws the offer.
+ */
+registerConnectionCheck( settingsNs: string, check: (request: LlmConnectionCheckOperation) => Promise<LlmConnectionCheckResult>, ): () => void
+
+/**
+ * Probe whether one draft provider configuration can serve a request. Unlike
+ * discovery this always reaches the endpoint: a catalog many answer
+ * "which models exist" without a network call, which says nothing about
+ * whether the stored key and endpoint work.
+ * @param settingsNs - namespace whose registered check serves this draft.
+ * @param request - the endpoint, protocol, model, and one-shot credential to use.
+ * @param signal - caller cancellation.
+ * @returns the endpoint and model that answered.
+ * @throws LlmError when no check is registered for the namespace, nothing
+ * identifies what to probe, or the endpoint refuses or fails the request.
+ */
+async validateConnection( settingsNs: string, request: LlmConnectionCheckRequest, signal?: AbortSignal, ): Promise<LlmConnectionCheckResult>
+
+/**
+ * Remote adapter for one draft provider connection check.
+ * @param settingsNs - namespace whose registered check serves this draft.
+ * @param request - endpoint, protocol, model, and one-shot credential to use.
+ * @param signal - caller cancellation supplied by the Remote carrier.
+ * @returns the endpoint and model that answered.
+ * @throws RemoteError with `llm/connection-check-rejected` when the check refuses or fails.
+ */
+@Remote('validateConnection') async remoteValidateConnection( settingsNs: string, request: LlmConnectionCheckRequest, signal: AbortSignal, ): Promise<LlmConnectionCheckResult>
+
+/**
  * Resolve the retry policy captured when one provider route was registered.
  * @param provider - registered provider route to inspect.
  * @returns the provider-owned policy, with normal defaults already resolved.

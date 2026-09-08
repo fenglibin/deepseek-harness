@@ -71,6 +71,7 @@
     "@deepseek-ai/dsh-llm-failover": "workspace:^",
     "@deepseek-ai/dsh-llm-pi-ai": "workspace:^",
     "@deepseek-ai/dsh-llm-retry": "workspace:^",
+    "@deepseek-ai/dsh-llm-round-robin": "workspace:^",
     "@deepseek-ai/dsh-mcp-manager": "workspace:^",
     "@deepseek-ai/dsh-permission-presets": "workspace:^",
     "@deepseek-ai/dsh-plan-mode": "workspace:^",

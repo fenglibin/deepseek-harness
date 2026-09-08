@@ -112,8 +112,8 @@ export type {
 export type { McpServerStatusKind, McpServerStatusView, McpToolInfo } from '@deepseek-ai/dsh-mcp-manager/types'
 // Provider registry and discovery vocabulary for the llm namespace.
 export type {
-  LlmConfigurableProvider, LlmDiscoveredModel,
-  LlmModelDiscoveryRequest, LlmProviderInfo,
+  LlmConfigurableProvider, LlmConnectionCheckRequest, LlmConnectionCheckResult,
+  LlmDiscoveredModel, LlmModelDiscoveryRequest, LlmProviderInfo,
 } from '@deepseek-ai/dsh-llm/types'
 // Reference-discovery result vocabulary for the fileReferences and
 // sessionReferenceResolver namespaces.

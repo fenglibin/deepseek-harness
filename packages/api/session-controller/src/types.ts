@@ -91,6 +91,12 @@ export interface ModelSelectionProjectionState {
   readonly lastUsed: ModelSelection | null
   /** Later user selection not yet consumed by a matching model request. */
   readonly pending: ModelSelection | null
+  /**
+   * Last user-authored selection, retained after its request consumed it so a
+   * failover reroute (a request served by a different model) never displaces
+   * the user's choice as the session's model.
+   */
+  readonly chosen: ModelSelection | null
 }
 
 /** Client view of the durable model-selection fold. */

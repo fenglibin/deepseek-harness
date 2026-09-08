@@ -35,6 +35,12 @@ export interface EditorFooterProps {
   onCancel: () => void
   /** Run the card's commit. */
   onSubmit: () => void
+  /** Whether a connection check is in flight; labels its button and holds the row. */
+  validating?: boolean
+  /** Whether the connection check is refused, as judged by the owning card. */
+  validateDisabled?: boolean
+  /** Run the card's connection check; absent hides the button. */
+  onValidate?: () => void
 }
 
 /**
@@ -46,6 +52,18 @@ export function EditorFooter(props: EditorFooterProps): ReactNode {
   const { t } = props
   return (
     <div className={styles['editorActions']}>
+      {props.onValidate === undefined
+        ? null
+        : (
+          <button
+            type="button"
+            className={styles['secondaryButton']}
+            disabled={props.busy || props.validating === true || props.validateDisabled === true}
+            onClick={props.onValidate}
+          >
+            {props.validating === true ? t('validating') : t('validate')}
+          </button>
+        )}
       <button
         type="button"
         className={styles['secondaryButton']}

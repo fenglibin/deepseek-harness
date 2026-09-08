@@ -311,8 +311,54 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
 
   return (
     <div className={styles['section']}>
-      <h2 className={styles['title']}>{t('title')}</h2>
-      <p className={styles['intro']}>{t('intro')}</p>
+      <div className={styles['pageHeader']}>
+        <div className={styles['pageHeading']}>
+          <h2 className={styles['title']}>{t('title')}</h2>
+          <p className={styles['intro']}>{t('intro')}</p>
+        </div>
+        {/* One entry point for the two ways to gain a provider — adopt one the
+            adapter already knows, or declare one by its endpoint — because
+            both start from the same question and the dialog asks it once. The
+            button sits in the heading row rather than below the list so the
+            page's one add action is where a heading's action belongs. */}
+        <button
+          type="button"
+          className={styles['addButton']}
+          disabled={!state.writable || (addable.length === 0 && protocols.length === 0)}
+          onClick={() => {
+            setSavedTarget(undefined)
+            setEditing(undefined)
+            setAdding(true)
+          }}
+        >
+          <IconPlusOutline16 size={14} />
+          {t('addShort')}
+        </button>
+        {adding
+          ? (
+            <AddModelDialog
+              rows={state.rows}
+              addable={addable}
+              namespaces={state.namespaces}
+              protocols={protocols}
+              /* v8 ignore next -- the create is only reachable with this namespace mounted */
+              revision={state.namespaces.get('llm-pi-ai')?.revision ?? 0}
+              schema={schema}
+              operations={operations}
+              t={t}
+              readOnly={!state.writable}
+              renderSlot={renderSlot}
+              onClose={(added) => {
+                setAdding(false)
+                // A committed route is announced like any saved row: the
+                // dialog is gone by then, and the notice is what says the
+                // write landed rather than merely closed.
+                if (added !== undefined) announceSaved({ provider: added, displayName: added })
+              }}
+            />
+          )
+          : null}
+      </div>
       {!state.writable && state.status === 'ready' ? <p className={styles['notice']}>{t('readOnly')}</p> : null}
       {savedIdentity === undefined
         ? null
@@ -427,48 +473,6 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
         onDiscard={() => { imageUnderstanding.discard() }}
         onRetry={() => { imageUnderstanding.retry() }}
       />
-      <div className={styles['addBlock']}>
-        {/* One entry point for the two ways to gain a provider — adopt one the
-            adapter already knows, or declare one by its endpoint — because
-            both start from the same question and the dialog asks it once. */}
-        <button
-          type="button"
-          className={styles['addButton']}
-          disabled={!state.writable || (addable.length === 0 && protocols.length === 0)}
-          onClick={() => {
-            setSavedTarget(undefined)
-            setEditing(undefined)
-            setAdding(true)
-          }}
-        >
-          <IconPlusOutline16 size={14} />
-          {t('add')}
-        </button>
-        {adding
-          ? (
-            <AddModelDialog
-              rows={state.rows}
-              addable={addable}
-              namespaces={state.namespaces}
-              protocols={protocols}
-              /* v8 ignore next -- the create is only reachable with this namespace mounted */
-              revision={state.namespaces.get('llm-pi-ai')?.revision ?? 0}
-              schema={schema}
-              operations={operations}
-              t={t}
-              readOnly={!state.writable}
-              renderSlot={renderSlot}
-              onClose={(added) => {
-                setAdding(false)
-                // A committed route is announced like any saved row: the
-                // dialog is gone by then, and the notice is what says the
-                // write landed rather than merely closed.
-                if (added !== undefined) announceSaved({ provider: added, displayName: added })
-              }}
-            />
-          )
-          : null}
-      </div>
       {cardRow === undefined ? null : card(cardRow)}
       {renderSlot('settings.models.footer', {})}
       <Modal

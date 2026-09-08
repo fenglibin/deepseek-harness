@@ -33,6 +33,8 @@ export interface CandidateRoute {
  * failure then falls through to the provider's retry policy unchanged.
  */
 export interface Config {
+  /** Anchor models the failover applies to; empty matches every anchor model. */
+  when?: CandidateRoute[]
   /** Ordered failover routes, tried in order after a rate-limit failure. */
   candidates?: CandidateRoute[]
 }
@@ -45,6 +47,7 @@ const candidateRouteSchema: z<CandidateRoute> = z.object({
 
 /** Runtime schema for {@link Config}. */
 export const Config: z<Config> = z.object({
+  when: z.array(candidateRouteSchema).default([]),
   candidates: z.array(candidateRouteSchema).default([]),
 })
 
@@ -54,27 +57,51 @@ function routeKey(route: CandidateRoute): string {
 }
 
 /**
- * Validate and detach the configured candidate pool, rejecting duplicates and
+ * Validate and detach a provider/model route list, rejecting duplicates and
  * blank ids. Programmatic callers can bypass Schemastery, so this re-judges the
  * bounds the schema would otherwise enforce.
- * @param config - raw plugin config.
- * @returns detached candidate routes in declaration order.
+ * @param routes - raw routes from the plugin config.
+ * @param label - which pool is being resolved, for error messages.
+ * @returns detached routes in declaration order.
  */
-function resolveCandidates(config: Config): CandidateRoute[] {
+function resolveRoutes(routes: CandidateRoute[] | undefined, label: string): CandidateRoute[] {
   const seen = new Set<string>()
-  const candidates: CandidateRoute[] = []
-  for (const candidate of config.candidates ?? []) {
-    if (candidate.provider.length === 0 || candidate.model.length === 0) {
-      throw new Error('llm-failover: candidate routes need non-empty provider and model ids')
+  const resolved: CandidateRoute[] = []
+  for (const route of routes ?? []) {
+    if (route.provider.length === 0 || route.model.length === 0) {
+      throw new Error(`llm-failover: ${label} routes need non-empty provider and model ids`)
     }
-    const key = routeKey(candidate)
+    const key = routeKey(route)
     if (seen.has(key)) {
-      throw new Error(`llm-failover: duplicate candidate route "${candidate.provider}/${candidate.model}"`)
+      throw new Error(`llm-failover: duplicate ${label} route "${route.provider}/${route.model}"`)
     }
     seen.add(key)
-    candidates.push({ provider: candidate.provider, model: candidate.model })
+    resolved.push({ provider: route.provider, model: route.model })
   }
-  return candidates
+  return resolved
+}
+
+/** Resolve the configured candidate pool. */
+function resolveCandidates(config: Config): CandidateRoute[] {
+  return resolveRoutes(config.candidates, 'candidate')
+}
+
+/** Resolve the configured `when` filter; empty means unrestricted. */
+function resolveWhen(config: Config): CandidateRoute[] {
+  return resolveRoutes(config.when, 'when')
+}
+
+/**
+ * Report whether an anchor route is admitted by the `when` filter. An empty
+ * filter matches every route; otherwise the route must equal one listed entry.
+ * @param when - resolved `when` routes (empty means unrestricted).
+ * @param anchor - the session-selected route to test.
+ * @returns true when the route is within the filter's scope.
+ */
+function matchesWhen(when: CandidateRoute[], anchor: CandidateRoute): boolean {
+  if (when.length === 0) return true
+  const key = routeKey(anchor)
+  return when.some(entry => routeKey(entry) === key)
 }
 
 /** Per-agent failover state for the currently open step. */
@@ -85,6 +112,8 @@ interface FailoverState {
   pending: CandidateRoute | undefined
   /** Route the most recent request used. */
   current: CandidateRoute | undefined
+  /** True when the step's anchor model is admitted by the `when` filter. */
+  armed: boolean
 }
 
 /**
@@ -94,12 +123,13 @@ interface FailoverState {
  */
 export function apply(ctx: Context, config: Config = {}): void {
   const candidates = resolveCandidates(config)
+  const when = resolveWhen(config)
   const states = new WeakMap<Agent, FailoverState>()
 
   const stateOf = (agent: Agent): FailoverState => {
     let state = states.get(agent)
     if (state === undefined) {
-      state = { tried: new Set(), pending: undefined, current: undefined }
+      state = { tried: new Set(), pending: undefined, current: undefined, armed: false }
       states.set(agent, state)
     }
     return state
@@ -112,7 +142,9 @@ export function apply(ctx: Context, config: Config = {}): void {
     const state = stateOf(payload.agent)
     const pending = state.pending
     if (pending === undefined) {
-      state.current = { provider: resolved.provider, model: resolved.model }
+      const anchor: CandidateRoute = { provider: resolved.provider, model: resolved.model }
+      state.current = anchor
+      state.armed = matchesWhen(when, anchor)
       return resolved
     }
     state.pending = undefined
@@ -133,6 +165,7 @@ export function apply(ctx: Context, config: Config = {}): void {
   ctx.on('agent/request-error', (payload, next): Promise<RequestErrorAction> => {
     if (payload.failure.code !== RATE_LIMIT_CODE) return next()
     const state = stateOf(payload.agent)
+    if (!state.armed) return next()
     if (state.current !== undefined) {
       state.tried.add(routeKey(state.current))
     }
@@ -148,6 +181,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     const state = stateOf(payload.agent)
     state.tried.clear()
     state.pending = undefined
+    state.armed = false
     return next()
   })
 }

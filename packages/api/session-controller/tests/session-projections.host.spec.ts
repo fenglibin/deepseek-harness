@@ -160,6 +160,24 @@ describe('session.history projections block', () => {
     })
   })
 
+  it('keeps the user choice as next after a request header records a different (failover) model', async () => {
+    const { ctx, session } = await harness(true)
+    remote(ctx)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    const primary = { provider: 'p', model: 'primary' }
+    const candidate = { provider: 'p', model: 'candidate' }
+    session.append('model/selection', primary)
+    session.append('request/header', { header: { config: primary }, reason: 'initial' })
+    // A failover reroute records a header under the borrowed candidate; the
+    // user's choice must still win as the next model.
+    session.append('request/header', { header: { config: candidate }, reason: 'change' })
+
+    expect(ctx.sessionProjections.snapshot(session).values.modelSelection).toEqual({
+      lastUsed: candidate,
+      next: primary,
+    })
+  })
+
   it('serves the unit value on the tail page with asOfSeq = last event seq', async () => {
     const { ctx, session } = await harness(true)
     ctx.sessionProjections.register(lastUserUnit())

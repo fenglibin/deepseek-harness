@@ -7,7 +7,8 @@
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {
-  CredentialInfo, LlmDiscoveredModel, LlmModelDiscoveryRequest,
+  CredentialInfo, LlmConnectionCheckRequest, LlmConnectionCheckResult,
+  LlmDiscoveredModel, LlmModelDiscoveryRequest,
   SettingsNamespaceView, SettingsPathOpView,
 } from '@deepseek-ai/dsh-api-remotes/client'
 
@@ -28,6 +29,13 @@ export type ModelDiscoveryOutcome =
   /** The candidates the provider disclosed, in its own order. */
   | { readonly kind: 'found'; readonly models: readonly LlmDiscoveredModel[] }
   /** The interrogation was refused, with the Host's own diagnostic. */
+  | { readonly kind: 'refused'; readonly message: string }
+
+/** What one connection check answered. */
+export type ConnectionCheckOutcome =
+  /** The configuration served a request; the report names what answered. */
+  | { readonly kind: 'ok'; readonly result: LlmConnectionCheckResult }
+  /** The check was refused, with the Host's own diagnostic. */
   | { readonly kind: 'refused'; readonly message: string }
 
 /** The Host operations the Models page and its cards invoke. */
@@ -71,6 +79,13 @@ export interface ModelsOperations {
    * @returns the candidates, or the refusal.
    */
   discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest): Promise<ModelDiscoveryOutcome>
+  /**
+   * Probe whether a draft provider configuration can serve a request.
+   * @param settingsNs - namespace whose adapter family answers.
+   * @param request - endpoint facts as the form currently shows them.
+   * @returns the endpoint and model that answered, or the refusal.
+   */
+  validateConnection(settingsNs: string, request: LlmConnectionCheckRequest): Promise<ConnectionCheckOutcome>
 }
 
 /**
@@ -103,6 +118,12 @@ export function createModelsOperations(ctx: ClientContext): ModelsOperations {
       const response = await ctx.remote.llm.discoverModels(settingsNs, request)
       return response.ok
         ? { kind: 'found', models: response.value }
+        : { kind: 'refused', message: response.error.message }
+    },
+    validateConnection: async (settingsNs, request) => {
+      const response = await ctx.remote.llm.validateConnection(settingsNs, request)
+      return response.ok
+        ? { kind: 'ok', result: response.value }
         : { kind: 'refused', message: response.error.message }
     },
   }

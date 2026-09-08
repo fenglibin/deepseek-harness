@@ -12,8 +12,10 @@ import { deepFreeze } from '@deepseek-ai/dsh-util-values'
 import type {
   GenerateOptions,
   LlmConfigurableProvider,
+  LlmConnectionCheckOperation,
+  LlmConnectionCheckRequest,
+  LlmConnectionCheckResult,
   LlmDiscoveredModel,
-  LlmFailure,
   LlmImageRequestPricing,
   LlmModelContext,
   LlmModelDiscoveryRequest,
@@ -26,15 +28,17 @@ import type {
 import { freezeMessage, type Message } from './message.ts'
 import { resolveRetryPolicy } from './retry-policy.ts'
 import type { ResolvedRetryPolicy } from './retry-policy.ts'
-import type { ProviderRequestId } from './brand.ts'
 import { callConfigEquals } from './call-config.ts'
 import type { LlmCallConfig, LlmCallConfigAdapterDefaults } from './call-config.ts'
-import { HarnessError, INVALID_CREDENTIAL_CODE } from './error.ts'
+import { INVALID_CREDENTIAL_CODE, LlmError } from './error.ts'
+export type { LlmErrorOptions } from './error.ts'
+export { LlmError } from './error.ts'
 import { normalizeLlmFailure } from './adapter-failure.ts'
 import { normalizeApiKey } from './api-key.ts'
 import { contentHasImage, projectImagesForTextModel } from './content.ts'
 
 export * from './attribution.ts'
+export * from './openai-chat-probe.ts'
 export * from './brand.ts'
 export * from './error.ts'
 export * from './api-key.ts'
@@ -66,56 +70,6 @@ declare module '@deepseek-ai/cordis' {
      */
     'llm/stream'(this: LlmRuntime, options: GenerateOptions, next: () => AsyncIterable<StreamChunk>): AsyncIterable<StreamChunk>
 
-  }
-}
-
-/** Structured provider facts and cause accepted by {@link LlmError}. */
-export interface LlmErrorOptions extends ErrorOptions {
-  /** Valid HTTP status observed at the provider boundary. */
-  status?: number
-  /** Positive finite provider-requested delay in milliseconds. */
-  providerRetryAfterMs?: number
-  /** Non-empty opaque provider request id. */
-  requestId?: ProviderRequestId
-}
-
-/**
- * Typed error for LLM-related failures. Extends {@link HarnessError}, so the
- * `code` string (e.g. `AUTH`, `RATE_LIMIT`, `NO_ADAPTER`) is shared taxonomy.
- */
-export class LlmError extends HarnessError {
-  /** Serializable facts retained beside this live Error. */
-  readonly failure: LlmFailure
-
-  /**
-   * @param message - non-empty human-readable failure summary.
-   * @param code - non-empty stable provider-neutral machine code.
-   * @param options - optional cause and validated serializable provider facts.
-   */
-  constructor(message: string, code: string, options?: LlmErrorOptions) {
-    if (typeof message !== 'string' || message.length === 0) throw new Error('LlmError message must be a non-empty string')
-    if (typeof code !== 'string' || code.length === 0) throw new Error('LlmError code must be a non-empty string')
-    if (options?.status !== undefined
-      && (!Number.isInteger(options.status) || options.status < 100 || options.status > 599)) {
-      throw new Error('LlmError status must be an integer from 100 through 599')
-    }
-    if (options?.providerRetryAfterMs !== undefined
-      && (!Number.isFinite(options.providerRetryAfterMs) || options.providerRetryAfterMs <= 0)) {
-      throw new Error('LlmError providerRetryAfterMs must be a positive finite number')
-    }
-    if (options?.requestId !== undefined
-      && (typeof options.requestId !== 'string' || options.requestId.length === 0)) {
-      throw new Error('LlmError requestId must be a non-empty string')
-    }
-    super(message, code, options)
-    this.name = 'LlmError'
-    this.failure = Object.freeze({
-      message,
-      code,
-      ...options?.status === undefined ? {} : { status: options.status },
-      ...options?.providerRetryAfterMs === undefined ? {} : { providerRetryAfterMs: options.providerRetryAfterMs },
-      ...options?.requestId === undefined ? {} : { requestId: options.requestId },
-    })
   }
 }
 
@@ -329,6 +283,10 @@ export class LlmRuntime extends TypertRemoteService {
   private discoveries = new Map<
     string,
     (request: LlmModelDiscoveryRequest, signal?: AbortSignal) => Promise<readonly LlmDiscoveredModel[]>
+  >()
+  private connectionChecks = new Map<
+    string,
+    (request: LlmConnectionCheckOperation) => Promise<LlmConnectionCheckResult>
   >()
 
   constructor(ctx: Context) {
@@ -628,6 +586,95 @@ export class LlmRuntime extends TypertRemoteService {
     } catch (error: unknown) {
       throw new RemoteError(
         'llm/model-discovery-rejected',
+        error instanceof Error ? error.message : String(error),
+        {
+          settingsNs,
+          ...request.baseURL === undefined ? {} : { baseURL: request.baseURL },
+        },
+        { cause: error },
+      )
+    }
+  }
+
+  /**
+   * Offer to probe provider configurations on behalf of the settings namespace
+   * this plugin owns. Registration is keyed by namespace for the same reason
+   * discovery is: a configuration surface already holds one per family, and a
+   * route being added has no identity of its own yet. Disposed with the fiber.
+   * @param settingsNs - the namespace whose profiles this check serves.
+   * @param check - probes one draft configuration and must honor the supplied signal.
+   * @returns the disposer that withdraws the offer.
+   */
+  registerConnectionCheck(
+    settingsNs: string,
+    check: (request: LlmConnectionCheckOperation) => Promise<LlmConnectionCheckResult>,
+  ): () => void {
+    const dispose = this.ctx.effect(function* (this: LlmRuntime) {
+      if (settingsNs.length === 0) {
+        throw new LlmError('a connection check needs a non-empty settings namespace', 'INVALID_CONNECTION_CHECK')
+      }
+      if (this.connectionChecks.has(settingsNs)) {
+        throw new LlmError(
+          `a connection check for "${settingsNs}" is already registered`,
+          'DUPLICATE_CONNECTION_CHECK',
+        )
+      }
+      this.connectionChecks.set(settingsNs, check)
+      yield () => {
+        this.connectionChecks.delete(settingsNs)
+      }
+    }.bind(this), 'llm.registerConnectionCheck()')
+    return () => void dispose()
+  }
+
+  /**
+   * Probe whether one draft provider configuration can serve a request. Unlike
+   * discovery this always reaches the endpoint: a catalog many answer
+   * "which models exist" without a network call, which says nothing about
+   * whether the stored key and endpoint work.
+   * @param settingsNs - namespace whose registered check serves this draft.
+   * @param request - the endpoint, protocol, model, and one-shot credential to use.
+   * @param signal - caller cancellation.
+   * @returns the endpoint and model that answered.
+   * @throws LlmError when no check is registered for the namespace, nothing
+   * identifies what to probe, or the endpoint refuses or fails the request.
+   */
+  async validateConnection(
+    settingsNs: string,
+    request: LlmConnectionCheckRequest,
+    signal?: AbortSignal,
+  ): Promise<LlmConnectionCheckResult> {
+    const check = this.connectionChecks.get(settingsNs)
+    if (check === undefined) {
+      throw new LlmError(`no connection check is registered for "${settingsNs}"`, 'NO_CONNECTION_CHECK')
+    }
+    // One of the two identifies what to probe: a route the adapter knows, or
+    // an endpoint to reach. Neither leaves anything to ask.
+    if ((request.provider ?? '').length === 0 && (request.baseURL ?? '').length === 0) {
+      throw new LlmError('a connection check needs a provider route or a baseURL', 'INVALID_CONNECTION_CHECK')
+    }
+    return await check({ ...request, ...signal === undefined ? {} : { signal } })
+  }
+
+  /**
+   * Remote adapter for one draft provider connection check.
+   * @param settingsNs - namespace whose registered check serves this draft.
+   * @param request - endpoint, protocol, model, and one-shot credential to use.
+   * @param signal - caller cancellation supplied by the Remote carrier.
+   * @returns the endpoint and model that answered.
+   * @throws RemoteError with `llm/connection-check-rejected` when the check refuses or fails.
+   */
+  @Remote('validateConnection')
+  async remoteValidateConnection(
+    settingsNs: string,
+    request: LlmConnectionCheckRequest,
+    signal: AbortSignal,
+  ): Promise<LlmConnectionCheckResult> {
+    try {
+      return await this.validateConnection(settingsNs, request, signal)
+    } catch (error: unknown) {
+      throw new RemoteError(
+        'llm/connection-check-rejected',
         error instanceof Error ? error.message : String(error),
         {
           settingsNs,

@@ -315,6 +315,87 @@ describe('model discovery registry', () => {
   })
 })
 
+describe('connection check registry', () => {
+  it('offers one check per settings namespace and disposes with its fiber', async () => {
+    const ctx = await setup()
+    const check = vi.fn(() => Promise.resolve({ baseURL: 'https://gateway.example/v1', model: 'm' }))
+
+    const dispose = ctx.llm.registerConnectionCheck('llm-example', check)
+    await expect(ctx.llm.validateConnection('llm-example', { baseURL: 'https://gateway.example/v1' }))
+      .resolves.toEqual({ baseURL: 'https://gateway.example/v1', model: 'm' })
+    expect(check).toHaveBeenCalledWith({ baseURL: 'https://gateway.example/v1' })
+
+    dispose()
+    await expect(ctx.llm.validateConnection('llm-example', { baseURL: 'https://gateway.example/v1' }))
+      .rejects.toThrow(/no connection check is registered/)
+  })
+
+  it('rejects an unnamed namespace and a second registration of the same one', async () => {
+    const ctx = await setup()
+    const check = (): Promise<never> => Promise.reject(new Error('unused'))
+
+    expect(() => ctx.llm.registerConnectionCheck('', check)).toThrow(/non-empty settings namespace/)
+    ctx.llm.registerConnectionCheck('llm-example', () => Promise.resolve({ baseURL: 'b', model: 'm' }))
+    expect(() => ctx.llm.registerConnectionCheck('llm-example', check)).toThrow(/already registered/)
+  })
+
+  it('carries cancellation into the Remote check and maps provider failures', async () => {
+    const ctx = await setup()
+    const check = vi.fn()
+      .mockResolvedValueOnce({ baseURL: 'https://gateway.example/v1', model: 'm' })
+      .mockRejectedValueOnce(new Error('endpoint offline'))
+      .mockRejectedValueOnce('provider refused')
+    ctx.llm.registerConnectionCheck('llm-example', check)
+    const signal = new AbortController().signal
+
+    await expect(ctx.llm.remoteValidateConnection(
+      'llm-example',
+      { baseURL: 'https://gateway.example/v1', model: 'm' },
+      signal,
+    )).resolves.toEqual({ baseURL: 'https://gateway.example/v1', model: 'm' })
+    expect(check).toHaveBeenNthCalledWith(
+      1,
+      { baseURL: 'https://gateway.example/v1', model: 'm', signal },
+    )
+
+    await expect(ctx.llm.remoteValidateConnection(
+      'llm-example',
+      { baseURL: 'https://gateway.example/v1' },
+      signal,
+    )).rejects.toMatchObject({
+      code: 'llm/connection-check-rejected',
+      message: 'endpoint offline',
+      details: { settingsNs: 'llm-example', baseURL: 'https://gateway.example/v1' },
+    })
+    await expect(ctx.llm.remoteValidateConnection(
+      'llm-example',
+      { provider: 'known-route' },
+      signal,
+    )).rejects.toMatchObject({
+      code: 'llm/connection-check-rejected',
+      message: 'provider refused',
+      details: { settingsNs: 'llm-example' },
+    })
+  })
+
+  it('refuses a namespace nothing serves and a draft with no endpoint', async () => {
+    const ctx = await setup()
+    ctx.llm.registerConnectionCheck('llm-example', () => Promise.resolve({ baseURL: 'b', model: 'm' }))
+
+    await expect(ctx.llm.validateConnection('llm-absent', { baseURL: 'https://gateway.example/v1' }))
+      .rejects.toMatchObject({ code: 'NO_CONNECTION_CHECK' })
+    await expect(ctx.llm.validateConnection('llm-example', { baseURL: '' }))
+      .rejects.toMatchObject({ code: 'INVALID_CONNECTION_CHECK' })
+    await expect(ctx.llm.validateConnection('llm-example', { provider: '', baseURL: '' }))
+      .rejects.toMatchObject({ code: 'INVALID_CONNECTION_CHECK' })
+    await expect(ctx.llm.validateConnection('llm-example', {}))
+      .rejects.toMatchObject({ code: 'INVALID_CONNECTION_CHECK' })
+    // Naming a route alone is enough: the adapter may know it without an endpoint.
+    await expect(ctx.llm.validateConnection('llm-example', { provider: 'known-route' }))
+      .resolves.toEqual({ baseURL: 'b', model: 'm' })
+  })
+})
+
 describe('imageRequestPricing resolution', () => {
   it('resolves the owning adapter declaration and degrades everywhere else to undefined', async () => {
     const ctx = await setup()

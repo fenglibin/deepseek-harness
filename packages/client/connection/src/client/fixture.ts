@@ -3517,6 +3517,16 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
           ok: true,
           value: fixtureModelGroups().flatMap(group => group.models.map(model => ({ id: model.id, name: model.name }))),
         })
+        // Same for a connection check: the fixture reaches no provider, so it
+        // echoes the endpoint and model the surface asked about back as the
+        // pair that "answered".
+        case 'llm/validateConnection': return Promise.resolve({
+          ok: true,
+          value: {
+            baseURL: (request as { baseURL?: string } | undefined)?.baseURL ?? 'https://api.deepseek.com',
+            model: (request as { model?: string } | undefined)?.model ?? 'deepseek-v4-flash',
+          },
+        })
         case 'settings/update': return Promise.resolve(settingsRemotes.update(args.ns as string))
         case 'settings/replace': return Promise.resolve(settingsRemotes.replace(args.ns as string))
         case 'settings/mutate': return Promise.resolve(settingsRemotes.mutate(args.ns as string))

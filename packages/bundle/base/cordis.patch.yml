@@ -96,13 +96,27 @@
     - id: jobs
       name: '@deepseek-ai/dsh-jobs-local'
 
+    # Optional round-robin rotation pool. An empty `candidates` list is a no-op;
+    # supply provider/model routes to rotate through per step, spreading load
+    # across routes to lower rate-limit likelihood before a throttle happens.
+    # The session-selected model anchors the rotation. An empty `when` matches
+    # every anchor model; listing routes restricts rotation to those models.
+    - id: llm-round-robin
+      name: '@deepseek-ai/dsh-llm-round-robin'
+      config:
+        when: []
+        candidates: []
+
     # Optional rate-limit failover pool. An empty `candidates` list is a no-op;
     # supply provider/model routes to rotate through instead of always waiting
     # the provider retry policy's fixed rate-limit delay. Registered before
-    # llm-retry so its immediate failover short-circuits the wait.
+    # llm-retry so its immediate failover short-circuits the wait. An empty
+    # `when` matches every anchor model; listing routes restricts failover to
+    # those models.
     - id: llm-failover
       name: '@deepseek-ai/dsh-llm-failover'
       config:
+        when: []
         candidates: []
 
     - id: llm-retry

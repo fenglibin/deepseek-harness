@@ -136,6 +136,19 @@ function layoutOf(ns: string): EditorLayout {
   return 'unknown'
 }
 
+/**
+ * The first model id one catalog carries, which is the model a connection
+ * check addresses. A catalog a provider does not answer with is the whole
+ * point of probing, so only a usable id is one.
+ * @param models - a drafted, inherited, or schema-default model list.
+ * @returns the first id, or undefined when there is none to address.
+ */
+function firstModelId(models: unknown): string | undefined {
+  if (!Array.isArray(models) || models.length === 0) return undefined
+  const id = (models[0] as { id?: unknown } | null)?.id
+  return typeof id === 'string' && id.length > 0 ? id : undefined
+}
+
 /** The credential reference this profile resolves keys through. */
 function refFor(
   schema: SettingsSchemaOperations,
@@ -162,6 +175,9 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   const [keyState, setKeyState] = useState<CredentialInfo | undefined>(undefined)
   const [busy, setBusy] = useState(false)
   const [failure, setFailure] = useState<string | undefined>(undefined)
+  const [validating, setValidating] = useState(false)
+  const [validateFailure, setValidateFailure] = useState<string | undefined>(undefined)
+  const [validateOk, setValidateOk] = useState(false)
   // A settings success advances both retry baselines immediately. Keeping the
   // derived fields in the draft prevents a pushed namespace refresh from
   // turning them into deletions when the following credential write is retried.
@@ -200,12 +216,22 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     const value = schema.getPath(source, [key])
     return typeof value === 'string' && value.trim().length > 0 ? value : undefined
   }
+  /**
+   * Drop a reported connection-check verdict, so one never outlives the draft
+   * it was about: an endpoint or key edited after a passing check is no longer
+   * the configuration that passed it.
+   */
+  const clearCheck = (): void => {
+    setValidateFailure(undefined)
+    setValidateOk(false)
+  }
   const setField = (key: string, next: string | undefined): void => {
     // A value of nothing but whitespace is cleared, not stored: `stringAt`
     // already reports it as absent, so the field would otherwise render empty
     // while the draft still carried the spaces into `settings.yaml`, where
     // both adapters would accept that non-empty string as a real value.
     const value = next === undefined || next.trim().length === 0 ? undefined : next
+    clearCheck()
     setDraft(current => value === undefined
       ? schema.deletePath(current, [key])
       : schema.setPath(current, [key], value))
@@ -237,6 +263,21 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     ...probeBaseURL === undefined ? {} : { baseURL: probeBaseURL },
     ...probeApi === undefined ? {} : { api: probeApi },
     ...keyValue.length === 0 ? {} : { apiKey: keyValue },
+  }
+  // The model a connection check addresses: the first one this draft would
+  // serve, which is the draft's own list when it overrides the catalog and the
+  // layer beneath that list otherwise. A card with no model anywhere leaves the
+  // field out, so the Host says which one it needs instead of the card asking
+  // about a model id it invented.
+  const probeModel = firstModelId(schema.getPath(draft, ['models']))
+    ?? firstModelId(schema.getPath(namespace.base, [...settingsPath, 'models']))
+    ?? firstModelId(schema.nodeAtPath(root, [...settingsPath, 'models'])?.meta.default)
+  const checkRequest = {
+    provider: props.provider,
+    ...probeBaseURL === undefined ? {} : { baseURL: probeBaseURL },
+    ...probeApi === undefined ? {} : { api: probeApi },
+    ...keyValue.length === 0 ? {} : { apiKey: keyValue },
+    ...probeModel === undefined ? {} : { model: probeModel },
   }
   /**
    * The write for this card, or a failure message. Every edit travels as
@@ -307,6 +348,26 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     }
   }
 
+  /**
+   * Drop a reported check result, so a verdict never outlives the draft it was
+   * about: an endpoint or key edited after a passing check is no longer the
+   * configuration that passed it.
+   */
+  const validate = async (): Promise<void> => {
+    setValidating(true)
+    clearCheck()
+    try {
+      const answer = await operations.validateConnection(namespace.ns, checkRequest)
+      if (answer.kind === 'refused') {
+        setValidateFailure(answer.message)
+        return
+      }
+      setValidateOk(true)
+    } finally {
+      setValidating(false)
+    }
+  }
+
   if (node === undefined) {
     // A directory entry addressing a position its schema cannot resolve is a
     // host-side inconsistency; showing it beats a blank card.
@@ -354,9 +415,13 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
       t,
       disabled,
       onChange: (next: Record<string, unknown>[]) => {
+        clearCheck()
         setDraft(current => schema.setPath(current, ['models'], next))
       },
-      onReset: () => { setDraft(current => schema.deletePath(current, ['models'])) },
+      onReset: () => {
+        clearCheck()
+        setDraft(current => schema.deletePath(current, ['models']))
+      },
     }
     return (
       <>
@@ -373,7 +438,10 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
             required={props.credentialRequired === true}
             autoFocus={props.autoFocusCredential === true}
             disabled={disabled || keyLocked}
-            onChange={(event) => { setKeyDraft(event.target.value) }}
+            onChange={(event) => {
+              clearCheck()
+              setKeyDraft(event.target.value)
+            }}
           />
           {shownKeyFailure === undefined ? null : <p className={styles['error']}>{t(shownKeyFailure)}</p>}
         </div>
@@ -498,6 +566,10 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
             {`${t('model')} ${String(modelFailure.index + 1)}: ${t(modelFailure.key)}`}
           </p>
         )}
+      {validateFailure !== undefined ? <p className={styles['error']}>{validateFailure}</p> : null}
+      {validateOk
+        ? <p className={styles['savedNotice']} role="status" aria-live="polite">{t('validateSuccess')}</p>
+        : null}
       <EditorFooter
         t={t}
         busy={busy}
@@ -510,6 +582,9 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
         {...props.cancelLabelKey === undefined ? {} : { cancelLabelKey: props.cancelLabelKey }}
         onCancel={() => { props.onClose(false) }}
         onSubmit={() => { void apply() }}
+        {...layout === 'unknown'
+          ? {}
+          : { validating, validateDisabled: shownKeyFailure !== undefined, onValidate: () => { void validate() } }}
       />
     </div>
   )

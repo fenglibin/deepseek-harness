@@ -308,10 +308,17 @@ export class ApiSessionAgentController {
     let picked = projectionState.pending === null
       ? undefined
       : agentModelSelection(projectionState.pending)
+    const sessionProjections = this.ctx.sessionProjections
     const defaultModel = this.ctx.agentDefaultModel
     const selection: InstalledSelection = {
       get current(): AgentModelSelection {
         if (picked !== undefined) return picked
+        // The user's last authored choice, read live so a selection made after
+        // this Agent resumed still resolves. A failover reroute records a
+        // request header under the borrowed candidate; reading that header here
+        // would silently promote the candidate to the session's model.
+        const chosen = sessionProjections.stateOf(agent.session, 'modelSelection')?.chosen ?? null
+        if (chosen !== null) return agentModelSelection(chosen)
         const loggedHeader = agent.session.requestHeader()
         if (loggedHeader === undefined) return defaultModel.currentSelection()
         const logged = loggedHeader.config

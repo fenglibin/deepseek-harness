@@ -283,10 +283,49 @@ export interface LlmModelDiscoveryOperation extends LlmModelDiscoveryRequest {
   signal?: AbortSignal
 }
 
+/**
+ * One probe of whether a provider configuration the user is still editing can
+ * serve a request. It is sent as a draft for the same reason a discovery
+ * request is: a route being added has no stored profile to name. The endpoint,
+ * protocol, and model are all optional because an adapter that already
+ * describes the route can supply each one the draft leaves out.
+ */
+export interface LlmConnectionCheckRequest {
+  /** Route the draft is editing, when it edits an existing one. */
+  provider?: string
+  /** Endpoint to probe; resolved from the route when the draft names none. */
+  baseURL?: string
+  /** Wire protocol the endpoint speaks, when the draft names one. */
+  api?: string
+  /** Credential for this probe alone; the harness never stores it. */
+  apiKey?: string
+  /** Model to address; resolved from the route when the draft names none. */
+  model?: string
+}
+
+/** Provider-side connection check with operation-local cancellation attached. */
+export interface LlmConnectionCheckOperation extends LlmConnectionCheckRequest {
+  /** Caller cancellation; implementations must settle promptly after it aborts. */
+  signal?: AbortSignal
+}
+
+/** What one connection check reports when the probed configuration answers. */
+export interface LlmConnectionCheckResult {
+  /** The endpoint that answered, as the probe resolved it. */
+  baseURL: string
+  /** The model the probe addressed. */
+  model: string
+}
+
 declare module '@deepseek-ai/dsh-typert-protocol' {
   interface RemoteErrorDetailsMap {
     /** A draft provider interrogation refused or failed. */
     'llm/model-discovery-rejected': {
+      readonly settingsNs: string
+      readonly baseURL?: string
+    }
+    /** A draft provider connection check refused or failed. */
+    'llm/connection-check-rejected': {
       readonly settingsNs: string
       readonly baseURL?: string
     }
