@@ -96,6 +96,15 @@
     - id: jobs
       name: '@deepseek-ai/dsh-jobs-local'
 
+    # Optional rate-limit failover pool. An empty `candidates` list is a no-op;
+    # supply provider/model routes to rotate through instead of always waiting
+    # the provider retry policy's fixed rate-limit delay. Registered before
+    # llm-retry so its immediate failover short-circuits the wait.
+    - id: llm-failover
+      name: '@deepseek-ai/dsh-llm-failover'
+      config:
+        candidates: []
+
     - id: llm-retry
       name: '@deepseek-ai/dsh-llm-retry'
 

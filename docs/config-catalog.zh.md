@@ -1113,6 +1113,33 @@ export interface DeepSeekCatalogModel {
 
 来源：[`packages/llm/llm-deepseek/src/index.ts:125`](../packages/llm/llm-deepseek/src/index.ts)
 
+<a id="deepseek-aidsh-llm-failover"></a>
+
+## `@deepseek-ai/dsh-llm-failover`
+
+需要：无
+
+```ts config-catalog
+/** One exact provider/model route a rate-limited request can fail over to. */
+export interface CandidateRoute {
+  /** Registered provider route. */
+  provider: string
+  /** Provider-owned model id. */
+  model: string
+}
+
+/**
+ * Plugin config. An empty candidate list disables failover: every rate-limit
+ * failure then falls through to the provider's retry policy unchanged.
+ */
+export interface Config {
+  /** Ordered failover routes, tried in order after a rate-limit failure. */
+  candidates?: CandidateRoute[]
+}
+```
+
+来源：[`packages/llm/llm-failover/src/index.ts:24`](../packages/llm/llm-failover/src/index.ts)
+
 <a id="deepseek-aidsh-llm-pi-ai"></a>
 
 ## `@deepseek-ai/dsh-llm-pi-ai`

@@ -407,7 +407,18 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'delivery/change': DeliveryChangeMeta
 ```
 
-来源：[`packages/delivery/delivery/src/types.ts:184`](../packages/delivery/delivery/src/types.ts)
+来源：[`packages/delivery/delivery/src/types.ts:239`](../packages/delivery/delivery/src/types.ts)
+
+<a id="deliverytasks--log-only"></a>
+
+#### `delivery/tasks` — log-only
+
+```ts persistence-catalog
+/** Full implementation checklist written for the current task. */
+'delivery/tasks': DeliveryTasksChangeMeta
+```
+
+来源：[`packages/delivery/delivery/src/types.ts:241`](../packages/delivery/delivery/src/types.ts)
 
 ### `feedback/*`
 

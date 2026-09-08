@@ -68,6 +68,7 @@
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-lightweight-model": "workspace:^",
     "@deepseek-ai/dsh-llm-deepseek": "workspace:^",
+    "@deepseek-ai/dsh-llm-failover": "workspace:^",
     "@deepseek-ai/dsh-llm-pi-ai": "workspace:^",
     "@deepseek-ai/dsh-llm-retry": "workspace:^",
     "@deepseek-ai/dsh-mcp-manager": "workspace:^",
