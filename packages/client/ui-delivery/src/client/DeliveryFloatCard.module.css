@@ -125,3 +125,71 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.group {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.groupLabel {
+  flex: none;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.groupState {
+  flex: none;
+  font-size: 11px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.group[data-state='done'] .groupState {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.group[data-state='doing'] .groupState,
+.group[data-state='writing'] .groupState {
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.taskList {
+  margin: 2px 0 0;
+  padding: 0 0 0 14px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.taskItem {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.taskContent {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-primary);
+}
+
+.taskState {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.taskItem[data-status='completed'] .taskState {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.taskItem[data-status='in_progress'] .taskState {
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}

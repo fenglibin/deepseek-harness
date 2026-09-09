@@ -67,6 +67,7 @@ function changeId(data: DeliveryChangeMeta): string {
     case 'record-change':
     case 'record-design':
     case 'record-spec':
+    case 'mark-analyzed':
       return String(data.ref.id)
     /* v8 ignore next -- DeliveryOperation is closed and every variant is handled above. */
     default:
@@ -132,6 +133,8 @@ export const deliveryTaskDefinition: ConversationNodeDefinition<DeliveryTaskStat
         // A second create for the same id cannot occur in a valid log; keep the
         // current state rather than re-opening the node.
         return state
+      case 'mark-analyzed':
+        return { ...state, events }
       /* v8 ignore next -- DeliveryOperation is closed and every variant is handled above. */
       default:
         return data satisfies never

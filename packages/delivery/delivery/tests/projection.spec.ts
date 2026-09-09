@@ -73,7 +73,7 @@ const createMeta: DeliverySnapshotChangeMeta = {
   kind: 'delivery/change',
   version: 1,
   operation: 'create',
-  task: { id: DeliveryTaskId('t1'), revision: 1, objective: 'x', phase: 'created', level: 'l0', changeCount: 0, designCount: 0, specCount: 0 },
+  task: { id: DeliveryTaskId('t1'), revision: 1, objective: 'x', phase: 'created', level: 'l0', changeCount: 0, designCount: 0, specCount: 0, analysisDone: false },
   createdAt: 1,
   updatedAt: 1,
 }
@@ -90,7 +90,7 @@ describe('delivery projection unit', () => {
 
   it('validates the checkpoint state schema and rejects incoherent states', () => {
     const current: DeliveryProjection = {
-      task: { id: DeliveryTaskId('t1'), revision: 1, objective: 'x', phase: 'created', level: 'l0', changeCount: 0, designCount: 0, specCount: 0 },
+      task: { id: DeliveryTaskId('t1'), revision: 1, objective: 'x', phase: 'created', level: 'l0', changeCount: 0, designCount: 0, specCount: 0, analysisDone: false },
       createdAt: 1,
       updatedAt: 1,
     }
@@ -114,7 +114,7 @@ describe('delivery projection unit', () => {
 
   it('retains strict replay failures without throwing from the drive', () => {
     const current: DeliveryProjection = {
-      task: { id: DeliveryTaskId('t1'), revision: 1, objective: 'x', phase: 'created', level: 'l0', changeCount: 0, designCount: 0, specCount: 0 },
+      task: { id: DeliveryTaskId('t1'), revision: 1, objective: 'x', phase: 'created', level: 'l0', changeCount: 0, designCount: 0, specCount: 0, analysisDone: false },
       createdAt: 1,
       updatedAt: 1,
     }
@@ -190,9 +190,9 @@ describe('delivery tasks projection', () => {
   it('serves the recorded checklist with per-phase progress', async () => {
     const { bench, ref } = await benchWithTask()
     bench.ctx.delivery.recordTasks(bench.agent, ref, 'add-thing', [
-      { content: 'design the thing', phase: 'designed', done: true },
-      { content: 'build the thing', phase: 'implemented', done: false },
-      { content: 'verify the thing', phase: 'verified', done: false },
+      { content: 'design the thing', phase: 'designed', status: 'completed' },
+      { content: 'build the thing', phase: 'implemented', status: 'pending' },
+      { content: 'verify the thing', phase: 'verified', status: 'pending' },
     ])
     const view = tasksView(bench)
     expect(view.changeId).toBe('add-thing')
@@ -202,13 +202,23 @@ describe('delivery tasks projection', () => {
     expect(view.progress.created).toEqual({ done: 0, total: 0 })
   })
 
+  it('counts only completed items, ignoring in_progress', async () => {
+    const { bench, ref } = await benchWithTask()
+    bench.ctx.delivery.recordTasks(bench.agent, ref, 'add-thing', [
+      { content: 'a', phase: 'implemented', status: 'pending' },
+      { content: 'b', phase: 'implemented', status: 'in_progress' },
+      { content: 'c', phase: 'implemented', status: 'completed' },
+    ])
+    expect(tasksView(bench).progress.implemented).toEqual({ done: 1, total: 3 })
+  })
+
   it('replaces the checklist on a later write', async () => {
     const { bench, ref } = await benchWithTask()
     bench.ctx.delivery.recordTasks(bench.agent, ref, 'add-thing', [
-      { content: 'a', phase: 'implemented', done: false },
+      { content: 'a', phase: 'implemented', status: 'pending' },
     ])
     bench.ctx.delivery.recordTasks(bench.agent, ref, 'add-thing', [
-      { content: 'a', phase: 'implemented', done: true },
+      { content: 'a', phase: 'implemented', status: 'completed' },
     ])
     expect(tasksView(bench).progress.implemented).toEqual({ done: 1, total: 1 })
   })
@@ -217,8 +227,8 @@ describe('delivery tasks projection', () => {
     const { bench, ref } = await benchWithTask()
     expect(() => {
       bench.ctx.delivery.recordTasks(bench.agent, ref, 'add-thing', [
-        { content: 'same', phase: 'implemented', done: false },
-        { content: 'same', phase: 'implemented', done: true },
+        { content: 'same', phase: 'implemented', status: 'pending' },
+        { content: 'same', phase: 'implemented', status: 'completed' },
       ])
     }).toThrow(/unique/)
   })
@@ -230,7 +240,7 @@ describe('delivery tasks projection', () => {
         bench.agent,
         ref,
         'add-thing',
-        [{ content: 'x', phase: 'nonsense', done: false }] as unknown as DeliveryTaskItem[],
+        [{ content: 'x', phase: 'nonsense', status: 'pending' }] as unknown as DeliveryTaskItem[],
       )
     }).toThrow(/phase/)
   })

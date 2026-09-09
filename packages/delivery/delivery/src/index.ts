@@ -29,6 +29,7 @@ import type {
   DeliveryChangeMeta,
   DeliveryClearChangeMeta,
   DeliveryLevel,
+  DeliveryMarkAnalyzedChangeMeta,
   DeliveryOperation,
   DeliveryPhase,
   DeliveryProjection,
@@ -79,6 +80,7 @@ const deliveryProjectionSchema: ZodType<DeliveryProjection | null> = zod.union([
       changeCount: zod.number().int().nonnegative(),
       designCount: zod.number().int().nonnegative(),
       specCount: zod.number().int().nonnegative(),
+      analysisDone: zod.boolean(),
     }),
     createdAt: zod.number(),
     updatedAt: zod.number(),
@@ -240,6 +242,7 @@ export class DeliveryService extends Service {
       changeCount: 0,
       designCount: 0,
       specCount: 0,
+      analysisDone: false,
     }
     return this.commitSnapshot(agent, 'create', task, now, now)
   }
@@ -350,6 +353,33 @@ export class DeliveryService extends Service {
   }
 
   /**
+   * Mark requirement analysis and alignment complete for the current task.
+   * @param agent - owning live agent.
+   * @param ref - expected current revision.
+   * @returns the view with `analysisDone` set to true.
+   */
+  markAnalyzed(agent: Agent, ref: DeliveryTaskRef): DeliveryView {
+    const currentState = this.expectCurrent(agent, ref)
+    const current = currentState.task
+    if (current.analysisDone) {
+      throw new DeliveryError(
+        `delivery task "${current.id}" already completed requirement analysis`,
+        'DELIVERY_ALREADY_ANALYZED',
+      )
+    }
+    const change: DeliveryMarkAnalyzedChangeMeta = {
+      kind: 'delivery/change',
+      version: DELIVERY_CHANGE_VERSION,
+      operation: 'mark-analyzed',
+      ref: { id: current.id, revision: current.revision + 1 },
+      analysisDone: true,
+      updatedAt: this.nextMutationTime(currentState),
+    }
+    this.commit(agent, change)
+    return this.view(this.state(agent.session)) as DeliveryView
+  }
+
+  /**
    * Record the implementation checklist for the current task, replacing any
    * earlier list. The write is checked with the decoder the replay uses, so a
    * checklist that could not be replayed is rejected at the write instead.
@@ -375,7 +405,7 @@ export class DeliveryService extends Service {
         return {
           content: typeof record['content'] === 'string' ? record['content'].trim() : '',
           phase: record['phase'],
-          done: record['done'] === true,
+          status: record['status'],
         }
       }) as unknown as DeliveryTaskItem[],
       updatedAt: Date.now(),
@@ -487,7 +517,7 @@ export class DeliveryService extends Service {
     const ref = change.operation === 'clear'
       ? change.cleared
       : change.operation === 'record-change' || change.operation === 'record-design'
-        || change.operation === 'record-spec'
+        || change.operation === 'record-spec' || change.operation === 'mark-analyzed'
         ? change.ref
         : { id: change.task.id, revision: change.task.revision }
     agent.session.append('delivery/change', change)

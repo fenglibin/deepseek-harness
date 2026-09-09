@@ -23,6 +23,7 @@ function makeSnapshot(over: Partial<DeliverySnapshot> = {}): DeliverySnapshot {
     changeCount: 1,
     designCount: 1,
     specCount: 1,
+    analysisDone: false,
     ...over,
   }
 }
@@ -43,16 +44,20 @@ function renderCard(value: DeliveryProjection | null | undefined, checklist?: De
   return render(<DeliveryFloatCard {...props} />)
 }
 
-/** A checklist whose only item sits in the implemented phase. */
+/** A checklist with one item in each of the three statuses. */
 const CHECKLIST: DeliveryTasksView = {
   changeId: 'add-thing',
-  items: [{ content: 'build it', phase: 'implemented', done: true }],
+  items: [
+    { content: 'build it', phase: 'implemented', status: 'completed' },
+    { content: 'test it', phase: 'verified', status: 'in_progress' },
+    { content: 'ship it', phase: 'verified', status: 'pending' },
+  ],
   progress: {
     created: { done: 0, total: 0 },
     designed: { done: 0, total: 0 },
     specified: { done: 0, total: 0 },
-    implemented: { done: 1, total: 2 },
-    verified: { done: 0, total: 0 },
+    implemented: { done: 1, total: 1 },
+    verified: { done: 0, total: 2 },
     accepted: { done: 0, total: 0 },
   },
 }
@@ -69,61 +74,67 @@ describe('DeliveryFloatCard', () => {
     expect(absent.container.firstChild).toBeNull()
   })
 
-  it('shows the tier badge, phase, and objective in the compact card', () => {
+  it('shows the tier badge and objective', () => {
     renderCard(makeProjection())
     expect(screen.getByText('L2')).toBeDefined()
-    expect(screen.getByText('已拆分')).toBeDefined()
     expect(screen.getByText('Ship the delivery discipline')).toBeDefined()
-    expect(screen.queryByTestId('delivery-float-progress')).toBeNull()
   })
 
-  it('expands to reveal the phase progress bar and artifact paths', () => {
+  it('renders the four semantic groups expanded by default for an l2 task', () => {
     renderCard(makeProjection(), CHECKLIST)
-    fireEvent.click(screen.getByRole('button'))
-    const progress = screen.getByTestId('delivery-float-progress')
-    expect(progress.querySelectorAll('[data-phase]')).toHaveLength(6)
-    expect(progress.querySelector('[data-phase="specified"]')?.getAttribute('data-state')).toBe('current')
-    expect(screen.getByText('.dsh/changes/task-1.md')).toBeDefined()
-    expect(screen.getByText('.dsh/design/task-1.md')).toBeDefined()
-    expect(screen.getByText('openspec/changes/add-thing/')).toBeDefined()
+    expect(screen.getByTestId('delivery-float-progress')).toBeDefined()
+    expect(screen.getByText('需求分析')).toBeDefined()
+    expect(screen.getByText('设计文档')).toBeDefined()
+    expect(screen.getByText('任务列表')).toBeDefined()
+    expect(screen.getByText('实现验证')).toBeDefined()
   })
 
-  it('omits the OpenSpec path until a checklist names the change', () => {
+  it('omits the design group for an l0 task', () => {
+    renderCard(makeProjection({ level: 'l0', designCount: 0 }))
+    expect(screen.getByText('需求分析')).toBeDefined()
+    expect(screen.queryByText('设计文档')).toBeNull()
+  })
+
+  it('shows 待拆分 when no checklist is recorded', () => {
     renderCard(makeProjection())
-    fireEvent.click(screen.getByRole('button'))
-    expect(screen.queryByText(/^openspec\/changes\//)).toBeNull()
+    expect(screen.getByText('待拆分')).toBeDefined()
   })
 
-  it('collapses again on a second click', () => {
+  it('renders checklist items with their status', () => {
+    const { container } = renderCard(makeProjection(), CHECKLIST)
+    const tasks = container.querySelector('[data-group="tasks"]')
+    expect(tasks?.querySelector('[data-status="completed"]')).not.toBeNull()
+    expect(tasks?.querySelector('[data-status="in_progress"]')).not.toBeNull()
+    expect(tasks?.querySelector('[data-status="pending"]')).not.toBeNull()
+    expect(screen.getByText('build it')).toBeDefined()
+    expect(screen.getByText('test it')).toBeDefined()
+    expect(screen.getByText('ship it')).toBeDefined()
+  })
+
+  it('shows analysis doing before mark_analysis_done and done after', () => {
+    const doing = renderCard(makeProjection({ analysisDone: false }))
+    expect(doing.container.querySelector('[data-group="analysis"]')?.getAttribute('data-state')).toBe('doing')
+    cleanup()
+
+    const done = renderCard(makeProjection({ analysisDone: true }))
+    expect(done.container.querySelector('[data-group="analysis"]')?.getAttribute('data-state')).toBe('done')
+  })
+
+  it('shows the design group writing before a design record and done after', () => {
+    const writing = renderCard(makeProjection({ designCount: 0 }))
+    expect(writing.container.querySelector('[data-group="design"]')?.getAttribute('data-state')).toBe('writing')
+    cleanup()
+
+    const done = renderCard(makeProjection({ designCount: 1 }))
+    expect(done.container.querySelector('[data-group="design"]')?.getAttribute('data-state')).toBe('done')
+  })
+
+  it('collapses on click and expands again', () => {
     renderCard(makeProjection())
     const button = screen.getByRole('button')
     fireEvent.click(button)
-    expect(screen.getByTestId('delivery-float-progress')).toBeDefined()
+    expect(screen.queryByTestId('delivery-float-progress')).toBeNull()
     fireEvent.click(button)
-    expect(screen.queryByTestId('delivery-float-progress')).toBeNull()
-  })
-
-  it('shows checklist counts beside the phases that carry items', () => {
-    renderCard(makeProjection(), CHECKLIST)
-    fireEvent.click(screen.getByRole('button'))
-    expect(screen.getByTestId('delivery-float-counts-implemented').textContent).toBe('1/2 已完成')
-    expect(screen.queryByTestId('delivery-float-counts-created')).toBeNull()
-  })
-
-  it('omits checklist counts when no checklist is recorded', () => {
-    renderCard(makeProjection())
-    fireEvent.click(screen.getByRole('button'))
-    expect(screen.queryByTestId('delivery-float-counts-implemented')).toBeNull()
-  })
-
-  it('expands itself when the task reaches a new phase', () => {
-    const props = (phase: DeliverySnapshot['phase']) => ({
-      useProjection: (key: string) => (key === 'delivery' ? makeProjection({ phase }) : undefined),
-      t,
-    } as DeliveryFloatCardProps)
-    const view = render(<DeliveryFloatCard {...props('created')} />)
-    expect(screen.queryByTestId('delivery-float-progress')).toBeNull()
-    view.rerender(<DeliveryFloatCard {...props('designed')} />)
     expect(screen.getByTestId('delivery-float-progress')).toBeDefined()
   })
 })

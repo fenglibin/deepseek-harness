@@ -15,6 +15,7 @@ import {
 } from '@deepseek-ai/dsh-delivery'
 import type {
   DeliveryClearChangeMeta,
+  DeliveryMarkAnalyzedChangeMeta,
   DeliveryPhase,
   DeliveryRecordChangeMeta,
   DeliveryRecordDesignMeta,
@@ -40,6 +41,7 @@ function create(
       changeCount: 0,
       designCount: 0,
       specCount: 0,
+      analysisDone: false,
       ...overrides,
     },
     createdAt: 10,
@@ -115,6 +117,22 @@ function spec(
   }
 }
 
+/** A valid incremental mark-analyzed for one task id. */
+function markAnalyzed(
+  id: string,
+  revision: number,
+  updatedAt = 20,
+): DeliveryMarkAnalyzedChangeMeta {
+  return {
+    kind: 'delivery/change',
+    version: 1,
+    operation: 'mark-analyzed',
+    ref: { id: DeliveryTaskId(id), revision },
+    analysisDone: true,
+    updatedAt,
+  }
+}
+
 /** An advance snapshot derived from a preceding snapshot, one phase forward. */
 function advanceFrom(prev: DeliverySnapshotChangeMeta, phase: DeliveryPhase): DeliverySnapshotChangeMeta {
   return {
@@ -132,11 +150,17 @@ function foldChanges(...changes: unknown[]): ReturnType<typeof foldDelivery> {
 }
 
 describe('decodeDeliveryChange', () => {
-  it('decodes valid clear, record-change, record-design, and record-spec payloads', () => {
+  it('decodes valid clear, record-change, record-design, record-spec, and mark-analyzed payloads', () => {
     expect(decodeDeliveryChange(clear('task-1', 2))).toMatchObject({ operation: 'clear' })
     expect(decodeDeliveryChange(record('task-1', 2, 'text', 1))).toMatchObject({ operation: 'record-change' })
     expect(decodeDeliveryChange(design('task-1', 2, 'text', 1))).toMatchObject({ operation: 'record-design' })
     expect(decodeDeliveryChange(spec('task-1', 2, 'text', 1))).toMatchObject({ operation: 'record-spec' })
+    expect(decodeDeliveryChange(markAnalyzed('task-1', 2))).toMatchObject({ operation: 'mark-analyzed' })
+  })
+
+  it('rejects a mark-analyzed whose analysisDone is not true', () => {
+    expect(() => decodeDeliveryChange({ ...markAnalyzed('task-1', 2), analysisDone: false }))
+      .toThrow('delivery mark-analyzed must set analysisDone to true')
   })
 
   it('rejects malformed record-design fields and text', () => {
@@ -276,6 +300,26 @@ describe('foldDelivery transitions', () => {
     expect(folded.task).toMatchObject({ revision: 2, specCount: 1, changeCount: 0, designCount: 0 })
   })
 
+  it('folds a mark-analyzed into analysisDone', () => {
+    const folded = foldChanges(create('task-1'), markAnalyzed('task-1', 2))
+    expect(folded.task).toMatchObject({ revision: 2, analysisDone: true, changeCount: 0 })
+  })
+
+  it('rejects a mark-analyzed without a current task', () => {
+    expect(() => foldChanges(markAnalyzed('task-1', 2)))
+      .toThrow('delivery mark-analyzed requires a current task')
+  })
+
+  it('rejects a mark-analyzed with a stale revision', () => {
+    expect(() => foldChanges(create('task-1'), markAnalyzed('task-1', 3)))
+      .toThrow('delivery mark-analyzed must advance the current task by one revision')
+  })
+
+  it('rejects a second mark-analyzed on an already-analyzed task', () => {
+    expect(() => foldChanges(create('task-1'), markAnalyzed('task-1', 2), markAnalyzed('task-1', 3)))
+      .toThrow('delivery mark-analyzed requires analysisDone to be false')
+  })
+
   it('rejects a create that is not a fresh revision-one created task', () => {
     expect(() => foldChanges(create('task-1', { revision: 2 })))
       .toThrow('delivery create requires a fresh created revision-one task with zero changes')
@@ -321,7 +365,7 @@ describe('foldDelivery transitions', () => {
       .toThrow('delivery advance must advance the current task by one revision')
   })
 
-  it('rejects an advance that changes objective, level, changeCount, designCount, or specCount', () => {
+  it('rejects an advance that changes objective, level, changeCount, designCount, specCount, or analysisDone', () => {
     const c1 = create('task-1')
     const target = advanceFrom(c1, 'implemented')
     const objective = { ...target, task: { ...target.task, objective: 'changed' } }
@@ -329,12 +373,14 @@ describe('foldDelivery transitions', () => {
     const changeCount = { ...target, task: { ...target.task, changeCount: 1 } }
     const designCount = { ...target, task: { ...target.task, designCount: 1 } }
     const specCount = { ...target, task: { ...target.task, specCount: 1 } }
-    const message = 'delivery advance cannot change objective, level, changeCount, designCount, or specCount'
+    const analysisDone = { ...target, task: { ...target.task, analysisDone: true } }
+    const message = 'delivery advance cannot change objective, level, changeCount, designCount, specCount, or analysisDone'
     expect(() => foldChanges(c1, objective)).toThrow(message)
     expect(() => foldChanges(c1, level)).toThrow(message)
     expect(() => foldChanges(c1, changeCount)).toThrow(message)
     expect(() => foldChanges(c1, designCount)).toThrow(message)
     expect(() => foldChanges(c1, specCount)).toThrow(message)
+    expect(() => foldChanges(c1, analysisDone)).toThrow(message)
   })
 
   it('rejects an advance that does not preserve the current timestamps', () => {

@@ -1,6 +1,44 @@
 {
   "initial": [
     {
+      "name": "advance_delivery_task",
+      "description": "Advance the current delivery task to the next phase in its level's order (created | designed | specified | implemented | verified | accepted). The phase must be the single legal next phase; skipping a required phase is rejected.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Exact id returned by get_delivery_task."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Exact positive revision returned by get_delivery_task."
+          },
+          "phase": {
+            "type": "string",
+            "description": "The target next phase.",
+            "enum": [
+              "created",
+              "designed",
+              "specified",
+              "implemented",
+              "verified",
+              "accepted"
+            ]
+          },
+          "coverage_confirmation": {
+            "type": "string",
+            "description": "Required when advancing to accepted on a task with design or spec records: state that every recorded design/spec is implemented. Also releases a verified-stage coverage gap: explain each uncovered or mis-anchored point specifically, since a bare confirmation is rejected."
+          }
+        },
+        "required": [
+          "task_id",
+          "revision",
+          "phase"
+        ]
+      }
+    },
+    {
       "name": "bash",
       "description": "Execute a bash command (`bash -c`) and return its stdout/stderr. Each call runs in a fresh shell: no state (cwd, variables, functions) persists between calls — pass `workdir` instead of using `cd`. Non-zero exits are reported as `[exit code: N]`. Current harness environment facts are exposed through managed `$DSH_*` variables; inspect them when needed. Commands may run under a file sandbox; a blocked file operation is reported as `[sandbox: file access denied under <mode> mode]` — a policy denial, not a bug in the command; do not retry another way. Long output is truncated to its tail; the full output is saved to a file whose path is reported when available. Set `run_in_background: true` for long-running commands: the call returns a job id immediately; read its output with `job_output` and stop it with `job_kill`. Attempting a command the sandbox may deny is safe and expected: run it and read the marker rather than assuming the denial. When a command is denied and a wider mode would let it succeed, escalate immediately in the same turn — the one sanctioned exception to a denial: retry the exact same command once with `sandbox_permissions` (the narrowest wider mode that suffices) plus a one-sentence `justification`. Do not detour through chat to ask permission first — the approval prompt raised by that retry is how the user consents. If the session states approval prompts are disabled, there is no exception: a denial is final — do not set `sandbox_permissions`. Never escalate speculatively: ground the request in a real denial — normally the one this command just hit; escalating up front is fine only when this session already denied the same access. A rejected escalation is final for that command — stop and explain, never work around it — but it does not forbid attempting or escalating other commands later.",
       "parameters": {
@@ -42,6 +80,43 @@
         "required": [
           "command",
           "description"
+        ]
+      }
+    },
+    {
+      "name": "create_delivery_task",
+      "description": "Create one delivery task in the created phase. Use it for a concrete piece of work that should produce a change record. Choose the level from these size signals. Any one strong signal makes the task non-small: it introduces or changes a structure contract (a capability seam, a session event, a persisted schema or projection, a public API or protocol, or a cross-version data format) (l2); it is a non-small bug fix or a change to data format, protocol, compatibility, or security (l2); it spans host and client or at least three packages, or changes a widely-referenced public symbol (l1); it adds a whole feature or capability, or performs a large-scale refactor or migration (l1). Two or more weak signals also make it l1: at least two design decisions that need weighing, decomposable into at least three independent verifiable subtasks, or multi-role coordination. Otherwise it is an l0 small fix. When level is omitted it is inferred from the objective length plus optional todo_count and touched_files estimates. An accepted task may be replaced.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "objective": {
+            "type": "string",
+            "description": "The concrete task objective."
+          },
+          "level": {
+            "type": "string",
+            "description": "Task-size class; inferred when omitted.",
+            "enum": [
+              "l0",
+              "l1",
+              "l2"
+            ]
+          },
+          "todo_count": {
+            "type": "number",
+            "description": "Estimated todo-item count used for size tiering."
+          },
+          "touched_files": {
+            "type": "number",
+            "description": "Estimated changed-file count used for size tiering."
+          },
+          "is_bug": {
+            "type": "boolean",
+            "description": "Whether this is a bug fix; may force l2 under requireOpenspecForBugs."
+          }
+        },
+        "required": [
+          "objective"
         ]
       }
     },
@@ -121,6 +196,14 @@
         "required": [
           "plan"
         ]
+      }
+    },
+    {
+      "name": "get_delivery_task",
+      "description": "Read the current delivery task, including its exact id/revision, objective, phase, level, recorded change count, and timestamps. Call this before advancing or recording a change.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
       }
     },
     {
@@ -298,6 +381,27 @@
       }
     },
     {
+      "name": "mark_analysis_done",
+      "description": "Mark requirement analysis and alignment complete for the current delivery task. Call this after clarifying the requirement with the user and before writing any design; record_design is blocked until analysis is marked done.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Exact id returned by get_delivery_task."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Exact positive revision returned by get_delivery_task."
+          }
+        },
+        "required": [
+          "task_id",
+          "revision"
+        ]
+      }
+    },
+    {
       "name": "ralph",
       "description": "Run a foreground fresh-agent Ralph loop toward one immutable objective. Use only when the direct human explicitly asks for Ralph or fresh-agent iteration. Each round opens a new child with no parent conversation or prior child session; the shared workspace is long-term memory, and only a bounded structured report crosses rounds. The call returns when a worker reports completion or a concrete blocker, or at the round limit. Ordinary long-running same-session work belongs to goal tools.",
       "parameters": {
@@ -354,6 +458,135 @@
         },
         "required": [
           "file_path"
+        ]
+      }
+    },
+    {
+      "name": "record_change",
+      "description": "Record one change against the current delivery task without changing its phase, and append it to .dsh/changes/<task-id>.md. Every task must record at least one change before it can reach implemented.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Exact id returned by get_delivery_task."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Exact positive revision returned by get_delivery_task."
+          },
+          "text": {
+            "type": "string",
+            "description": "Non-empty description of the change."
+          }
+        },
+        "required": [
+          "task_id",
+          "revision",
+          "text"
+        ]
+      }
+    },
+    {
+      "name": "record_design",
+      "description": "Record one design against the current delivery task without changing its phase, and append it to .dsh/design/<task-id>.md. A task must record at least one design before it can reach designed.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Exact id returned by get_delivery_task."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Exact positive revision returned by get_delivery_task."
+          },
+          "text": {
+            "type": "string",
+            "description": "Non-empty description of the design."
+          }
+        },
+        "required": [
+          "task_id",
+          "revision",
+          "text"
+        ]
+      }
+    },
+    {
+      "name": "record_spec",
+      "description": "Record one OpenSpec change artifact against the current delivery task without changing its phase, writing openspec/changes/<change_id>/proposal.md (why and what), design.md (technical decisions), tasks.md (checkbox checklist), or specs/<capability>/spec.md (delta requirements, each with at least one #### Scenario: and a SHALL/MUST statement). change_id must be verb-led kebab-case (add-, update-, remove-, refactor-). In design.md, name each decision with a `### D<n> <title>` heading. In tasks.md, anchor each checkbox to the point it implements with a trailing `(covers: <capability>/<Scenario name>, design/D<n>)` annotation, so verification can confirm every scenario and decision is covered. A task must record at least one spec before it can reach specified.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Exact id returned by get_delivery_task."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Exact positive revision returned by get_delivery_task."
+          },
+          "change_id": {
+            "type": "string",
+            "description": "Verb-led kebab-case OpenSpec change id."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Which change artifact to write.",
+            "enum": [
+              "proposal",
+              "design",
+              "tasks",
+              "spec"
+            ]
+          },
+          "capability": {
+            "type": "string",
+            "description": "Kebab-case capability directory; required when kind is spec."
+          },
+          "text": {
+            "type": "string",
+            "description": "Non-empty content of the artifact."
+          }
+        },
+        "required": [
+          "task_id",
+          "revision",
+          "change_id",
+          "kind",
+          "text"
+        ]
+      }
+    },
+    {
+      "name": "record_tasks",
+      "description": "Record the implementation checklist for the current delivery task, replacing any earlier list. Each item is { content, phase, status }: a short description, the lifecycle phase it belongs to (created/designed/specified/implemented/verified/accepted), and its progress status (pending/in_progress/completed). The checklist drives the per-phase progress shown for the task and is checked against openspec tasks.md before the task may reach implemented, so keep it aligned with that file.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Exact id returned by get_delivery_task."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Exact positive revision returned by get_delivery_task."
+          },
+          "change_id": {
+            "type": "string",
+            "description": "Verb-led kebab-case OpenSpec change id; empty string for a non-l2 task."
+          },
+          "items": {
+            "type": "array",
+            "description": "Complete checklist; each entry has content, phase, and status."
+          }
+        },
+        "required": [
+          "task_id",
+          "revision",
+          "change_id",
+          "items"
         ]
       }
     },

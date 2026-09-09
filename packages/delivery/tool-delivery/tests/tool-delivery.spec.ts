@@ -149,9 +149,9 @@ function resultTask(result: ToolExecutionResult): Record<string, unknown> {
 }
 
 describe('tool-delivery registration', () => {
-  it('registers the six delivery tools by default', async () => {
+  it('registers the seven delivery tools by default', async () => {
     const { ctx } = await harness()
-    for (const name of ['get_delivery_task', 'create_delivery_task', 'record_change', 'record_design', 'record_spec', 'advance_delivery_task']) {
+    for (const name of ['get_delivery_task', 'create_delivery_task', 'record_change', 'record_design', 'mark_analysis_done', 'record_spec', 'advance_delivery_task']) {
       expect(ctx.tools.get(name)).toBeDefined()
     }
   })
@@ -361,13 +361,17 @@ describe('tool-delivery design discipline', () => {
     const { ctx, agent } = await harness()
     const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l1 task', level: 'l1' }, agent))
     expect(created).toMatchObject({ level: 'l1', phase: 'created', designCount: 0 })
+    const analyzed = resultTask(await execute(ctx, 'mark_analysis_done', {
+      task_id: created['id'], revision: created['revision'],
+    }, agent))
+    expect(analyzed).toMatchObject({ analysisDone: true, revision: 2 })
 
     const designed = resultTask(await execute(ctx, 'record_design', {
-      task_id: created['id'],
-      revision: created['revision'],
+      task_id: analyzed['id'],
+      revision: analyzed['revision'],
       text: 'the design',
     }, agent))
-    expect(designed).toMatchObject({ designCount: 1, revision: 2 })
+    expect(designed).toMatchObject({ designCount: 1, revision: 3 })
 
     const advanced = resultTask(await execute(ctx, 'advance_delivery_task', {
       task_id: designed['id'],
@@ -375,6 +379,50 @@ describe('tool-delivery design discipline', () => {
       phase: 'designed',
     }, agent))
     expect(advanced).toMatchObject({ phase: 'designed' })
+  })
+
+  it('blocks record_design before analysis is marked done under stateful', async () => {
+    const { ctx, agent } = await harness({ enforcement: 'stateful' })
+    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'analyze first', level: 'l1' }, agent))
+    const result = await execute(ctx, 'record_design', {
+      task_id: created['id'], revision: created['revision'], text: 'the design',
+    }, agent)
+    expect(result.isError).toBe(true)
+  })
+
+  it('allows record_design after analysis is marked done', async () => {
+    const { ctx, agent } = await harness()
+    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'analyze then design', level: 'l1' }, agent))
+    const analyzed = resultTask(await execute(ctx, 'mark_analysis_done', {
+      task_id: created['id'], revision: created['revision'],
+    }, agent))
+    const design = resultTask(await execute(ctx, 'record_design', {
+      task_id: analyzed['id'], revision: analyzed['revision'], text: 'the design',
+    }, agent))
+    expect(design).toMatchObject({ designCount: 1 })
+  })
+
+  it('blocks record_spec design before analysis is marked done under stateful', async () => {
+    const { ctx, agent } = await harness({ enforcement: 'stateful' })
+    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'analyze first', level: 'l2' }, agent))
+    const result = await execute(ctx, 'record_spec', {
+      task_id: created['id'], revision: created['revision'],
+      change_id: 'add-thing', kind: 'design', text: 'the design',
+    }, agent)
+    expect(result.isError).toBe(true)
+  })
+
+  it('allows record_spec design after analysis is marked done', async () => {
+    const { ctx, agent } = await harness()
+    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'analyze then spec', level: 'l2' }, agent))
+    const analyzed = resultTask(await execute(ctx, 'mark_analysis_done', {
+      task_id: created['id'], revision: created['revision'],
+    }, agent))
+    const spec = resultTask(await execute(ctx, 'record_spec', {
+      task_id: analyzed['id'], revision: analyzed['revision'],
+      change_id: 'add-thing', kind: 'design', text: 'the design',
+    }, agent))
+    expect(spec).toMatchObject({ specCount: 1 })
   })
 
   it('blocks advancing to designed without a design record under stateful', async () => {
@@ -446,9 +494,12 @@ describe('tool-delivery spec discipline', () => {
     const { ctx, agent } = await harness()
     const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l2 task', level: 'l2' }, agent))
     expect(created).toMatchObject({ level: 'l2', phase: 'created', specCount: 0 })
+    const analyzed = resultTask(await execute(ctx, 'mark_analysis_done', {
+      task_id: created['id'], revision: created['revision'],
+    }, agent))
 
     const design = resultTask(await execute(ctx, 'record_design', {
-      task_id: created['id'], revision: created['revision'], text: 'the design',
+      task_id: analyzed['id'], revision: analyzed['revision'], text: 'the design',
     }, agent))
     const designed = resultTask(await execute(ctx, 'advance_delivery_task', {
       task_id: design['id'], revision: design['revision'], phase: 'designed',
@@ -463,7 +514,7 @@ describe('tool-delivery spec discipline', () => {
       capability: 'thing',
       text: 'the spec',
     }, agent))
-    expect(spec).toMatchObject({ specCount: 1, revision: 4 })
+    expect(spec).toMatchObject({ specCount: 1, revision: 5 })
 
     const specified = resultTask(await execute(ctx, 'advance_delivery_task', {
       task_id: spec['id'],
@@ -476,8 +527,11 @@ describe('tool-delivery spec discipline', () => {
   it('blocks advancing to specified without a spec record under stateful', async () => {
     const { ctx, agent } = await harness({ enforcement: 'stateful' })
     const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'gated', level: 'l2' }, agent))
+    const analyzed = resultTask(await execute(ctx, 'mark_analysis_done', {
+      task_id: created['id'], revision: created['revision'],
+    }, agent))
     const design = resultTask(await execute(ctx, 'record_design', {
-      task_id: created['id'], revision: created['revision'], text: 'the design',
+      task_id: analyzed['id'], revision: analyzed['revision'], text: 'the design',
     }, agent))
     const designed = resultTask(await execute(ctx, 'advance_delivery_task', {
       task_id: design['id'], revision: design['revision'], phase: 'designed',
@@ -525,8 +579,11 @@ describe('tool-delivery artifact persistence', () => {
   it('writes design records to .dsh/design/<task-id>.md', async () => {
     const { ctx, agent, cwd } = await harness()
     const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'persist design', level: 'l1' }, agent))
+    const analyzed = resultTask(await execute(ctx, 'mark_analysis_done', {
+      task_id: created['id'], revision: created['revision'],
+    }, agent))
     await execute(ctx, 'record_design', {
-      task_id: created['id'], revision: created['revision'], text: 'the design',
+      task_id: analyzed['id'], revision: analyzed['revision'], text: 'the design',
     }, agent)
     const path = join(cwd, '.dsh', 'design', `${created['id']}.md`)
     expect(readFileSync(path, 'utf8')).toContain('the design')
@@ -535,8 +592,11 @@ describe('tool-delivery artifact persistence', () => {
   it('writes the design to .dsh/design and the spec to openspec/changes', async () => {
     const { ctx, agent, cwd } = await harness()
     const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'persist spec', level: 'l2' }, agent))
+    const analyzed = resultTask(await execute(ctx, 'mark_analysis_done', {
+      task_id: created['id'], revision: created['revision'],
+    }, agent))
     const design = resultTask(await execute(ctx, 'record_design', {
-      task_id: created['id'], revision: created['revision'], text: 'the design',
+      task_id: analyzed['id'], revision: analyzed['revision'], text: 'the design',
     }, agent))
     await execute(ctx, 'record_spec', {
       task_id: design['id'], revision: design['revision'],
@@ -795,10 +855,13 @@ describe('tool-delivery openspec change layout', () => {
   it('writes each of the three non-delta artifacts to its own path', async () => {
     const { ctx, agent, cwd } = await harness()
     const created = await l2Task(ctx, agent)
-    let revision = created['revision']
+    const analyzed = resultTask(await execute(ctx, 'mark_analysis_done', {
+      task_id: created['id'], revision: created['revision'],
+    }, agent))
+    let revision = analyzed['revision']
     for (const kind of ['proposal', 'design', 'tasks'] as const) {
       const after = resultTask(await execute(ctx, 'record_spec', {
-        task_id: created['id'], revision, change_id: 'add-thing', kind, text: `the ${kind}`,
+        task_id: analyzed['id'], revision, change_id: 'add-thing', kind, text: `the ${kind}`,
       }, agent))
       revision = after['revision']
       expect(readFileSync(join(cwd, 'openspec', 'changes', 'add-thing', `${kind}.md`), 'utf8'))
@@ -869,6 +932,9 @@ describe('tool-delivery l2 task source', () => {
 /** Walk an l2 task through designed into specified. */
 async function toSpecified(ctx: Context, agent: Agent): Promise<Record<string, unknown>> {
   let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l2 task', level: 'l2' }, agent))
+  task = resultTask(await execute(ctx, 'mark_analysis_done', {
+    task_id: task['id'], revision: task['revision'],
+  }, agent))
   task = resultTask(await execute(ctx, 'record_design', {
     task_id: task['id'], revision: task['revision'], text: 'the design',
   }, agent))
@@ -907,7 +973,7 @@ describe('tool-delivery checklist cross-check', () => {
     writeFileSync(join(dir, 'tasks.md'), '- [ ] 1.1 build it\n')
     const after = resultTask(await execute(ctx, 'record_tasks', {
       task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
-      items: [{ content: 'build it', phase: 'implemented', done: true }],
+      items: [{ content: 'build it', phase: 'implemented', status: 'completed' }],
     }, agent))
     const changed = await withChange(ctx, agent, after)
     const blocked = await execute(ctx, 'advance_delivery_task', {
@@ -924,7 +990,7 @@ describe('tool-delivery checklist cross-check', () => {
     writeFileSync(join(dir, 'tasks.md'), '- [x] 1.1 build it\n')
     const after = resultTask(await execute(ctx, 'record_tasks', {
       task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
-      items: [{ content: 'build it', phase: 'implemented', done: true }],
+      items: [{ content: 'build it', phase: 'implemented', status: 'completed' }],
     }, agent))
     const changed = await withChange(ctx, agent, after)
     const advanced = await execute(ctx, 'advance_delivery_task', {
@@ -954,8 +1020,8 @@ describe('tool-delivery task checklist', () => {
     await execute(ctx, 'record_tasks', {
       task_id: created['id'], revision: created['revision'], change_id: 'add-thing',
       items: [
-        { content: 'build it', phase: 'implemented', done: false },
-        { content: 'test it', phase: 'verified', done: true },
+        { content: 'build it', phase: 'implemented', status: 'pending' },
+        { content: 'test it', phase: 'verified', status: 'completed' },
       ],
     }, agent)
     const view = checklist(ctx, agent)
@@ -964,12 +1030,22 @@ describe('tool-delivery task checklist', () => {
     expect(view.progress.verified).toEqual({ done: 1, total: 1 })
   })
 
+  it('records an empty change_id for a non-l2 task', async () => {
+    const { ctx, agent } = await harness()
+    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l1 task', level: 'l1' }, agent))
+    await execute(ctx, 'record_tasks', {
+      task_id: created['id'], revision: created['revision'], change_id: '',
+      items: [{ content: 'build it', phase: 'implemented', status: 'pending' }],
+    }, agent)
+    expect(checklist(ctx, agent).changeId).toBe('')
+  })
+
   it('rejects a checklist item whose phase is unknown', async () => {
     const { ctx, agent } = await harness()
     const created = await l2(ctx, agent)
     const result = await execute(ctx, 'record_tasks', {
       task_id: created['id'], revision: created['revision'], change_id: 'add-thing',
-      items: [{ content: 'x', phase: 'nope', done: false }],
+      items: [{ content: 'x', phase: 'nope', status: 'pending' }],
     }, agent)
     expect(result.isError).toBe(true)
   })
@@ -979,7 +1055,66 @@ describe('tool-delivery task checklist', () => {
     const created = await l2(ctx, agent)
     const result = await execute(ctx, 'record_tasks', {
       task_id: created['id'], revision: created['revision'], change_id: 'x; rm -rf /',
-      items: [{ content: 'x', phase: 'implemented', done: false }],
+      items: [{ content: 'x', phase: 'implemented', status: 'pending' }],
+    }, agent)
+    expect(result.isError).toBe(true)
+  })
+})
+
+describe('tool-delivery non-l2 verification', () => {
+  /** Walk an l1 task to implemented with a recorded checklist. */
+  async function l1ToImplemented(
+    ctx: Context,
+    agent: Agent,
+    status: string,
+  ): Promise<Record<string, unknown>> {
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l1 task', level: 'l1' }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
+    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
+    task = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: '',
+      items: [{ content: 'build it', phase: 'implemented', status }],
+    }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
+    return resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'implemented',
+    }, agent))
+  }
+
+  it('blocks verifying a non-l2 task with an unfinished checklist under stateful', async () => {
+    const { ctx, agent } = await harness({ enforcement: 'stateful' })
+    const implemented = await l1ToImplemented(ctx, agent, 'pending')
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: implemented['id'], revision: implemented['revision'], phase: 'verified',
+    }, agent)
+    expect(result.isError).toBe(true)
+  })
+
+  it('verifies a non-l2 task once its checklist is complete', async () => {
+    const { ctx, agent } = await harness()
+    const implemented = await l1ToImplemented(ctx, agent, 'completed')
+    const verified = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: implemented['id'], revision: implemented['revision'], phase: 'verified',
+    }, agent))
+    expect(verified).toMatchObject({ phase: 'verified' })
+  })
+
+  it('blocks verifying a non-l2 task with a non-empty change_id and unfinished checklist', async () => {
+    const { ctx, agent } = await harness({ enforcement: 'stateful' })
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l1 task', level: 'l1' }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
+    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
+    // A non-l2 task with a non-empty change_id still verifies by its level.
+    task = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [{ content: 'build it', phase: 'implemented', status: 'pending' }],
+    }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
     }, agent)
     expect(result.isError).toBe(true)
   })
@@ -1008,7 +1143,7 @@ describe('tool-delivery coverage review', () => {
     const task = await toSpecified(ctx, agent)
     const after = resultTask(await execute(ctx, 'record_tasks', {
       task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
-      items: [{ content: '1.1 已覆盖的场景', phase: 'implemented', done: true }],
+      items: [{ content: '1.1 已覆盖的场景', phase: 'implemented', status: 'completed' }],
     }, agent))
     const changed = resultTask(await execute(ctx, 'record_change', {
       task_id: after['id'], revision: after['revision'], text: 'the fix',
@@ -1089,6 +1224,7 @@ describe('tool-delivery acceptance gate', () => {
   /** Walk an l1 task (with a design record) to verified. */
   async function advanceL1ToVerified(ctx: Context, agent: Agent): Promise<Record<string, unknown>> {
     let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l1 task', level: 'l1' }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
     task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
     task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
     task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))

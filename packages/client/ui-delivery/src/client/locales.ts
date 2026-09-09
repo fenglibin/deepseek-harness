@@ -13,6 +13,15 @@ export const zh = {
   'phase.accepted': '已验收',
   'artifacts.label': '{count} 个产物',
   'progress.counts': '{done}/{total} 已完成',
+  'progress.analysis': '需求分析',
+  'progress.design': '设计文档',
+  'progress.tasks': '任务列表',
+  'progress.verify': '实现验证',
+  'progress.tasks.none': '待拆分',
+  'status.todo': '待实现',
+  'status.doing': '进行中',
+  'status.done': '已完成',
+  'status.writing': '编写中',
   'gate.change': '下一步需要变更记录',
   'gate.design': '下一步需要设计记录',
   'gate.spec': '下一步需要 spec 记录',
@@ -25,6 +34,7 @@ export const zh = {
   'event.record-change': '记录变更',
   'event.record-design': '记录设计',
   'event.record-spec': '记录拆分',
+  'event.mark-analyzed': '标记需求分析完成',
   'event.clear': '清除任务',
 } satisfies Record<string, string>
 

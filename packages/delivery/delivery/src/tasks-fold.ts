@@ -15,6 +15,7 @@ import type {
   DeliveryPhase,
   DeliveryPhaseProgress,
   DeliveryTaskItem,
+  DeliveryTaskStatus,
   DeliveryTasksChangeMeta,
   DeliveryTasksState,
   DeliveryTasksView,
@@ -31,6 +32,9 @@ const PHASE_TUPLE = [
 ] as const
 
 const PHASES: readonly DeliveryPhase[] = PHASE_TUPLE
+
+/** Progress statuses one checklist item may carry. */
+const STATUSES: readonly DeliveryTaskStatus[] = ['pending', 'in_progress', 'completed']
 
 /** Durable checklist write version decoded by this fold. */
 const DELIVERY_TASKS_VERSION = 1
@@ -51,10 +55,11 @@ function decodeItem(value: unknown, index: number): DeliveryTaskItem {
   if (typeof phase !== 'string' || !PHASES.includes(phase as DeliveryPhase)) {
     throw new Error(`delivery tasks item ${index} phase is invalid`)
   }
-  if (typeof value['done'] !== 'boolean') {
-    throw new Error(`delivery tasks item ${index} done must be a boolean`)
+  const status = value['status']
+  if (typeof status !== 'string' || !STATUSES.includes(status as DeliveryTaskStatus)) {
+    throw new Error(`delivery tasks item ${index} status is invalid`)
   }
-  return { content, phase: phase as DeliveryPhase, done: value['done'] }
+  return { content, phase: phase as DeliveryPhase, status: status as DeliveryTaskStatus }
 }
 
 /**
@@ -74,8 +79,8 @@ export function decodeDeliveryTasks(value: unknown): DeliveryTasksChangeMeta | u
     throw new Error('delivery tasks ref must be a non-empty id and a positive revision')
   }
   const changeId = value['changeId']
-  if (typeof changeId !== 'string' || changeId.trim().length === 0) {
-    throw new Error('delivery tasks changeId must be a non-empty string')
+  if (typeof changeId !== 'string') {
+    throw new Error('delivery tasks changeId must be a string')
   }
   const items = value['items']
   if (!Array.isArray(items)) throw new Error('delivery tasks items must be an array')
@@ -107,7 +112,10 @@ export function tasksProgress(items: readonly DeliveryTaskItem[]): Record<Delive
   for (const phase of PHASES) progress[phase] = { done: 0, total: 0 }
   for (const item of items) {
     const entry = progress[item.phase]
-    progress[item.phase] = { done: entry.done + (item.done ? 1 : 0), total: entry.total + 1 }
+    progress[item.phase] = {
+      done: entry.done + (item.status === 'completed' ? 1 : 0),
+      total: entry.total + 1,
+    }
   }
   return progress
 }
@@ -142,11 +150,11 @@ const phaseProgressSchema = zod.object({
 
 const tasksViewSchema: ZodType<DeliveryTasksView | null> = zod.union([
   zod.object({
-    changeId: zod.string().min(1),
+    changeId: zod.string(),
     items: zod.array(zod.object({
       content: zod.string().min(1),
       phase: zod.enum(PHASE_TUPLE),
-      done: zod.boolean(),
+      status: zod.enum(['pending', 'in_progress', 'completed']),
     })),
     progress: zod.object({
       created: phaseProgressSchema,

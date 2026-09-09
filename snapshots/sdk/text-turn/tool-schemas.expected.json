@@ -25,6 +25,10 @@
               "verified",
               "accepted"
             ]
+          },
+          "coverage_confirmation": {
+            "type": "string",
+            "description": "Required when advancing to accepted on a task with design or spec records: state that every recorded design/spec is implemented. Also releases a verified-stage coverage gap: explain each uncovered or mis-anchored point specifically, since a bare confirmation is rejected."
           }
         },
         "required": [
@@ -81,7 +85,7 @@
     },
     {
       "name": "create_delivery_task",
-      "description": "Create one delivery task in the created phase. Use it for a concrete piece of work that should produce a change record; level selects the discipline path (l0 small fix, l1 adds a design, l2 adds an openspec split). When level is omitted it is inferred from the objective length plus optional todo_count and touched_files estimates. An accepted task may be replaced.",
+      "description": "Create one delivery task in the created phase. Use it for a concrete piece of work that should produce a change record. Choose the level from these size signals. Any one strong signal makes the task non-small: it introduces or changes a structure contract (a capability seam, a session event, a persisted schema or projection, a public API or protocol, or a cross-version data format) (l2); it is a non-small bug fix or a change to data format, protocol, compatibility, or security (l2); it spans host and client or at least three packages, or changes a widely-referenced public symbol (l1); it adds a whole feature or capability, or performs a large-scale refactor or migration (l1). Two or more weak signals also make it l1: at least two design decisions that need weighing, decomposable into at least three independent verifiable subtasks, or multi-role coordination. Otherwise it is an l0 small fix. When level is omitted it is inferred from the objective length plus optional todo_count and touched_files estimates. An accepted task may be replaced.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -340,6 +344,27 @@
       }
     },
     {
+      "name": "mark_analysis_done",
+      "description": "Mark requirement analysis and alignment complete for the current delivery task. Call this after clarifying the requirement with the user and before writing any design; record_design and record_spec(kind: design) are blocked until analysis is marked done.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Exact id returned by get_delivery_task."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Exact positive revision returned by get_delivery_task."
+          }
+        },
+        "required": [
+          "task_id",
+          "revision"
+        ]
+      }
+    },
+    {
       "name": "ralph",
       "description": "Run a foreground fresh-agent Ralph loop toward one immutable objective. Use only when the direct human explicitly asks for Ralph or fresh-agent iteration. Each round opens a new child with no parent conversation or prior child session; the shared workspace is long-term memory, and only a bounded structured report crosses rounds. The call returns when a worker reports completion or a concrete blocker, or at the round limit. Ordinary long-running same-session work belongs to goal tools.",
       "parameters": {
@@ -453,7 +478,7 @@
     },
     {
       "name": "record_spec",
-      "description": "Record one spec against the current delivery task without changing its phase, and append it to openspec/changes/<task-id>/spec.md. A task must record at least one spec before it can reach specified.",
+      "description": "Record one OpenSpec change artifact against the current delivery task without changing its phase, writing openspec/changes/<change_id>/proposal.md (why and what), design.md (technical decisions), tasks.md (checkbox checklist), or specs/<capability>/spec.md (delta requirements, each with at least one #### Scenario: and a SHALL/MUST statement). change_id must be verb-led kebab-case (add-, update-, remove-, refactor-). In design.md, name each decision with a `### D<n> <title>` heading. In tasks.md, anchor each checkbox to the point it implements with a trailing `(covers: <capability>/<Scenario name>, design/D<n>)` annotation, so verification can confirm every scenario and decision is covered. A task must record at least one spec before it can reach specified.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -465,15 +490,66 @@
             "type": "number",
             "description": "Exact positive revision returned by get_delivery_task."
           },
+          "change_id": {
+            "type": "string",
+            "description": "Verb-led kebab-case OpenSpec change id."
+          },
+          "kind": {
+            "type": "string",
+            "description": "Which change artifact to write.",
+            "enum": [
+              "proposal",
+              "design",
+              "tasks",
+              "spec"
+            ]
+          },
+          "capability": {
+            "type": "string",
+            "description": "Kebab-case capability directory; required when kind is spec."
+          },
           "text": {
             "type": "string",
-            "description": "Non-empty description of the spec."
+            "description": "Non-empty content of the artifact."
           }
         },
         "required": [
           "task_id",
           "revision",
+          "change_id",
+          "kind",
           "text"
+        ]
+      }
+    },
+    {
+      "name": "record_tasks",
+      "description": "Record the implementation checklist for the current delivery task, replacing any earlier list. Each item is { content, phase, status }: a short description, the lifecycle phase it belongs to (created/designed/specified/implemented/verified/accepted), and its progress status (pending/in_progress/completed). The checklist drives the per-phase progress shown for the task and is checked against openspec tasks.md before the task may reach implemented, so keep it aligned with that file.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "description": "Exact id returned by get_delivery_task."
+          },
+          "revision": {
+            "type": "number",
+            "description": "Exact positive revision returned by get_delivery_task."
+          },
+          "change_id": {
+            "type": "string",
+            "description": "Verb-led kebab-case OpenSpec change id; empty string for a non-l2 task."
+          },
+          "items": {
+            "type": "array",
+            "description": "Complete checklist; each entry has content, phase, and status."
+          }
+        },
+        "required": [
+          "task_id",
+          "revision",
+          "change_id",
+          "items"
         ]
       }
     },

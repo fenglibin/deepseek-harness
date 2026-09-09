@@ -145,6 +145,7 @@ type DeliveryToolValue =
       changeCount: number
       designCount: number
       specCount: number
+      analysisDone: boolean
       createdAt: number
       updatedAt: number
     }
@@ -176,6 +177,7 @@ const DELIVERY_OUTPUT_SCHEMA = {
             changeCount: { type: 'integer', required: true },
             designCount: { type: 'integer', required: true },
             specCount: { type: 'integer', required: true },
+            analysisDone: { type: 'boolean', required: true },
             createdAt: { type: 'integer', required: true },
             updatedAt: { type: 'integer', required: true },
           },
@@ -200,6 +202,7 @@ function deliveryValue(task: DeliveryView | undefined): DeliveryToolValue {
       changeCount: task.changeCount,
       designCount: task.designCount,
       specCount: task.specCount,
+      analysisDone: task.analysisDone,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     },
@@ -242,11 +245,15 @@ function guidance(): string {
     + 'small fix; see create_delivery_task for the size signals. create_delivery_task takes an objective '
     + 'and an optional level: l0 for a small fix, l1 to add a design, l2 to add an openspec split; omit '
     + 'level and it is inferred from the objective length and any todo_count/touched_files estimates. '
+    + 'After creating the task, first clarify and align the requirement with the user, then call '
+    + 'mark_analysis_done to mark analysis complete; writing a design is blocked until then. '
     + 'Before advancing to designed, record at least one design with record_design (writes '
     + '.dsh/design/<task-id>.md); before specified, record the OpenSpec change with record_spec (writes '
     + 'proposal.md, design.md, tasks.md and a spec delta under openspec/changes/<change_id>/); before '
     + 'implemented, record at least one change with '
-    + 'record_change (writes .dsh/changes/<task-id>.md). Call get_delivery_task first and copy its exact '
+    + 'record_change (writes .dsh/changes/<task-id>.md). Record the checklist with record_tasks (empty '
+    + 'change_id for a non-l2 task) so it persists across turns and drives verification. '
+    + 'Call get_delivery_task first and copy its exact '
     + 'task_id and revision into every record and advance call. Use todo_write only for lightweight '
     + 'multi-step tracking; use the delivery tools when the work must leave a design or change record on disk.'
 }
@@ -539,6 +546,10 @@ function checkboxCounts(text: string): { done: number; total: number } {
 async function checklistMismatch(ctx: Context, agent: Agent): Promise<string | undefined> {
   const recorded = ctx.delivery.getTasks(agent)
   if (recorded === undefined) return undefined
+  // A non-l2 task has no OpenSpec change, so its checklist is not cross-checked
+  // against a tasks.md on disk.
+  const current = ctx.delivery.get(agent)
+  if (current === undefined || current.level !== 'l2') return undefined
   const path = `openspec/changes/${recorded.changeId}/tasks.md`
   const cwd = agent.session.header.cwd
   const target = cwd === undefined
@@ -553,7 +564,7 @@ async function checklistMismatch(ctx: Context, agent: Agent): Promise<string | u
   const disk = checkboxCounts(text)
   const reported = recorded.items.reduce(
     (counts, item) => ({
-      done: counts.done + (item.done ? 1 : 0),
+      done: counts.done + (item.status === 'completed' ? 1 : 0),
       total: counts.total + 1,
     }),
     { done: 0, total: 0 },
@@ -579,6 +590,25 @@ function gateAdvance(view: DeliveryView | undefined, phase: DeliveryPhase): stri
     return 'at least one spec record is required before the task reaches specified'
   }
   return undefined
+}
+
+/** Reject or remind when requirement analysis is not yet complete. */
+function gateAnalysisDone(
+  ctx: Context,
+  agent: Agent,
+  exec: ToolRunContext,
+  policy: () => ResolvedConfig,
+): void {
+  const current = ctx.delivery.get(agent)
+  if (current === undefined || current.analysisDone) return
+  const message = 'requirement analysis is not complete; call mark_analysis_done before writing a design'
+  if (policy().enforcement === 'stateful') {
+    throw new HarnessError(message, 'DELIVERY_GATE_BLOCKED')
+  }
+  exec.deferContext(createUserMessage({
+    content: [{ type: 'text', text: `Delivery reminder: ${message}` }],
+    source: { kind: 'plugin', plugin: 'tool-delivery', form: 'notice', summary: 'delivery analysis' },
+  }))
 }
 
 /** Why an l2 task refuses the lightweight todo list. */
@@ -785,11 +815,33 @@ export function apply(ctx: Context, config: Config): void {
     async execute(args, exec) {
       const agent = deliveryAgent(ctx, exec)
       const ref = deliveryRef(args.task_id, args.revision)
+      gateAnalysisDone(ctx, agent, exec, policy)
       const view = ctx.delivery.recordDesign(agent, ref, args.text)
       await appendArtifact(ctx, agent, `.dsh/design/${view.id}.md`, `- [revision ${view.revision}] ${args.text}\n`)
       return deliveryValue(view)
     },
     presentCall: args => present('Record design', 'other', args.text),
+  }))
+
+  ctx.tools.register(defineTool({
+    name: 'mark_analysis_done',
+    description: 'Mark requirement analysis and alignment complete for the current delivery task. '
+      + 'Call this after clarifying the requirement with the user and before writing any design; '
+      + 'record_design and record_spec(kind: design) are blocked until analysis is marked done.',
+    parameters: {
+      task_id: { type: 'string', required: true, description: 'Exact id returned by get_delivery_task.' },
+      revision: { type: 'number', required: true, description: 'Exact positive revision returned by get_delivery_task.' },
+    },
+    output: {
+      schema: DELIVERY_OUTPUT_SCHEMA,
+      render: (_args: unknown, value: DeliveryToolValue) => [{ type: 'text' as const, text: JSON.stringify(value) }],
+    },
+    execute(args, exec) {
+      const agent = deliveryAgent(ctx, exec)
+      const ref = deliveryRef(args.task_id, args.revision)
+      return Promise.resolve(deliveryValue(ctx.delivery.markAnalyzed(agent, ref)))
+    },
+    presentCall: () => present('Mark analysis done', 'other'),
   }))
 
   ctx.tools.register(defineTool({
@@ -817,6 +869,9 @@ export function apply(ctx: Context, config: Config): void {
     async execute(args, exec) {
       const agent = deliveryAgent(ctx, exec)
       const ref = deliveryRef(args.task_id, args.revision)
+      // The design artifact is also a design document, so it obeys the same
+      // requirement-analysis prerequisite as record_design.
+      if (args.kind === 'design') gateAnalysisDone(ctx, agent, exec, policy)
       const path = changeArtifactPath(args.change_id, args.kind, args.capability)
       const view = ctx.delivery.recordSpec(agent, ref, args.text)
       await writeArtifact(ctx, agent, path, args.text)
@@ -828,18 +883,19 @@ export function apply(ctx: Context, config: Config): void {
   ctx.tools.register(defineTool({
     name: 'record_tasks',
     description: 'Record the implementation checklist for the current delivery task, replacing any earlier '
-      + 'list. Each item is { content, phase, done }: a short description, the lifecycle phase it belongs to '
-      + '(created/designed/specified/implemented/verified/accepted), and whether it is complete. The checklist '
-      + 'drives the per-phase progress shown for the task and is checked against openspec tasks.md before the '
-      + 'task may reach implemented, so keep it aligned with that file.',
+      + 'list. Each item is { content, phase, status }: a short description, the lifecycle phase it belongs to '
+      + '(created/designed/specified/implemented/verified/accepted), and its progress status '
+      + '(pending/in_progress/completed). The checklist drives the per-phase progress shown for the task and '
+      + 'is checked against openspec tasks.md before the task may reach implemented, so keep it aligned with '
+      + 'that file.',
     parameters: {
       task_id: { type: 'string', required: true, description: 'Exact id returned by get_delivery_task.' },
       revision: { type: 'number', required: true, description: 'Exact positive revision returned by get_delivery_task.' },
-      change_id: { type: 'string', required: true, description: 'Verb-led kebab-case OpenSpec change id.' },
+      change_id: { type: 'string', required: true, description: 'Verb-led kebab-case OpenSpec change id; empty string for a non-l2 task.' },
       items: {
         type: 'array',
         required: true,
-        description: 'Complete checklist; each entry has content, phase, and done.',
+        description: 'Complete checklist; each entry has content, phase, and status.',
       },
     },
     output: {
@@ -849,10 +905,12 @@ export function apply(ctx: Context, config: Config): void {
     execute(args, exec) {
       const agent = deliveryAgent(ctx, exec)
       const ref = deliveryRef(args.task_id, args.revision)
+      const changeId = typeof args.change_id === 'string' ? args.change_id.trim() : ''
+      const current = ctx.delivery.get(agent)
       // The change id is later interpolated into the `openspec validate`
-      // command, so it must already be the kebab-case grammar that cannot
-      // carry shell metacharacters.
-      if (!isValidChangeId(args.change_id)) {
+      // command, so an l2 task must carry the kebab-case grammar that cannot
+      // carry shell metacharacters; a non-l2 task records an empty id.
+      if (current?.level === 'l2' && !isValidChangeId(changeId)) {
         throw new HarnessError(
           'change_id must be verb-led kebab-case (add-, update-, remove-, refactor-)',
           'DELIVERY_INVALID_TASKS',
@@ -861,7 +919,7 @@ export function apply(ctx: Context, config: Config): void {
       const items = Array.isArray(args.items) ? args.items : []
       // Checklist entries cross the model boundary, so the service's strict
       // decoder judges them; the cast carries unvalidated JSON there.
-      ctx.delivery.recordTasks(agent, ref, args.change_id, items as unknown as readonly DeliveryTaskItem[])
+      ctx.delivery.recordTasks(agent, ref, changeId, items as unknown as readonly DeliveryTaskItem[])
       return Promise.resolve(deliveryValue(ctx.delivery.get(agent)))
     },
     presentCall: args => present('Record tasks', 'other', args.change_id),
@@ -931,6 +989,22 @@ export function apply(ctx: Context, config: Config): void {
               + 'coverage_confirmation; a bare "done" is not accepted.',
               'DELIVERY_GATE_BLOCKED',
             )
+          }
+        }
+        // A non-l2 task verifies against its recorded checklist: every item
+        // must be completed. An l2 task is verified by coverage instead.
+        const recorded = ctx.delivery.getTasks(agent)
+        if (current !== undefined && current.level !== 'l2' && recorded !== undefined) {
+          const unfinished = recorded.items.filter(item => item.status !== 'completed')
+          if (unfinished.length > 0) {
+            const message = `delivery checklist has ${unfinished.length} unfinished item(s); complete them before verifying`
+            if (policy().enforcement === 'stateful') {
+              throw new HarnessError(message, 'DELIVERY_GATE_BLOCKED')
+            }
+            exec.deferContext(createUserMessage({
+              content: [{ type: 'text', text: `Delivery reminder: ${message}` }],
+              source: { kind: 'plugin', plugin: 'tool-delivery', form: 'notice', summary: 'delivery checklist' },
+            }))
           }
         }
       }

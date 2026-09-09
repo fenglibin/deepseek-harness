@@ -23,6 +23,8 @@ Use the web_search tool to discover current information on the web. The required
 
 Use goal tools for one long-running completion objective in the current session. create_goal may infer goal intent from a direct human request in any language; do not create a goal for routine single-turn work. Call get_goal before update_goal and copy its exact goal_id and revision. After session resume or fork, an active goal is disarmed: when a human asks to continue or resume in any wording or language, use update_goal action resume to rearm it. Mark complete only when the objective is actually achieved. Mark blocked only after the same blocking condition persists for at least 3 consecutive goal rounds, and report that concrete condition in blocked_reason; difficulty, uncertainty, or useful remaining work is not blocked.
 
+Use the delivery tools to run larger pieces of work under the delivery discipline. Classify the request size first: a non-small task (l1/l2) needs a design or a split, an l0 is a small fix; see create_delivery_task for the size signals. create_delivery_task takes an objective and an optional level: l0 for a small fix, l1 to add a design, l2 to add an openspec split; omit level and it is inferred from the objective length and any todo_count/touched_files estimates. After creating the task, first clarify and align the requirement with the user, then call mark_analysis_done to mark analysis complete; record_design is blocked until then. Before advancing to designed, record at least one design with record_design (writes .dsh/design/<task-id>.md); before specified, record the OpenSpec change with record_spec (writes proposal.md, design.md, tasks.md and a spec delta under openspec/changes/<change_id>/); before implemented, record at least one change with record_change (writes .dsh/changes/<task-id>.md). Call get_delivery_task first and copy its exact task_id and revision into every record and advance call. Use todo_write only for lightweight multi-step tracking; use the delivery tools when the work must leave a design or change record on disk.
+
 Use the workflow tool ONLY when the user explicitly asks for a workflow or for large multi-agent orchestration: you write a JavaScript script (the tool description documents the exact format) that fans work out across many subagents with phases and structured results. For one or two delegations, prefer plain subagent calls.
 
 Use the ralph tool ONLY when the direct human explicitly asks for a Ralph loop or fresh-agent iterative execution. Each Ralph round starts a fresh child with no conversation seed and uses the shared workspace as durable memory. Completion and blockers are worker reports, not independent evaluation. Use same-session goal tools for ordinary long-running objectives, and plain subagents or workflows for bounded delegation and fan-out.
@@ -48,6 +50,17 @@ Program-only SDK bindings:
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }
 
 interface ToolArgsMap {
+  /** Advance the current delivery task to the next phase in its level's order (created | designed | specified | implemented | verified | accepted). The phase must be the single legal next phase; skipping a required phase is rejected. */
+  advance_delivery_task: {
+    /** Exact id returned by get_delivery_task. */
+    task_id: string;
+    /** Exact positive revision returned by get_delivery_task. */
+    revision: number;
+    /** The target next phase. */
+    phase: "created" | "designed" | "specified" | "implemented" | "verified" | "accepted";
+    /** Required when advancing to accepted on a task with design or spec records: state that every recorded design/spec is implemented. Also releases a verified-stage coverage gap: explain each uncovered or mis-anchored point specifically, since a bare confirmation is rejected. */
+    coverage_confirmation?: string;
+  } & Record<string, JsonValue>;
   /** Execute a bash command (`bash -c`) and return its stdout/stderr. Each call runs in a fresh shell: no state (cwd, variables, functions) persists between calls — pass `workdir` instead of using `cd`. Non-zero exits are reported as `[exit code: N]`. Current harness environment facts are exposed through managed `$DSH_*` variables; inspect them when needed. Commands may run under a file sandbox; a blocked file operation is reported as `[sandbox: file access denied under <mode> mode]` — a policy denial, not a bug in the command; do not retry another way. Long output is truncated to its tail; the full output is saved to a file whose path is reported when available. Set `run_in_background: true` for long-running commands: the call returns a job id immediately; read its output with `job_output` and stop it with `job_kill`. Attempting a command the sandbox may deny is safe and expected: run it and read the marker rather than assuming the denial. When a command is denied and a wider mode would let it succeed, escalate immediately in the same turn — the one sanctioned exception to a denial: retry the exact same command once with `sandbox_permissions` (the narrowest wider mode that suffices) plus a one-sentence `justification`. Do not detour through chat to ask permission first — the approval prompt raised by that retry is how the user consents. If the session states approval prompts are disabled, there is no exception: a denial is final — do not set `sandbox_permissions`. Never escalate speculatively: ground the request in a real denial — normally the one this command just hit; escalating up front is fine only when this session already denied the same access. A rejected escalation is final for that command — stop and explain, never work around it — but it does not forbid attempting or escalating other commands later. */
   bash: {
     /** The bash command to execute. */
@@ -64,6 +77,19 @@ interface ToolArgsMap {
     sandbox_permissions?: "workspace-write" | "danger-full-access";
     /** Required with sandbox_permissions: one sentence for the user explaining why this exact command needs the wider access. */
     justification?: string;
+  } & Record<string, JsonValue>;
+  /** Create one delivery task in the created phase. Use it for a concrete piece of work that should produce a change record. Choose the level from these size signals. Any one strong signal makes the task non-small: it introduces or changes a structure contract (a capability seam, a session event, a persisted schema or projection, a public API or protocol, or a cross-version data format) (l2); it is a non-small bug fix or a change to data format, protocol, compatibility, or security (l2); it spans host and client or at least three packages, or changes a widely-referenced public symbol (l1); it adds a whole feature or capability, or performs a large-scale refactor or migration (l1). Two or more weak signals also make it l1: at least two design decisions that need weighing, decomposable into at least three independent verifiable subtasks, or multi-role coordination. Otherwise it is an l0 small fix. When level is omitted it is inferred from the objective length plus optional todo_count and touched_files estimates. An accepted task may be replaced. */
+  create_delivery_task: {
+    /** The concrete task objective. */
+    objective: string;
+    /** Task-size class; inferred when omitted. */
+    level?: "l0" | "l1" | "l2";
+    /** Estimated todo-item count used for size tiering. */
+    todo_count?: number;
+    /** Estimated changed-file count used for size tiering. */
+    touched_files?: number;
+    /** Whether this is a bug fix; may force l2 under requireOpenspecForBugs. */
+    is_bug?: boolean;
   } & Record<string, JsonValue>;
   /** Create one persisted same-session completion goal when the current direct human request is a long-running objective that should continue across autonomous goal rounds. You may infer that intent without requiring the user to say "create a goal". Do not use this for trivial single-turn work. Execution rejects non-human and subagent authority. */
   create_goal: {
@@ -92,6 +118,8 @@ interface ToolArgsMap {
     /** The complete plan, as markdown, starting with a # heading that names it. */
     plan: string;
   } & Record<string, JsonValue>;
+  /** Read the current delivery task, including its exact id/revision, objective, phase, level, recorded change count, and timestamps. Call this before advancing or recording a change. */
+  get_delivery_task: Record<string, JsonValue>;
   /** Read the current same-session goal, including its exact id/revision, objective, phase, completed continuation rounds, round limit, blocker reason when present, and whether another continuation is armed. Call this before updating a goal. */
   get_goal: Record<string, JsonValue>;
   /** Find files whose paths match a glob pattern. Returns matching file paths — never directories — including hidden and ignored files (VCS metadata directories are excluded). Up to 100 paths come back in modification-time order; a larger result returns the first 100 paths in modification-time order, says so, and reports where the complete sorted list was saved. This tool does not enumerate directory entries. */
@@ -138,6 +166,13 @@ interface ToolArgsMap {
     /** children (default) lists direct children only; descendants walks the complete tree below you. */
     scope?: "children" | "descendants";
   } & Record<string, JsonValue>;
+  /** Mark requirement analysis and alignment complete for the current delivery task. Call this after clarifying the requirement with the user and before writing any design; record_design is blocked until analysis is marked done. */
+  mark_analysis_done: {
+    /** Exact id returned by get_delivery_task. */
+    task_id: string;
+    /** Exact positive revision returned by get_delivery_task. */
+    revision: number;
+  } & Record<string, JsonValue>;
   /** Run a foreground fresh-agent Ralph loop toward one immutable objective. Use only when the direct human explicitly asks for Ralph or fresh-agent iteration. Each round opens a new child with no parent conversation or prior child session; the shared workspace is long-term memory, and only a bounded structured report crosses rounds. The call returns when a worker reports completion or a concrete blocker, or at the round limit. Ordinary long-running same-session work belongs to goal tools. */
   ralph: {
     /** The immutable completion objective for every fresh Ralph round. */
@@ -158,6 +193,50 @@ interface ToolArgsMap {
   read_image: {
     /** Path to the image file, resolved by the filesystem backend. */
     file_path: string;
+  } & Record<string, JsonValue>;
+  /** Record one change against the current delivery task without changing its phase, and append it to .dsh/changes/<task-id>.md. Every task must record at least one change before it can reach implemented. */
+  record_change: {
+    /** Exact id returned by get_delivery_task. */
+    task_id: string;
+    /** Exact positive revision returned by get_delivery_task. */
+    revision: number;
+    /** Non-empty description of the change. */
+    text: string;
+  } & Record<string, JsonValue>;
+  /** Record one design against the current delivery task without changing its phase, and append it to .dsh/design/<task-id>.md. A task must record at least one design before it can reach designed. */
+  record_design: {
+    /** Exact id returned by get_delivery_task. */
+    task_id: string;
+    /** Exact positive revision returned by get_delivery_task. */
+    revision: number;
+    /** Non-empty description of the design. */
+    text: string;
+  } & Record<string, JsonValue>;
+  /** Record one OpenSpec change artifact against the current delivery task without changing its phase, writing openspec/changes/<change_id>/proposal.md (why and what), design.md (technical decisions), tasks.md (checkbox checklist), or specs/<capability>/spec.md (delta requirements, each with at least one #### Scenario: and a SHALL/MUST statement). change_id must be verb-led kebab-case (add-, update-, remove-, refactor-). In design.md, name each decision with a `### D<n> <title>` heading. In tasks.md, anchor each checkbox to the point it implements with a trailing `(covers: <capability>/<Scenario name>, design/D<n>)` annotation, so verification can confirm every scenario and decision is covered. A task must record at least one spec before it can reach specified. */
+  record_spec: {
+    /** Exact id returned by get_delivery_task. */
+    task_id: string;
+    /** Exact positive revision returned by get_delivery_task. */
+    revision: number;
+    /** Verb-led kebab-case OpenSpec change id. */
+    change_id: string;
+    /** Which change artifact to write. */
+    kind: "proposal" | "design" | "tasks" | "spec";
+    /** Kebab-case capability directory; required when kind is spec. */
+    capability?: string;
+    /** Non-empty content of the artifact. */
+    text: string;
+  } & Record<string, JsonValue>;
+  /** Record the implementation checklist for the current delivery task, replacing any earlier list. Each item is { content, phase, status }: a short description, the lifecycle phase it belongs to (created/designed/specified/implemented/verified/accepted), and its progress status (pending/in_progress/completed). The checklist drives the per-phase progress shown for the task and is checked against openspec tasks.md before the task may reach implemented, so keep it aligned with that file. */
+  record_tasks: {
+    /** Exact id returned by get_delivery_task. */
+    task_id: string;
+    /** Exact positive revision returned by get_delivery_task. */
+    revision: number;
+    /** Verb-led kebab-case OpenSpec change id; empty string for a non-l2 task. */
+    change_id: string;
+    /** Complete checklist; each entry has content, phase, and status. */
+    items: JsonValue[];
   } & Record<string, JsonValue>;
   /** Send a message to a background subagent by its subagent id, continuing the same conversation. It becomes the subagent's next turn: if it is still working, the message waits until its current turn finishes, so it cannot redirect work already underway. This call returns no answer from the subagent — only confirmation that the message was delivered — so use it to give it more work. A failure means the message was NOT delivered. */
   send_message: {
@@ -275,6 +354,23 @@ interface ToolArgsMap {
 }
 
 interface ToolOutputMap {
+  advance_delivery_task: {
+    task: null;
+  } | {
+    task: {
+      id: string;
+      revision: number;
+      objective: string;
+      phase: "created" | "designed" | "specified" | "implemented" | "verified" | "accepted";
+      level: "l0" | "l1" | "l2";
+      changeCount: number;
+      designCount: number;
+      specCount: number;
+      analysisDone: boolean;
+      createdAt: number;
+      updatedAt: number;
+    };
+  };
   bash: {
     kind: "background";
     jobId: string;
@@ -302,6 +398,23 @@ interface ToolOutputMap {
       runnerFailed?: boolean;
     };
   };
+  create_delivery_task: {
+    task: null;
+  } | {
+    task: {
+      id: string;
+      revision: number;
+      objective: string;
+      phase: "created" | "designed" | "specified" | "implemented" | "verified" | "accepted";
+      level: "l0" | "l1" | "l2";
+      changeCount: number;
+      designCount: number;
+      specCount: number;
+      analysisDone: boolean;
+      createdAt: number;
+      updatedAt: number;
+    };
+  };
   create_goal: {
     goal: null;
   } | {
@@ -326,6 +439,23 @@ interface ToolOutputMap {
   };
   exit_plan_mode: {
     approved: true;
+  };
+  get_delivery_task: {
+    task: null;
+  } | {
+    task: {
+      id: string;
+      revision: number;
+      objective: string;
+      phase: "created" | "designed" | "specified" | "implemented" | "verified" | "accepted";
+      level: "l0" | "l1" | "l2";
+      changeCount: number;
+      designCount: number;
+      specCount: number;
+      analysisDone: boolean;
+      createdAt: number;
+      updatedAt: number;
+    };
   };
   get_goal: {
     goal: null;
@@ -405,6 +535,23 @@ interface ToolOutputMap {
     parent?: string;
     depth?: number;
   })[];
+  mark_analysis_done: {
+    task: null;
+  } | {
+    task: {
+      id: string;
+      revision: number;
+      objective: string;
+      phase: "created" | "designed" | "specified" | "implemented" | "verified" | "accepted";
+      level: "l0" | "l1" | "l2";
+      changeCount: number;
+      designCount: number;
+      specCount: number;
+      analysisDone: boolean;
+      createdAt: number;
+      updatedAt: number;
+    };
+  };
   ralph: {
     runId: string;
     agentsStarted: number;
@@ -432,6 +579,74 @@ interface ToolOutputMap {
         width: number;
         height: number;
       };
+    };
+  };
+  record_change: {
+    task: null;
+  } | {
+    task: {
+      id: string;
+      revision: number;
+      objective: string;
+      phase: "created" | "designed" | "specified" | "implemented" | "verified" | "accepted";
+      level: "l0" | "l1" | "l2";
+      changeCount: number;
+      designCount: number;
+      specCount: number;
+      analysisDone: boolean;
+      createdAt: number;
+      updatedAt: number;
+    };
+  };
+  record_design: {
+    task: null;
+  } | {
+    task: {
+      id: string;
+      revision: number;
+      objective: string;
+      phase: "created" | "designed" | "specified" | "implemented" | "verified" | "accepted";
+      level: "l0" | "l1" | "l2";
+      changeCount: number;
+      designCount: number;
+      specCount: number;
+      analysisDone: boolean;
+      createdAt: number;
+      updatedAt: number;
+    };
+  };
+  record_spec: {
+    task: null;
+  } | {
+    task: {
+      id: string;
+      revision: number;
+      objective: string;
+      phase: "created" | "designed" | "specified" | "implemented" | "verified" | "accepted";
+      level: "l0" | "l1" | "l2";
+      changeCount: number;
+      designCount: number;
+      specCount: number;
+      analysisDone: boolean;
+      createdAt: number;
+      updatedAt: number;
+    };
+  };
+  record_tasks: {
+    task: null;
+  } | {
+    task: {
+      id: string;
+      revision: number;
+      objective: string;
+      phase: "created" | "designed" | "specified" | "implemented" | "verified" | "accepted";
+      level: "l0" | "l1" | "l2";
+      changeCount: number;
+      designCount: number;
+      specCount: number;
+      analysisDone: boolean;
+      createdAt: number;
+      updatedAt: number;
     };
   };
   send_message: {

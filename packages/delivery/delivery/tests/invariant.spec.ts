@@ -25,6 +25,7 @@ const create: DeliverySnapshotChangeMeta = {
     changeCount: 0,
     designCount: 0,
     specCount: 0,
+    analysisDone: false,
   },
   createdAt: 1,
   updatedAt: 1,

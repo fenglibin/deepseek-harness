@@ -57,6 +57,7 @@ kind: "package-reference"
 | `recordChange` | 记录一条变更并递增变更数，不改变阶段 |
 | `recordDesign` | 记录一条设计并递增设计数，不改变阶段 |
 | `recordSpec` | 记录一条 spec 并递增 spec 数，不改变阶段 |
+| `markAnalyzed` | 标记需求分析已完成；完成前不可记录设计 |
 | `advance` | 推进到该分级唯一合法的下一阶段 |
 | `clear` | 移除当前任务；其历史保留在会话日志中 |
 
@@ -71,6 +72,7 @@ view.level                               // 'l0' | 'l1' | 'l2'
 view.changeCount                         // number of recorded changes
 view.designCount                         // number of recorded designs
 view.specCount                           // number of recorded specs
+view.analysisDone                        // whether requirement analysis is complete
 ```
 
 -----

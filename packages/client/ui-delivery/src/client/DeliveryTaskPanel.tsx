@@ -36,6 +36,7 @@ function eventLabel(event: DeliveryTaskEvent, t: DeliveryTaskPanelProps['t']): s
     case 'record-change': return t('event.record-change')
     case 'record-design': return t('event.record-design')
     case 'record-spec': return t('event.record-spec')
+    case 'mark-analyzed': return t('event.mark-analyzed')
     case 'clear': return t('event.clear')
     /* v8 ignore next -- DeliveryOperation is closed and every variant is handled above. */
     default: return event.operation satisfies never

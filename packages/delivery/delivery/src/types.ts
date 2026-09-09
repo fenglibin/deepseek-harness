@@ -53,6 +53,8 @@ export interface DeliverySnapshot extends DeliveryTaskRef {
   readonly designCount: number
   /** Number of spec records committed for this task so far. */
   readonly specCount: number
+  /** Whether requirement analysis and alignment is complete. */
+  readonly analysisDone: boolean
 }
 
 /** Current task projection, including values derived from the session log. */
@@ -113,6 +115,7 @@ export type DeliveryOperation =
   | 'record-change'
   | 'record-design'
   | 'record-spec'
+  | 'mark-analyzed'
   | 'clear'
 
 /** Full-snapshot task mutation committed by a durable `delivery/change` event. */
@@ -164,6 +167,17 @@ export interface DeliveryRecordSpecMeta {
   readonly updatedAt: number
 }
 
+/** Requirement-analysis completion committed without changing the task phase. */
+export interface DeliveryMarkAnalyzedChangeMeta {
+  readonly kind: 'delivery/change'
+  readonly version: 1
+  readonly operation: 'mark-analyzed'
+  readonly ref: DeliveryTaskRef
+  /** Post-mutation analysis flag; always true for this operation. */
+  readonly analysisDone: true
+  readonly updatedAt: number
+}
+
 /** Tombstone retained when the current task is cleared. */
 export interface DeliveryClearChangeMeta {
   readonly kind: 'delivery/change'
@@ -179,7 +193,11 @@ export type DeliveryChangeMeta =
   | DeliveryRecordChangeMeta
   | DeliveryRecordDesignMeta
   | DeliveryRecordSpecMeta
+  | DeliveryMarkAnalyzedChangeMeta
   | DeliveryClearChangeMeta
+
+/** Progress status of one checklist item. */
+export type DeliveryTaskStatus = 'pending' | 'in_progress' | 'completed'
 
 /** One item of a change's implementation checklist. */
 export interface DeliveryTaskItem {
@@ -187,8 +205,8 @@ export interface DeliveryTaskItem {
   readonly content: string
   /** Lifecycle phase the item is carried out in. */
   readonly phase: DeliveryPhase
-  /** Whether the item is complete. */
-  readonly done: boolean
+  /** Progress status of the item. */
+  readonly status: DeliveryTaskStatus
 }
 
 /** Completed and total counts for one lifecycle phase. */
@@ -205,7 +223,7 @@ export interface DeliveryTasksChangeMeta {
   readonly version: 1
   /** Task the checklist belongs to. */
   readonly ref: DeliveryTaskRef
-  /** OpenSpec change id the checklist was recorded for. */
+  /** OpenSpec change id the checklist was recorded for; empty for a non-l2 task. */
   readonly changeId: string
   /** Complete checklist; later writes replace earlier ones. */
   readonly items: readonly DeliveryTaskItem[]
@@ -214,7 +232,7 @@ export interface DeliveryTasksChangeMeta {
 
 /** Client value of the `delivery-tasks` projection. */
 export interface DeliveryTasksView {
-  /** OpenSpec change id carrying this checklist. */
+  /** OpenSpec change id carrying this checklist; empty for a non-l2 task. */
   readonly changeId: string
   /** The recorded checklist. */
   readonly items: readonly DeliveryTaskItem[]
@@ -268,3 +286,4 @@ export type DeliveryErrorCode =
   | 'DELIVERY_INVALID_SPEC_TEXT'
   | 'DELIVERY_INVALID_TASKS'
   | 'DELIVERY_INVALID_TRANSITION'
+  | 'DELIVERY_ALREADY_ANALYZED'

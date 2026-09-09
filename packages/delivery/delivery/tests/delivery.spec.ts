@@ -157,6 +157,18 @@ describe('DeliveryService mutations', () => {
     }))
   })
 
+  it('marks analysis done with a monotonic revision and rejects a second mark', async () => {
+    const { ctx, agent, session } = await harness()
+    let task = ctx.delivery.create(agent, { objective: 'analyze me', level: 'l2' })
+    expect(task.analysisDone).toBe(false)
+    task = ctx.delivery.markAnalyzed(agent, task)
+    expect(task).toMatchObject({ revision: 2, analysisDone: true })
+    expect(() => ctx.delivery.markAnalyzed(agent, task)).toThrow(expect.objectContaining({
+      code: 'DELIVERY_ALREADY_ANALYZED',
+    }))
+    expect(foldDelivery(session.events)).toMatchObject({ task: { revision: 2, analysisDone: true } })
+  })
+
   it('advances an l0 task through implemented, verified, accepted', async () => {
     const { ctx, agent, session } = await harness()
     let task = ctx.delivery.create(agent, { objective: 'l0 lifecycle' })
@@ -311,6 +323,7 @@ describe('delivery replay validation', () => {
         changeCount: 0,
         designCount: 0,
         specCount: 0,
+        analysisDone: false,
       },
       createdAt: 10,
       updatedAt: 10,

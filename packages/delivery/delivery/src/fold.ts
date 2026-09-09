@@ -6,6 +6,7 @@ import type {
   DeliveryChangeMeta,
   DeliveryClearChangeMeta,
   DeliveryLevel,
+  DeliveryMarkAnalyzedChangeMeta,
   DeliveryPhase,
   DeliveryRecordChangeMeta,
   DeliveryRecordDesignMeta,
@@ -94,8 +95,11 @@ function decodeSnapshot(value: unknown): DeliverySnapshot {
   if (typeof value['level'] !== 'string' || !LEVELS.has(value['level'] as DeliveryLevel)) {
     throw new Error('delivery change task.level is invalid')
   }
-  if (Object.keys(value).sort().join(',') !== 'changeCount,designCount,id,level,objective,phase,revision,specCount') {
-    throw new Error('delivery change task must have exactly changeCount, designCount, id, level, objective, phase, revision, specCount fields')
+  if (typeof value['analysisDone'] !== 'boolean') {
+    throw new Error('delivery change task.analysisDone must be a boolean')
+  }
+  if (Object.keys(value).sort().join(',') !== 'analysisDone,changeCount,designCount,id,level,objective,phase,revision,specCount') {
+    throw new Error('delivery change task must have exactly analysisDone, changeCount, designCount, id, level, objective, phase, revision, specCount fields')
   }
   return {
     id: DeliveryTaskId(value['id']),
@@ -106,6 +110,7 @@ function decodeSnapshot(value: unknown): DeliverySnapshot {
     changeCount: nonNegativeInteger(value['changeCount'], 'task.changeCount'),
     designCount: nonNegativeInteger(value['designCount'], 'task.designCount'),
     specCount: nonNegativeInteger(value['specCount'], 'task.specCount'),
+    analysisDone: value['analysisDone'],
   }
 }
 
@@ -198,6 +203,22 @@ export function decodeDeliveryChange(value: unknown): DeliveryChangeMeta | undef
       updatedAt: nonNegativeInteger(value['updatedAt'], 'updatedAt'),
     } satisfies DeliveryRecordSpecMeta
   }
+  if (operation === 'mark-analyzed') {
+    if (Object.keys(value).sort().join(',') !== 'analysisDone,kind,operation,ref,updatedAt,version') {
+      throw new Error('delivery mark-analyzed must have exactly analysisDone, kind, operation, ref, updatedAt, version fields')
+    }
+    if (value['analysisDone'] !== true) {
+      throw new Error('delivery mark-analyzed must set analysisDone to true')
+    }
+    return {
+      kind: 'delivery/change',
+      version: DELIVERY_CHANGE_VERSION,
+      operation: 'mark-analyzed',
+      ref: decodeRef(value['ref']),
+      analysisDone: true,
+      updatedAt: nonNegativeInteger(value['updatedAt'], 'updatedAt'),
+    } satisfies DeliveryMarkAnalyzedChangeMeta
+  }
   if (typeof operation !== 'string' || !SNAPSHOT_OPERATIONS.has(operation as 'create' | 'advance')) {
     throw new Error('delivery change operation is invalid')
   }
@@ -246,7 +267,7 @@ export function nextDeliveryPhase(level: DeliveryLevel, current: DeliveryPhase):
 export function deliveryChangeRef(change: DeliveryChangeMeta): DeliveryTaskRef {
   if (change.operation === 'clear') return change.cleared
   if (change.operation === 'record-change' || change.operation === 'record-design'
-    || change.operation === 'record-spec') return change.ref
+    || change.operation === 'record-spec' || change.operation === 'mark-analyzed') return change.ref
   return { id: change.task.id, revision: change.task.revision }
 }
 
@@ -323,9 +344,27 @@ export function applyDeliveryChange(state: DeliveryFoldState, change: DeliveryCh
     state.lastRef = ref
     return
   }
+  if (change.operation === 'mark-analyzed') {
+    const current = state.task
+    if (current === undefined) throw new Error('delivery mark-analyzed requires a current task')
+    requireNextRevision(current, change.ref, 'mark-analyzed')
+    if (current.analysisDone) {
+      throw new Error('delivery mark-analyzed requires analysisDone to be false')
+    }
+    /* v8 ignore next -- a current task established by this fold always has an updatedAt */
+    if (state.updatedAt === undefined) throw new Error('current task fold lacks updatedAt')
+    if (change.updatedAt < state.updatedAt) {
+      throw new Error('delivery mark-analyzed timestamp cannot precede the current task update')
+    }
+    state.task = { ...current, revision: change.ref.revision, analysisDone: true }
+    state.updatedAt = change.updatedAt
+    state.lastRef = ref
+    return
+  }
   if (change.operation === 'create') {
     if (change.task.revision !== 1 || change.task.phase !== 'created' || change.task.changeCount !== 0
       || change.task.designCount !== 0 || change.task.specCount !== 0
+      || change.task.analysisDone !== false
       || (state.task !== undefined && state.task.phase !== 'accepted')
       || state.seenTaskIds.has(change.task.id)) {
       throw new Error('delivery create requires a fresh created revision-one task with zero changes')
@@ -338,8 +377,9 @@ export function applyDeliveryChange(state: DeliveryFoldState, change: DeliveryCh
     if (change.task.id !== current.id || change.task.objective !== current.objective
       || change.task.level !== current.level || change.task.changeCount !== current.changeCount
       || change.task.designCount !== current.designCount
-      || change.task.specCount !== current.specCount) {
-      throw new Error('delivery advance cannot change objective, level, changeCount, designCount, or specCount')
+      || change.task.specCount !== current.specCount
+      || change.task.analysisDone !== current.analysisDone) {
+      throw new Error('delivery advance cannot change objective, level, changeCount, designCount, specCount, or analysisDone')
     }
     /* v8 ignore next -- a current task established by this fold always has an updatedAt */
     if (state.updatedAt === undefined) throw new Error('current task fold lacks updatedAt')
