@@ -1,3 +1,8 @@
+---
+description: "The vendored loader group plugin for Cordis: nests child entries inside a loader config with : -separated ids."
+kind: "package-reference"
+---
+
 # @cordisjs/plugin-group
 
 Loader group plugin for nesting Cordis entries.

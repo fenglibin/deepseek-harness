@@ -10,78 +10,11 @@ DeepSeek Harness 是一个一切皆插件的 Cordis agent harness（智能体框
 
 ## 仓库布局
 
-```
-vendor/  内置的 Cordis 源码 — manifest 与同步流程见 vendor/README.md
-packages/  @deepseek-ai/dsh-<pkg> workspace，位于 packages/<group>/<pkg>/
-  core/   产品 API 主干：session、system-prompt、tools、agent、agent-loop
-  api/    Remote BFF 组装与 Typert RPC 网关
-  typert/  类型图生成器、加载器与运行时注册表
-  llm/    LLM 能力：Service Definition/Consumer + DeepSeek 提供方
-  e2b/    E2B 概念验证（POC）：沙箱 + FS/subprocess 适配器
-  shell/  bash 能力：Service Definition + local/pwsh 提供方 + shell Consumer
-  subprocess/  subprocess 能力 + 本地进程树提供方 + 共享 Win32 库
-  terminal/  持久会话
-  fs/     文件系统能力 + 策略
-  lsp/    language-server 能力
-  skill/  skill provider 注册表 + 本地实现 + catalog/loader 工具
-  web/    web 能力：Service Definition + search/fetch 提供方 + tool Consumer
-  compaction/  compaction 能力 + 基础提供方
-  context/  request-context 插件
-  subagent/  subagent 能力：Service Definition + 提供方 + delegation Consumer
-  bundle/  可安装的 dsh --profile patch-layer bundle
-  workflow/  workflow 能力 + worker-thread 提供方 + tool Consumer
-  webhook/  webhook 入口
-  todo/    todo_write 工具
-  plan/    以记录状态（logged state）呈现的 plan 模式
-  preset/  从 preset cordis.yml 文件进行按会话的 agent 组合
-  guard/   loop-hygiene + tool-timeout 插件
-  self-modification/  agent 检查并挂载自己的插件
-  hooks/   Claude Code/Codex hook 桥 + wire-protocol 库
-  session/  持久会话数据：持久化、投影、标题、遥测
-  identity/  匿名身份
-  settings/  用户设置能力 + 文件提供方
-  credentials/  credential/authorization 能力 + env/.env 提供方
-  acp/     仅自动化使用的 Agent Client Protocol 服务器
-  interaction/  approval/interaction 能力、权限、命令、ask-user
-  boot/    共享 profile/应用启动胶水
-  sdk/     JSON-RPC 协议 + TypeScript 客户端/服务器
-  examples/  可复用的组合 bundle（agent-spine）
-  experimental/  排除在正式发布之外的私有原型
-  support/  开发/测试基础设施
-  util/    零依赖工具库
-python/  Python SDK 与内置运行时（见 python/README.md）
-native/  @deepseek-ai/node-addon-landlock-run 的源记录（见 native/README.md）
-.agents/  Agent 工作流与 Agent Notes（`notes/`）
-docs/    架构、生成目录、事后复盘、cookbook（见 docs/AGENTS.md）
-scripts/  仓库 gate 与生成器
-website/  docs/ 源的 VitePress 投影
-```
-
-Package 分组：[packages/README.md](packages/README.zh.md)。
+目录树与分组见 [packages/README.zh.md](packages/README.zh.md#repository-layout)。
 
 ## 命令
 
-```sh
-pnpm install            # pnpm workspaces，node ^22.19 || >=24
-pnpm run clean           # 移除构建产物与已删除 package 的安全残留
-pnpm run test           # 单元测试
-pnpm run test:coverage  # CI 覆盖率门禁：packages/*/*/src 上每个文件 100%
-pnpm run test:e2e       # 真实 API 测试；无 DEEPSEEK_API_KEY 时自行跳过
-pnpm run test:expected  # 各 owner 本地的进程期望输出
-pnpm run test:snapshot  # 通过随附 profile 回放无密钥录制的会话；过滤：-t <name>
-pnpm run test:snapshot:record  # 重新录制期望输出（需要 key）
-pnpm run typecheck
-pnpm run lint
-pnpm run duplication    # 跨文件 TypeScript 克隆检测
-pnpm run build          # tsc 产出 lib/types，tsdown 打包 runtime
-pnpm run hygiene        # publint + workspace/package/依赖检查 + NodeNext consumer 检查
-pnpm run check:windows-wine  # 仅在诊断已知 Windows 故障时使用（需要 wine）；该信号由 CI 负责
-pnpm run doc-sync       # 所有文档门禁；叶子清单见 scripts/run-gates.ts
-pnpm run test:docs      # 快速文档检查（不构建；doc-quick 聚合）
-pnpm run website:build  # VitePress 构建（兼作死链检查）
-pnpm dsh --profile headless "task"  # 从源码运行一个任务（需要 DEEPSEEK_API_KEY）
-pnpm run demo:ptc -- "task"  # headless PTC 模式运行（需要 key）
-```
+命令清单见 [docs/development.zh.md](docs/development.zh.md#commands)。
 
 ### 宿主机沙箱失败
 
@@ -142,7 +75,7 @@ pnpm run demo:ptc -- "task"  # headless PTC 模式运行（需要 key）
 
 所有代码在 `strict: true` 与 `noImplicitAny` 下编译；任何剩余的 `any` 都要解释为何无法收窄。每个模块与导出对其非显而易见的契约都有简洁 JSDoc；函数式导出包含 `@param`/`@returns`，由 `verify-export-jsdoc` 强制执行。继承声明的成员、plugin 协议槽位与构造函数，其文档保留在声明处的 Service Definition、协议或类中。
 
-注释与文档陈述的是完整契约与上下文，而不是推理过程记录。使用直接、具体的措辞，不使用隐喻。在写 `contract`、`boundary` 或 `shape` 之前，先问是否有更精确的词能命名该主题：写 `response fields`、`JSON validation` 或 `ESM exports`，而不是 `response shape`、`validation boundary` 或 `module shape`。`contract` 只用于前置条件、后置条件、不变式、兼容性承诺，以及其他调用方、被调方、实现者、提供方、生产者或消费者所依赖的义务。`boundary` 只用于字面意义上的进程、wire、安全、事务或生命周期边界。不要叙述控制流或测试过程、保留评审历史，或复述代码。保留关于行为、失败、时序、归属与安全使用的实事，并链接到其依据。决策时使用 [dsh-prose-standard](.agents/skills/dsh-prose-standard/SKILL.md)。把可机械检查的不变式接入一个被执行的最顶层 gate，并证明每条被改动的验收路径都会拒绝非法用例。使用狭窄且有依据的例外，而不是全局禁用某条规则。
+注释与文档陈述完整契约而不是推理过程。把可机械检查的不变式接入一个被执行的最顶层 gate，并证明每条被改动的验收路径都会拒绝非法用例；使用狭窄且有依据的例外，而不是全局禁用某条规则。措辞与词频见 [docs/AGENTS.md](docs/AGENTS.md) 与 [dsh-prose-standard](.agents/skills/dsh-prose-standard/SKILL.md)。
 
 每个代码变更都伴随文档：同步更新受影响的 README 与 JSDoc 契约。当前态行文、每段一个物理行、每项实事只有一个归属、以及词数预算，都在 [docs/AGENTS.md](docs/AGENTS.md) 中定义。
 
@@ -152,56 +85,9 @@ pnpm run demo:ptc -- "task"  # headless PTC 模式运行（需要 key）
 
 ## 内置依赖（Vendoring）策略
 
-`vendor/` 下的 packages 是锁定版本的源码拷贝（manifest 连同上游 SHA 见 [vendor/README.md](vendor/README.md)）。按其中的同步流程更新；重新应用或撤除已记录在案的本地修改；重跑 `pnpm run test && pnpm run build`。
+`vendor/` 下的 packages 是锁定版本的源码拷贝，按 [vendor/README.md](vendor/README.md) 的同步流程更新。
 
 <!-- CODEGRAPH_START -->
-## CodeGraph
-
-This project has a CodeGraph MCP server (`codegraph_*` tools) configured. CodeGraph is a tree-sitter-parsed knowledge graph of every symbol, edge, and file. Reads are sub-millisecond and return structural information grep cannot.
-
-### 🚫 Mandatory rules — do NOT skip
-
-These are **rules**, not suggestions. Models that haven't been
-fine-tuned on codegraph (DeepSeek, Qwen, GLM, HunYuan, …) often fall back to
-grep/Read by training-data habit even when codegraph is faster.
-
-1. **NEVER grep / find / Read to look up a symbol by name.** Use `codegraph_search` or `codegraph_context` first.
-2. **NEVER chain Read + grep to trace how something works.** Use `codegraph_context` (one call) plus ONE `codegraph_explore`.
-3. **NEVER call `codegraph_node` more than 3 times in a row.** Switch to `codegraph_explore` which batches by file in a single capped call.
-4. **NEVER trust an edge tagged `[heur 0.NN ⚠️]` (confidence < 0.7) without verifying.** Open the call site to confirm before relying on the relationship.
-5. **NEVER answer when the response footer shows `⚠️ Index age:` over 30 minutes.** Ask the user to run `codegraph sync`, or check `codegraph_status`.
-
-### When to prefer codegraph over native search
-
-Use codegraph for **structural** questions — what calls what, what would break, where is X defined, what is X's signature. Use native grep/read only for **literal text** queries (string contents, comments, log messages) or after you already have a specific file open.
-
-| Question | Tool |
-|---|---|
-| "Where is X defined?" / "Find symbol named X" | `codegraph_search` |
-| "What calls function Y?" | `codegraph_callers` |
-| "What does Y call?" | `codegraph_callees` |
-| "What would break if I changed Z?" | `codegraph_impact` |
-| "Show me Y's signature / source / docstring" | `codegraph_node` |
-| "Give me focused context for a task/area" | `codegraph_context` |
-| "See several related symbols' source at once" | `codegraph_explore` |
-| "What files exist under path/" | `codegraph_files` |
-| "Is the index healthy?" | `codegraph_status` |
-
-### Rules of thumb
-
-- **Answer directly — don't delegate exploration.** For "how does X work" / architecture / trace questions, answer with 2-3 codegraph calls: `codegraph_context` first, then ONE `codegraph_explore` for the source of the symbols it surfaces. Codegraph IS the pre-built index, so spawning a separate file-reading sub-task/agent — or running a grep + read loop — repeats work codegraph already did and costs more for the same answer.
-- **Trust codegraph results.** They come from a full AST parse. Do NOT re-verify them with grep — that's slower, less accurate, and wastes context.
-- **Don't grep first** when looking up a symbol by name. `codegraph_search` is faster and returns kind + location + signature in one call.
-- **Don't chain `codegraph_search` + `codegraph_node`** when you just want context — `codegraph_context` is one call.
-- **Don't loop `codegraph_node` over many symbols** — one `codegraph_explore` call returns several symbols' source grouped in a single capped call, while each separate node/Read call re-reads the whole context and costs far more.
-- **Index lag**: the file watcher debounces ~500ms behind writes; don't re-query immediately after editing a file in the same turn.
-
-### If `.codegraph/` doesn't exist
-
-The MCP server returns "not initialized." Ask the user: *"I notice this project doesn't have CodeGraph initialized. Want me to run `codegraph init -i` to build the index?"*
-
----
-
 ## CodeGraph（中文）
 
 本项目已配置 CodeGraph MCP 服务（`codegraph_*` 工具集）。CodeGraph 基于

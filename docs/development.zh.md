@@ -162,3 +162,28 @@ pnpm run demo:ptc -- "summarize this workspace"
 ```
 
 `pnpm run verify-type-equiv`（`doc-sync` 的一环）随后通过 TypeScript 解析器从源码提取该符号的声明及其附带的 JSDoc，并断言代码块同时匹配两者。对于不应把实现体写进目录的类，请使用 ` ```ts public-api ` 并设置 `"projection": "public-api"`；门禁检查的投影会保留公共字段、构造函数、访问器、方法以及类和成员的原始 JSDoc，同时省略实现体和私有或受保护成员。比对会忽略空白和非 JSDoc 注释，但要求保留每条原始 JSDoc（包括成员文档），让读者同时看到源码约定和确切类型定义。该门禁按文档、符号和投影，在主块与 manifest 条目之间强制 1:1 对应；只有当配对 `.zh.md` 块的完整受跟踪围栏序列与其无后缀兄弟文件按字节一致且顺序相同时，才会复用后者的条目。`doc-typecheck` 对可编译围栏应用同一派生规则，同时跳过两种源码等价围栏的编译，并将其排除在 opt-out 比例的计算之外。当你改动一个已记录的类型声明或其 JSDoc 时，门禁会失败直到你更新粘贴内容；当你增删一个主块时，请在同一个变更里更新 manifest。
+
+<a id="commands"></a>
+## 命令
+
+```sh
+pnpm install            # pnpm workspaces，node ^22.19 || >=24
+pnpm run clean           # 移除构建产物与已删除 package 的安全残留
+pnpm run test           # 单元测试
+pnpm run test:coverage  # CI 覆盖率门禁：packages/*/*/src 上每个文件 100%
+pnpm run test:e2e       # 真实 API 测试；无 DEEPSEEK_API_KEY 时自行跳过
+pnpm run test:expected  # 各 owner 本地的进程期望输出
+pnpm run test:snapshot  # 通过随附 profile 回放无密钥录制的会话；过滤：-t <name>
+pnpm run test:snapshot:record  # 重新录制期望输出（需要 key）
+pnpm run typecheck
+pnpm run lint
+pnpm run duplication    # 跨文件 TypeScript 克隆检测
+pnpm run build          # tsc 产出 lib/types，tsdown 打包 runtime
+pnpm run hygiene        # publint + workspace/package/依赖检查 + NodeNext consumer 检查
+pnpm run check:windows-wine  # 仅在诊断已知 Windows 故障时使用（需要 wine）；该信号由 CI 负责
+pnpm run doc-sync       # 所有文档门禁；叶子清单见 scripts/run-gates.ts
+pnpm run test:docs      # 快速文档检查（不构建；doc-quick 聚合）
+pnpm run website:build  # VitePress 构建（兼作死链检查）
+pnpm dsh --profile headless "task"  # 从源码运行一个任务（需要 DEEPSEEK_API_KEY）
+pnpm run demo:ptc -- "task"  # headless PTC 模式运行（需要 key）
+```

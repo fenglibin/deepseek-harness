@@ -43,6 +43,22 @@ export interface AgentPresetPluginRow {
   readonly fiberPhase: PluginFiberPhase
 }
 
+/** The full README one plugin module's package ships. */
+export interface PluginReadmeText {
+  /** `README.zh.md` or `README.md`, whichever the package ships. */
+  readonly name: string
+  /** The README's body, with its frontmatter block removed. */
+  readonly text: string
+}
+
+/** One module's short description and README name, fetched on demand. */
+export interface PluginDescribeResult {
+  /** One sentence the package published; absent when it published none. */
+  readonly description?: string
+  /** Name of the README its package ships; absent when it ships none. */
+  readonly readme?: string
+}
+
 /** One agent preset's identity and flattened composition in the inventory. */
 export interface AgentPresetPluginGroup {
   /** Stable preset id. */
@@ -57,6 +73,15 @@ export interface AgentPresetPluginGroup {
   readonly broken?: string
   /** Plugin rows in composition order; empty when the preset is broken. */
   readonly rows: readonly AgentPresetPluginRow[]
+}
+
+declare module '@deepseek-ai/dsh-typert-protocol' {
+  interface RemoteErrorDetailsMap {
+    /** No Loader entry carries this id. */
+    'plugin-inventory/entry-not-found': { readonly entryId: PluginEntryId }
+    /** The id names a structural group, which carries no enablement of its own. */
+    'plugin-inventory/entry-is-group': { readonly entryId: PluginEntryId }
+  }
 }
 
 /** Point-in-time inventory returned by the plugin inventory Remote. */

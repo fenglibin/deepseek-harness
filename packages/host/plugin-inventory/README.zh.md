@@ -1,5 +1,5 @@
 ---
-description: "当前 Cordis Loader 插件状态的只读投影，并附带每个 Agent 预设的组合：面向 web GUI 宿主客户端的 pluginInventory 服务及其 pluginInventory/list Remote。"
+description: "当前 Cordis Loader 插件状态的投影与全局启停写入口，并附带每个 Agent 预设的组合：面向 web GUI 宿主客户端的 pluginInventory 服务及其 pluginInventory/list、pluginInventory/setEnabled、pluginInventory/readme Remote。"
 kind: "package-reference"
 ---
 
@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## 概述
 
-客户端与设置页可以展示宿主当前组合了什么：调用 `pluginInventory/list` 即按 Loader 顺序返回当前的非组条目——条目 id、模块标识、有效启用状态与根 Fiber 阶段（`pending`、`loading`、`active`、`failed` 或 `unloading`；条目没有存活根 Fiber 时为 `null`）。当部署组合了 Agent 预设 roster 时，快照还携带每个预设一组——id、trust、显示名、默认标记、健康状态与压平后的组合行——因为挂载 roster 的部署把模型侧插件运行在预设组合里，而不是 Loader 自己的条目上。该快照只表示调用当下：Loader 是唯一的生命周期权威，本包不拥有缓存、历史、来源模型、事件流或修改路径。Client 包通过显式的 [`api-remotes`](../../api/remotes/README.zh.md) 组合消费这个 Remote，而不导入 Host 实现。
+客户端与设置页可以展示宿主当前组合了什么，也可以启停其中的全局插件：调用 `pluginInventory/list` 即按 Loader 顺序返回当前的非组条目——条目 id、模块标识、有效启用状态、根 Fiber 阶段（`pending`、`loading`、`active`、`failed` 或 `unloading`；条目没有存活根 Fiber 时为 `null`）、该插件所属包在 README frontmatter 里发布的描述，以及可读到的 README 文件名；调用 `pluginInventory/setEnabled` 即写入某一条目自己的 `disabled`；调用 `pluginInventory/readme` 即取回某一插件所属包 README 的全文。当部署组合了 Agent 预设 roster 时，快照还携带每个预设一组——id、trust、显示名、默认标记、健康状态与压平后的组合行——因为挂载 roster 的部署把模型侧插件运行在预设组合里，而不是 Loader 自己的条目上；预设行的启停不在这里，它由 [`dsh-agent-presets`](../../preset/agent-presets/README.zh.md) 写组合文件。该快照只表示调用当下：Loader 是唯一的生命周期权威，本包不拥有缓存、历史、来源模型或事件流。Client 包通过显式的 [`api-remotes`](../../api/remotes/README.zh.md) 组合消费这个 Remote，而不导入 Host 实现。
 
 ## 目录
 
@@ -27,7 +27,13 @@ kind: "package-reference"
 
 ### 快照包含什么
 
-每一行是一个非组 Loader 条目：其条目 id、精确模块标识、有效启用状态（含被禁用的祖先组）与当前根 Fiber 阶段。`pending` 表示条目等待加载，`loading` 表示正在读取，`active` 表示正在运行，`failed` 表示其 fiber 被拒绝，`unloading` 表示正在拆除；`null` 表示完全不存在存活的根 Fiber。结构性的 group 行会被跳过。
+每一行是一个非组 Loader 条目：其条目 id、精确模块标识、有效启用状态（含被禁用的祖先组）、当前根 Fiber 阶段，以及该模块所属包在 README frontmatter 里发布的 `description`；读得到 README 时还带上 `readme` 文件名。`pending` 表示条目等待加载，`loading` 表示正在读取，`active` 表示正在运行，`failed` 表示其 fiber 被拒绝，`unloading` 表示正在拆除；`null` 表示完全不存在存活的根 Fiber。结构性的 group 行会被跳过。
+
+描述与 README 文件名来自包自己的文档，而不是插件代码：模块名按「条目所在树的 base → 本部署的 base → 本模块」这一顺序解析到包目录，取最近的 `README.zh.md` 或 `README.md`。`description` 读顶部 frontmatter 的 `description`；`readme` 是发现该文件时它实际的文件名，因此读不到包、包没有 README、或 README 没有可解析的 frontmatter 描述时，该行不带 `description` 键——发布为空比发布一个空白更诚实。
+
+### 读取一个插件的 README 全文
+
+`pluginInventory/readme(moduleName)` 取回该模块所属包 README 的正文，frontmatter 块已被剥掉——它正是清单里那行 `description` 的来源，浏览正文时不该再出现一次。全文不进 `list` 快照：一个完整 roster 的散文不该让每次清单读取都付账，只有读者打开「查看更多」时才取。解析不到模块、或包没有 README 时返回 `undefined`。
 
 ### 每个预设的组合
 
@@ -35,7 +41,11 @@ kind: "package-reference"
 
 ### 你能用它做什么、不能做什么
 
-该清单是供展示与诊断的快照：客户端可以渲染名单、标出失败条目，并通过比较快照检测变化。它不能启用、停用、添加或移除插件，也不携带历史——已经失败并被移除的 fiber 缺席。由于服务每次调用都读取 Loader，答案总是反映当前组合，而不是缓存视图。
+该清单是供展示与诊断的快照：客户端可以渲染名单、标出失败条目，并通过比较快照检测变化；也可以启停某一条全局条目。它不携带历史——已经失败并被移除的 fiber 缺席——也不能添加或移除插件，更不能写 Agent 预设的组合。由于服务每次调用都读取 Loader，答案总是反映当前组合，而不是缓存视图。
+
+### 启停一条全局条目
+
+`pluginInventory/setEnabled(entryId, enabled)` 写入的是该条目**自己**的 `disabled` 选项，也就是 Loader 每次挂载决策都会读的那个值。因此在一个已被停用的组里启用某条目不会让它跑起来——组的判断才是有效的那一个，快照如实报告这一点。文件支撑的条目树会把这次改动写回它的配置文件；内存根树不会，所以由它持有的条目在进程重启后恢复原状。未知 id 报 `plugin-inventory/entry-not-found`，命名到结构性 group 的 id 报 `plugin-inventory/entry-is-group`。
 
 -----
 
@@ -49,6 +59,10 @@ kind: "package-reference"
 
 网关是一层没有第二个生命周期真源的直接投影：每次 `list()` 调用都读取 `ctx.loader.entries()`，并把每个非组条目映射为公共行。Cordis 内部的 plugin/status 事件已经维护了 `Entry.fiber` 与 `Fiber.state`，因此再加缓存只会多出一个需要同步的生命周期真源。Agent 预设 roster 是每次调用经 `ctx.get('agentPresets')` 解析的可选伙伴：所有预设读取都由它的 `compositionInventory()` 负责，本包只把根 Fiber 状态映射到公共阶段词汇。
 
+### 描述解析
+
+描述在投影时解析，不在插件注册时收集：模块名先按条目所在树的 base，再按本部署的 base，最后按本模块自身去解析，第一个解析成功的锚点说了算——包括它解析到一个不发布描述的包时。走到包 manifest 就停止向上的查找，因为再往上的 README 属于另一个包（在本仓库里是一个包组）。`cordis:` 内建直接跳过：它们在 Cordis 内部，没有自己的包文档。
+
 ### 阶段映射
 
 Fiber 状态映射到公共阶段词汇，其中 `disposed` 折叠为 `null`——fiber 已消失的条目没有可报告的存活根。因此阶段从不区分为什么没有存活根：条目可能从未启动，也可能其 fiber 已被释放。
@@ -58,7 +72,8 @@ Fiber 状态映射到公共阶段词汇，其中 `disposed` 折叠为 `null`—�
 | 文件 | 职责 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | `PluginInventoryGateway`：`pluginInventory` Remote 服务与 Loader 投影 |
-| [`src/types.ts`](src/types.ts) | 公共 payload 类型：`PluginInventoryEntry`、`PluginInventorySnapshot`、`PluginFiberPhase` |
+| [`src/description.ts`](src/description.ts) | 从包 README 读取插件描述与全文的解析器（frontmatter 剥离） |
+| [`src/types.ts`](src/types.ts) | 公共 payload 类型：`PluginInventoryEntry`、`PluginInventorySnapshot`、`PluginFiberPhase`、`PluginReadmeText`，以及 `plugin-inventory/*` 失败码 |
 | [`src/invariant.ts`](src/invariant.ts) | 不变式伴生插件（无运行时不变式；每个快照都投影 Loader 持有的状态） |
 
 Typert 生成由 `./typert` 与 `./remote` 导出的 Host 和 Client Remote 产物。
@@ -95,7 +110,10 @@ Typert 生成由 `./typert` 与 `./remote` 导出的 Host 和 Client Remote 产�
 这些限制说明一个点时刻清单无法告诉客户端什么。它们是当前包约束，不是任务积压。
 
 - **仅表示调用当下**——结果不包含持久的失败历史或订阅；只要不存在存活的根 Fiber，就会报告 `null`，而不区分其原因。
-- **无来源与修改能力**——服务不识别条目由哪个 bundle、profile 或 override 引入，也不能在任一平面启用、停用、添加或移除插件。
+- **无来源，且只改全局平面**——服务不识别条目由哪个 bundle、profile 或 override 引入，也不能添加或移除插件；预设平面的启停归 [`dsh-agent-presets`](../../preset/agent-presets/README.zh.md)。
+- **描述依赖包文档而非插件声明**——模块不发布自己的描述，读的是所属包 README 的 frontmatter；包没写、或部署里解析不到那个包，这一行就没有描述。
+- **描述与 README 名都不缓存**——每次 `list()` 都重新解析，因此包文档改动在下一次读取即可见，代价是每次读取都要走一次模块解析与文件读取。
+- **README 全文按模块名解析**——`readme` Remote 用的是本部署的 base，而不是某一棵树自己的 base；两个 base 解析到不同包版本时，全文可能与清单行的描述来自不同的 README。
 - **预设仅随 roster 出现**——未装 `dsh-agent-presets` 的部署只提供 Loader 条目；`agentPresets` 字段缺席而非为空。
 
 <a id="dev-note"></a>

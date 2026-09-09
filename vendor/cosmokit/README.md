@@ -1,3 +1,8 @@
+---
+description: "A vendored collection of common utilities shared by the Cordis framework and its plugin packages."
+kind: "package-library"
+---
+
 # cosmokit
 
 [![Codecov](https://img.shields.io/codecov/c/github/shigma/cosmokit?style=flat-square)](https://codecov.io/gh/shigma/cosmokit)

@@ -13,6 +13,9 @@ import type { PluginInventorySettingsTabInjected } from '../src/client/PluginInv
 usePinnedBrowserLanguages('zh-CN')
 afterEach(cleanup)
 
+/** The branded entry id the Host Remote face takes, spelled through the tab. */
+type EntryId = Parameters<PluginInventorySettingsTabInjected['setEnabled']>[0]
+
 const EMPTY = { entries: [] }
 type ListResult =
   | { readonly ok: true; readonly value: typeof EMPTY }
@@ -31,9 +34,20 @@ async function bench() {
   new RemoteService(ctx)
   const list = vi.fn<() => Promise<ListResult>>()
     .mockResolvedValue({ ok: true, value: EMPTY })
-  ctx.provide('remote.pluginInventory', { list })
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list }
+  const setEnabled = vi.fn<() => Promise<RemoteResult>>()
+    .mockResolvedValue({ ok: true, value: undefined })
+  const setRowDisabled = vi.fn<() => Promise<RemoteResult>>()
+    .mockResolvedValue({ ok: true, value: undefined })
+  ctx.provide('remote.pluginInventory', { list, setEnabled })
+  ctx.provide('remote.agentPresets', { setRowDisabled })
+  return {
+    ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, setEnabled, setRowDisabled,
+  }
 }
+
+type RemoteResult =
+  | { readonly ok: true; readonly value: undefined }
+  | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
 
 function declare(slots: SlotRegistry): () => void {
   return slots.register({
@@ -44,7 +58,9 @@ function declare(slots: SlotRegistry): () => void {
 
 describe('ui-settings-plugin-inventory browser plugin', () => {
   it('declares only the services used by the Settings Remote contribution', () => {
-    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.pluginInventory'])
+    expect(inject).toEqual([
+      'slots', 'locale', 'remote', 'remote.pluginInventory', 'remote.agentPresets',
+    ])
   })
 
   it('registers a localized tab without reading the Remote eagerly', async () => {
@@ -64,6 +80,24 @@ describe('ui-settings-plugin-inventory browser plugin', () => {
     expect(b.list).toHaveBeenCalledOnce()
     b.list.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } })
     await expect(injected.list()).rejects.toThrow('pluginInventory.list failed: REMOTE_ERROR: unavailable')
+
+    await injected.setEnabled('timer' as EntryId, false)
+    expect(b.setEnabled).toHaveBeenCalledWith('timer', false)
+    b.setEnabled.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'plugin-inventory/entry-not-found', message: 'gone' },
+    })
+    await expect(injected.setEnabled('gone' as EntryId, true))
+      .rejects.toThrow('pluginInventory.setEnabled failed: plugin-inventory/entry-not-found: gone')
+
+    await injected.setPresetRowDisabled('mine', 'fs', true)
+    expect(b.setRowDisabled).toHaveBeenCalledWith('mine', 'fs', true)
+    b.setRowDisabled.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'agent-preset/read-only', message: 'it ships with the deployment' },
+    })
+    await expect(injected.setPresetRowDisabled('standard', 'fs', true))
+      .rejects.toThrow('agentPresets.setRowDisabled failed: agent-preset/read-only: it ships with the deployment')
 
     // Shipped preset names resolve over the agent-preset dictionaries the
     // real plugin registers; user-authored metadata stays untranslated.

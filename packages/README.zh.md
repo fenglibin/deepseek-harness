@@ -111,3 +111,55 @@ harness 由 `packages/` 下的 npm 包组装而成，按能力系列分组：会
 无。
 
 </details>
+
+<a id="repository-layout"></a>
+## 仓库布局
+
+```
+vendor/  内置的 Cordis 源码 — manifest 与同步流程见 vendor/README.md
+packages/  @deepseek-ai/dsh-<pkg> workspace，位于 packages/<group>/<pkg>/
+  core/   产品 API 主干：session、system-prompt、tools、agent、agent-loop
+  api/    Remote BFF 组装与 Typert RPC 网关
+  typert/  类型图生成器、加载器与运行时注册表
+  llm/    LLM 能力：Service Definition/Consumer + DeepSeek 提供方
+  e2b/    E2B 概念验证（POC）：沙箱 + FS/subprocess 适配器
+  shell/  bash 能力：Service Definition + local/pwsh 提供方 + shell Consumer
+  subprocess/  subprocess 能力 + 本地进程树提供方 + 共享 Win32 库
+  terminal/  持久会话
+  fs/     文件系统能力 + 策略
+  lsp/    language-server 能力
+  skill/  skill provider 注册表 + 本地实现 + catalog/loader 工具
+  web/    web 能力：Service Definition + search/fetch 提供方 + tool Consumer
+  compaction/  compaction 能力 + 基础提供方
+  context/  request-context 插件
+  subagent/  subagent 能力：Service Definition + 提供方 + delegation Consumer
+  bundle/  可安装的 dsh --profile patch-layer bundle
+  workflow/  workflow 能力 + worker-thread 提供方 + tool Consumer
+  webhook/  webhook 入口
+  todo/    todo_write 工具
+  plan/    以记录状态（logged state）呈现的 plan 模式
+  preset/  从 preset cordis.yml 文件进行按会话的 agent 组合
+  guard/   loop-hygiene + tool-timeout 插件
+  self-modification/  agent 检查并挂载自己的插件
+  hooks/   Claude Code/Codex hook 桥 + wire-protocol 库
+  session/  持久会话数据：持久化、投影、标题、遥测
+  identity/  匿名身份
+  settings/  用户设置能力 + 文件提供方
+  credentials/  credential/authorization 能力 + env/.env 提供方
+  acp/     仅自动化使用的 Agent Client Protocol 服务器
+  interaction/  approval/interaction 能力、权限、命令、ask-user
+  boot/    共享 profile/应用启动胶水
+  sdk/     JSON-RPC 协议 + TypeScript 客户端/服务器
+  examples/  可复用的组合 bundle（agent-spine）
+  experimental/  排除在正式发布之外的私有原型
+  support/  开发/测试基础设施
+  util/    零依赖工具库
+python/  Python SDK 与内置运行时（见 python/README.md）
+native/  @deepseek-ai/node-addon-landlock-run 的源记录（见 native/README.md）
+.agents/  Agent 工作流与 Agent Notes（`notes/`）
+docs/    架构、生成目录、事后复盘、cookbook（见 docs/AGENTS.md）
+scripts/  仓库 gate 与生成器
+website/  docs/ 源的 VitePress 投影
+```
+
+Package 分组：[packages/README.md](packages/README.zh.md)。

@@ -179,6 +179,13 @@ export async function fileComposition(
 
 /**
  * Plugin rows of one live standing composition, in Loader-entry order.
+ *
+ * The id reported is the one the composition FILE declares (`entry.options.id`),
+ * not the Loader's synthesized id (`entry.id`). A standing mount hangs off the
+ * roster's own Loader entry, so `entry.id` prefixes every row with that entry's
+ * id (`<roster-id>:<row-id>`), while a row edit addresses the file id the
+ * composition declares. Reporting the file id keeps a mounted preset's rows
+ * addressable by the same id a file read reports.
  * @param tree - the standing mount's entry tree.
  * @returns rows with the Loader's evaluated enablement and root-fiber states.
  */
@@ -187,7 +194,7 @@ export function mountedCompositionRows(tree: EntryTree): AgentPresetCompositionR
   for (const entry of tree.entries()) {
     if (entry.options.group) continue
     found.push({
-      entryId: entry.id,
+      entryId: entry.options.id,
       moduleName: entry.options.name,
       enabled: !entry.disabled,
       ...isJsExpr(entry.options.disabled) ? { condition: entry.options.disabled.__jsExpr } : {},

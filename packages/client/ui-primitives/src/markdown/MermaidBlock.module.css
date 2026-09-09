@@ -1,0 +1,20 @@
+.diagram {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  padding: 12px 0;
+}
+
+.diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.fallback {
+  overflow-x: auto;
+  margin: 0;
+  font-family: var(--ds-font-family-code, monospace);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre;
+}

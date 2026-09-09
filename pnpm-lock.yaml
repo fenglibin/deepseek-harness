@@ -2979,6 +2979,9 @@ importers:
       mdast-util-math:
         specifier: ^3.0.0
         version: 3.0.0
+      mermaid:
+        specifier: ^11.16.0
+        version: 11.16.0
       micromark-core-commonmark:
         specifier: ^2.0.3
         version: 2.0.3
@@ -3474,6 +3477,10 @@ importers:
         version: 18.3.1
 
   packages/client/ui-settings-plugin-inventory:
+    dependencies:
+      clsx:
+        specifier: ^2.0.0
+        version: 2.1.1
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:^
@@ -6530,6 +6537,9 @@ importers:
 
   packages/host/plugin-inventory:
     dependencies:
+      js-yaml:
+        specifier: ^4.1.0
+        version: 4.3.1
       zod:
         specifier: ^4.4.3
         version: 4.4.3

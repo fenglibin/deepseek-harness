@@ -38,7 +38,9 @@ import type SettingsService from '@deepseek-ai/dsh-settings'
 import type { SettingsScope } from '@deepseek-ai/dsh-settings'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import { discoverPresets, SHIPPED_PRESET_ROOT, USER_PRESET_DIR } from './discovery.ts'
-import { copyComposition, deleteComposition, presetExists, readComposition } from './authoring.ts'
+import {
+  copyComposition, deleteComposition, presetExists, readComposition, writeRowDisabled,
+} from './authoring.ts'
 import { livePresetMounts, mountPreset, serviceForAgent, standingMountFor } from './mount.ts'
 import {
   fileComposition, mountedCompositionRows,
@@ -80,7 +82,9 @@ export {
   inactiveRows, leakedServices, livePresetMounts, mountPreset, serviceForAgent, standingMountFor,
   type JoinedPresetMount, type PresetMount,
 } from './mount.ts'
-export { copyComposition, deleteComposition, readComposition, writableRoot } from './authoring.ts'
+export {
+  copyComposition, deleteComposition, readComposition, writeRowDisabled, writableRoot,
+} from './authoring.ts'
 export { agentPresetProjectionDefinition } from './session.ts'
 export type { AgentPreset, Config, PresetRoot, PresetTrust } from './preset.ts'
 
@@ -603,6 +607,46 @@ export class AgentPresets extends TypertRemoteService {
   async remoteExportDelete(id: string): Promise<void> {
     validatePresetId(id, 'agentPreset')
     await this.remove(id)
+  }
+
+  /**
+   * Enable or disable one plugin row of one preset's composition.
+   *
+   * A shipped preset is edited in place, at the composition file discovery
+   * resolved: the deployment ships the decision to run a row, not a veto over
+   * whether this user runs it. Only the row's own `disabled` line moves, so the
+   * comments a shipped composition records its design in survive.
+   *
+   * The write reaches the composition FILE first, then reconciles every
+   * standing mount of this preset with the new enablement. Without that step a
+   * session that already composed the preset keeps the generation it started
+   * on and the inventory keeps answering from the stale mount, so a reader
+   * would see the old state until restart. The row is addressed by the id its
+   * file declares, so a row a listing shows without an id cannot be changed at
+   * all.
+   * @param agentPreset - the preset whose composition to change.
+   * @param entryId - the id the target row declares.
+   * @param disabled - whether the row should be stopped.
+   * @returns once the composition file carries the change and live mounts match.
+   * @throws {RemoteError} `gateway/bad-request` for an empty id,
+   * `agent-preset/not-found` when no root supplies the preset, or
+   * `agent-preset/invalid` when the write is refused.
+   */
+  @Remote('setRowDisabled')
+  async setRowDisabled(agentPreset: string, entryId: string, disabled: boolean): Promise<void> {
+    validatePresetId(agentPreset, 'agentPreset')
+    if (entryId.length === 0) {
+      throw new RemoteError('gateway/bad-request', 'entryId must be a non-empty string', {})
+    }
+    await writeRowDisabled(await this.resolve(agentPreset), entryId, disabled)
+    // Reconcile the mounts the write just made stale. `mount.tree.update`
+    // applies the enablement in memory; the PresetTree never writes its file
+    // back (its `write` is a no-op), so the durable change stays the one the
+    // composition file now carries.
+    for (const mount of livePresetMounts(this.selfCtx.root.fiber)) {
+      if (mount.presetId !== agentPreset) continue
+      await mount.tree.update(entryId, { disabled })
+    }
   }
 
   /**

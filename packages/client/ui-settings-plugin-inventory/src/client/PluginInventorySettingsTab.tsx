@@ -1,5 +1,5 @@
-import { useEffect, useId, useMemo, useState, type ReactNode } from 'react'
-import type { PluginInventorySnapshot } from '@deepseek-ai/dsh-api-remotes/client'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import type { PluginDescribeResult, PluginInventorySnapshot } from '@deepseek-ai/dsh-api-remotes/client'
 import {
   IconChevronDownOutline14,
   IconSearchOutline16,
@@ -7,6 +7,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PluginInventoryLocaleKey } from './locales.ts'
+import { ReadmeDialog, type ReadmeDocument } from './ReadmeDialog.tsx'
 import css from './PluginInventorySettingsTab.module.css'
 
 type PluginInventoryEntry = PluginInventorySnapshot['entries'][number]
@@ -17,6 +18,29 @@ type AgentPresetRow = AgentPresetGroup['rows'][number]
 export interface PluginInventorySettingsTabInjected {
   /** Read a current Host inventory snapshot. */
   list: () => Promise<PluginInventorySnapshot>
+  /**
+   * Enable or disable one global-plane entry, persisted by the tree that owns
+   * it. Rejects when the Host refuses the write.
+   */
+  setEnabled: (entryId: PluginInventoryEntry['entryId'], enabled: boolean) => Promise<void>
+  /**
+   * Enable or disable one row of a locally authored preset's composition,
+   * addressed by the id the composition file declares. Rejects for a shipped
+   * preset, an unnamed row, or a row the deployment gates by expression.
+   */
+  setPresetRowDisabled: (agentPreset: string, entryId: string, disabled: boolean) => Promise<void>
+  /**
+   * Read the whole README one plugin module's package ships. Resolves to
+   * undefined when the module publishes none, and rejects when the Host
+   * refuses the read.
+   */
+  readme: (moduleName: string) => Promise<ReadmeDocument | undefined>
+  /**
+   * Read one plugin module's short description and README name on demand,
+   * fetched only when a reader expands the card. Omits either key when the
+   * package publishes none, and rejects when the Host refuses the read.
+   */
+  describe: (moduleName: string) => Promise<PluginDescribeResult>
   /**
    * Display name for one preset: shipped presets resolve through the
    * agent-preset dictionaries, user-authored ones keep their own metadata.
@@ -121,15 +145,55 @@ function PluginCard({ rowKey, moduleName, entryId, trailing, ariaLabel, failed, 
   )
 }
 
-/** Detail rows shared by every card: the Loader identity, then labeled facts. */
-function CardFacts({ moduleName, moduleLabel, entryId, facts }: {
+/** On-demand description read for one expanded card. */
+type DescribeState =
+  | { readonly status: 'loading' }
+  | { readonly status: 'error' }
+  | { readonly status: 'ready'; readonly description?: string; readonly readme?: string }
+
+/** Detail rows shared by every card: what the plugin is, then labeled facts. */
+function CardFacts({ moduleName, moduleLabel, entryId, describe, onReadme, readmeLabel, facts }: {
   readonly moduleName: string
   readonly moduleLabel: string
   readonly entryId: string | null
+  /** Fetch the short description and README name on demand, once the card opens. */
+  readonly describe: (moduleName: string) => Promise<PluginDescribeResult>
+  /** Open the whole README, named by the README file the describe returned. */
+  readonly onReadme: ((readmeName: string) => void) | undefined
+  /** Localized link text. */
+  readonly readmeLabel: string
   readonly facts: readonly (readonly [label: string, value: ReactNode])[]
 }): ReactNode {
+  // The description is fetched only while the card is expanded, because
+  // CardFacts mounts exactly when its card opens and unmounts when it closes.
+  const [detail, setDetail] = useState<DescribeState>({ status: 'loading' })
+  useEffect(() => {
+    let current = true
+    setDetail({ status: 'loading' })
+    void describe(moduleName).then(
+      (result) => { if (current) setDetail({ status: 'ready', ...result }) },
+      () => { if (current) setDetail({ status: 'error' }) },
+    )
+    return () => { current = false }
+  }, [describe, moduleName])
+
+  const description = detail.status === 'ready' ? detail.description : undefined
+  const readmeName = detail.status === 'ready' ? detail.readme : undefined
   return (
     <>
+      {description === undefined
+        ? null
+        : <p className={css.description} data-plugin-description>{description}</p>}
+      {readmeName === undefined || onReadme === undefined ? null : (
+        <button
+          type="button"
+          className={css.readmeLink}
+          data-plugin-readme={readmeName}
+          onClick={() => { onReadme(readmeName) }}
+        >
+          {readmeLabel}
+        </button>
+      )}
       {entryId === null ? null : <code className={css.entryValue} data-loader-entry>{entryId}</code>}
       <dl className={css.details}>
         <div>
@@ -166,13 +230,48 @@ function StateTag({ kind, label }: { readonly kind: string; readonly label: stri
   return <span className={css.configTag} data-kind={kind}>{label}</span>
 }
 
+/** Enablement switch for one row; disabled while any write is in flight. */
+function StateToggle({ label, enabled, busy, onToggle }: {
+  readonly label: string
+  readonly enabled: boolean
+  readonly busy: boolean
+  readonly onToggle: () => void
+}): ReactNode {
+  return (
+    <div className={css.toggleRow}>
+      <span className={css.toggleLabel}>{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={enabled}
+        aria-label={label}
+        className={enabled ? `${css.switch} ${css.switchOn}` : css.switch}
+        disabled={busy}
+        onClick={onToggle}
+      >
+        <span className={css.thumb} />
+      </button>
+    </div>
+  )
+}
+
 /** Render the read-only plugin inventory: agent presets first, then the global plane. */
-export function PluginInventorySettingsTab({ list, presetName, t }: PluginInventorySettingsTabProps): ReactNode {
+export function PluginInventorySettingsTab({
+  list, setEnabled, setPresetRowDisabled, readme, describe, presetName, t,
+}: PluginInventorySettingsTabProps): ReactNode {
   const sectionId = useId()
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
   const [request, setRequest] = useState(0)
+  const [pendingEntry, setPendingEntry] = useState<string | null>(null)
+  const [toggleFailed, setToggleFailed] = useState(false)
   const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [chosenPreset, setChosenPreset] = useState<string | null>(null)
+  const [readmeTarget, setReadmeTarget] = useState<{ moduleName: string; readmeName: string } | null>(null)
   const [switcherOpen, setSwitcherOpen] = useState(false)
   const [presetOpen, setPresetOpen] = useState<boolean | null>(null)
   const [globalOpen, setGlobalOpen] = useState<boolean | null>(null)
@@ -240,10 +339,41 @@ export function PluginInventorySettingsTab({ list, presetName, t }: PluginInvent
     setExpanded(current => current === key ? null : key)
   }
 
+  /**
+   * Write one entry's enablement, then re-read: only a fresh snapshot knows
+   * the row's effective state and its root-fiber phase after the change.
+   */
+  const applyToggle = async (rowKey: string, write: () => Promise<void>): Promise<void> => {
+    setPendingEntry(rowKey)
+    setToggleFailed(false)
+    let refused = false
+    try {
+      await write()
+    } catch {
+      refused = true
+    }
+    // A write that settles after unmount has no screen left to report to.
+    if (!mounted.current) return
+    setPendingEntry(null)
+    if (refused) {
+      setToggleFailed(true)
+      return
+    }
+    try {
+      setState({ status: 'ready', snapshot: await list() })
+    } catch {
+      setState({ status: 'error' })
+    }
+  }
+
   /** Trailing status and detail facts for one row of the selected preset. */
   const presetRowCard = (preset: AgentPresetGroup, row: AgentPresetRow, index: number): ReactNode => {
     const key = `preset:${preset.id}:${String(index)}`
     const title = moduleShortName(row.moduleName)
+    const rowId: string | null = row.entryId
+    // A const binding keeps the `boolean` narrowing inside the toggle callback,
+    // where a property read on `row` would re-widen to `boolean | 'conditional'`.
+    const rowEnabled = row.enabled
     const failed = row.fiberPhase === 'failed'
     const stateText = failed
       ? t('failedTag')
@@ -272,6 +402,9 @@ export function PluginInventorySettingsTab({ list, presetName, t }: PluginInvent
           moduleName={row.moduleName}
           moduleLabel={t('moduleLabel')}
           entryId={row.entryId}
+          describe={describe}
+          onReadme={(readmeName) => { setReadmeTarget({ moduleName: row.moduleName, readmeName }) }}
+          readmeLabel={t('readmeMore')}
           facts={[
             [t('fromPreset'), presetName(preset)],
             [t('configuration'), stateText],
@@ -279,6 +412,24 @@ export function PluginInventorySettingsTab({ list, presetName, t }: PluginInvent
             ...row.condition === undefined ? [] : [[t('condition'), <code key="condition">{row.condition}</code>] as const],
           ]}
         />
+        {/* A row the file names, a boolean enablement, and a row with no `!!js`
+            gate give a switch something to write — the preset's trust does not,
+            because stopping one row of a shipped composition is the same edit as
+            stopping one row of the user's own. The third argument is the
+            `disabled` flag, so flipping a row writes its current enablement: an
+            enabled row is stopped, a disabled one is started. */}
+        {rowId !== null && rowEnabled !== 'conditional' && row.condition === undefined
+          ? (
+            <StateToggle
+              label={t('toggleLabel')}
+              enabled={rowEnabled}
+              busy={pendingEntry !== null}
+              onToggle={() => {
+                void applyToggle(key, () => setPresetRowDisabled(preset.id, rowId, rowEnabled))
+              }}
+            />
+          )
+          : null}
       </PluginCard>
     )
   }
@@ -318,6 +469,9 @@ export function PluginInventorySettingsTab({ list, presetName, t }: PluginInvent
           moduleName={entry.moduleName}
           moduleLabel={t('moduleLabel')}
           entryId={entry.entryId}
+          describe={describe}
+          onReadme={(readmeName) => { setReadmeTarget({ moduleName: entry.moduleName, readmeName }) }}
+          readmeLabel={t('readmeMore')}
           facts={providers !== undefined
             ? [
               [t('configuration'), t('presetProvidedDetail')],
@@ -339,6 +493,12 @@ export function PluginInventorySettingsTab({ list, presetName, t }: PluginInvent
               ...entry.enabled ? [[t('runtime'), phaseLabel(entry.fiberPhase, t)] as const] : [],
             ]}
         />
+        <StateToggle
+          label={t('toggleLabel')}
+          enabled={entry.enabled}
+          busy={pendingEntry !== null}
+          onToggle={() => { void applyToggle(key, () => setEnabled(entry.entryId, !entry.enabled)) }}
+        />
       </PluginCard>
     )
   }
@@ -346,6 +506,7 @@ export function PluginInventorySettingsTab({ list, presetName, t }: PluginInvent
   return (
     <div className={css.section} aria-busy={state.status === 'loading'}>
       {state.status === 'loading' ? <p className={css.status}>{t('loading')}</p> : null}
+      {toggleFailed ? <p className={css.toggleFailure} role="alert">{t('toggleError')}</p> : null}
       {state.status === 'error' ? (
         <div className={css.failure}>
           <p role="alert">{t('error')}</p>
@@ -479,6 +640,15 @@ export function PluginInventorySettingsTab({ list, presetName, t }: PluginInvent
           ) : null}
         </div>
       ) : null}
+      {readmeTarget === null ? null : (
+        <ReadmeDialog
+          moduleName={readmeTarget.moduleName}
+          readmeName={readmeTarget.readmeName}
+          read={readme}
+          onClose={() => { setReadmeTarget(null) }}
+          t={t}
+        />
+      )}
     </div>
   )
 }

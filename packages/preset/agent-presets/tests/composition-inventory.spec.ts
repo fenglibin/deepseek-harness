@@ -5,7 +5,7 @@
  * read reported broken by reason instead of dropped.
  */
 
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -285,6 +285,31 @@ describe('AgentPresets.compositionInventory', () => {
     ])
   })
 
+  it('answers a mounted preset fresh after a row edit, not its stale pre-write state', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-composition-edit-'))
+    const plugin = join(FIXTURES, 'plugins', 'contribute.js')
+    await mkdir(join(root, 'standard'), { recursive: true })
+    await writeFile(join(root, 'standard', COMPOSITION_FILE), `- id: alpha\n  name: ${plugin}\n  config:\n    tool: alpha\n`)
+    const ctx = await harness({
+      default: 'standard',
+      roots: [{ path: root, trust: 'user' }],
+      includeShippedRoot: false,
+      includeUserRoot: false,
+    })
+    await ctx.agents.create({
+      sessionId: SessionId('row-edit-fresh'),
+      setup: async (agentCtx: Context) => void await ctx.agentPresets.mount(agentCtx, 'standard'),
+    })
+
+    await ctx.agentPresets.setRowDisabled('standard', 'alpha', true)
+
+    const standard = (await ctx.agentPresets.compositionInventory())
+      .find(composition => composition.id === 'standard')
+    expect(standard?.rows.find(row => row.entryId === 'alpha')?.enabled).toBe(false)
+    // The file write is durable too: a fresh read agrees with the mount.
+    expect(await readFile(join(root, 'standard', COMPOSITION_FILE), 'utf8')).toContain('disabled: true')
+  })
+
   it('prefers the standing mount over a file that broke after mounting', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dsh-composition-volatile-'))
     await mkdir(join(root, 'volatile'))
@@ -389,6 +414,38 @@ describe('AgentPresets.compositionInventory', () => {
     // The agent joined a standing composition without the composition
     // becoming host Loader entries.
     expect([...ctx.loader.entries()].map(entry => entry.id)).toEqual(before)
+  })
+
+  it('reports the composition file id for a mounted preset, not the synthesized Loader id', async () => {
+    const ctx = new Context()
+    contexts.push(ctx)
+    ctx.baseUrl = pathToFileURL(FIXTURES).href + '/'
+    await ctx.plugin(Loader)
+    ctx.loader.builtins.include = Include
+    ctx.loader.builtins['agent-presets'] = AgentPresets
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SystemPrompt, { persona: '' })
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(AgentLoop, { agents: [] })
+    // The roster is a Loader entry, so a mounted row's `entry.id` gains the
+    // roster's own id as a prefix; the inventory must still answer with the id
+    // the composition FILE declares, which is what a row edit addresses.
+    await ctx.loader.create({
+      name: 'cordis:agent-presets',
+      config: { default: 'standard', roots: [SYSTEM_ROOT], includeShippedRoot: false, includeUserRoot: false },
+    })
+
+    await ctx.agents.create({
+      sessionId: SessionId('file-id-guard'),
+      setup: async (agentCtx: Context) => void await ctx.agentPresets.mount(agentCtx, 'standard'),
+    })
+
+    const standard = (await ctx.agentPresets.compositionInventory())
+      .find(composition => composition.id === 'standard')
+    expect(standard?.rows.map(row => row.entryId)).toEqual(['alpha', 'alpha-extra'])
   })
 
   it('reports a composition that raced discovery as broken instead of dropping it', async () => {

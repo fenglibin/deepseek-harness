@@ -1,3 +1,8 @@
+---
+description: "The vendored Cordis runtime plugin loader: owns an entry tree, imports plugin modules by name, applies config, and keeps the running plugin graph in sync with entry updates."
+kind: "package-reference"
+---
+
 # @cordisjs/plugin-loader
 
 Runtime plugin loader for Cordis. The loader owns an `EntryTree`, imports plugin

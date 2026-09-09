@@ -20,10 +20,18 @@ const t = ((key: PluginInventoryLocaleKey, params?: Record<string, string>): str
 function props(
   list: PluginInventorySettingsTabInjected['list'],
   presetName: PluginInventorySettingsTabInjected['presetName'] = preset => preset.name ?? preset.id,
+  setEnabled: PluginInventorySettingsTabInjected['setEnabled'] = () => Promise.resolve(),
+  setPresetRowDisabled: PluginInventorySettingsTabInjected['setPresetRowDisabled'] = () => Promise.resolve(),
+  readme: PluginInventorySettingsTabInjected['readme'] = () => Promise.resolve(undefined),
+  describe: PluginInventorySettingsTabInjected['describe'] = () => Promise.resolve({}),
 ): PluginInventorySettingsTabProps {
   return {
     t,
     list,
+    setEnabled,
+    setPresetRowDisabled,
+    readme,
+    describe,
     presetName,
   } as PluginInventorySettingsTabProps
 }
@@ -32,7 +40,12 @@ function props(
 const SNAPSHOT = {
   entries: [
     { entryId: 'telemetry', moduleName: '@fixture/telemetry', enabled: true, fiberPhase: 'failed' },
-    { entryId: 'timer', moduleName: 'cordis:timer', enabled: true, fiberPhase: 'active' },
+    {
+      entryId: 'timer',
+      moduleName: 'cordis:timer',
+      enabled: true,
+      fiberPhase: 'active',
+    },
     { entryId: '8a1b2c3d', moduleName: '@deepseek-ai/cordis-plugin-hmr', enabled: true, fiberPhase: 'active' },
     { entryId: 'unobserved', moduleName: '@fixture/unobserved-name', enabled: true, fiberPhase: null },
     { entryId: 'bash-host', moduleName: '@deepseek-ai/dsh-tool-bash', enabled: false, fiberPhase: null },
@@ -133,6 +146,220 @@ describe('PluginInventorySettingsTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'anonymous, 已启用' }))
     expect(view.container.querySelector('[data-loader-entry]')).toBeNull()
     expect(screen.getByText(zh.moduleLabel).nextElementSibling?.textContent).toBe('@fixture/anonymous')
+  })
+
+  it('fetches a description on demand when a card expands and none for a silent package', async () => {
+    const describe = vi.fn(async (moduleName: string): Promise<{ description?: string; readme?: string }> => {
+      if (moduleName === '@fixture/pwsh') return { description: 'PowerShell 执行器', readme: 'README.zh.md' }
+      if (moduleName === 'cordis:timer') return { description: '计时器能力', readme: 'README.zh.md' }
+      return {}
+    })
+    const view = render(
+      <PluginInventorySettingsTab {...props(async () => SNAPSHOT, undefined, undefined, undefined, undefined, describe)} />,
+    )
+    await screen.findByRole('searchbox', { name: zh.search })
+
+    // Expanding a preset row fetches its description on demand.
+    fireEvent.click(screen.getByRole('button', { name: 'pwsh, 条件启用' }))
+    expect(await screen.findByText('PowerShell 执行器')).toBeTruthy()
+    expect(describe).toHaveBeenCalledWith('@fixture/pwsh')
+
+    // A global row fetches its own description on demand.
+    fireEvent.click(globalToggle())
+    fireEvent.click(screen.getByRole('button', { name: 'timer, 已启用' }))
+    expect(await screen.findByText('计时器能力')).toBeTruthy()
+
+    // A row whose package published nothing renders no description paragraph.
+    fireEvent.click(screen.getByRole('button', { name: 'dormant, 已停用' }))
+    expect(view.container.querySelector('[data-plugin-description]')).toBeNull()
+  })
+
+  it('shows the read-more link only where a README exists, then renders it', async () => {
+    const describe = vi.fn(async (moduleName: string) =>
+      moduleName === '@fixture/pwsh' ? { readme: 'README.zh.md' } : {})
+    const read = vi.fn(async (): Promise<{ name: string; text: string }> => ({
+      name: 'README.zh.md',
+      text: '# timer\n\n| 列 | 值 |\n|---|---|\n| 1 | 2 |\n',
+    }))
+    render(
+      <PluginInventorySettingsTab {...props(async () => SNAPSHOT, undefined, undefined, undefined, read, describe)} />,
+    )
+    await screen.findByRole('searchbox', { name: zh.search })
+
+    // A preset row with a README carries the link once the describe returns.
+    fireEvent.click(screen.getByRole('button', { name: 'pwsh, 条件启用' }))
+    fireEvent.click(await screen.findByRole('button', { name: zh.readmeMore }))
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+    expect(read).toHaveBeenCalledWith('@fixture/pwsh')
+    // The GFM table is rendered as a real table, not pipe text.
+    expect(screen.getByRole('table')).toBeTruthy()
+    expect(screen.getByRole('cell', { name: '2' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: zh.readmeClose }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('toggles a row the user authored and offers no switch where no write is possible', async () => {
+    let rowEnabled = false
+    const list = vi.fn(async (): Promise<Snapshot> => ({
+      ...SNAPSHOT,
+      agentPresets: [{
+        id: 'mine',
+        trust: 'user',
+        isDefault: false,
+        rows: [
+          { entryId: 'fs', moduleName: '@fixture/fs', enabled: rowEnabled, fiberPhase: null },
+          {
+            entryId: 'pwsh',
+            moduleName: '@fixture/pwsh',
+            enabled: 'conditional',
+            condition: 'process.platform === \'win32\'',
+            fiberPhase: null,
+          },
+          // An evaluated `!!js` gate still carries its condition, so it is as
+          // unwritable as an unevaluated one.
+          { entryId: 'gate', moduleName: '@fixture/gate', enabled: false, condition: 'x', fiberPhase: null },
+          { entryId: null, moduleName: '@fixture/anon', enabled: true, fiberPhase: null },
+        ],
+      }],
+    }))
+    const setPresetRowDisabled = vi.fn<PluginInventorySettingsTabInjected['setPresetRowDisabled']>()
+      .mockResolvedValue(undefined)
+    render(<PluginInventorySettingsTab {...props(list, undefined, undefined, setPresetRowDisabled)} />)
+    await screen.findByRole('searchbox', { name: zh.search })
+
+    // Enabling a stopped row writes `disabled = false` (its current enablement).
+    fireEvent.click(screen.getByRole('button', { name: 'fs, 已停用' }))
+    expect(screen.getByRole('switch', { name: zh.toggleLabel }).getAttribute('aria-checked')).toBe('false')
+    rowEnabled = true
+    await act(async () => {
+      fireEvent.click(screen.getByRole('switch', { name: zh.toggleLabel }))
+    })
+    expect(setPresetRowDisabled).toHaveBeenCalledWith('mine', 'fs', false)
+    expect(await screen.findByRole('button', { name: 'fs, 已启用' })).toBeTruthy()
+
+    // Stopping the now-running row writes `disabled = true`.
+    await act(async () => {
+      fireEvent.click(screen.getByRole('switch', { name: zh.toggleLabel }))
+    })
+    expect(setPresetRowDisabled).toHaveBeenLastCalledWith('mine', 'fs', true)
+
+    // A `!!js` gate and an id-less row give a switch nothing to write.
+    fireEvent.click(screen.getByRole('button', { name: 'pwsh, 条件启用' }))
+    expect(screen.queryByRole('switch')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'gate, 已停用' }))
+    expect(screen.queryByRole('switch')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'anon, 已启用' }))
+    expect(screen.queryByRole('switch')).toBeNull()
+  })
+
+  it('offers a switch on a row of a preset the deployment ships', async () => {
+    const codexEnabled = false
+    const list = vi.fn(async (): Promise<Snapshot> => ({
+      ...SNAPSHOT,
+      agentPresets: [{
+        id: 'standard',
+        trust: 'system',
+        isDefault: true,
+        rows: [{ entryId: 'codex', moduleName: '@fixture/codex', enabled: codexEnabled, fiberPhase: null }],
+      }],
+    }))
+    const setPresetRowDisabled = vi.fn<PluginInventorySettingsTabInjected['setPresetRowDisabled']>()
+      .mockResolvedValue(undefined)
+    render(<PluginInventorySettingsTab {...props(list, undefined, undefined, setPresetRowDisabled)} />)
+    await screen.findByRole('searchbox', { name: zh.search })
+
+    fireEvent.click(screen.getByRole('button', { name: 'codex, 已停用' }))
+    const toggle = screen.getByRole('switch', { name: zh.toggleLabel })
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    await act(async () => { fireEvent.click(toggle) })
+    expect(setPresetRowDisabled).toHaveBeenCalledWith('standard', 'codex', false)
+  })
+
+  it('toggles a global plugin and re-reads the snapshot after the write', async () => {
+    let dormantEnabled = false
+    const list = vi.fn(async (): Promise<Snapshot> => ({
+      ...SNAPSHOT,
+      entries: SNAPSHOT.entries.map(entry => entry.entryId === 'dormant'
+        ? { ...entry, enabled: dormantEnabled }
+        : entry),
+    }))
+    const gate = Promise.withResolvers<undefined>()
+    const setEnabled = vi.fn<PluginInventorySettingsTabInjected['setEnabled']>()
+      .mockReturnValueOnce(gate.promise)
+      .mockResolvedValue(undefined)
+    render(<PluginInventorySettingsTab {...props(list, undefined, setEnabled)} />)
+    await screen.findByRole('searchbox', { name: zh.search })
+    fireEvent.click(globalToggle())
+    fireEvent.click(screen.getByRole('button', { name: 'dormant, 已停用' }))
+
+    const toggle = screen.getByRole('switch', { name: zh.toggleLabel })
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
+    dormantEnabled = true
+    await act(async () => { fireEvent.click(toggle) })
+    expect(setEnabled).toHaveBeenCalledWith('dormant', true)
+    // The switch stays put while the write is in flight.
+    expect(screen.getByRole('switch', { name: zh.toggleLabel })).toHaveProperty('disabled', true)
+
+    await act(async () => { gate.resolve(undefined) })
+    expect(await screen.findByRole('button', { name: 'dormant, 已启用' })).toBeTruthy()
+
+    // Toggling back writes the opposite value against the re-read snapshot.
+    dormantEnabled = false
+    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: zh.toggleLabel })) })
+    expect(setEnabled).toHaveBeenLastCalledWith('dormant', false)
+    expect(await screen.findByRole('button', { name: 'dormant, 已停用' })).toBeTruthy()
+  })
+
+  it('falls back to the failure state when the re-read after a write fails', async () => {
+    let failRead = false
+    const list = vi.fn(async (): Promise<Snapshot> => {
+      if (failRead) throw new Error('host gone')
+      return SNAPSHOT
+    })
+    const setEnabled = vi.fn<PluginInventorySettingsTabInjected['setEnabled']>().mockResolvedValue(undefined)
+    render(<PluginInventorySettingsTab {...props(list, undefined, setEnabled)} />)
+    await screen.findByRole('searchbox', { name: zh.search })
+    fireEvent.click(globalToggle())
+    fireEvent.click(screen.getByRole('button', { name: 'dormant, 已停用' }))
+
+    failRead = true
+    await act(async () => {
+      fireEvent.click(screen.getByRole('switch', { name: zh.toggleLabel }))
+    })
+    expect((await screen.findByRole('alert')).textContent).toBe(zh.error)
+  })
+
+  it('drops an enablement write that settles after unmount', async () => {
+    const gate = Promise.withResolvers<undefined>()
+    const setEnabled = vi.fn<PluginInventorySettingsTabInjected['setEnabled']>()
+      .mockReturnValue(gate.promise)
+    const view = render(
+      <PluginInventorySettingsTab {...props(async () => SNAPSHOT, undefined, setEnabled)} />,
+    )
+    await screen.findByRole('searchbox', { name: zh.search })
+    fireEvent.click(globalToggle())
+    fireEvent.click(screen.getByRole('button', { name: 'dormant, 已停用' }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('switch', { name: zh.toggleLabel }))
+    })
+    view.unmount()
+    await act(async () => { gate.resolve(undefined) })
+  })
+
+  it('reports a refused enablement write and keeps the snapshot it had', async () => {
+    const setEnabled = vi.fn<PluginInventorySettingsTabInjected['setEnabled']>()
+      .mockRejectedValue(new Error('the tree is read-only'))
+    const view = render(<PluginInventorySettingsTab {...props(async () => SNAPSHOT, undefined, setEnabled)} />)
+    await screen.findByRole('searchbox', { name: zh.search })
+    fireEvent.click(globalToggle())
+    fireEvent.click(screen.getByRole('button', { name: 'dormant, 已停用' }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('switch', { name: zh.toggleLabel }))
+    })
+
+    expect((await screen.findByRole('alert')).textContent).toBe(zh.toggleError)
+    expect(screen.getByRole('button', { name: 'dormant, 已停用' })).toBeTruthy()
+    expect(view.container.querySelectorAll('[data-plugin-scope="global"] li').length).toBe(7)
   })
 
   it('expands the global plane with failures first and preset-provided rows inline', async () => {

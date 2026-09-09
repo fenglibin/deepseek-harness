@@ -1,3 +1,8 @@
+---
+description: "The vendored Cordis core framework: the plugin container (Context, services, events, and disposal-aware fibers) every @deepseek-ai/dsh-* package builds on."
+kind: "package-library"
+---
+
 # Cordis
 
 Cordis is a TypeScript plugin framework for applications that need explicit

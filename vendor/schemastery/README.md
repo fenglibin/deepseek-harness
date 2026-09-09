@@ -1,3 +1,8 @@
+---
+description: "A vendored type-driven schema validator used to define and validate configuration schemas across the harness."
+kind: "package-library"
+---
+
 # Schemastery
 
 [![Codecov](https://img.shields.io/codecov/c/github/shigma/schemastery?style=flat-square)](https://codecov.io/gh/shigma/schemastery)

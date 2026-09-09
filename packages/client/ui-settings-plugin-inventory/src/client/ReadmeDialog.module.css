@@ -1,0 +1,50 @@
+.dialog {
+  width: min(860px, calc(100vw - 48px));
+  max-height: min(80vh, 760px);
+}
+
+/* The content column fills the card's height; the header stays pinned while
+   only the body below it scrolls, so the close button and title stay visible
+   through a long README. */
+.content {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* The body is the one scrollable region: it takes the height the header
+   leaves and scrolls internally instead of being clipped by the dialog's
+   `overflow: hidden`. */
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.note {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.failure {
+  margin: 0;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.retry {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  padding: 4px 12px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.retry:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}

@@ -72,6 +72,12 @@ agent-presets:
 
 以下情况会拒绝复制：id 不符合 `[a-z0-9][a-z0-9-]*`（id 会成为目录名）、id 已被占用（复制从不覆写）、或来源未知。删除只移除本地创作的 preset；随部署提供的 preset 不可删除。已在被删除 preset 上运行的会话会继续运行。
 
+### 启停一个 preset 行
+
+`agentPresets/setRowDisabled(agentPreset, entryId, disabled)` 只做一件事：改某个 preset 组合文件里某一行的 `disabled`——随部署提供的 preset 与本地创作的 preset 一视同仁，写的是 discovery 解析出的那份组合文件。行由文件自己声明的 id 定位，因此没有 id 的行改不了；启用是删掉这个键而不是写成 `false`，因为「没有门」和「显式不停用」是同一种状态，而只有前者读起来和文件其余部分一致。带 `!!js` 表达式的行被拒绝——换掉那个门是作者的决定，不是开关的决定。
+
+写的是文件，不是活着的挂载：本次已经组合过该 preset 的会话继续跑在它启动时那一代组合上，只有之后创建的会话读到新状态。只移动 `disabled` 那一行，文件里的注释与手写格式原样保留；无法按行保真编辑的行（流样式 `- {id: x}`）会被拒绝，而不是被重写。
+
 ### 切换会话的 preset
 
 会话只有在尚未产出任何内容——没有消息或工具调用——时才能切换到不同的 preset。此后组装在会话的生命周期内固定，因为在对话中途调换工具会留下新组装无法执行的已记录工具调用。已提交的切换会发出 `tools/change`，因为解析后的工具集在没有注册表编辑的情况下发生了变化。切换也会记入会话日志，因此恢复或 fork 的会话会按它运行的组装重建。
@@ -106,7 +112,7 @@ agent-presets:
 | [`src/composition-inventory.ts`](src/composition-inventory.ts) | 面向插件清单表面的压平组合行：文件读取（求值 disabled 门）与挂载读取（携带 fiber 状态） |
 | [`src/preset.ts`](src/preset.ts) | 词汇体系：preset id 规则、`AgentPreset` 与 `PresetRoot`、错误类型 |
 | [`src/mount.ts`](src/mount.ts) | 子树挂载、宿主 base-URL 处理、挂载审计、`write()` 抑制 |
-| [`src/authoring.ts`](src/authoring.ts) | 本地创作 preset 的复制/删除/读取、权限收紧 |
+| [`src/authoring.ts`](src/authoring.ts) | 本地创作 preset 的复制/删除/读取、任一 preset 的单行启停写入（保注释）、权限收紧与删除的根目录收束 |
 | [`src/metadata.ts`](src/metadata.ts) | `preset.yml` 展示元数据 |
 | [`src/session.ts`](src/session.ts) | `agent-preset/selected` 事件与 `agentPreset` Session 投影 |
 | [`src/types.ts`](src/types.ts) | client-safe 的线上载荷与 cordis 事件声明 |
@@ -126,7 +132,7 @@ agent-presets:
 
 ### 创作机制
 
-复制会解引用符号链接以保证自包含，把目录树收紧为仅属主可用（文件 `0o600` 并保留属主执行位，目录 `0o700`），并在首次复制时创建根目录。复制出的 `preset.yml` 会被重写：保留来源的描述供作者编辑，丢弃其名称与 roster `order`，从而让名单始终能区分副本与来源。删除拒绝随部署提供的 preset，并清除指向刚删除 preset 的用户默认值。
+复制会解引用符号链接以保证自包含，把目录树收紧为仅属主可用（文件 `0o600` 并保留属主执行位，目录 `0o700`），并在首次复制时创建根目录。复制出的 `preset.yml` 会被重写：保留来源的描述供作者编辑，丢弃其名称与 roster `order`，从而让名单始终能区分副本与来源。删除拒绝随部署提供的 preset，并清除指向刚删除 preset 的用户默认值。单行启停是唯一的就地写入：本地创作的 preset 写成 `0o600`，随部署提供的 preset 保留其安装时的模式，避免把以其他用户身份运行的宿主锁在它自己启动要读的文件之外。
 
 ### 会话记录
 

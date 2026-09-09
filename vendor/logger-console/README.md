@@ -1,3 +1,8 @@
+---
+description: "The vendored console exporter for the built-in Cordis logger service, with per-logger level filtering and formatting options."
+kind: "package-reference"
+---
+
 # @cordisjs/plugin-logger-console
 
 Console exporter for the built-in Cordis logger service.

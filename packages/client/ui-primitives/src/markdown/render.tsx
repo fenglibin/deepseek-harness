@@ -23,6 +23,7 @@ import type * as Md from 'mdast'
 import type {} from 'mdast-util-math'
 import { normalizeUri } from 'micromark-util-sanitize-uri'
 import { CodeBlock } from './CodeBlock.tsx'
+import { MermaidBlock } from './MermaidBlock.tsx'
 import { renderTexToReact } from './katex.tsx'
 import type { PositionedBlock } from './incremental.ts'
 import css from './MarkdownText.module.css'
@@ -142,6 +143,10 @@ export interface MarkdownRenderContext {
   readonly footnoteOrder: string[]
   /** References rendered per identifier; drives the section's back-reference count. */
   readonly footnoteCounts: Map<string, number>
+  /** Render ```mermaid fences as diagrams; off where the surface does not opt in. */
+  readonly mermaid?: boolean
+  /** Localized prefix for a diagram that failed to render; required with `mermaid`. */
+  readonly mermaidErrorLabel?: string
 }
 
 /**
@@ -326,6 +331,15 @@ function renderCode(node: Md.Code, key: Key, context: MarkdownRenderContext): Re
     // ```math fences render as display TeX once settled (rehype-katex parity);
     // its text extraction saw the code block's trailing newline.
     return <Fragment key={key}>{renderTexToReact(`${node.value}\n`, true)}</Fragment>
+  }
+  if (!context.streaming && lang === 'mermaid' && context.mermaid === true) {
+    return (
+      <MermaidBlock
+        key={key}
+        code={node.value}
+        errorLabel={context.mermaidErrorLabel ?? ''}
+      />
+    )
   }
   return (
     <CodeBlock

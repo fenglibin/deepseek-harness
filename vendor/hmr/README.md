@@ -1,3 +1,8 @@
+---
+description: "The vendored hot module replacement plugin for Cordis: watches files, traces Node's module graph, and reloads only the loader-managed entries that depend on changed files."
+kind: "package-reference"
+---
+
 # @cordisjs/plugin-hmr
 
 Hot module replacement for loader-managed Cordis plugins.

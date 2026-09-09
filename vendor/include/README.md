@@ -1,3 +1,8 @@
+---
+description: "The vendored file-backed loader tree for Cordis: reads a YAML or JSON entry file into loader entries and writes updates back when the file is writable."
+kind: "package-reference"
+---
+
 # @cordisjs/plugin-include
 
 File-backed loader tree for Cordis. The include plugin reads a YAML or JSON

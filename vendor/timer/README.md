@@ -1,3 +1,8 @@
+---
+description: "The vendored disposal-aware timer service for Cordis: timeout, interval, throttle, and debounce helpers cleared with their owning fiber."
+kind: "package-reference"
+---
+
 # @cordisjs/plugin-timer
 
 Disposal-aware timer service for Cordis.
