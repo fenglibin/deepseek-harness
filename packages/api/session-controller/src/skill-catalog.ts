@@ -2,8 +2,8 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
-import type { SessionId } from '@deepseek-ai/dsh-session'
-import { SessionQueryError } from '@deepseek-ai/dsh-session-query'
+import type { SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-session-projection-cache'
 import { isUserInvocable } from '@deepseek-ai/dsh-skill'
 import type { ScopeKey } from '@deepseek-ai/dsh-scope'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
@@ -36,29 +36,12 @@ export class SessionSkillCatalog extends TypertRemoteService {
   async list(request: SkillListRequest, signal: AbortSignal): Promise<SkillListValue> {
     void signal
     const { sessionId } = request
-    let cwd: string | undefined
-    let agentPreset: string | undefined
-    try {
-      using observation = await this.ctx.sessionQuery.observeSession(sessionId)
-      if (observation.projections === undefined) {
-        throw new Error('skill catalog requires a projected Session observation')
-      }
-      cwd = observation.header.cwd
-      agentPreset = observation.projections.values.agentPreset ?? undefined
-    } catch (error: unknown) {
-      if (error instanceof SessionQueryError
-        && error.code === 'SESSION_QUERY_SESSION_NOT_FOUND') {
-        throw new RemoteError('session/not-found', `session "${sessionId}" not found`, { sessionId })
-      }
-      throw new RemoteError(
-        'gateway/internal',
-        `session "${sessionId}" could not be inspected: ${String(error)}`,
-        {},
-      )
-    }
+    const header = await this.resolveHeader(sessionId)
+    const cwd = header.cwd
     if (cwd === undefined) {
       throw new RemoteError('gateway/internal', `session "${sessionId}" has no project cwd`, {})
     }
+    const agentPreset = this.agentPresetFor(header)
 
     const live = this.ctx.agents.get(sessionId)
     const presets = this.ctx.get('agentPresets')
@@ -86,6 +69,44 @@ export class SessionSkillCatalog extends TypertRemoteService {
     } catch (error: unknown) {
       throw new RemoteError('gateway/internal', `skill listing failed: ${String(error)}`, {})
     }
+  }
+
+  /**
+   * Resolve the session's header without replaying its log. A live session
+   * reads its in-memory header; a cold session comes from the persistence
+   * listing, which carries headers only and never reads an event log.
+   * @throws RemoteError `session/not-found` when the id is absent, or
+   *   `gateway/internal` when the listing itself fails.
+   */
+  private async resolveHeader(sessionId: SessionId): Promise<SessionHeader> {
+    const live = this.ctx.sessions.get(sessionId)
+    if (live !== undefined) return live.header
+    let records
+    try {
+      records = await this.ctx.sessionQuery.listSessions()
+    } catch (error: unknown) {
+      throw new RemoteError(
+        'gateway/internal',
+        `session "${sessionId}" could not be inspected: ${String(error)}`,
+        {},
+      )
+    }
+    const header = records.find(record => record.header.id === sessionId)?.header
+    if (header === undefined) {
+      throw new RemoteError('session/not-found', `session "${sessionId}" not found`, { sessionId })
+    }
+    return header
+  }
+
+  /**
+   * The preset a cold session actually runs: the persisted projection
+   * checkpoint (a zero-I/O read) first, then the creation header's value. A
+   * blank session may have switched presets after creation, so the header
+   * alone can name the wrong composition.
+   */
+  private agentPresetFor(header: SessionHeader): string | undefined {
+    const cached = this.ctx.get('sessionProjectionCache')?.cachedSnapshot(header)
+    return cached?.values.agentPreset ?? header.agentPreset ?? undefined
   }
 
   /** Resolve a live or standing preset scope without creating an Agent. */
