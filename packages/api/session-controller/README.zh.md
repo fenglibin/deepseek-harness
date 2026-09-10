@@ -27,6 +27,8 @@ kind: "package-reference"
 
 `deleteSession` 是唯一移除 Session 的操作：它先退役仍在驻留的普通 Agent（把其 Session 移出 store 并排空它欠 durable 存储的内容），再通过 `ctx.sessionPersistence.remove` 丢弃 durable 日志，在该可选服务挂载时通过 `ctx.sessionProjectionCache.remove` 丢弃派生的 projection 缓存行，通过 `ctx.workspaceRegistry.removeSession` 丢弃 Host 的引用，并发出 `api-session/removed`，让每个已连接的 Client 删除该行。删除不是归档——被归档的 Session 保留其日志与在 Workspace 行中的位置，而被删除的 Session 两者都不保留。只有当 Session 的 Agent 仍在运行一轮（`agent/status` 为 running）时，`deleteSession` 才会以 `RemoteError('session/live', …)` 拒绝它——仅仅打开过会话并不算运行；本控制器无法退役的驻留 Agent（配置启动、subagent 持有或外部创建的）同样会被拒绝。未挂载 persistence 后端的部署会以 `gateway/internal` 拒绝删除。日志不存在时报告 `session/not-found`；其他持久化失败报告 `gateway/internal`，且不删除任何内容。
 
+保留是有界的。每个被保留的 Agent 都钉住其 Session 的整份内存事件日志（一个流式 delta 一个事件对象），所以无界的保留集就是无界的堆：长期运行的 Host 会累积每个被浏览器打开过的 Session，直到 V8 在堆上限上以 `FATAL ERROR: Ineffective mark-compacts near heap limit` 中止进程。超过 `liveAgentLimit` 后，一次激活会释放最久未活跃且已静默（`liveAgentIdleMs`；`agent/status` 是静默期的起点）的 Agent；运行中的 Agent 永不释放，所以配额是软上限——没有可释放对象时保留集可以暂时超出。释放沿用 `deleteSession` 的退役路径，但**不**发布 `api-session/removed`：Session 仍 durable，Client 的行与 follow stream 都保留，下次使用时走普通冷恢复。`heapWatchIntervalMs` 开启后，Host 周期性把堆用量、V8 堆上限、RSS、保留 Agent 数与保留事件数记为一行日志，达到 `heapWatchWarnRatio` 时按 warn 记录；`heapWatchSnapshotNearLimit` 让进程在临界时留下 heap snapshot 供事后定位。
+
 Client adapter 提供 `SessionEventStream`，即绑定到一个普通 Session 或 direct subagent address 的 Gateway `RemoteJournalStream`。它在读取首个 page 前打开 follow，只发布连续的 `replace`、`prepend` 和 `append` 变更，并通过 tail page 修复重连或 seq 缺口。普通 record 覆盖 `[event.seq, event.seq]`，packed row 覆盖 `[event.seq, event.seq + memberCount - 1]`。业务、persistence 或无法恢复的连续性错误会终止 stream，只有物理载体断开才触发自动恢复。`SessionControlStream` 是 Gateway `RemoteSnapshotStream`；每代都以完整的进程本地 baseline 开始，因此重连会替换 queue、jobs 和 projection 状态，而不会把瞬态值当作 durable event。
 
 Session 对象还承载本地提交回显：`session.beginSubmission` 在调用方序列化与 prompt 之前，同步把一条回显写入 `SessionSnapshot.pendingSubmissions`，会话 UI 因此能在点击提交的当帧显示消息。prompt 的 `requestId` 就是关联标识，Host 本就把它回显为 durable user source 的 `rpcId`，queue occurrence 也把它投影为 `SessionQueuedItem.rpcId`。回显在观察到其 durable event 或 queue occurrence 后延迟一个动画帧退休（该延迟保证 transcript 节点可渲染之前回显仍在），带标识的 prompt 失败或被放弃时立即退休，销毁时按 failed 退休；每次退休恰好触发一次注册的 `onRetire` 回调。回显只存在于 Client 内存，刷新与重连只从 durable event 重建会话。
@@ -40,6 +42,11 @@ Session 对象还承载本地提交回显：`session.beginSubmission` 在调用�
 |---|---:|---|
 | `coldBlankProbeMaxBytes` | `1,024` | 可进行空白状态验证的冷 Session 工件最大物理大小；`0` 禁用探测 |
 | `nativeOpen` | 平台探测 | 是否能把 Session 工作区路径交给原生桌面打开器 |
+| `liveAgentLimit` | `16` | 保留的普通 Agent 上限；超出后释放最久未活跃的静默 Agent；`0` 不设上限 |
+| `liveAgentIdleMs` | `600,000` | 空闲 Agent 可被释放前必须保持的静默时长 |
+| `heapWatchIntervalMs` | `300,000` | 堆水位与保留工作量采样间隔；`0` 关闭采样 |
+| `heapWatchWarnRatio` | `0.75` | 堆用量达到堆上限的该比例时按 warn 记录水位，否则按 info |
+| `heapWatchSnapshotNearLimit` | `0` | 进程接近堆上限时保留的 heap snapshot 数量；`0` 不抓取 |
 
 生成的[配置目录](../../../docs/config-catalog.zh.md#deepseek-aidsh-api-session-controller)是所有受支持字段及其 JSDoc 的完整来源。
 
@@ -60,6 +67,7 @@ Session 对象还承载本地提交回显：`session.beginSubmission` 在调用�
 
 - Control baseline 表示进程本地状态，因此 Host 重启后无法重建 jobs。
 - follow 恢复失败会对调用方可见，而不会无限重试。
+- 保留上限是软的：只有静默且空闲的 Agent 会被释放，正在运行的一轮与刚被使用的 Session 不会被为此让路。
 - 文件引用补全使用共享 Agent lookup，因此可能恢复冷 Session；`skills/list` 目录是不激活 Agent 的 skill 元数据读取路径。
 
 

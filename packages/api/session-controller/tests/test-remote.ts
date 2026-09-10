@@ -82,6 +82,12 @@ export interface TestSessionRemoteDefaults {
   readonly cwd: string
   readonly coldBlankProbeMaxBytes?: number
   readonly nativeOpen?: boolean
+  /** Ordinary Agents the harness retains; the harness default of `0` keeps every activation. */
+  readonly liveAgentLimit?: number
+  /** Quiet period before an idle Agent is released; the harness default of `0` needs no clock. */
+  readonly liveAgentIdleMs?: number
+  /** Watermark interval; the harness default of `0` keeps harness logs free of samples. */
+  readonly heapWatchIntervalMs?: number
   readonly saveDefaultModelSelection?: (selection: AgentModelSelection) => void | Promise<void>
   readonly openPath?: (path: string, signal: AbortSignal) => Promise<void>
   readonly canOpenPath?: () => boolean
@@ -197,6 +203,12 @@ function installControllers(
           ? {}
           : { coldBlankProbeMaxBytes: defaults.coldBlankProbeMaxBytes },
         ...defaults.nativeOpen === undefined ? {} : { nativeOpen: defaults.nativeOpen },
+        // Harness defaults differ from the schema's on purpose: these cases own
+        // Session behaviour, so they keep every activation and log no samples
+        // unless a case opts into the bound or the watermark.
+        liveAgentLimit: defaults.liveAgentLimit ?? 0,
+        liveAgentIdleMs: defaults.liveAgentIdleMs ?? 0,
+        heapWatchIntervalMs: defaults.heapWatchIntervalMs ?? 0,
       },
       {
         ...defaults.openPath === undefined ? {} : { openPath: defaults.openPath },

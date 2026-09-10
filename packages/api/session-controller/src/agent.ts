@@ -9,7 +9,7 @@ import type {
 } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
 import type {} from '@deepseek-ai/dsh-agent-presets'
-import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import { errorChain, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { Session, SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { RemoteError } from '@deepseek-ai/dsh-typert-protocol'
@@ -68,6 +68,54 @@ export type ApiSessionAgentResult =
 type InstalledSelection = ModelSelectionRef & {
   current: AgentModelSelection
   consume(provider: string, model: string, reasoningEffort: string | undefined): boolean
+}
+
+/**
+ * Resolved policy for the ordinary Agents this Host keeps activated.
+ *
+ * A retained Agent pins its Session's whole in-memory event log, so an
+ * unbounded retained set is an unbounded heap: a Host left up for days would
+ * accumulate every Session a browser ever opened, each one holding one event
+ * object per streamed delta, until V8 aborts the process on its heap limit.
+ * Releases are therefore policy, not an emergency measure, and a released
+ * Session stays durable and cold-resumable.
+ */
+export interface ApiSessionAgentRetention {
+  /** Maximum retained ordinary Agents; `0` keeps every activation. */
+  readonly limit: number
+  /**
+   * Quiet period before an idle retained Agent becomes eligible for release.
+   * It protects the Sessions someone is working in from paying a cold resume
+   * on their next prompt.
+   */
+  readonly idleMs: number
+}
+
+/** Non-serializable hooks used to make retention timing deterministic in tests. */
+export interface ApiSessionAgentRetentionInternals {
+  /** Clock returning the current epoch milliseconds; defaults to `Date.now`. */
+  readonly now?: () => number
+}
+
+/** Default number of ordinary Agents one Host keeps activated. */
+export const DEFAULT_LIVE_AGENT_LIMIT = 16
+/** Default quiet period before an idle retained Agent is eligible for release. */
+export const DEFAULT_LIVE_AGENT_IDLE_MS = 10 * 60 * 1000
+
+/** Retained work this controller can account for, reported to the runtime watermark. */
+export interface ApiSessionAgentRetainedWork {
+  /** Ordinary Agents currently retained. */
+  readonly agents: number
+  /** Committed events those Agents' Sessions hold in memory. */
+  readonly events: number
+}
+
+/** One retained ordinary Agent and the last activity this controller observed for it. */
+interface RetainedAgent {
+  /** Teardown capability owed to the Session's owner. */
+  readonly handle: AgentHandle
+  /** Epoch milliseconds of the last observed use. */
+  lastUsedAt: number
 }
 
 /**
@@ -136,13 +184,37 @@ export async function inspectApiSession(
 export class ApiSessionAgentController {
   private readonly resumes = new Map<SessionId, Promise<Agent>>()
   private readonly creations = new Map<SessionId, Promise<Agent>>()
-  /** Teardown capability of every Agent this controller activated, keyed by Session id. */
-  private readonly handles = new Map<SessionId, AgentHandle>()
+  /**
+   * Teardown capability of every Agent this controller activated, keyed by
+   * Session id, with the activity stamp the retention bound orders by.
+   */
+  private readonly retained = new Map<SessionId, RetainedAgent>()
+  /**
+   * IDs whose `session/disposed` must NOT be published as a removal. A
+   * retention release leaves the durable Session in place, so a client told to
+   * drop the row would lose a Session that still exists and can resume.
+   */
+  private readonly retentionReleases = new Set<SessionId>()
+  /** In-flight retention releases; awaited by this controller's teardown. */
+  private readonly releases = new Set<Promise<void>>()
   private readonly selections = new WeakMap<Agent, InstalledSelection>()
   private readonly imageAdmissionChains = new WeakMap<Agent, Promise<void>>()
+  private readonly now: () => number
 
-  /** @param ctx - Host context carrying Agent, model, persistence, and Typert services. */
-  constructor(private readonly ctx: Context) {
+  /**
+   * @param ctx - Host context carrying Agent, model, persistence, and Typert services.
+   * @param retention - resolved retention policy for activated ordinary Agents.
+   * @param internals - timing hooks; production callers pass none.
+   */
+  constructor(
+    private readonly ctx: Context,
+    private readonly retention: ApiSessionAgentRetention,
+    internals: ApiSessionAgentRetentionInternals = {},
+  ) {
+    this.now = internals.now ?? Date.now
+    ctx.effect(() => async () => {
+      await Promise.allSettled([...this.releases])
+    }, 'api-session-agent.retentionReleases')
     ctx.typert.lookups.configure('agent', async (sessionId: SessionId) => {
       const found = await this.resolveAgent(sessionId)
       if ('error' in found) throw found.error
@@ -195,9 +267,9 @@ export class ApiSessionAgentController {
     // dispose, so let it settle (or fail) before releasing what it produced.
     const inflight = this.resumes.get(sessionId) ?? this.creations.get(sessionId)
     if (inflight !== undefined) await inflight.then(() => undefined, () => undefined)
-    const handle = this.handles.get(sessionId)
+    const handle = this.retained.get(sessionId)?.handle
     if (handle === undefined) return false
-    this.handles.delete(sessionId)
+    this.retained.delete(sessionId)
     // A different Agent under the same id belongs to a later lifecycle this
     // capability cannot tear down.
     if (this.ctx.agents.get(sessionId) !== handle.agent) return false
@@ -205,10 +277,44 @@ export class ApiSessionAgentController {
     return true
   }
 
+  /**
+   * Record one observed use of a Session, so the retention bound orders by real
+   * activity rather than by activation order.
+   * @param sessionId - Session whose retained Agent the caller just used.
+   */
+  touch(sessionId: SessionId): void {
+    const entry = this.retained.get(sessionId)
+    if (entry !== undefined) entry.lastUsedAt = this.now()
+  }
+
+  /**
+   * Report whether one disposal is this controller's own retention release, so
+   * the Host retires the Agent without publishing a removal.
+   * @param sessionId - Session identity that just left the Host store.
+   * @returns true for a retention release; the report is consumed once, and a
+   *   deletion the Host published itself is never reported.
+   */
+  consumeRetentionRelease(sessionId: SessionId): boolean {
+    return this.retentionReleases.delete(sessionId)
+  }
+
+  /**
+   * Account for the work this controller keeps in memory, the retained-work
+   * half of the Host's runtime watermark.
+   * @returns the retained Agent count and their Sessions' committed-event
+   *   count, read without copying any log.
+   */
+  retentionStats(): ApiSessionAgentRetainedWork {
+    let events = 0
+    for (const entry of this.retained.values()) events += entry.handle.agent.session.seq
+    return { agents: this.retained.size, events }
+  }
+
   private async resolve(
     sessionId: SessionId,
     observation?: SessionObservation,
   ): Promise<ApiSessionAgentResult> {
+    this.touch(sessionId)
     const live = this.liveAgent(sessionId)
     if (live !== undefined) return live
     const attached = this.ctx.sessions.get(sessionId)
@@ -260,6 +366,7 @@ export class ApiSessionAgentController {
     checkPersistedIdentity: boolean,
     presetId?: string,
   ): Promise<Agent> {
+    this.touch(sessionId)
     let creation = this.creations.get(sessionId)
     if (creation === undefined) {
       creation = this.createOrAdopt(sessionId, cwd, checkPersistedIdentity, presetId)
@@ -299,6 +406,7 @@ export class ApiSessionAgentController {
    * @returns the installed mutable selection reference.
    */
   selectionFor(agent: Agent): InstalledSelection {
+    this.touch(agent.id)
     const installed = this.selections.get(agent)
     if (installed !== undefined) return installed
     const projectionState = this.ctx.sessionProjections.stateOf(agent.session, 'modelSelection')
@@ -383,6 +491,7 @@ export class ApiSessionAgentController {
    * @returns the operation result or rejection.
    */
   serializeImageAdmission<Value>(agent: Agent, operation: () => Promise<Value>): Promise<Value> {
+    this.touch(agent.id)
     const result = (this.imageAdmissionChains.get(agent) ?? Promise.resolve()).then(operation)
     this.imageAdmissionChains.set(agent, result.then(() => undefined, () => undefined))
     return result
@@ -455,14 +564,108 @@ export class ApiSessionAgentController {
   }
 
   /**
-   * Record one activated Agent's teardown capability against its Session id.
+   * Record one activated Agent's teardown capability against its Session id,
+   * then hold the retained set to its configured bound.
    * @param sessionId - Session identity the Agent was activated under.
    * @param handle - owned Agent plus its disposer.
    * @returns the activated Agent.
    */
   private activate(sessionId: SessionId, handle: AgentHandle): Agent {
-    this.handles.set(sessionId, handle)
+    this.retained.set(sessionId, { handle, lastUsedAt: this.now() })
+    this.enforceRetention()
     return handle.agent
+  }
+
+  /**
+   * Release least-recently-used idle Agents until the retained set fits the
+   * configured limit. A released Session stays durable and cold-resumable, so
+   * this is the ordinary resume path rather than a special case.
+   *
+   * Nothing waits on a release: an activation must not be delayed by another
+   * Session's teardown, and `release` deletes the retained entry synchronously,
+   * so the next loop turn already sees the smaller set.
+   */
+  private enforceRetention(): void {
+    const { limit, idleMs } = this.retention
+    if (limit <= 0) return
+    this.dropStaleEntries()
+    if (this.retained.size <= limit) return
+    const now = this.now()
+    const idle = [...this.retained.entries()]
+      .filter(([sessionId, entry]) => this.releasable(sessionId, entry, now, idleMs))
+      .sort((left, right) => left[1].lastUsedAt - right[1].lastUsedAt)
+    for (const [sessionId] of idle) {
+      if (this.retained.size <= limit) return
+      this.evict(sessionId)
+    }
+  }
+
+  /**
+   * Drop retained entries whose Agent the registry no longer holds under that
+   * id. A later lifecycle owns its own teardown, and counting the stale entry
+   * here would release other Sessions to satisfy a bound it does not consume.
+   */
+  private dropStaleEntries(): void {
+    for (const [sessionId, entry] of this.retained) {
+      if (this.ctx.agents.get(sessionId) === entry.handle.agent) continue
+      this.retained.delete(sessionId)
+    }
+  }
+
+  /**
+   * Whether one retained Agent may be released: quiescent, untouched for the
+   * configured quiet period, still the entry this map holds, and not being
+   * activated right now.
+   * @param sessionId - Session identity to judge.
+   * @param entry - the retained entry observed by the caller.
+   * @param now - current epoch milliseconds.
+   * @param idleMs - quiet period this deployment requires.
+   * @returns true when releasing this Agent cannot interrupt work in progress.
+   */
+  private releasable(
+    sessionId: SessionId,
+    entry: RetainedAgent,
+    now: number,
+    idleMs: number,
+  ): boolean {
+    if (now - entry.lastUsedAt < idleMs) return false
+    if (this.retained.get(sessionId) !== entry) return false
+    if (this.resumes.has(sessionId) || this.creations.has(sessionId)) return false
+    // A different Agent under the same id belongs to a later lifecycle this
+    // capability cannot tear down; refusing here also keeps `release` from
+    // deleting a retained entry it would decline to dispose.
+    if (this.ctx.agents.get(sessionId) !== entry.handle.agent) return false
+    return entry.handle.agent.status === 'idle'
+  }
+
+  /**
+   * Release one idle Agent as a retention decision, tracked so teardown can
+   * await it and contained so a failing release never fails the activation that
+   * triggered it.
+   * @param sessionId - Session identity to release.
+   */
+  private evict(sessionId: SessionId): void {
+    this.retentionReleases.add(sessionId)
+    const task = (async () => {
+      try {
+        if (!await this.release(sessionId)) {
+          this.retentionReleases.delete(sessionId)
+          return
+        }
+        const counts = this.retentionStats()
+        this.ctx.logger.info(
+          `session-controller: released idle session "${sessionId}" past the retained limit; `
+          + `retained agents ${counts.agents}, retained events ${counts.events}`,
+        )
+      } catch (error: unknown) {
+        this.retentionReleases.delete(sessionId)
+        this.ctx.logger.warn(
+          `session-controller: releasing idle session "${sessionId}" failed: ${errorChain(error)}`,
+        )
+      }
+    })()
+    this.releases.add(task)
+    void task.finally(() => { this.releases.delete(task) })
   }
 
   private async createOrAdopt(

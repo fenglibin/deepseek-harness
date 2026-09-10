@@ -26,6 +26,9 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map(ctx => ctx.fiber.dispose()))
 })
 
+/** Retention bound disabled: these cases own identity and composition, not retention. */
+const UNBOUNDED_RETENTION = { limit: 0, idleMs: 0 }
+
 async function harness(): Promise<{ ctx: Context; agents: ApiSessionAgentController }> {
   const ctx = new Context()
   roots.push(ctx)
@@ -39,7 +42,7 @@ async function harness(): Promise<{ ctx: Context; agents: ApiSessionAgentControl
     currentSelection: () => ({ provider: 'fixture', model: 'fixture-model' }),
     saveSelection: () => Promise.resolve(),
   } as never)
-  return { ctx, agents: new ApiSessionAgentController(ctx) }
+  return { ctx, agents: new ApiSessionAgentController(ctx, UNBOUNDED_RETENTION) }
 }
 
 function header(id: string, cwd: string | null = '/workspace'): SessionHeader {

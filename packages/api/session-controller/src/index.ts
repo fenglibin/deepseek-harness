@@ -9,9 +9,18 @@ import type { SessionObservation } from '@deepseek-ai/dsh-session-query'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import {
   ApiSessionAgentController,
+  DEFAULT_LIVE_AGENT_IDLE_MS,
+  DEFAULT_LIVE_AGENT_LIMIT,
   inspectApiSession,
   type ApiSessionAgentResult,
+  type ApiSessionAgentRetention,
 } from './agent.ts'
+import {
+  DEFAULT_HEAP_WATCH_INTERVAL_MS,
+  DEFAULT_HEAP_WATCH_WARN_RATIO,
+  installHeapWatch,
+  type HeapWatchSpec,
+} from './heap-watch.ts'
 import { SessionCommandController } from './commands.ts'
 import { SessionControlController } from './control.ts'
 import { SessionHistoryController } from './history.ts'
@@ -71,6 +80,24 @@ export interface Config {
   readonly coldBlankProbeMaxBytes?: number
   /** Override platform desktop-opener detection. */
   readonly nativeOpen?: boolean
+  /**
+   * Maximum ordinary Agents the Host keeps activated; `0` keeps every
+   * activation. A retained Agent pins its Session's whole in-memory event log,
+   * so this is the Host's principal heap bound.
+   */
+  readonly liveAgentLimit?: number
+  /**
+   * Quiet period before an idle retained Agent becomes eligible for release,
+   * which is what keeps a Session someone is working in from being released
+   * and cold-resumed on its next prompt.
+   */
+  readonly liveAgentIdleMs?: number
+  /** Interval of the retained-work and heap watermark, in milliseconds; `0` disables it. */
+  readonly heapWatchIntervalMs?: number
+  /** Share of the V8 heap limit at which the watermark warns instead of reporting at info. */
+  readonly heapWatchWarnRatio?: number
+  /** Heap snapshots Node keeps when the process nears its heap limit; `0` disables capture. */
+  readonly heapWatchSnapshotNearLimit?: number
 }
 
 /** Host integrations replaceable by direct unit tests. */
@@ -98,6 +125,11 @@ export class SessionController extends TypertRemoteService {
   static Config: z<Config> = z.object({
     coldBlankProbeMaxBytes: z.natural().default(DEFAULT_COLD_BLANK_PROBE_MAX_BYTES),
     nativeOpen: z.boolean(),
+    liveAgentLimit: z.natural().default(DEFAULT_LIVE_AGENT_LIMIT),
+    liveAgentIdleMs: z.natural().default(DEFAULT_LIVE_AGENT_IDLE_MS),
+    heapWatchIntervalMs: z.natural().default(DEFAULT_HEAP_WATCH_INTERVAL_MS),
+    heapWatchWarnRatio: z.number().min(0).max(1).default(DEFAULT_HEAP_WATCH_WARN_RATIO),
+    heapWatchSnapshotNearLimit: z.natural().default(0),
   })
 
   private readonly agents: ApiSessionAgentController
@@ -116,7 +148,12 @@ export class SessionController extends TypertRemoteService {
   constructor(ctx: Context, config: Config, internals: SessionControllerInternals = {}) {
     super(ctx, 'sessionController', { namespace: 'session' })
     installModelSelectionProjection(ctx)
-    this.agents = new ApiSessionAgentController(ctx)
+    const host = resolveHostPolicy(config)
+    this.agents = new ApiSessionAgentController(ctx, host.retention)
+    // The watermark reports the process heap next to the retained Sessions this
+    // plugin owns: those logs are the growth a deployment can account for, and
+    // neither number means much without the other.
+    installHeapWatch(ctx, { ...host.watermark, retained: () => this.agents.retentionStats() })
     this.commands = new SessionCommandController(ctx, this.agents, process.cwd())
     this.controlState = new SessionControlController(ctx)
     // Registered before history so reverse-order teardown closes every
@@ -139,9 +176,17 @@ export class SessionController extends TypertRemoteService {
       ctx.emit('api-session/added', this.listState.summaryFor(session))
     })
     ctx.on('session/disposed', (session) => {
+      // A retention release retires the Agent to free its Session's in-memory
+      // log while the Session itself stays durable and resumable, so its row
+      // must survive. Only a deletion publishes a removal, and `deleteSession`
+      // publishes its own at its commit point.
+      if (this.agents.consumeRetentionRelease(session.id)) return
       ctx.emit('api-session/removed', session.id)
     })
     ctx.on('agent/status', ({ agent, status }) => {
+      // A turn start or end is this Session's activity signal; the retention
+      // bound measures its quiet period from here, not from activation.
+      this.agents.touch(agent.id)
       ctx.emit('api-session/status', agent.id, status === 'running')
     })
     ctx.on('agent/error', ({ agent, error }) => {
@@ -398,6 +443,32 @@ export class SessionController extends TypertRemoteService {
     return this.controlState.control(signal)
   }
 
+}
+
+/**
+ * Resolve this deployment's Host-side policy from validated config.
+ *
+ * The schema states the deployment surface and its defaults; the fallbacks
+ * cover direct construction by tests and embedders, which bypasses schema
+ * validation and would otherwise read `undefined` as a limit.
+ * @param config - Session Controller config, validated when the plugin loaded.
+ * @returns the Agent retention spec and the watermark spec without its counters.
+ */
+function resolveHostPolicy(config: Config): {
+  readonly retention: ApiSessionAgentRetention
+  readonly watermark: Omit<HeapWatchSpec, 'retained'>
+} {
+  return {
+    retention: {
+      limit: config.liveAgentLimit ?? DEFAULT_LIVE_AGENT_LIMIT,
+      idleMs: config.liveAgentIdleMs ?? DEFAULT_LIVE_AGENT_IDLE_MS,
+    },
+    watermark: {
+      intervalMs: config.heapWatchIntervalMs ?? DEFAULT_HEAP_WATCH_INTERVAL_MS,
+      warnRatio: config.heapWatchWarnRatio ?? DEFAULT_HEAP_WATCH_WARN_RATIO,
+      snapshotNearLimit: config.heapWatchSnapshotNearLimit ?? 0,
+    },
+  }
 }
 
 export { buildModelCatalog }

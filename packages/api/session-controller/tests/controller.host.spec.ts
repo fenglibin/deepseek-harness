@@ -195,3 +195,19 @@ describe('SessionController facade', () => {
     await expect(waiting).resolves.toMatchObject({ done: true })
   })
 })
+
+describe('SessionController heap watermark', () => {
+  it('samples the process heap beside the retained work when the deployment enables it', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    const info = vi.spyOn(ctx.logger, 'info').mockImplementation(() => {})
+
+    createSessionTestController(ctx, { ...defaults, heapWatchIntervalMs: 1000 })
+
+    const sampled = info.mock.calls.map(call => String(call[0]))
+    expect(sampled.some(line => line.includes('session-controller heap watermark'))).toBe(true)
+    expect(sampled.some(line => line.includes('retained agents 0, retained events 0'))).toBe(true)
+    await ctx.fiber.dispose()
+  })
+})

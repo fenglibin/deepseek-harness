@@ -304,10 +304,28 @@ export interface Config {
   readonly coldBlankProbeMaxBytes?: number
   /** Override platform desktop-opener detection. */
   readonly nativeOpen?: boolean
+  /**
+   * Maximum ordinary Agents the Host keeps activated; `0` keeps every
+   * activation. A retained Agent pins its Session's whole in-memory event log,
+   * so this is the Host's principal heap bound.
+   */
+  readonly liveAgentLimit?: number
+  /**
+   * Quiet period before an idle retained Agent becomes eligible for release,
+   * which is what keeps a Session someone is working in from being released
+   * and cold-resumed on its next prompt.
+   */
+  readonly liveAgentIdleMs?: number
+  /** Interval of the retained-work and heap watermark, in milliseconds; `0` disables it. */
+  readonly heapWatchIntervalMs?: number
+  /** Share of the V8 heap limit at which the watermark warns instead of reporting at info. */
+  readonly heapWatchWarnRatio?: number
+  /** Heap snapshots Node keeps when the process nears its heap limit; `0` disables capture. */
+  readonly heapWatchSnapshotNearLimit?: number
 }
 ```
 
-来源：[`packages/api/session-controller/src/index.ts:69`](../packages/api/session-controller/src/index.ts)
+来源：[`packages/api/session-controller/src/index.ts:78`](../packages/api/session-controller/src/index.ts)
 
 <a id="deepseek-aidsh-api-settings-controller"></a>
 
