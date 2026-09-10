@@ -5,7 +5,21 @@
   left: 12px;
   top: 12px;
   z-index: 10;
-  width: min(260px, calc(100% - 24px));
+  /* Cap walked from 260 -> 360 -> 320: even at 360 the card reads wider than
+     the user expects on columns that approach or exceed 920px and starts to
+     crowd the conversation text on the right. 320 keeps long L2 task titles
+     legible (line-clamp: 3 still wraps M0-1.x titles on three lines) while
+     reclaiming ~11% overlay footprint. The card still lives inside .body
+     (conversation column, --dsh-chat-content-width self-capped 680–920px).
+     `calc(100% - 24px)` keeps the card off the column edges for any column
+     narrower than 320 + 24. */
+  width: min(320px, calc(100% - 24px));
+  /* Stack card + panel vertically so the panel can scroll while the header
+     button stays pinned. The half-viewport cap keeps a long task list from
+     growing the card past the fold; the panel scrolls past that. */
+  display: flex;
+  flex-direction: column;
+  max-height: 50vh;
 }
 
 .card {
@@ -14,6 +28,7 @@
   gap: 6px;
   width: 100%;
   min-width: 0;
+  flex: none;
   padding: 6px 8px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 8px;
@@ -66,6 +81,10 @@
   border-radius: 8px;
   background: var(--dsw-alias-bg-layer-1);
   box-shadow: var(--dsw-shadow-lv3);
+  /* The scroll region inside the half-viewport cap: the header button stays
+     pinned, this box scrolls when the task list outgrows the card. */
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .progress {
@@ -156,32 +175,57 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* The tasks group stacks its label over the list: "任务列表" owns its line
+   and the first task item wraps under it, instead of the label and the first
+   item sharing a baseline row. `align-items: stretch` lets the <ol> take the
+   panel width so titles still get the full 360px instead of shrink-wrapping. */
+.group[data-group='tasks'] {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
 .taskList {
   margin: 2px 0 0;
   padding: 0 0 0 14px;
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .taskItem {
+  /* Stack content + status vertically so long L2 task titles get the full
+     panel width instead of fighting the status chip on a single row. The
+     status chip stays a sibling rather than a floating right because the
+     baseline alignment it inherited from the row assumed single-line text. */
   display: flex;
-  align-items: baseline;
-  gap: 6px;
+  flex-direction: column;
+  gap: 2px;
   font-size: 11px;
 }
 
 .taskContent {
   min-width: 0;
+  /* Multi-line wrap, capped at three lines so the longest checklist item
+     does not balloon the panel; -webkit-line-clamp needs -webkit-box display
+     for its terse truncation contract. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* Allow wrapping inside the clamped window for CJK + English mix without
+     breaking words that exceed the clamp width. */
+  overflow-wrap: break-word;
+  word-break: break-word;
   color: var(--dsw-alias-label-primary);
 }
 
 .taskState {
-  flex: none;
+  /* Self-align to the list indent so a long status label does not push
+     further right than the title. */
+  align-self: flex-start;
   color: var(--dsw-alias-label-tertiary);
 }
 
