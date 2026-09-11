@@ -12,6 +12,8 @@ import type { DeliveryLevel, DeliveryPhase, DeliveryTaskItem, DeliveryTaskRef, D
 import type {} from '@deepseek-ai/dsh-fs'
 import { createUserMessage, HarnessError } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
+import type { SandboxPolicyService } from '@deepseek-ai/dsh-sandbox-policy'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-shell'
 import type {} from '@deepseek-ai/dsh-system-prompt'
@@ -247,6 +249,8 @@ function guidance(): string {
     + 'level and it is inferred from the objective length and any todo_count/touched_files estimates. '
     + 'After creating the task, first clarify and align the requirement with the user, then call '
     + 'mark_analysis_done to mark analysis complete; writing a design is blocked until then. '
+    + 'Write full analysis or design drafts to ordinary project paths (e.g. docs/); record_design then '
+    + 'records a concise summary pointing at those drafts, not a duplicate full document. '
     + 'Before advancing to designed, record at least one design with record_design (writes '
     + '.dsh/design/<task-id>.md); before specified, record the OpenSpec change with record_spec (writes '
     + 'proposal.md, design.md, tasks.md and a spec delta under openspec/changes/<change_id>/); before '
@@ -463,6 +467,23 @@ function inferLevel(objective: string, signals: SizeSignals, resolved: ResolvedC
 const SPEC_KINDS: readonly SpecKind[] = ['proposal', 'design', 'tasks', 'spec']
 
 /**
+ * Resolve the per-call sandbox policy for the agent's session, or `undefined`
+ * when no sandbox-policy service is mounted. Delivery artifact writes must
+ * pass this to `ctx.fs.writeText`: a workspace-write sandbox fences the write
+ * against the session's own cwd this way, whereas omitting it lets the backend
+ * fall back to the harness process cwd — which denied `.dsh/*` and
+ * `openspec/*` writes in deployed sessions whose cwd differs from the harness
+ * process.
+ * @param ctx - plugin context.
+ * @param agent - owning live agent.
+ * @returns the session-scoped policy, or `undefined` without a mounted service.
+ */
+function sandboxPolicyFor(ctx: Context, agent: Agent): SandboxExecutionPolicy | undefined {
+  const service = ctx.reflect.get('sandboxPolicy') as SandboxPolicyService | undefined
+  return service?.resolve({ session: agent.session })
+}
+
+/**
  * Write one artifact file, replacing any prior content. OpenSpec parses
  * `tasks.md` and the spec deltas structurally, so revision prefixes that suit
  * the `.dsh` records must not be added here.
@@ -472,7 +493,7 @@ async function writeArtifact(ctx: Context, agent: Agent, path: string, content: 
   const target = cwd === undefined
     ? await ctx.fs.resolve(path)
     : await ctx.fs.resolve(path, { cwd })
-  await ctx.fs.writeText(target, content)
+  await ctx.fs.writeText(target, content, undefined, undefined, sandboxPolicyFor(ctx, agent))
 }
 
 /** Append one entry to a `.dsh` artifact file, creating it when absent. */
@@ -483,7 +504,171 @@ async function appendArtifact(ctx: Context, agent: Agent, path: string, entry: s
     : await ctx.fs.resolve(path, { cwd })
   const existing = await ctx.fs.stat(target)
   const prefix = existing === undefined ? '' : await ctx.fs.readText(target)
-  await ctx.fs.writeText(target, `${prefix}${entry}`)
+  await ctx.fs.writeText(target, `${prefix}${entry}`, undefined, undefined, sandboxPolicyFor(ctx, agent))
+}
+
+/** Checkbox regex reused by `renderTasksMarkdown`; matches `[ ]`, `[x]`, `[X]`. */
+const TASKS_CHECKBOX = /^\s*[-*]\s+\[([ xX])\]\s*(.*)$/
+/** Trailing `(covers: ...)` or `(覆盖: ...)` annotation preserved on each line. */
+const TASKS_COVERS = /\((?:covers|覆盖)\s*:\s*[^)]*\)\s*$/i
+
+/**
+ * Render the `openspec/changes/<change>/tasks.md` body that mirrors one
+ * checklist. Lines whose checkbox content matches an item have their checkbox
+ * flipped to `[x]` (completed) or `[ ]` (pending or in_progress); any trailing
+ * `(covers: ...)` annotation and unrelated lines are preserved so headings,
+ * blank lines, and the model's own grouping survive the rewrite. Items with
+ * no matching existing line are appended at the end.
+ * @param existing - prior tasks.md body; empty when the file is absent.
+ * @param items - authoritative checklist from the latest `record_tasks` call.
+ * @returns the rewritten tasks.md body.
+ */
+export function renderTasksMarkdown(
+  existing: string,
+  items: readonly DeliveryTaskItem[],
+): string {
+  // A trailing newline is the file-end convention; stripping it before
+  // splitting avoids a phantom empty element that would otherwise turn into
+  // a stray blank line on every rewrite.
+  const stripped = existing.endsWith('\n') ? existing.slice(0, -1) : existing
+  const lines = stripped.length === 0 ? [] : stripped.split('\n')
+  const consumed = new Set<number>()
+  const output: string[] = []
+  for (const line of lines) {
+    const match = TASKS_CHECKBOX.exec(line)
+    if (match === null || match[2] === undefined) {
+      output.push(line)
+      continue
+    }
+    const body = match[2].trim()
+    const annotation = TASKS_COVERS.exec(body)
+    const lineContent = annotation === null
+      ? body
+      : body.slice(0, annotation.index).trim()
+    const matchingIdx = items.findIndex(
+      (item, idx) => !consumed.has(idx) && item.content === lineContent,
+    )
+    if (matchingIdx < 0) {
+      output.push(line)
+      continue
+    }
+    consumed.add(matchingIdx)
+    const item = items[matchingIdx] as DeliveryTaskItem
+    const done = item.status === 'completed'
+    output.push(line.replace(/^(\s*[-*]\s+)\[[ xX]\]/, `$1${done ? '[x]' : '[ ]'}`))
+  }
+  for (let idx = 0; idx < items.length; idx += 1) {
+    if (consumed.has(idx)) continue
+    const item = items[idx] as DeliveryTaskItem
+    const checkbox = item.status === 'completed' ? '- [x]' : '- [ ]'
+    output.push(`${checkbox} ${item.content}`)
+  }
+  const body = output.join('\n')
+  return body.length === 0 ? '' : `${body}\n`
+}
+
+/**
+ * Order one checklist so its items appear in the same order as their matches
+ * in an existing `openspec/changes/<change>/tasks.md` body, with items absent
+ * from the body appended at the end. Used by `record_tasks` so the in-memory
+ * `delivery-tasks` projection and the on-disk artifact agree on order — the
+ * float card reads the projection, so a model-passed order different from
+ * the file would otherwise drift from the canonical tasks.md listing.
+ * @param existing - prior tasks.md body; empty when the file is absent.
+ * @param items - authoritative checklist from the latest `record_tasks` call.
+ * @returns items in tasks.md line order, with unmatched items at the end in
+ * their input order.
+ */
+export function orderItemsByMarkdown(
+  existing: string,
+  items: readonly DeliveryTaskItem[],
+): DeliveryTaskItem[] {
+  const stripped = existing.endsWith('\n') ? existing.slice(0, -1) : existing
+  const lines = stripped.length === 0 ? [] : stripped.split('\n')
+  const consumed = new Set<number>()
+  const ordered: DeliveryTaskItem[] = []
+  for (const line of lines) {
+    const match = TASKS_CHECKBOX.exec(line)
+    if (match === null || match[2] === undefined) continue
+    const body = match[2].trim()
+    const annotation = TASKS_COVERS.exec(body)
+    const lineContent = annotation === null
+      ? body
+      : body.slice(0, annotation.index).trim()
+    const matchingIdx = items.findIndex(
+      (item, idx) => !consumed.has(idx) && item.content === lineContent,
+    )
+    if (matchingIdx < 0) continue
+    consumed.add(matchingIdx)
+    ordered.push(items[matchingIdx] as DeliveryTaskItem)
+  }
+  for (let idx = 0; idx < items.length; idx += 1) {
+    if (consumed.has(idx)) continue
+    ordered.push(items[idx] as DeliveryTaskItem)
+  }
+  return ordered
+}
+
+/**
+ * Read the body of `openspec/changes/<changeId>/tasks.md` for the session's cwd.
+ * Returns the empty string when the file is absent.
+ * @param ctx - plugin context.
+ * @param agent - owning live agent.
+ * @param changeId - verb-led kebab-case OpenSpec change id.
+ * @throws {HarnessError} with `DELIVERY_TASKS_WRITE_FAILED` when stat succeeds
+ * but the read fails; a missing file is the only expected case where stat
+ * returns `undefined` and the read is skipped.
+ */
+async function readTasksMarkdown(ctx: Context, agent: Agent, changeId: string): Promise<string> {
+  const cwd = agent.session.header.cwd
+  const path = `openspec/changes/${changeId}/tasks.md`
+  const target = cwd === undefined
+    ? await ctx.fs.resolve(path)
+    : await ctx.fs.resolve(path, { cwd })
+  // `fs.stat` returns undefined for a missing file, matching `appendArtifact`;
+  // a thrown error here would be a real backend fault worth surfacing.
+  if ((await ctx.fs.stat(target)) === undefined) return ''
+  try {
+    return await ctx.fs.readText(target)
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new HarnessError(
+      `failed to read ${path}: ${message}`,
+      'DELIVERY_TASKS_WRITE_FAILED',
+    )
+  }
+}
+
+/**
+ * Write the rendered `openspec/changes/<changeId>/tasks.md` body. A write
+ * failure surfaces as `DELIVERY_TASKS_WRITE_FAILED` so the model can retry
+ * rather than see a silent drift between the in-memory checklist and the disk
+ * artifact OpenSpec reads.
+ * @param ctx - plugin context.
+ * @param agent - owning live agent.
+ * @param changeId - verb-led kebab-case OpenSpec change id.
+ * @param content - the full rendered tasks.md body to write.
+ */
+async function writeTasksMarkdown(
+  ctx: Context,
+  agent: Agent,
+  changeId: string,
+  content: string,
+): Promise<void> {
+  const cwd = agent.session.header.cwd
+  const path = `openspec/changes/${changeId}/tasks.md`
+  const target = cwd === undefined
+    ? await ctx.fs.resolve(path)
+    : await ctx.fs.resolve(path, { cwd })
+  try {
+    await ctx.fs.writeText(target, content, undefined, undefined, sandboxPolicyFor(ctx, agent))
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new HarnessError(
+      `failed to write ${path}: ${message}`,
+      'DELIVERY_TASKS_WRITE_FAILED',
+    )
+  }
 }
 
 /** Issue messages reported by one `validate --json` result, when it produced JSON. */
@@ -570,8 +755,17 @@ async function checklistMismatch(ctx: Context, agent: Agent): Promise<string | u
     { done: 0, total: 0 },
   )
   if (disk.done === reported.done && disk.total === reported.total) return undefined
-  return `checklist mismatch: ${path} has ${disk.done}/${disk.total} done but the recorded checklist reports `
-    + `${reported.done}/${reported.total}; align them before implementing`
+  // A differing total means the checklist contents drifted — a content
+  // mismatch, an added item, or a removed item — while an equal total with a
+  // differing done count means the statuses alone are stale. The two have
+  // different remedies, so name the failing one instead of a generic "align".
+  if (disk.total !== reported.total) {
+    return `${path} has ${disk.total} checkbox line(s) but the recorded checklist has ${reported.total} item(s): `
+      + 'their contents drifted (a content mismatch, an added item, or a removed item). '
+      + 'Rewrite tasks.md with record_spec(kind: "tasks") or re-record record_tasks with contents matching tasks.md.'
+  }
+  return `${path} has ${disk.done}/${disk.total} done but the recorded checklist reports ${reported.done}/${reported.total}: `
+    + 're-record record_tasks to sync the statuses before implementing.'
 }
 
 /** The first change, design, and spec records are prerequisites for their phases. */
@@ -902,7 +1096,7 @@ export function apply(ctx: Context, config: Config): void {
       schema: DELIVERY_OUTPUT_SCHEMA,
       render: (_args: unknown, value: DeliveryToolValue) => [{ type: 'text' as const, text: JSON.stringify(value) }],
     },
-    execute(args, exec) {
+    async execute(args, exec) {
       const agent = deliveryAgent(ctx, exec)
       const ref = deliveryRef(args.task_id, args.revision)
       const changeId = typeof args.change_id === 'string' ? args.change_id.trim() : ''
@@ -919,8 +1113,23 @@ export function apply(ctx: Context, config: Config): void {
       const items = Array.isArray(args.items) ? args.items : []
       // Checklist entries cross the model boundary, so the service's strict
       // decoder judges them; the cast carries unvalidated JSON there.
-      ctx.delivery.recordTasks(agent, ref, changeId, items as unknown as readonly DeliveryTaskItem[])
-      return Promise.resolve(deliveryValue(ctx.delivery.get(agent)))
+      const raw = items as unknown as readonly DeliveryTaskItem[]
+      // An l2 task owns an OpenSpec tasks.md, so its checklist must be read
+      // once, reordered to the file's line order, and written back so the
+      // in-memory projection and the on-disk artifact agree on both order and
+      // status. A non-l2 task records the model-passed order unchanged and
+      // leaves the filesystem untouched.
+      const writesTasks = changeId.length > 0 && isValidChangeId(changeId)
+      const existing = writesTasks ? await readTasksMarkdown(ctx, agent, changeId) : ''
+      const tasks = writesTasks ? orderItemsByMarkdown(existing, raw) : raw
+      ctx.delivery.recordTasks(agent, ref, changeId, tasks)
+      // The on-disk `tasks.md` is what OpenSpec parses and what
+      // `checklistMismatch` reads at advance time, so the in-memory checklist
+      // and the file must agree after every write.
+      if (writesTasks) {
+        await writeTasksMarkdown(ctx, agent, changeId, renderTasksMarkdown(existing, tasks))
+      }
+      return deliveryValue(ctx.delivery.get(agent))
     },
     presentCall: args => present('Record tasks', 'other', args.change_id),
   }))

@@ -412,7 +412,14 @@ export class PiAiAdapter extends LlmAdapter {
       if (options.signal?.aborted) {
         throw new LlmError('pi-ai request aborted by caller', 'ABORTED', { cause: error })
       }
-      throw error
+      if (error instanceof LlmError) throw error
+      // A bare SDK throw — openai's JSON.parse of a malformed SSE line is the
+      // common case, e.g. a gateway emitting `data:data:` — carries no harness
+      // code. Without a wrapping TRANSPORT it would surface as UNKNOWN, which
+      // the default retry policy does not retry and ends the turn. A malformed
+      // stream is transport-level and safe to repeat: the next attempt may read
+      // a well-formed frame.
+      throw new LlmError(`pi-ai API stream for model "${options.model}" failed`, 'TRANSPORT', { cause: error })
     } finally {
       consumer.abort('pi-ai stream consumer stopped')
     }

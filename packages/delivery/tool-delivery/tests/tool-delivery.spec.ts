@@ -1,13 +1,15 @@
-import { describe, expect, it } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { afterEach, describe, expect, it } from 'vitest'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { Inbox, agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import DeliveryService from '@deepseek-ai/dsh-delivery'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
+import SandboxedFileSystem from '@deepseek-ai/dsh-fs-sandbox'
 import { ToolCallId, createUserMessage } from '@deepseek-ai/dsh-llm'
+import SandboxPolicyService from '@deepseek-ai/dsh-sandbox-policy'
 import { Session, SessionId, SESSION_FORMAT_VERSION, type UserMessage } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { ShellExecutor } from '@deepseek-ai/dsh-shell'
@@ -16,6 +18,7 @@ import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import * as toolDelivery from '@deepseek-ai/dsh-tool-delivery'
+import { orderItemsByMarkdown, renderTasksMarkdown } from '@deepseek-ai/dsh-tool-delivery/src/index.ts'
 
 const testToolSignal = new AbortController().signal
 
@@ -965,16 +968,20 @@ describe('tool-delivery checklist cross-check', () => {
     }, agent))
   }
 
-  it('rejects implementing when the recorded checklist is ahead of tasks.md', async () => {
+  it('rejects implementing when an out-of-band edit desynchronizes tasks.md', async () => {
     const { ctx, agent, cwd } = await harness()
     const task = await toSpecified(ctx, agent)
     const dir = join(cwd, 'openspec', 'changes', 'add-thing')
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, 'tasks.md'), '- [ ] 1.1 build it\n')
+    // `record_tasks` keeps the disk in sync with the recorded checklist; the
+    // gate's defense-in-depth job is to catch a later out-of-band edit that
+    // makes disk and record disagree.
     const after = resultTask(await execute(ctx, 'record_tasks', {
       task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
-      items: [{ content: 'build it', phase: 'implemented', status: 'completed' }],
+      items: [{ content: '1.1 build it', phase: 'implemented', status: 'completed' }],
     }, agent))
+    writeFileSync(join(dir, 'tasks.md'), '- [ ] 1.1 build it\n')
     const changed = await withChange(ctx, agent, after)
     const blocked = await execute(ctx, 'advance_delivery_task', {
       task_id: changed['id'], revision: changed['revision'], phase: 'implemented',
@@ -988,15 +995,62 @@ describe('tool-delivery checklist cross-check', () => {
     const dir = join(cwd, 'openspec', 'changes', 'add-thing')
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, 'tasks.md'), '- [x] 1.1 build it\n')
+    // The recorded item content must match the line on disk once `record_tasks`
+    // keeps `tasks.md` in sync; the count-only check used to be loose enough
+    // to forgive a mismatch, but the synced file makes content the authority.
     const after = resultTask(await execute(ctx, 'record_tasks', {
       task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
-      items: [{ content: 'build it', phase: 'implemented', status: 'completed' }],
+      items: [{ content: '1.1 build it', phase: 'implemented', status: 'completed' }],
     }, agent))
     const changed = await withChange(ctx, agent, after)
     const advanced = await execute(ctx, 'advance_delivery_task', {
       task_id: changed['id'], revision: changed['revision'], phase: 'implemented',
     }, agent)
     expect(advanced.isError).toBe(false)
+  })
+
+  it('reports a content drift when tasks.md gains an unmatched checkbox line', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const task = await toSpecified(ctx, agent)
+    const dir = join(cwd, 'openspec', 'changes', 'add-thing')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'tasks.md'), '- [ ] 1.1 build it\n')
+    const after = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [{ content: '1.1 build it', phase: 'implemented', status: 'completed' }],
+    }, agent))
+    // An out-of-band line addition makes disk.total diverge from reported.total.
+    writeFileSync(join(dir, 'tasks.md'), '- [x] 1.1 build it\n- [ ] extra line\n')
+    const changed = await withChange(ctx, agent, after)
+    const blocked = await execute(ctx, 'advance_delivery_task', {
+      task_id: changed['id'], revision: changed['revision'], phase: 'implemented',
+    }, agent)
+    expect(blocked.isError).toBe(true)
+    const block = blocked.content[0]
+    expect(block?.type).toBe('text')
+    if (block?.type === 'text') expect(block.text).toContain('contents drifted')
+  })
+
+  it('reports a status desync when only the checkbox state drifts', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const task = await toSpecified(ctx, agent)
+    const dir = join(cwd, 'openspec', 'changes', 'add-thing')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'tasks.md'), '- [ ] 1.1 build it\n')
+    const after = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [{ content: '1.1 build it', phase: 'implemented', status: 'completed' }],
+    }, agent))
+    // An out-of-band checkbox flip keeps total equal but changes done.
+    writeFileSync(join(dir, 'tasks.md'), '- [ ] 1.1 build it\n')
+    const changed = await withChange(ctx, agent, after)
+    const blocked = await execute(ctx, 'advance_delivery_task', {
+      task_id: changed['id'], revision: changed['revision'], phase: 'implemented',
+    }, agent)
+    expect(blocked.isError).toBe(true)
+    const block = blocked.content[0]
+    expect(block?.type).toBe('text')
+    if (block?.type === 'text') expect(block.text).toContain('re-record record_tasks')
   })
 })
 
@@ -1279,5 +1333,355 @@ describe('tool-delivery acceptance gate', () => {
       task_id: task['id'], revision: task['revision'], phase: 'accepted',
     }, agent))
     expect(accepted).toMatchObject({ phase: 'accepted', changeCount: 1 })
+  })
+})
+
+describe('renderTasksMarkdown', () => {
+  it('updates the checkbox of a matching line and preserves a covers annotation', () => {
+    const rendered = renderTasksMarkdown(
+      '- [ ] ship it (covers: cap/a, cap/b)\n',
+      [{ content: 'ship it', phase: 'implemented', status: 'completed' }],
+    )
+    expect(rendered).toBe('- [x] ship it (covers: cap/a, cap/b)\n')
+  })
+
+  it('writes a pending checkbox for in_progress without flipping done', () => {
+    const rendered = renderTasksMarkdown(
+      '- [ ] build it\n',
+      [{ content: 'build it', phase: 'implemented', status: 'in_progress' }],
+    )
+    expect(rendered).toBe('- [ ] build it\n')
+  })
+
+  it('appends an item whose content has no matching line', () => {
+    const rendered = renderTasksMarkdown(
+      '- [ ] ship it (covers: cap/a)\n',
+      [
+        { content: 'ship it', phase: 'implemented', status: 'completed' },
+        { content: 'verify it', phase: 'verified', status: 'pending' },
+      ],
+    )
+    expect(rendered).toBe('- [x] ship it (covers: cap/a)\n- [ ] verify it\n')
+  })
+
+  it('preserves unrelated lines such as headings and blank lines', () => {
+    const rendered = renderTasksMarkdown(
+      '## 1. Setup\n\n- [ ] ship it\n\n## 2. Done\n',
+      [{ content: 'ship it', phase: 'implemented', status: 'completed' }],
+    )
+    expect(rendered).toBe('## 1. Setup\n\n- [x] ship it\n\n## 2. Done\n')
+  })
+
+  it('returns only the appended items when the existing body is empty', () => {
+    const rendered = renderTasksMarkdown(
+      '',
+      [
+        { content: 'a', phase: 'implemented', status: 'pending' },
+        { content: 'b', phase: 'verified', status: 'completed' },
+      ],
+    )
+    expect(rendered).toBe('- [ ] a\n- [x] b\n')
+  })
+
+  it('consumes a content once so duplicates do not collapse onto the same line', () => {
+    const rendered = renderTasksMarkdown(
+      '- [ ] ship it\n- [ ] ship it\n',
+      [
+        { content: 'ship it', phase: 'implemented', status: 'completed' },
+        { content: 'ship it', phase: 'verified', status: 'pending' },
+      ],
+    )
+    expect(rendered).toBe('- [x] ship it\n- [ ] ship it\n')
+  })
+})
+
+describe('orderItemsByMarkdown', () => {
+  it('returns items unchanged when the existing body is empty', () => {
+    const ordered = orderItemsByMarkdown('', [
+      { content: 'a', phase: 'implemented', status: 'pending' },
+      { content: 'b', phase: 'verified', status: 'completed' },
+    ])
+    expect(ordered.map(item => item.content)).toEqual(['a', 'b'])
+  })
+
+  it('orders items to match the existing tasks.md line order', () => {
+    const ordered = orderItemsByMarkdown(
+      '- [ ] build first\n- [ ] verify it\n- [ ] ship it\n',
+      [
+        { content: 'ship it', phase: 'implemented', status: 'pending' },
+        { content: 'build first', phase: 'implemented', status: 'completed' },
+        { content: 'verify it', phase: 'verified', status: 'in_progress' },
+      ],
+    )
+    expect(ordered.map(item => item.content)).toEqual(['build first', 'verify it', 'ship it'])
+  })
+
+  it('appends items absent from the existing tasks.md after matched lines', () => {
+    const ordered = orderItemsByMarkdown(
+      '- [ ] build first\n',
+      [
+        { content: 'ship it', phase: 'implemented', status: 'pending' },
+        { content: 'build first', phase: 'implemented', status: 'completed' },
+        { content: 'verify it', phase: 'verified', status: 'pending' },
+      ],
+    )
+    expect(ordered.map(item => item.content)).toEqual(['build first', 'ship it', 'verify it'])
+  })
+
+  it('strips a covers annotation before matching a line in the body', () => {
+    const ordered = orderItemsByMarkdown(
+      '- [ ] build first (covers: cap/scenario)\n',
+      [
+        { content: 'build first', phase: 'implemented', status: 'pending' },
+      ],
+    )
+    expect(ordered.map(item => item.content)).toEqual(['build first'])
+  })
+
+  it('preserves the input order when no item content matches the body', () => {
+    const ordered = orderItemsByMarkdown(
+      '- [ ] unrelated (covers: cap/a)\n',
+      [
+        { content: 'ship it', phase: 'implemented', status: 'pending' },
+        { content: 'verify it', phase: 'verified', status: 'pending' },
+      ],
+    )
+    expect(ordered.map(item => item.content)).toEqual(['ship it', 'verify it'])
+  })
+})
+
+describe('tool-delivery task checklist disk sync', () => {
+  /** Walk an l2 task to the specified phase so record_tasks can write a tasks.md. */
+  async function l2Task(ctx: Context, agent: Agent): Promise<Record<string, unknown>> {
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l2 sync', level: 'l2' }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
+    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
+    return resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
+  }
+
+  /** Read the `delivery-tasks` projection value for the agent's session. */
+  function tasksView(ctx: Context, agent: Agent): {
+    changeId: string
+    items: ReadonlyArray<{ content: string; phase: string; status: string }>
+    progress: Record<string, { done: number; total: number }>
+  } {
+    return ctx.sessionProjections.snapshot(agent.session).values['delivery-tasks'] as never
+  }
+
+  it('creates tasks.md when the file does not yet exist', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const task = await l2Task(ctx, agent)
+    resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [{ content: 'ship it', phase: 'implemented', status: 'pending' }],
+    }, agent))
+    const path = join(cwd, 'openspec', 'changes', 'add-thing', 'tasks.md')
+    expect(readFileSync(path, 'utf8')).toBe('- [ ] ship it\n')
+  })
+
+  it('preserves the existing covers annotation while flipping the checkbox', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const task = await l2Task(ctx, agent)
+    const dir = join(cwd, 'openspec', 'changes', 'add-thing')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'tasks.md'), '## 1. Setup\n\n- [ ] ship it (covers: cap/scenario)\n\n')
+    resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [{ content: 'ship it', phase: 'implemented', status: 'completed' }],
+    }, agent))
+    expect(readFileSync(join(dir, 'tasks.md'), 'utf8'))
+      .toBe('## 1. Setup\n\n- [x] ship it (covers: cap/scenario)\n\n')
+  })
+
+  it('skips writing for an l0 task without a change_id', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l0 sync', level: 'l0' }, agent))
+    resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: '',
+      items: [{ content: 'fix it', phase: 'implemented', status: 'pending' }],
+    }, agent))
+    expect(() => readFileSync(join(cwd, 'openspec', 'changes', '', 'tasks.md'), 'utf8'))
+      .toThrow(/ENOENT|no such file/i)
+  })
+
+  it('skips writing for an l1 task without a change_id', async () => {
+    const { ctx, agent, cwd } = await harness()
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l1 sync', level: 'l1' }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
+    task = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: '',
+      items: [{ content: 'fix it', phase: 'implemented', status: 'pending' }],
+    }, agent))
+    expect(() => readFileSync(join(cwd, 'openspec', 'changes', '', 'tasks.md'), 'utf8'))
+      .toThrow(/ENOENT|no such file/i)
+  })
+
+  it('appends new items that have no matching line on disk', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const task = await l2Task(ctx, agent)
+    const dir = join(cwd, 'openspec', 'changes', 'add-thing')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'tasks.md'), '- [ ] ship it\n')
+    resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [
+        { content: 'ship it', phase: 'implemented', status: 'completed' },
+        { content: 'verify it', phase: 'verified', status: 'pending' },
+      ],
+    }, agent))
+    expect(readFileSync(join(dir, 'tasks.md'), 'utf8'))
+      .toBe('- [x] ship it\n- [ ] verify it\n')
+  })
+
+  it('reflects a second record_tasks call in tasks.md without losing the first', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const task = await l2Task(ctx, agent)
+    const first = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [{ content: 'ship it', phase: 'implemented', status: 'pending' }],
+    }, agent))
+    resultTask(await execute(ctx, 'record_tasks', {
+      task_id: first['id'], revision: first['revision'], change_id: 'add-thing',
+      items: [{ content: 'ship it', phase: 'implemented', status: 'completed' }],
+    }, agent))
+    const path = join(cwd, 'openspec', 'changes', 'add-thing', 'tasks.md')
+    expect(readFileSync(path, 'utf8')).toBe('- [x] ship it\n')
+  })
+
+  it('rejects a kebab-case-violating change_id without writing to disk', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const task = await l2Task(ctx, agent)
+    const result = await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'BadId',
+      items: [{ content: 'ship it', phase: 'implemented', status: 'pending' }],
+    }, agent)
+    expect(result.isError).toBe(true)
+    expect(() => readFileSync(join(cwd, 'openspec', 'changes', 'BadId', 'tasks.md'), 'utf8'))
+      .toThrow(/ENOENT|no such file/i)
+  })
+
+  it('orders the projection items to match the existing tasks.md line order', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const dir = join(cwd, 'openspec', 'changes', 'add-thing')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'tasks.md'),
+      '- [ ] build first\n- [ ] verify it\n- [ ] ship it\n')
+    const task = await l2Task(ctx, agent)
+    resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [
+        { content: 'ship it', phase: 'implemented', status: 'pending' },
+        { content: 'build first', phase: 'implemented', status: 'completed' },
+        { content: 'verify it', phase: 'verified', status: 'in_progress' },
+      ],
+    }, agent))
+    const view = tasksView(ctx, agent)
+    expect(view.items.map(item => item.content)).toEqual(['build first', 'verify it', 'ship it'])
+    expect(readFileSync(join(dir, 'tasks.md'), 'utf8'))
+      .toBe('- [x] build first\n- [ ] verify it\n- [ ] ship it\n')
+  })
+
+  it('appends new model-passed items at the end of the existing tasks.md line order', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const dir = join(cwd, 'openspec', 'changes', 'add-thing')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'tasks.md'), '- [ ] build first\n')
+    const task = await l2Task(ctx, agent)
+    resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [
+        { content: 'ship it', phase: 'implemented', status: 'pending' },
+        { content: 'build first', phase: 'implemented', status: 'completed' },
+        { content: 'verify it', phase: 'verified', status: 'pending' },
+      ],
+    }, agent))
+    const view = tasksView(ctx, agent)
+    expect(view.items.map(item => item.content)).toEqual(['build first', 'ship it', 'verify it'])
+    expect(readFileSync(join(dir, 'tasks.md'), 'utf8'))
+      .toBe('- [x] build first\n- [ ] ship it\n- [ ] verify it\n')
+  })
+})
+
+describe('tool-delivery sandboxed artifact writes', () => {
+  // The session cwd and the filesystem's default cwd must live OUTSIDE the
+  // platform temp areas: `writableRoots` grants `/tmp` and `os.tmpdir()` under
+  // workspace-write, so a temp-dir session cwd would pass containment for the
+  // wrong reason and make the regression invisible.
+  const sandboxRoots: string[] = []
+  afterEach(() => {
+    for (const root of sandboxRoots.splice(0)) rmSync(root, { recursive: true, force: true })
+  })
+
+  /**
+   * Mount the confining filesystem backend and the shared policy service, then
+   * register a delivery agent whose session cwd differs from the filesystem's
+   * default cwd (the harness process cwd the bare `resolve()` would fall back
+   * to). Delivery artifacts must still land under the session cwd, which is the
+   * exact deployed-session shape that previously denied `.dsh/*` writes.
+   */
+  async function sandboxHarness(): Promise<{
+    ctx: Context
+    agent: Agent
+    sessionCwd: string
+    fsDefaultCwd: string
+  }> {
+    const ctx = new Context()
+    const sessionCwd = mkdtempSync(join(homedir(), 'dsh-delivery-sandbox-cwd-'))
+    const fsDefaultCwd = mkdtempSync(join(homedir(), 'dsh-delivery-sandbox-fs-'))
+    sandboxRoots.push(sessionCwd, fsDefaultCwd)
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: fsDefaultCwd })
+    await ctx.plugin(SandboxedFileSystem, { cwd: fsDefaultCwd })
+    await ctx.plugin(StubShell)
+    await ctx.plugin(DeliveryService)
+    await ctx.plugin(toolDelivery, {})
+    const id = SessionId(`delivery-sandbox-${Math.random()}`)
+    const agent = stubAgent(`sandbox-agent-${Math.random()}`, Session.create(
+      id,
+      undefined,
+      { version: SESSION_FORMAT_VERSION, id, createdAt: Date.now(), cwd: sessionCwd },
+    ))
+    ctx.agents.register(agent)
+    return { ctx, agent, sessionCwd, fsDefaultCwd }
+  }
+
+  it('writes the design artifact under the session cwd through a workspace-write sandbox', async () => {
+    const { ctx, agent, sessionCwd } = await sandboxHarness()
+    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'sandbox design', level: 'l1' }, agent))
+    const analyzed = resultTask(await execute(ctx, 'mark_analysis_done', {
+      task_id: created['id'], revision: created['revision'],
+    }, agent))
+    await execute(ctx, 'record_design', {
+      task_id: analyzed['id'], revision: analyzed['revision'], text: 'the sandboxed design',
+    }, agent)
+    expect(readFileSync(join(sessionCwd, '.dsh', 'design', `${created['id']}.md`), 'utf8'))
+      .toContain('the sandboxed design')
+  })
+
+  it('writes the change artifact under the session cwd through a workspace-write sandbox', async () => {
+    const { ctx, agent, sessionCwd } = await sandboxHarness()
+    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'sandbox change', level: 'l0' }, agent))
+    await execute(ctx, 'record_change', {
+      task_id: created['id'], revision: created['revision'], text: 'the sandboxed change',
+    }, agent)
+    expect(readFileSync(join(sessionCwd, '.dsh', 'changes', `${created['id']}.md`), 'utf8'))
+      .toContain('the sandboxed change')
+  })
+
+  it('writes tasks.md under the session cwd through a workspace-write sandbox', async () => {
+    const { ctx, agent, sessionCwd } = await sandboxHarness()
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'sandbox tasks', level: 'l2' }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
+    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
+    resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [{ content: 'ship it', phase: 'implemented', status: 'pending' }],
+    }, agent))
+    expect(readFileSync(join(sessionCwd, 'openspec', 'changes', 'add-thing', 'tasks.md'), 'utf8'))
+      .toBe('- [ ] ship it\n')
   })
 })
