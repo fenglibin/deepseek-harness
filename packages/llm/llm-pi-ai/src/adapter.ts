@@ -348,6 +348,10 @@ export class PiAiAdapter extends LlmAdapter {
       : AbortSignal.any([options.signal, consumer.signal])
     const streamIdleTimeoutMs = profile.streamIdleTimeoutMs
     using watchdog = idleWatchdog(upstream, streamIdleTimeoutMs, 'LLM_STREAM_IDLE_TIMEOUT')
+    // Tracks whether stream consumption has begun. A bare SDK throw before this
+    // point is a local (pre-dispatch) failure and stays as-is; one after it is a
+    // transport failure the recovery layer may retry.
+    let iterating = false
 
     try {
       const containsImage = options.messages.some(message => contentHasImage(message.content))
@@ -385,6 +389,7 @@ export class PiAiAdapter extends LlmAdapter {
       const iterator = toStreamChunks(events, model.contextWindow, options.signal)[Symbol.asyncIterator]()
       let exhausted = false
       try {
+        iterating = true
         while (true) {
           const result = await watchdog.next(iterator)
           const timeout = timeoutOf(watchdog.signal, 'LLM_STREAM_IDLE_TIMEOUT')
@@ -413,13 +418,17 @@ export class PiAiAdapter extends LlmAdapter {
         throw new LlmError('pi-ai request aborted by caller', 'ABORTED', { cause: error })
       }
       if (error instanceof LlmError) throw error
-      // A bare SDK throw — openai's JSON.parse of a malformed SSE line is the
-      // common case, e.g. a gateway emitting `data:data:` — carries no harness
-      // code. Without a wrapping TRANSPORT it would surface as UNKNOWN, which
-      // the default retry policy does not retry and ends the turn. A malformed
-      // stream is transport-level and safe to repeat: the next attempt may read
-      // a well-formed frame.
-      throw new LlmError(`pi-ai API stream for model "${options.model}" failed`, 'TRANSPORT', { cause: error })
+      // A bare SDK throw once stream consumption has begun — openai's JSON.parse
+      // of a malformed SSE line is the common case, e.g. a gateway emitting
+      // `data:data:` — carries no harness code. Without a wrapping TRANSPORT it
+      // would surface as UNKNOWN, which the default retry policy does not retry
+      // and ends the turn. A malformed stream is transport-level and safe to
+      // repeat: the next attempt may read a well-formed frame. A bare throw
+      // before consumption (context conversion) stays local and is preserved.
+      if (iterating) {
+        throw new LlmError(`pi-ai API stream for model "${options.model}" failed`, 'TRANSPORT', { cause: error })
+      }
+      throw error
     } finally {
       consumer.abort('pi-ai stream consumer stopped')
     }

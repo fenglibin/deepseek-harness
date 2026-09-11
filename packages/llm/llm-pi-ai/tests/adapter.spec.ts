@@ -944,6 +944,20 @@ describe('provider profile lifecycle', () => {
   })
 })
 
+describe('stream transport failure classification', () => {
+  it('classifies a malformed SSE payload as a retryable TRANSPORT', async () => {
+    // A `data:` line that is not JSON — e.g. a gateway emitting a duplicated
+    // `data:` prefix so the field value still reads `data: {…}` — surfaces
+    // through pi-ai's in-stream error event. It must be classified as TRANSPORT,
+    // which the default retry policy repeats, instead of PI_AI_ERROR, which ends
+    // the turn.
+    const server = await mockServer([{ events: ['not-json'] }])
+    const ctx = await harness(server.url)
+    const result = await assemble(ctx, { model: 'deepseek-v4-flash', messages: [] })
+    expect(result.finish).toMatchObject({ kind: 'error', failure: { code: 'TRANSPORT' } })
+  })
+})
+
 describe('abort wiring', () => {
   it('preserves an unknown pre-dispatch adapter Error exactly', async () => {
     const original = new Error('SDK context conversion exploded')

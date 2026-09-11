@@ -854,6 +854,19 @@ describe('mapStopReason / mapUsage', () => {
       .toMatchObject({ kind: 'error', failure: { code: 'TRANSPORT' } })
   })
 
+  it.each([
+    // A gateway emitting a duplicated `data:` prefix leaves `data: {…}` in the
+    // field value, so JSON.parse rejects it with this V8 wording.
+    'Unexpected token \'d\', "data: {\"id\":1}" is not valid JSON',
+    'Unexpected end of JSON input',
+    'Unexpected non-whitespace character after JSON at position 10',
+    'malformed JSON payload',
+    'invalid JSON in response body',
+  ])('maps a JSON parse failure to a retryable TRANSPORT (%j)', (errorMessage) => {
+    expect(mapStopReason(assistant({ stopReason: 'error', errorMessage })))
+      .toMatchObject({ kind: 'error', failure: { code: 'TRANSPORT' } })
+  })
+
   it('uses pi-ai provider-specific overflow classification without losing rate-limit exclusions', () => {
     expect(mapStopReason(assistant({
       stopReason: 'error',

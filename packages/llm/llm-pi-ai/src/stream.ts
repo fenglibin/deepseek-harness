@@ -49,6 +49,12 @@ function classifyPiAiError(message: string): string {
   if (/\b400\b|invalid.?request/i.test(message)) return 'INVALID_REQUEST'
   if (/\b5\d\d\b/.test(message)) return 'SERVER'
   if (/\btime(?:d)?\s*out\b|timeout/i.test(message)) return 'TIMEOUT'
+  // A wire payload that could not be parsed as JSON — the common case is a
+  // gateway emitting a duplicated `data:` prefix (`data:data:`) so the field
+  // value still carries `data: {…}` and JSON.parse rejects it — is transport
+  // corruption, not a model failure. The next attempt may read a well-formed
+  // frame, so it is retryable.
+  if (/\bunexpected (?:token|end of (?:JSON )?input|non-whitespace character after JSON)\b|\b(?:is not valid|malformed|invalid) JSON\b/i.test(message)) return 'TRANSPORT'
   // A stream truncated before the provider's terminal event: each pi-ai provider
   // throws its own wording when the wire closes mid-response without a terminal
   // event (`… stream ended before message_stop`, `… before a terminal response
