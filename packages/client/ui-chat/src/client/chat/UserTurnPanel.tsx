@@ -5,10 +5,11 @@
  * visual sibling of {@link TurnNavigator}); the open mode swaps the toggle
  * for a vertical panel listing every user turn in the durable log with its
  * first-line preview. The panel reads the whole-log `turnOutline` projection
- * (one entry per turn that opened with a direct user prompt), so the list is
- * complete on re-entry regardless of how much history the client has paged
- * in, and the only way it changes is a new user message landing. Picking a
- * row pages older history on demand when the target turn is not yet loaded.
+ * (one entry per turn that opened with a direct user prompt, the running turn
+ * included), so the list is complete on re-entry regardless of how much
+ * history the client has paged in, and a message the reader just sent appears
+ * as soon as it lands. Picking a row pages older history on demand when the
+ * target turn is not yet loaded.
  */
 import {
   useEffect, useId, useRef, useState, type CSSProperties,

@@ -96,6 +96,8 @@ export interface TurnTailChatData {
   readonly branchUnavailable: boolean
   readonly ttftMs?: number
   readonly tokensPerSecond?: number
+  /** Highest single-step decode throughput; equals `tokensPerSecond` on a one-step turn. */
+  readonly peakTokensPerSecond?: number
   /** Exact per-Turn accounting; absent when the loaded evidence is incomplete. */
   readonly tokenUsage?: TurnTokenUsage
 }

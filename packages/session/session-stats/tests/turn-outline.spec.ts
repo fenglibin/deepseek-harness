@@ -155,4 +155,77 @@ describe('turnOutline session projection', () => {
       { turn: 1, prompt: '' },
     ])
   })
+
+  it('shows the open turn before turn/end and keeps exactly one row after it', async () => {
+    // The drawer must list a message the reader just sent, not one the host has
+    // finished answering: the open turn is carried by the view ahead of its
+    // turn/end, and finalizing it must not duplicate the row.
+    const { ctx, session } = await harness()
+    session.append('turn/start', { turn: 1 })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'first question' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    expect(projected(ctx, session)).toEqual({ turns: [{ turn: 1, prompt: 'first question' }] })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    expect(projected(ctx, session)).toEqual({ turns: [{ turn: 1, prompt: 'first question' }] })
+  })
+
+  it('publishes the open turn on the change feed when its prompt lands', async () => {
+    const { ctx, session } = await harness()
+    const changes: { value: unknown; seq: number }[] = []
+    ctx.sessionProjections.onChanged((_session, key, value, seq) => {
+      if (key === 'turnOutline') changes.push({ value, seq })
+    })
+    session.append('turn/start', { turn: 1 })
+    const landed = session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'live question' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    expect(changes).toContainEqual({
+      value: { turns: [{ turn: 1, prompt: 'live question' }] },
+      seq: landed.seq,
+    })
+  })
+
+  it('keeps an open turn out of the list until a direct prompt lands', async () => {
+    // Injected context opens no user row, and the turn joins the list only when
+    // the reader's own message arrives — the same keep test turn/end applies.
+    const { ctx, session } = await harness()
+    session.append('turn/start', { turn: 1 })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'injected' }],
+      source: { kind: 'plugin', plugin: 'test' },
+    }), { surfaceOp: 'append' })
+    expect(projected(ctx, session)).toEqual({ turns: [] })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'real question' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    expect(projected(ctx, session)).toEqual({ turns: [{ turn: 1, prompt: 'real question' }] })
+  })
+
+  it('shows an open image-only turn with an empty preview', async () => {
+    const { ctx, session } = await harness()
+    session.append('turn/start', { turn: 1 })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'image', attachment: { attachmentId: 'attach-3' as never, mediaType: 'image/png', bytes: 0, width: 1, height: 1 } }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    expect(projected(ctx, session)).toEqual({ turns: [{ turn: 1, prompt: '' }] })
+  })
+
+  it('keeps the opening prompt while a steering message lands mid-turn', async () => {
+    const { ctx, session } = await harness()
+    session.append('turn/start', { turn: 1 })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'opening' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'steering' }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    expect(projected(ctx, session)).toEqual({ turns: [{ turn: 1, prompt: 'opening' }] })
+  })
 })

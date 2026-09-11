@@ -64,7 +64,7 @@
 
 - `ConversationRoot.tsx:521` 在 `phase === 'active'` 时才挂载 `<HeightHandle>`。未提交首轮的新会话是 `phase = 'hero'`。`InputBar.module.css:135-137` 同时显式强制 `.hero .scroll { height: auto }`。两处需要一起解开。
 - `ModelSelect.tsx:29, 119-122, 248-263`：`Pane = 'root' | 'model' | 'effort'`。`show()` 总是进入 root 面板。若已选 model，effort 可能 undefined → effort cell 隐藏 → root 面板只剩一个「模型」可点击。删除 root 后直接进列表是一次状态变更 + 重新映射键盘语义。
-- `response-language/src/index.ts:41-43`：只有 `zh` 有指令。原文「Reply to the user in Simplified Chinese (简体中文). Write every sentence a person reads in Chinese ...」。多个用户报 `auto` 模式仍是英文。两个真实候选：(a) locale preference 写入 `locale.preference` 链路失败 (b) 指令太软，模型回到 prior。我们两手抓：加固指令，加装定位日志。
+- `response-language/src/index.ts:41-43`：只有 `zh` 有指令。多个用户报 `auto` 模式仍是英文。两个真实候选：(a) locale preference 写入 `locale.preference` 链路失败 (b) 指令太软，模型回到 prior。审计确认读路径、写入链路与挂载三处都正确，因此只加固指令，不加定位日志。
 - `ui-deliverables/turn-deliverables.ts:122-135`：`producedForClosing(data, seq)` 已是稳定的 per-turn mutation 列表（去重、首现序）。项 4 把它的可见面扩到会话级，但不复制数据源 — 订阅同一份 `turn-deliverables` 定义。
 - `facade.ts:557-560`、`InputBar.tsx:97-106`：`notify(level, text)` 把 `this.notices.set({ level, text, seq: ++this.noticeSeq })`。错误会粘在头部直到下一次 `notify`。项 5 加 `clearNotices()` verb，由 session readiness 驱动调用。
 - `ToolRow.module.css`：当前 `data-variant` 实际只有 `code` 一种，且 `[data-tool^='cordis_']` 是唯一带强调色的工具。`data-tool=write/edit` 走 diff card 但整行外观与 read / search / bash 一样。项 6 加 `data-tool=write` 和 `data-tool=edit` 的强调规则，配合现有的 `.operation`(写入)/(修改) 标记。
@@ -106,18 +106,13 @@
 **A. 加强指令 + 审计读路径。** *（推荐）*
 给 `zh` 指令加一条显式「禁止掉回英文」的条款，并审计 `localePreference` 相对 Web GUI 存储值的真实路径。审计把已有或缺失的 bug 暴露给我们；加固后的指令无论如何都能把模型拉回来。
 
-新指令全文：
+指令全文（权威源是 [`DIRECTIVES.zh`](../../packages/context/response-language/src/index.ts)；注释条款的由来见 [代码注释跟随响应语言指令](../../.agents/notes/implemented/feature/2026-09-11-code-comments-follow-response-language.zh.md)）：
 
 ```
-Reply to the user in Simplified Chinese (简体中文). Write every sentence a person reads
-in Chinese — explanations, plans, progress updates, summaries, questions, and the
-prose of commit messages, reports, and documents you author. Do NOT switch to English
-when reproducing identifiers, paths, commands, or quoted user/tool output; quoted text
-stays quoted, surrounding prose stays Chinese. If the user writes in English, mirror
-their tone but keep your reply in Chinese unless they explicitly ask otherwise.
+用简体中文回复用户。凡是人会读到的句子都用中文写：解释、计划、进度更新、总结、提问，以及你撰写的提交信息、报告与文档正文。你自己撰写的注释也用中文，包括行注释、块注释与文档注释（JSDoc、docstring 等）。标识符、关键字、字符串字面量、shell 命令、文件路径、工具名、JSON key、URL，以及引用的用户或工具输出保持原样，不是你撰写的既有注释维持其原有语言，只翻译它们周围的散文。复现标识符、路径、命令或引用的用户/工具输出时不要切换成英文；引文保持引用状态，周围的散文保持中文。即使用户用英文输入，也保持中文回复，除非用户明确要求用其他语言。
 ```
 
-审计通过日志（`dsh.dev.trace` 门控）记录解析出的 `preference` / `environment` / 最终语言，下次复现就能定位是哪一环失败。
+审计结论：读路径、写入链路与挂载三处都正确，不需要额外日志——`localePreference(ctx)` 读到的正是 `settings.get('locale').preference`，`dsh-base` 已按默认挂载该 row，回环页面的写入会落到 host（[依据](../../.agents/notes/implemented/feature/2026-09-03-chat-ux-response-language-directive.zh.md)）。
 
 - 优点：影响半径小，无 model contract 变更，无新配置面；trace 日志 opt-in，会话结束即销毁。
 - 缺点：沙箱下 `auto` 模式无 `en` 指令的事实仍在；一个 PR 里加不了 force-off 的中文行为（那需要 `en` 指令，项目会单独评估）。

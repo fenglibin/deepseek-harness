@@ -131,7 +131,7 @@ describe('TurnUsagePanel', () => {
 describe('TurnTimePanel', () => {
   it('shows a clock-and-duration pill and opens the time dialog on click', () => {
     const view = render(
-      <TurnTimePanel runMs={19_000} tokensPerSecond={20} ttftMs={1_200} t={t} />,
+      <TurnTimePanel runMs={19_000} tokensPerSecond={20} peakTokensPerSecond={35} ttftMs={1_200} t={t} />,
     )
     const trigger = view.getByRole('button')
     expect(trigger.textContent).toBe('用时 19秒')
@@ -147,6 +147,7 @@ describe('TurnTimePanel', () => {
     const details = dialog.querySelector('[data-turn-time-details]') as HTMLElement
     expect(details.textContent).toContain('本轮总用时19秒')
     expect(details.textContent).toContain('输出速度（TPS）20 tok/s')
+    expect(details.textContent).toContain('输出峰值速度（TPS）35 tok/s')
     expect(details.textContent).toContain('首 token 用时（TTFT）1.2秒')
 
     fireEvent.keyDown(document, { key: 'Escape' })
@@ -159,6 +160,7 @@ describe('TurnTimePanel', () => {
     const dialog = view.getByRole('dialog')
     expect(dialog.textContent).toContain('本轮总用时3秒')
     expect(dialog.textContent).not.toContain('输出速度')
+    expect(dialog.textContent).not.toContain('输出峰值速度')
     expect(dialog.textContent).not.toContain('首 token 用时')
   })
 })

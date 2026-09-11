@@ -106,6 +106,7 @@ export const zh = {
   'message.turnTime.title': '本轮用时和速度',
   'message.turnTime.duration': '本轮总用时',
   'message.turnTime.speed': '输出速度（TPS）',
+  'message.turnTime.peakSpeed': '输出峰值速度（TPS）',
   'message.turnTime.ttft': '首 token 用时（TTFT）',
   'duration.seconds': '{seconds}秒',
   'duration.minutes': '{minutes}分{seconds}秒',

@@ -13,7 +13,7 @@ Status: implemented
 - 一条显式的「复现标识符 / 路径 / 命令 / 引文时，禁止切换到英文」，以及
 - 一条镜像条款：即使用户用英文输入，回复也保持中文，除非用户明确要求用英文。
 
-这两条是**追加**到既有的「原文保留」条款之后，而不是替换，所以指令现在用一句话流完整表达：正文用中文写、非正文原文保留、围绕原文的上下文不得切换英文、用户写英文时回复仍保持中文。
+这两条是**追加**到既有的「原文保留」条款之后，而不是替换，所以指令现在用一句话流完整表达：正文用中文写、非正文原文保留、围绕原文的上下文不得切换英文、用户写英文时回复仍保持中文。该指令的覆盖范围此后扩展到模型自己撰写的代码注释与文档注释（见[代码注释跟随响应语言指令](2026-09-11-code-comments-follow-response-language.zh.md)），因此「非正文原文保留」精确指代码标记——标识符、关键字、字符串字面量、命令、路径、URL 与引用输出。
 
 ### 为什么是修指令，而不是修写入链路
 
@@ -35,13 +35,13 @@ Status: implemented
 
 ## Consequences
 
-`zh` 用户现在得到的指令是：正文用中文、非正文原文保留、围绕原文的上下文禁止掉回英文、用户写英文时仍保持中文。指令仍是 `RESPONSE_LANGUAGE` 位置上的一段，因此依然在 `includeRuntimeContext: false` 下存活，也依然能传递到子代理。
+`zh` 用户现在得到的指令是：正文与模型自己撰写的代码注释用中文、代码标记与既有注释原文保留、围绕原文的上下文禁止掉回英文、用户写英文时仍保持中文。指令仍是 `RESPONSE_LANGUAGE` 位置上的一段，因此依然在 `includeRuntimeContext: false` 下存活，也依然能传递到子代理。
 
 代价是系统提示更长（多了三条条款），这正是换取更强指令的意图。思考语言仍是模型自己的，所以用户可能仍看到英文思考，即使正文回答已经是中文。
 
 ## Testing
 
-- `response-language.spec.ts` —— `directiveText('zh')` 现在额外断言指令包含 `Do NOT switch to English` 与 `mirror their tone but keep your reply in Chinese`。整文件 17 条测试。
+- `response-language.spec.ts` —— `directiveText('zh')` 现在额外断言指令包含禁止掉回英文与镜像用户语言两条条款；断言的短语随后随[指令改用中文书写](2026-09-11-response-language-directive-in-chinese.zh.md)改为中文。整文件 17 条测试。
 - `loader.spec.ts` —— 仍在 identity 与 persona 之间渲染中文指令。
 - 整个包 18/18 通过。其中 `lets the stored GUI language outrank the host environment` 这条硬编码了运行主机是 `zh`；它在 `LC_ALL=zh_CN.UTF-8` 下通过，属于既有的环境假设，不是本次改动引入。
 - 没有 recorded-session snapshot 内嵌旧指令文本（`translate only the prose around them` 未出现在任何 `snapshots/` 的 expected 输出里），所以 `test:snapshot` 不受影响。

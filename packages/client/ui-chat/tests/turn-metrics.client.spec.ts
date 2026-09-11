@@ -67,7 +67,7 @@ describe('assistantStepReading', () => {
 })
 
 describe('deriveTurnMetrics', () => {
-  it('takes ttft from the lowest step and throughput over all sampled steps', () => {
+  it('takes ttft from the lowest step, throughput over all sampled steps, and the peak from the fastest one', () => {
     const nodes: ConversationNode[] = [
       user(1),
       // Out of step order on purpose: the lowest step owns the ttft slot.
@@ -82,8 +82,10 @@ describe('deriveTurnMetrics', () => {
         usage: { outputTokens: 40 },
       }),
     ]
-    // 100 tokens over 5s of decode.
-    expect(deriveTurnMetrics(nodes).get(1)).toEqual({ ttftMs: 1_200, tokensPerSecond: 20 })
+    // 100 tokens over 5s of decode; the 2s step alone ran at 30 tok/s.
+    expect(deriveTurnMetrics(nodes).get(1)).toEqual({
+      ttftMs: 1_200, tokensPerSecond: 20, peakTokensPerSecond: 30,
+    })
   })
 
   it('emits ttft without throughput when no step carries usage', () => {
@@ -103,7 +105,7 @@ describe('deriveTurnMetrics', () => {
         usage: { outputTokens: 30 },
       }),
     ]
-    expect(deriveTurnMetrics(nodes).get(1)).toEqual({ tokensPerSecond: 15 })
+    expect(deriveTurnMetrics(nodes).get(1)).toEqual({ tokensPerSecond: 15, peakTokensPerSecond: 15 })
   })
 
   it('omits turns with no readings and zero-decode throughput', () => {
@@ -134,8 +136,50 @@ describe('deriveTurnMetrics', () => {
       }),
     ]
     const metrics = deriveTurnMetrics(nodes)
-    expect(metrics.get(1)).toEqual({ ttftMs: 400, tokensPerSecond: 10 })
-    expect(metrics.get(2)).toEqual({ ttftMs: 100, tokensPerSecond: 50 })
+    expect(metrics.get(1)).toEqual({ ttftMs: 400, tokensPerSecond: 10, peakTokensPerSecond: 10 })
+    expect(metrics.get(2)).toEqual({ ttftMs: 100, tokensPerSecond: 50, peakTokensPerSecond: 50 })
+  })
+
+  it('takes the peak from the fastest step rather than the last one', () => {
+    const nodes: ConversationNode[] = [
+      // 200 tokens over 2s → 100 tok/s, then 100 tokens over 8s → 12.5 tok/s.
+      assistant({
+        seq: 2, turn: 1, step: 1,
+        timing: { stepStartTime: 1_000, firstTokenTime: 1_000, completedTime: 3_000 },
+        usage: { outputTokens: 200 },
+      }),
+      assistant({
+        seq: 4, turn: 1, step: 2,
+        timing: { stepStartTime: 4_000, firstTokenTime: 4_000, completedTime: 12_000 },
+        usage: { outputTokens: 100 },
+      }),
+    ]
+    // Average: 300 tokens over 10s of decode.
+    expect(deriveTurnMetrics(nodes).get(1)).toEqual({
+      ttftMs: 0, tokensPerSecond: 30, peakTokensPerSecond: 100,
+    })
+  })
+
+  it('reports the peak equal to the average on a one-step turn', () => {
+    const nodes = [assistant({
+      seq: 2, turn: 1, step: 1,
+      timing: { stepStartTime: 1_000, firstTokenTime: 2_000, completedTime: 4_000 },
+      usage: { outputTokens: 60 },
+    })]
+    // One step: 60 tokens over 2s — the two ratios coincide by construction.
+    expect(deriveTurnMetrics(nodes).get(1)).toEqual({
+      ttftMs: 1_000, tokensPerSecond: 30, peakTokensPerSecond: 30,
+    })
+  })
+
+  it('omits the peak when every step has zero decode time', () => {
+    const nodes = [assistant({
+      seq: 2, turn: 1, step: 1,
+      timing: { stepStartTime: 1_000, firstTokenTime: 1_500, completedTime: 1_500 },
+      usage: { outputTokens: 12 },
+    })]
+    // Zero decode time yields no ratio, so neither throughput figure appears.
+    expect(deriveTurnMetrics(nodes).get(1)).toEqual({ ttftMs: 500 })
   })
 })
 

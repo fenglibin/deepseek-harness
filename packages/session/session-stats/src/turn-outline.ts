@@ -5,7 +5,9 @@
  * The client drawer lists only the turns a history page actually loaded. This
  * unit folds the complete durable log on the host, so the full user-message
  * list is available regardless of paging; the client pages back to a turn on
- * demand instead of listing only what it already has.
+ * demand instead of listing only what it already has. The open turn joins the
+ * wire view the moment its opening prompt lands, so the drawer shows a message
+ * when the reader sends it rather than when the turn closes.
  *
  * @module @deepseek-ai/dsh-session-stats/turn-outline
  */
@@ -78,10 +80,33 @@ function promptOf(event: SessionEvent<'user/message'>): string {
 }
 
 /**
+ * Whether the open turn has produced a direct user prompt worth listing.
+ * One predicate for both readers — `turn/end` decides whether to keep the
+ * slot, the wire view decides whether to publish it early — so the two can
+ * never disagree about which turns are user turns.
+ * @param state - the current fold state.
+ * @returns true once an own user message landed, whether or not it carried text.
+ */
+function isUserTurn(state: TurnOutlineState): boolean {
+  return state.currentPrompt !== '' || state.currentIsUserTurn
+}
+
+/**
+ * The open turn as an outline entry, while it qualifies as a user turn.
+ * @param state - the current fold state.
+ * @returns the entry, or null when no direct user prompt has landed yet.
+ */
+function openTurnEntry(state: TurnOutlineState): TurnOutlineEntry | null {
+  if (state.currentTurn === null || !isUserTurn(state)) return null
+  return { turn: state.currentTurn, prompt: state.currentPrompt }
+}
+
+/**
  * Session-stats' turn-outline projection unit.
  *
  * A `turn/start` opens a slot, the first direct user message fills its prompt,
- * and `turn/end` publishes the slot when a prompt was captured. Turns without a
+ * and the wire view publishes the slot as soon as that prompt lands —
+ * `turn/end` only moves it into the finalized log-ordered list. Turns without a
  * direct prompt (injected-only, compaction entries) stay out of the list; an
  * event outside any turn leaves the state untouched.
  */
@@ -114,9 +139,7 @@ export const turnOutlineProjectionDefinition = {
         : state
     }
     if (event.type === 'turn/end') {
-      const keepOwnPrompt = state.currentPrompt !== ''
-      const keepOwnUser = state.currentIsUserTurn
-      if (!keepOwnPrompt && !keepOwnUser) {
+      if (!isUserTurn(state)) {
         return { turns: state.turns, currentTurn: null, currentPrompt: '', currentIsUserTurn: false }
       }
       return {
@@ -128,5 +151,11 @@ export const turnOutlineProjectionDefinition = {
     }
     return state
   },
-  wire: { viewSchema: turnOutlineViewSchema, view: state => ({ turns: state.turns }) },
+  wire: {
+    viewSchema: turnOutlineViewSchema,
+    view: (state) => {
+      const open = openTurnEntry(state)
+      return { turns: open === null ? state.turns : [...state.turns, open] }
+    },
+  },
 } satisfies ProjectionDefinition<'turnOutline', TurnOutlineState>

@@ -171,6 +171,7 @@ function tailData(context: ConversationNodeContext<TurnTailState>): TurnTailChat
     branchUnavailable: closing === null || latestTranscriptSeq !== closing.finalNode.seq,
     ...metrics?.ttftMs === undefined ? {} : { ttftMs: metrics.ttftMs },
     ...metrics?.tokensPerSecond === undefined ? {} : { tokensPerSecond: metrics.tokensPerSecond },
+    ...metrics?.peakTokensPerSecond === undefined ? {} : { peakTokensPerSecond: metrics.peakTokensPerSecond },
     ...tokenUsage === undefined ? {} : { tokenUsage },
   }
 }

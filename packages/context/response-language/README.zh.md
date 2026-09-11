@@ -106,17 +106,17 @@ kind: "package-reference"
 
 #### 模型看到的内容
 
-只有一个段落，且仅在解析出的语言拥有已发布指令时出现。它要求该语言用于人会读到的全部内容，并豁免模型不得改写的数据。
+只有一个段落，且仅在解析出的语言拥有已发布指令时出现。它要求该语言用于人会读到的全部内容，包括模型自己撰写的代码注释与文档注释，同时保留模型不得改写的代码标记，并让模型未撰写的既有注释维持原语言。
 
 ##### 面向 `zh` 的指令
 
 ```markdown
-Reply to the user in Simplified Chinese (简体中文). Write every sentence a person reads in Chinese — explanations, plans, progress updates, summaries, questions, and the prose of commit messages, reports, and documents you author. Keep code, shell commands, file paths, identifiers, tool names, JSON keys, URLs, and quoted user or tool output verbatim; translate only the prose around them. Do NOT switch to English when reproducing identifiers, paths, commands, or quoted user/tool output; quoted text stays quoted, surrounding prose stays Chinese. If the user writes in English, mirror their tone but keep your reply in Chinese unless they explicitly ask otherwise.
+用简体中文回复用户。凡是人会读到的句子都用中文写：解释、计划、进度更新、总结、提问，以及你撰写的提交信息、报告与文档正文。你自己撰写的注释也用中文，包括行注释、块注释与文档注释（JSDoc、docstring 等）。标识符、关键字、字符串字面量、shell 命令、文件路径、工具名、JSON key、URL，以及引用的用户或工具输出保持原样，不是你撰写的既有注释维持其原有语言，只翻译它们周围的散文。复现标识符、路径、命令或引用的用户/工具输出时不要切换成英文；引文保持引用状态，周围的散文保持中文。即使用户用英文输入，也保持中文回复，除非用户明确要求用其他语言。
 ```
 
 #### Token 影响
 
-固定开销：约 80 个 token 的一段文本，在整个会话中要么存在要么不存在，不随对话增长。
+固定开销：约 180 个 token 的一段文本（约 300 字），在整个会话中要么存在要么不存在，不随对话增长。
 
 #### KV Cache 影响
 
@@ -132,6 +132,7 @@ Reply to the user in Simplified Chinese (简体中文). Write every sentence a p
 - **界面语言在被选择之前不可见** —— 新页面采用的、由浏览器推导出的语言从不落盘，因此在有人于「设置 → 常规」中显式选择语言之前，英文宿主上的中文浏览器只能经由宿主环境被识别。
 - **`minimal` 预设会抑制该段落** —— 它的 persona 是 `complete: true`，装配会把完整的 persona 还原为唯一段落，丢弃包括本段落在内的其他全部贡献。
 - **宿主区域设置在激活时采样** —— 在运行中的进程里修改 `LANG` 不会改变指令；界面语言则会，因为它在每次装配时读取。
+- **注释语言是提示词层面的软约束** —— harness 不检查产出文本的语言，模型从既有英文代码续写时仍可能写出英文注释。
 
 <a id="dev-note"></a>
 ### 开发备注

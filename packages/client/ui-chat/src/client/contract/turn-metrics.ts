@@ -8,6 +8,12 @@ export interface TurnMetrics {
   ttftMs?: number
   /** Decode throughput over steps carrying both timing and provider usage. */
   tokensPerSecond?: number
+  /**
+   * Highest single-step decode throughput among the steps behind
+   * `tokensPerSecond`; absent when none carries positive decode time, and equal
+   * to `tokensPerSecond` on a one-step turn.
+   */
+  peakTokensPerSecond?: number
 }
 
 /** One assistant step's derivable latency facts; null marks an unrecorded part. */
@@ -53,6 +59,8 @@ interface TurnFold {
   firstStepTtftMs: number | null
   decodeMs: number
   outputTokens: number
+  /** Highest single-step decode throughput; null until a positive-decode step lands. */
+  peakTokensPerSecond: number | null
   sampled: boolean
 }
 
@@ -63,7 +71,8 @@ interface TurnFold {
  * it is only meaningful when the turn's start is inside
  * the loaded window (the caller gates on `turnTimings`, which shares that
  * window). Throughput divides summed output tokens by summed decode wall time,
- * counting only steps that carry both.
+ * counting only steps that carry both; the peak is the highest such ratio over
+ * a single step, so it exceeds the average only on a multi-step turn.
  * @param nodes - Snapshot nodes of the loaded window.
  * @returns Turn number → available metrics; turns with none are absent.
  */
@@ -74,7 +83,14 @@ export function deriveTurnMetrics(nodes: readonly ConversationNode[]): Map<numbe
     const reading = assistantStepReading(node)
     let fold = folds.get(node.turn)
     if (fold === undefined) {
-      fold = { firstStep: node.step, firstStepTtftMs: reading.ttftMs, decodeMs: 0, outputTokens: 0, sampled: false }
+      fold = {
+        firstStep: node.step,
+        firstStepTtftMs: reading.ttftMs,
+        decodeMs: 0,
+        outputTokens: 0,
+        peakTokensPerSecond: null,
+        sampled: false,
+      }
       folds.set(node.turn, fold)
     } else if (node.step < fold.firstStep) {
       fold.firstStep = node.step
@@ -84,6 +100,12 @@ export function deriveTurnMetrics(nodes: readonly ConversationNode[]): Map<numbe
       fold.decodeMs += reading.decodeMs
       fold.outputTokens += reading.outputTokens
       fold.sampled = true
+      if (reading.decodeMs > 0) {
+        const stepRate = reading.outputTokens / (reading.decodeMs / 1000)
+        fold.peakTokensPerSecond = fold.peakTokensPerSecond === null
+          ? stepRate
+          : Math.max(fold.peakTokensPerSecond, stepRate)
+      }
     }
   }
   const metrics = new Map<number, TurnMetrics>()
@@ -91,6 +113,7 @@ export function deriveTurnMetrics(nodes: readonly ConversationNode[]): Map<numbe
     const entry: TurnMetrics = {}
     if (fold.firstStepTtftMs !== null) entry.ttftMs = fold.firstStepTtftMs
     if (fold.sampled && fold.decodeMs > 0) entry.tokensPerSecond = fold.outputTokens / (fold.decodeMs / 1000)
+    if (fold.peakTokensPerSecond !== null) entry.peakTokensPerSecond = fold.peakTokensPerSecond
     if (entry.ttftMs !== undefined || entry.tokensPerSecond !== undefined) metrics.set(turn, entry)
   }
   return metrics

@@ -25,6 +25,8 @@ export interface TurnTimePanelProps {
   runMs: number
   /** Turn decode throughput, a dialog row when known. */
   tokensPerSecond?: number | undefined
+  /** Highest single-step decode throughput, a dialog row when known. */
+  peakTokensPerSecond?: number | undefined
   /** Turn first-step TTFT in ms, a dialog row when known. */
   ttftMs?: number | undefined
   /** The owning view's locale seat, passed down as a plain prop. */
@@ -226,7 +228,7 @@ export function TurnUsagePanel({ usage, t }: TurnUsagePanelProps) {
  * @param props - Turn timing facts and locale seat.
  * @returns The clock-and-duration trigger and, while open, its portaled dialog anchored above the trigger.
  */
-export function TurnTimePanel({ runMs, tokensPerSecond, ttftMs, t }: TurnTimePanelProps) {
+export function TurnTimePanel({ runMs, tokensPerSecond, peakTokensPerSecond, ttftMs, t }: TurnTimePanelProps) {
   const { open, setOpen, openNow, armClose, rootRef, panelRef, pos } = useStatDialog()
   return (
     <span
@@ -267,6 +269,12 @@ export function TurnTimePanel({ runMs, tokensPerSecond, ttftMs, t }: TurnTimePan
               <>
                 <dt>{t('message.turnTime.speed')}</dt>
                 <dd>{t('message.tokensPerSecond', { tps: formatTokensPerSecond(tokensPerSecond) })}</dd>
+              </>
+            )}
+            {peakTokensPerSecond !== undefined && (
+              <>
+                <dt>{t('message.turnTime.peakSpeed')}</dt>
+                <dd>{t('message.tokensPerSecond', { tps: formatTokensPerSecond(peakTokensPerSecond) })}</dd>
               </>
             )}
             {ttftMs !== undefined && (

@@ -73,9 +73,17 @@ describe('directiveText', () => {
   it('names Simplified Chinese for zh and produces empty text otherwise', () => {
     const zh = ResponseLanguage.directiveText('zh')
     expect(zh).toContain('简体中文')
-    expect(zh).toContain('Do NOT switch to English')
-    expect(zh).toContain('mirror their tone but keep your reply in Chinese')
+    expect(zh).toContain('不要切换成英文')
+    expect(zh).toContain('即使用户用英文输入，也保持中文回复')
     expect(ResponseLanguage.directiveText(undefined)).toBe('')
+  })
+
+  it('requires authored comments in Chinese while keeping code tokens verbatim', () => {
+    const zh = ResponseLanguage.directiveText('zh')
+    expect(zh).toContain('你自己撰写的注释也用中文')
+    expect(zh).toContain('文档注释')
+    expect(zh).toContain('不是你撰写的既有注释维持其原有语言')
+    expect(zh).toContain('字符串字面量')
   })
 })
 

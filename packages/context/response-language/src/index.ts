@@ -39,7 +39,7 @@ export const RESPONSE_LANGUAGE_SETTINGS = ['auto', 'zh', 'en', 'off'] as const
  * which is the only honest instruction for a locale this row cannot name.
  */
 const DIRECTIVES = {
-  zh: 'Reply to the user in Simplified Chinese (简体中文). Write every sentence a person reads in Chinese — explanations, plans, progress updates, summaries, questions, and the prose of commit messages, reports, and documents you author. Keep code, shell commands, file paths, identifiers, tool names, JSON keys, URLs, and quoted user or tool output verbatim; translate only the prose around them. Do NOT switch to English when reproducing identifiers, paths, commands, or quoted user/tool output; quoted text stays quoted, surrounding prose stays Chinese. If the user writes in English, mirror their tone but keep your reply in Chinese unless they explicitly ask otherwise.',
+  zh: '用简体中文回复用户。凡是人会读到的句子都用中文写：解释、计划、进度更新、总结、提问，以及你撰写的提交信息、报告与文档正文。你自己撰写的注释也用中文，包括行注释、块注释与文档注释（JSDoc、docstring 等）。标识符、关键字、字符串字面量、shell 命令、文件路径、工具名、JSON key、URL，以及引用的用户或工具输出保持原样，不是你撰写的既有注释维持其原有语言，只翻译它们周围的散文。复现标识符、路径、命令或引用的用户/工具输出时不要切换成英文；引文保持引用状态，周围的散文保持中文。即使用户用英文输入，也保持中文回复，除非用户明确要求用其他语言。',
 } as const
 
 /** A language this row can direct the model to write in. */

@@ -42,11 +42,15 @@ export interface SessionStatsProjection {
 export interface TurnOutlineEntry {
   /** Turn number, stable for navigation. */
   turn: number
-  /** Bounded opening user prompt. */
+  /** Bounded opening user prompt; '' when that prompt carried no text (images or attachments only). */
   prompt: string
 }
 
-/** Whole-log list of turns that opened with a direct user prompt. */
+/**
+ * Whole-log list of turns that opened with a direct user prompt, oldest first.
+ * The open turn is carried as soon as its opening prompt lands, ahead of its
+ * `turn/end`, so a reader sees the message they just sent before the turn closes.
+ */
 export interface TurnOutlineProjection {
   turns: readonly TurnOutlineEntry[]
 }
