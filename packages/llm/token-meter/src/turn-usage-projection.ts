@@ -9,22 +9,35 @@
  * unit folds the complete durable log on the host instead, so a turn's usage
  * is available regardless of how much history the client has loaded.
  *
+ * The fold state is incremental — {@link stepTurnUsageFold} per event — and
+ * holds one entry per CLOSED attempt rather than the turn's events. That is a
+ * hard requirement of this unit, not a micro-optimization: this state is
+ * checkpointed to the projection cache, so an event-proportional state would
+ * put a whole session's log in every checkpoint document. A turn can span an
+ * entire session (one prompt, one long autonomous run), which is exactly the
+ * shape that made the raw-event buffer unbounded.
+ *
  * @module @deepseek-ai/dsh-token-meter/turn-usage-projection
  */
 
 import { z } from 'zod'
-import type { SessionEvent } from '@deepseek-ai/dsh-session'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
+import {
+  beginTurnUsageFold,
+  settleTurnUsageFold,
+  stepTurnUsageFold,
+  type AttemptState,
+  type NormalizedAttempt,
+  type TurnUsageFold,
+} from './turn-usage.ts'
 import type { TurnUsageProjection } from './projection.ts'
-import { deriveTurnTokenUsage, type TurnTokenUsage } from './turn-usage.ts'
+import type { TurnTokenUsage } from './turn-usage.ts'
 
-/** Fold state: finalized usage plus the in-flight turn's raw event buffer. */
+/** Fold state: finalized usage plus the open turn's incremental fold. */
 interface TurnUsageState {
   turns: Record<string, TurnTokenUsage>
-  /** Turn number of the open buffer; null between turns. */
-  currentTurn: number | null
-  /** Events from the open turn's `turn/start` through its `turn/end`. */
-  buffer: SessionEvent[]
+  /** The open turn's fold; null between turns. */
+  open: TurnUsageFold | null
 }
 
 declare module '@deepseek-ai/dsh-session-projection/types' {
@@ -56,57 +69,60 @@ const turnTokenUsageSchema: z.ZodType<TurnTokenUsage> = z.object({
   ...usage.routes === undefined ? {} : { routes: usage.routes },
 }))
 
+const turnUsageFoldSchema = z.object({
+  turn: z.number().int().nonnegative(),
+  // The fold is derived from session events that were already validated at
+  // append/restore, so this schema asserts the shape it reads back and trusts
+  // the two derived members, exactly as the former raw-event buffer did.
+  attempt: z.unknown(),
+  attempts: z.array(z.unknown()),
+  sawEnd: z.boolean(),
+  invalid: z.boolean(),
+}).strict()
+
 const turnUsageStateSchema: z.ZodType<TurnUsageState> = z.object({
   turns: z.record(z.string(), turnTokenUsageSchema),
-  currentTurn: z.number().int().nonnegative().nullable(),
-  // Session events are already validated at append/restore; the buffer only
-  // asserts array shape and trusts the elements.
-  buffer: z.array(z.unknown()),
-}).strict().transform(({ turns, currentTurn, buffer }) => ({
+  open: turnUsageFoldSchema.nullable(),
+}).strict().transform(({ turns, open }) => ({
   turns,
-  currentTurn,
-  buffer: buffer as SessionEvent[],
+  open: open === null ? null : {
+    turn: open.turn,
+    attempt: open.attempt as AttemptState,
+    attempts: open.attempts as NormalizedAttempt[],
+    sawEnd: open.sawEnd,
+    invalid: open.invalid,
+  },
 }))
 
 const turnUsageViewSchema: z.ZodType<TurnUsageProjection> = z.object({
   turns: z.record(z.string(), turnTokenUsageSchema),
 }).strict()
 
-/** Empty in-flight buffer fold (the persisted-cache precondition). */
-function emptyBuffer(): SessionEvent[] {
-  return []
-}
-
 /**
  * Token-meter's per-turn usage projection unit.
  *
- * The buffer carries every event between a turn's `turn/start` and `turn/end`;
- * at `turn/end` the buffered events fold through the existing
- * `deriveTurnTokenUsage` machine and a non-empty disclosure joins the map. An
- * event outside any turn leaves the state untouched, and a turn whose fold
- * discloses nothing (no billed attempt) is simply absent from the map.
+ * A `turn/start` opens a fold, every following event steps it, and `turn/end`
+ * settles it: a non-empty disclosure joins the map and the fold is dropped
+ * either way. An event outside any turn leaves the state untouched, and a turn
+ * whose fold discloses nothing (no billed attempt) is simply absent from the
+ * map.
  */
 export const turnUsageProjectionDefinition = {
   key: 'turnUsage',
-  stateVersion: 1,
+  stateVersion: 2,
   stateSchema: turnUsageStateSchema,
-  init: () => ({ turns: {}, currentTurn: null, buffer: emptyBuffer() }),
+  init: () => ({ turns: {}, open: null }),
   apply: (state, event) => {
     if (event.type === 'turn/start') {
-      return { turns: state.turns, currentTurn: event.data.turn, buffer: [event] }
+      return { turns: state.turns, open: beginTurnUsageFold(event.data.turn) }
     }
-    if (state.currentTurn === null) return state
-    if (event.type === 'turn/end') {
-      const usage = deriveTurnTokenUsage([...state.buffer, event])
-      return usage === undefined
-        ? { turns: state.turns, currentTurn: null, buffer: emptyBuffer() }
-        : {
-          turns: { ...state.turns, [String(state.currentTurn)]: usage },
-          currentTurn: null,
-          buffer: emptyBuffer(),
-        }
-    }
-    return { ...state, buffer: [...state.buffer, event] }
+    if (state.open === null) return state
+    const open = stepTurnUsageFold(state.open, event)
+    if (event.type !== 'turn/end') return { turns: state.turns, open }
+    const usage = settleTurnUsageFold(open)
+    return usage === undefined
+      ? { turns: state.turns, open: null }
+      : { turns: { ...state.turns, [String(open.turn)]: usage }, open: null }
   },
   wire: { viewSchema: turnUsageViewSchema, view: state => ({ turns: state.turns }) },
 } satisfies ProjectionDefinition<'turnUsage', TurnUsageState>

@@ -7,6 +7,7 @@ import type { Session } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import type { TurnUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
+import { turnUsageProjectionDefinition } from '../src/turn-usage-projection.ts'
 
 async function harness(): Promise<{ ctx: Context; session: Session }> {
   const ctx = new Context()
@@ -99,9 +100,99 @@ describe('turnUsage session projection', () => {
       ctx.sessionProjections.checkpoint(session),
     )) as ReturnType<typeof ctx.sessionProjections.checkpoint>
 
-    expect(checkpoint.turnUsage?.ver).toBe(1)
+    expect(checkpoint.turnUsage?.ver).toBe(2)
     expect(ctx.sessionProjections.viewCheckpoint(checkpoint).turnUsage).toMatchObject({
       turns: { '1': { uncachedInputTokens: 8, outputTokens: 2, totalTokens: 10 } },
+    })
+  })
+
+  it('keeps the checkpointed state proportional to steps, not to the turn\'s events', async () => {
+    const { ctx, session } = await harness()
+    const payload = 'x'.repeat(4_000)
+    session.append('turn/start', { turn: 1 })
+    for (let step = 1; step <= 20; step++) {
+      session.append('step/start', { turn: 1, step })
+      const source = session.append('assistant/chunk', {
+        turn: 1,
+        step,
+        chunk: { type: 'usage', usage: { inputTokens: 10, outputTokens: 1, totalTokens: 11 } },
+      }).seq
+      session.append('assistant/message', {
+        turn: 1,
+        step,
+        message: createMessage({
+          role: 'assistant',
+          content: [{ type: 'text', text: payload }],
+          source: { kind: 'model', provider: 'mock', model: 'mock' },
+        }),
+        usage: { inputTokens: 10, outputTokens: 1, totalTokens: 11 },
+      }, { surfaceOp: 'append', sourceEventSeqs: [source] })
+      session.append('step/end', { turn: 1, step })
+    }
+
+    // The turn is still open, so this is exactly what a mid-turn checkpoint
+    // would persist: 20 closed attempts, and none of the 20 × 4 KB messages.
+    const row = ctx.sessionProjections.checkpoint(session).turnUsage
+    const state = JSON.parse(JSON.stringify(row?.val)) as { open?: { attempts?: unknown[] } }
+    expect(state.open?.attempts).toHaveLength(20)
+    expect(JSON.stringify(state).length).toBeLessThan(8_000)
+  })
+
+  it('keeps the state size independent of the turn\'s payload size', async () => {
+    const stateSize = async (payloadBytes: number): Promise<number> => {
+      const { ctx, session } = await harness()
+      session.append('turn/start', { turn: 1 })
+      for (let step = 1; step <= 5; step++) {
+        session.append('step/start', { turn: 1, step })
+        const source = session.append('assistant/chunk', {
+          turn: 1,
+          step,
+          chunk: { type: 'usage', usage: { inputTokens: 10, outputTokens: 1, totalTokens: 11 } },
+        }).seq
+        session.append('assistant/message', {
+          turn: 1,
+          step,
+          message: createMessage({
+            role: 'assistant',
+            content: [{ type: 'text', text: 'x'.repeat(payloadBytes) }],
+            source: { kind: 'model', provider: 'mock', model: 'mock' },
+          }),
+          usage: { inputTokens: 10, outputTokens: 1, totalTokens: 11 },
+        }, { surfaceOp: 'append', sourceEventSeqs: [source] })
+        session.append('step/end', { turn: 1, step })
+      }
+      const row = ctx.sessionProjections.checkpoint(session).turnUsage
+      return JSON.stringify(row?.val).length
+    }
+
+    // Same turn shape, 400× the payload: nothing an event carries may reach the
+    // state, or a long turn's checkpoint grows with its log again.
+    const small = await stateSize(1_000)
+    const large = await stateSize(400_000)
+    expect(large - small).toBeLessThan(1_000)
+  })
+
+  it('round-trips an open turn\'s fold through the durable document', async () => {
+    const { ctx, session } = await harness()
+    session.append('turn/start', { turn: 1 })
+    session.append('step/start', { turn: 1, step: 1 })
+    const usage = { inputTokens: 10, outputTokens: 1, totalTokens: 11 }
+    session.append('assistant/chunk', { turn: 1, step: 1, chunk: { type: 'usage', usage } })
+
+    const row = JSON.parse(JSON.stringify(
+      ctx.sessionProjections.checkpoint(session).turnUsage,
+    )) as { ver: number; val: unknown }
+    expect(row.ver).toBe(2)
+
+    // The schema is the durable read boundary: a stored fold must come back as
+    // the fold that keeps folding, not as an approximation of one.
+    const parsed = turnUsageProjectionDefinition.stateSchema.parse(row.val)
+    expect(parsed.open).toEqual({
+      turn: 1,
+      attempt: { kind: 'open', turn: 1, step: 1, sample: usage },
+      attempts: [],
+      sawEnd: false,
+      invalid: false,
     })
   })
 })

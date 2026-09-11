@@ -35,6 +35,7 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionStateMap {
     'cache-test/marks': MarksState
     'cache-test/marks2': Map<string, string>
+    'cache-test/live': { marks: string[] }
     'cache-test/count': number
     'cache-test/secret': string
   }
@@ -84,7 +85,12 @@ const headerOf = (id: SessionId, createdAt = 0, cwd?: string) =>
 
 interface HarnessOptions {
   root?: string
-  config?: { writeEveryEvents: number; writeIntervalMs: number }
+  config?: {
+    writeEveryEvents: number
+    writeIntervalMs: number
+    maxRowBytes?: number
+    budgetBytes?: number
+  }
   stateVersion?: number
 }
 
@@ -187,14 +193,17 @@ describe('SessionProjectionCache write policy', () => {
     }, { inject: ['sessions'] }))
     if (session === undefined) throw new Error('session was not created')
     const created = session
-    mark(created, ['live'])
+    const markSeq = mark(created, ['live']).seq
     await owner.dispose()
     // The disposal write is fire-and-forget over real fs I/O; poll until it is
     // durable instead of trusting a fixed settle, so an aggregate under load
     // cannot starve the drain and turn the assertion into a false negative.
+    // The creation write already left an OLDER cut in this document, so "a row
+    // exists" is satisfied by the cut this test is not asserting; the wait has
+    // to name the disposal cut's watermark.
     const rows = await vi.waitFor(async () => {
       const rows = await storedRows(root, created.id)
-      if (rows?.['cache-test/marks']?.val === undefined) throw new Error('disposal checkpoint is not durable yet')
+      if (rows?.['cache-test/marks']?.seq !== markSeq) throw new Error('disposal checkpoint is not durable yet')
       return rows
     }, { timeout: 5_000, interval: 25 })
     expect(rows['cache-test/marks']?.val).toEqual({ marks: ['live'] })
@@ -258,6 +267,35 @@ describe('SessionProjectionCache write policy', () => {
     await expect(ctx.sessionProjectionCache.write(clean)).rejects.toThrow('not losslessly JSON-serializable')
   })
 
+  it('stores a cut detached from live state, so a later fold cannot rewrite the record', async () => {
+    const { ctx, root } = await harness()
+    // A unit whose state IS an object the test keeps mutating: the registry's
+    // checkpoint is the only thing standing between live state and the stored
+    // record, so this fails the moment that detachment is dropped.
+    let live: { marks: string[] } | null = null
+    ctx.sessionProjections.register({
+      key: 'cache-test/live',
+      stateSchema: z.object({ marks: z.array(z.string()) }),
+      init: () => (live = { marks: [] }),
+      apply: state => state,
+      stateVersion: 1,
+    })
+    const session = ctx.sessions.create(SessionId('detached-write'))
+    await ctx.sessionProjectionCache.write(session)
+    expect((await storedRows(root, session.id))?.['cache-test/live']).toEqual({
+      ver: 1,
+      seq: -1,
+      val: { marks: [] },
+    })
+
+    live!.marks.push('mutated-after-write')
+    expect((await storedRows(root, session.id))?.['cache-test/live']).toEqual({
+      ver: 1,
+      seq: -1,
+      val: { marks: [] },
+    })
+  })
+
   it('plugin disposal clears armed interval timers and leaves cleaned sessions alone', async () => {
     vi.useFakeTimers()
     const { ctx, root, fiber } = await harness({ config: { writeEveryEvents: 100, writeIntervalMs: 5000 } })
@@ -296,9 +334,14 @@ describe('SessionProjectionCache write policy', () => {
     endTurn(session)
     // The write failure is reported through the same fire-and-forget drain;
     // poll instead of trusting a fixed settle so a loaded aggregate cannot
-    // starve the drain and turn the assertion into a false negative.
+    // starve the drain and turn the assertion into a false negative. The
+    // creation write fails against the same blocker and its warning can land
+    // first, so "some warning exists" is satisfied by the write this test is
+    // not asserting; the wait has to name the turn/end warning.
     await vi.waitFor(() => {
-      if (warn.mock.calls.length === 0) throw new Error('failed turn/end write was not logged')
+      if (!warn.mock.calls.some(call => String(call[0]).includes('turn/end write for "fail-soft" failed'))) {
+        throw new Error('failed turn/end write was not logged')
+      }
     }, { timeout: 5_000, interval: 25 })
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('turn/end write for "fail-soft" failed'))
     expect(await storedRows(root, session.id)).toBeUndefined()
@@ -506,7 +549,81 @@ describe('SessionProjectionCache cold-read seeding', () => {
     const meta = headerOf(SessionId('cold-fail'))
     await mkdir(recordPath(root, meta.id), { recursive: true })
     expect(ctx.sessionProjectionCache.coldSnapshot(meta, [])).toBeDefined()
+    // The write-back is fire-and-forget over real fs I/O: poll for the warning
+    // rather than trusting a fixed settle, so a loaded aggregate cannot starve
+    // the drain and turn the assertion into a false negative.
+    await vi.waitFor(() => {
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('cold-read write-back for "cold-fail" failed'))
+    }, { timeout: 5_000, interval: 25 })
+  })
+})
+
+describe('SessionProjectionCache retention policy', () => {
+  it('refuses a row above the row cap, and drops one the medium already holds', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'dsh-projcache-'))
+    roots.push(root)
+    // Stored under an older policy: the open-time sweep is what retires it.
+    await seedRecord(root, 'oversized-stored', {
+      'cache-test/marks': { ver: 1, seq: 0, val: { marks: ['y'.repeat(20_000)] } },
+    })
+    await seedRecord(root, 'ordinary-stored', {
+      'cache-test/marks': { ver: 1, seq: 0, val: { marks: ['keep'] } },
+    })
+    const { ctx } = await harness({
+      root,
+      config: { writeEveryEvents: 100, writeIntervalMs: 60_000, maxRowBytes: 10_000 },
+    })
+    expect(await storedRows(root, SessionId('oversized-stored'))).toBeUndefined()
+    // The sweep is a bound, not a wipe: a row inside the cap keeps its content.
+    expect((await storedRows(root, SessionId('ordinary-stored')))?.['cache-test/marks']?.val)
+      .toEqual({ marks: ['keep'] })
+
+    const session = ctx.sessions.create(SessionId('oversized-live'))
+    mark(session, ['x'.repeat(20_000)])
+    await ctx.sessionProjectionCache.write(session)
+    // The creation write cached a small cut; the oversized one retires it.
+    expect(await storedRows(root, session.id)).toBeUndefined()
+  })
+
+  it('holds the byte budget by dropping cold rows and never a live session\'s row', async () => {
+    const budget = 20_000
+    const { ctx, root } = await harness({
+      config: { writeEveryEvents: 100, writeIntervalMs: 60_000, maxRowBytes: 0, budgetBytes: budget },
+    })
+    // Sessions dispose with their owning fiber: these two become cold together.
+    const cold: Session[] = []
+    const owner = await ctx.plugin(Object.assign((inner: Context) => {
+      cold.push(inner.sessions.create(SessionId('cold-a')))
+      cold.push(inner.sessions.create(SessionId('cold-b')))
+    }, { inject: ['sessions'] }))
+    const live = ctx.sessions.create(SessionId('warm-live'))
+    const payload = 'm'.repeat(8_000)
+    for (const session of [...cold, live]) mark(session, [payload])
+    const [coldA, coldB] = cold
+    if (coldA === undefined || coldB === undefined) throw new Error('cold sessions were not created')
     await settle()
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('cold-read write-back for "cold-fail" failed'))
+    await ctx.sessionProjectionCache.write(coldA)
+    await ctx.sessionProjectionCache.write(coldB)
+    await ctx.sessionProjectionCache.write(live)
+
+    // Every row belongs to an attached session, so nothing is evictable yet:
+    // the budget is soft rather than a reason to drop state in use.
+    expect(await storedRows(root, coldA.id)).toBeDefined()
+    expect(await storedRows(root, coldB.id)).toBeDefined()
+    expect(await storedRows(root, live.id)).toBeDefined()
+
+    await owner.dispose()
+    await vi.waitFor(async () => {
+      const sizes = await Promise.all([coldA.id, coldB.id, live.id].map(async (id) => {
+        try {
+          return (await readFile(recordPath(root, id), 'utf8')).length
+        } catch {
+          return 0
+        }
+      }))
+      expect(sizes.reduce((total, size) => total + size, 0)).toBeLessThanOrEqual(budget)
+    }, { timeout: 5_000, interval: 25 })
+    // The bound was paid for by the cold rows, not by the live session's.
+    expect(await storedRows(root, live.id)).toBeDefined()
   })
 })

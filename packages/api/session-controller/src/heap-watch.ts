@@ -35,9 +35,12 @@ export interface HeapWatchSpec {
   readonly warnRatio: number
   /**
    * Heap snapshots Node keeps when the process nears its heap limit; `0`
-   * disables capture. A deployment choice — capture writes a multi-gigabyte
-   * file into the process working directory and costs a pause at the moment
-   * the process is already under pressure.
+   * disables capture. A deployment choice with a cost worth stating: V8 builds
+   * the snapshot graph synchronously on the main thread before streaming it,
+   * so capture stops the process from serving for as long as the graph takes
+   * to build and grows its footprint by multiples of the heap. At a
+   * multi-gigabyte heap that is an unbounded stall — a crash with a FATAL
+   * ERROR and a watermark curve becomes a hang with neither.
    */
   readonly snapshotNearLimit: number
   /** Retained-work counters read once per sample. */

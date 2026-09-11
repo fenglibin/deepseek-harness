@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { TokenUsage } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
-import { deriveTurnTokenUsage } from '../src/turn-usage.ts'
+import {
+  beginTurnUsageFold,
+  deriveTurnTokenUsage,
+  settleTurnUsageFold,
+  stepTurnUsageFold,
+  type TurnUsageFold,
+} from '../src/turn-usage.ts'
 
 function event(seq: number, type: string, data: unknown): SessionEvent {
   return { seq, time: seq, type, data } as unknown as SessionEvent
@@ -465,5 +471,56 @@ describe('deriveTurnTokenUsage', () => {
   it('requires the complete turn window', () => {
     expect(deriveTurnTokenUsage(completeAttempt(message(3, usage())).slice(1))).toBeUndefined()
     expect(deriveTurnTokenUsage(completeAttempt(message(3, usage())).slice(0, -1))).toBeUndefined()
+  })
+})
+
+describe('turnUsage incremental fold', () => {
+  /** Step one fold through the log, opening it at the log's own `turn/start`. */
+  function foldAll(events: readonly SessionEvent[]): TurnUsageFold | undefined {
+    let fold: TurnUsageFold | undefined
+    for (const entry of events) {
+      if (fold === undefined) {
+        if (entry.type !== 'turn/start') return undefined
+        fold = beginTurnUsageFold(entry.data.turn)
+        continue
+      }
+      fold = stepTurnUsageFold(fold, entry)
+    }
+    return fold
+  }
+
+  it('settles to the same disclosure as the whole-log fold', () => {
+    const complete = completeAttempt(message(3, usage()))
+    const fold = foldAll(complete)
+    expect(fold).toBeDefined()
+    expect(settleTurnUsageFold(fold!)).toEqual(deriveTurnTokenUsage(complete))
+  })
+
+  it('latches invalidity so a later event cannot resurrect a disclosure', () => {
+    let fold = beginTurnUsageFold(1)
+    for (const entry of [
+      event(2, 'step/start', { turn: 1, step: 1 }),
+      // Closing an unsampled attempt is a skip, not a failure.
+      event(3, 'step/end', { turn: 1, step: 1 }),
+      // A second close for the same step is a lifecycle violation.
+      event(4, 'step/end', { turn: 1, step: 1 }),
+      event(5, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+    ]) {
+      fold = stepTurnUsageFold(fold, entry)
+    }
+    expect(fold.invalid).toBe(true)
+    fold = stepTurnUsageFold(fold, event(6, 'turn/start', { turn: 2 }))
+    expect(settleTurnUsageFold(fold)).toBeUndefined()
+  })
+
+  it('retains one entry per closed attempt and discloses nothing before turn/end', () => {
+    const fold = foldAll([
+      event(1, 'turn/start', { turn: 1 }),
+      event(2, 'step/start', { turn: 1, step: 1 }),
+      message(3, usage()),
+    ])
+    expect(fold?.attempts).toHaveLength(1)
+    expect(fold?.sawEnd).toBe(false)
+    expect(settleTurnUsageFold(fold!)).toBeUndefined()
   })
 })

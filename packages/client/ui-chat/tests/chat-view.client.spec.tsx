@@ -19,7 +19,7 @@ import type { SessionPendingInteractionSnapshot } from '@deepseek-ai/dsh-client-
 import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { EMPTY_CONVERSATION_SNAPSHOT } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { TurnOutlineEntry } from '@deepseek-ai/dsh-session-stats/client'
+import type { TurnOutlineEntry, TurnTimingProjection } from '@deepseek-ai/dsh-session-stats/client'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { createChatStore } from '../src/client/stores.ts'
 import { ChatView } from '../src/client/chat/ChatView.tsx'
@@ -99,6 +99,8 @@ type HarnessUpdate = ChatSlice & Partial<SessionSnapshot> & {
   readonly chat?: ChatSnapshot
   /** Whole-log user-turn outline entries; absent means no drawer items. */
   readonly turnOutline?: readonly TurnOutlineEntry[]
+  /** Whole-log per-turn timing facts; absent leaves the window fold answering. */
+  readonly turnTiming?: TurnTimingProjection
 }
 
 /** Scripted Chat target source, independent from Session lifecycle state. */
@@ -212,6 +214,7 @@ function makeHarness(
 ) {
   const {
     chat: initialChat, nodes, partial, runningCalls, turnTimings, turnEnds, turnUsages, turnOutline,
+    turnTiming,
     ...sessionInit
   } = init
   // The drawer reads the whole-log outline independently of the chat
@@ -220,6 +223,9 @@ function makeHarness(
   const outlineStore = createSnapshotStore<{ turns: readonly TurnOutlineEntry[] }>(
     { turns: turnOutline ?? [] },
   )
+  // Whole-log per-turn timing rides its own store, so a scenario can disclose a
+  // turn's wall time while the chat window carries no boundary at all.
+  const timingStore = createSnapshotStore<TurnTimingProjection>(turnTiming ?? { turns: {} })
   const chatSlice: ChatSlice = {
     ...(nodes === undefined ? {} : { nodes }),
     ...(partial === undefined ? {} : { partial }),
@@ -359,10 +365,12 @@ function makeHarness(
       createSnapshotStore<SessionPendingInteractionSnapshot>(new Map()),
     ),
     useWorkspaces: emptyWorkspaces(),
-    useProjection: ((_key: string, selector?: (v: unknown) => unknown) =>
-      bindSnapshotSelector(outlineStore)(s =>
+    useProjection: ((key: string, selector?: (v: unknown) => unknown) => {
+      if (key === 'turnTiming') return bindSnapshotSelector(timingStore)(s => (selector ?? (v => v))(s))
+      return bindSnapshotSelector(outlineStore)(s =>
         (selector ?? (v => v))(s.turns === undefined ? undefined : { turns: s.turns }),
-      )),
+      )
+    }),
     useInput: (() => { throw new Error('unused') }),
     inputActions: {
       setDraft: () => {},
@@ -394,11 +402,13 @@ function makeHarness(
   const set = (next: HarnessUpdate): void => {
     const {
       chat: explicitChat, nodes, partial, runningCalls, turnTimings, turnEnds, turnOutline: newOutline,
+      turnTiming: newTiming,
       ...sessionUpdate
     } = next
     if (newOutline !== undefined) {
       outlineStore.set({ turns: newOutline })
     }
+    if (newTiming !== undefined) timingStore.set(newTiming)
     if (explicitChat !== undefined) chatSource.replace(explicitChat)
     else if (nodes !== undefined || partial !== undefined || runningCalls !== undefined
       || turnTimings !== undefined || turnEnds !== undefined) {
@@ -1562,6 +1572,38 @@ describe('ChatView', () => {
     const view = render(<h.ChatView {...h.props} />)
     // The exact turn/end includes trailing tool activity after the final text.
     expect(view.container.querySelector('[data-turn-tail="1"]')?.textContent).toContain('用时 19秒')
+  })
+
+  it('discloses a turn run time from the whole-log timing when the window carries no boundary', () => {
+    // Regression: the window fold needs the turn's own `turn/start` and
+    // `turn/end`, so a turn whose boundaries were paged out showed no clock
+    // while its usage pill still arrived from the host. The timing projection
+    // answers for every completed turn, keeping the footer legible on all of
+    // them. The closing Assistant deliberately carries no timing of its own, so
+    // every figure below can only have come from the projection.
+    const closing: AssistantMessageNode = {
+      kind: 'assistant', seq: 2, time: 2_000, turn: 1, step: 1, blocks: [{ kind: 'text', text: 'final answer' }],
+    }
+    const h = makeHarness({
+      nodes: [user(1, 'hi'), closing],
+      // Only the closing boundary is loaded, so the window fold can derive no
+      // run time at all — the paged-out `turn/start` case.
+      turnEnds: new Map([[1, 20]]),
+      turnTiming: {
+        turns: {
+          1: { runMs: 62_000, ttftMs: 1_200, tokensPerSecond: 40, peakTokensPerSecond: 55 },
+        },
+      },
+    })
+    const view = render(<h.ChatView {...h.props} />)
+    const tail = view.container.querySelector('[data-turn-tail="1"]')
+    expect(tail).not.toBeNull()
+    expect(tail?.textContent).toContain('用时 1分02秒')
+    fireEvent.click(view.getByRole('button', { name: /用时 1分02秒/ }))
+    const dialog = view.getByRole('dialog')
+    expect(dialog.textContent).toContain('输出速度（TPS）40 tok/s')
+    expect(dialog.textContent).toContain('输出峰值速度（TPS）55 tok/s')
+    expect(dialog.textContent).toContain('首 token 用时（TTFT）1.2秒')
   })
 
   it('the settled footer exposes ttft, decode throughput, and usage as the details trigger', () => {

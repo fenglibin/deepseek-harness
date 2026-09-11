@@ -2,6 +2,8 @@ import { memo, type ReactNode } from 'react'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: the `turnUsage` projection key merge (whole-log per-turn usage).
 import type {} from '@deepseek-ai/dsh-token-meter/client'
+// Type-only: the `turnTiming` projection key merge (whole-log per-turn timing).
+import type {} from '@deepseek-ai/dsh-session-stats/client'
 import type { ChatNodeViewProps, TurnTailOwnerProps } from '../contract/slots.ts'
 import { MessageIconActions } from './MessageIconActions.tsx'
 import { TurnTimePanel, TurnUsagePanel } from './TurnUsagePanel.tsx'
@@ -22,6 +24,12 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
   // window-derived value.
   const projectedUsage = useProjection('turnUsage')
   const tokenUsage = projectedUsage?.turns[String(data.turn)] ?? data.tokenUsage
+  // Whole-log per-turn timing wins over the window fold for the same reason:
+  // a turn whose `turn/start` boundary is paged out still discloses its wall
+  // time, first-token latency, and throughput, while an assembly without the
+  // unit falls back to the window-derived values.
+  const projectedTiming = useProjection('turnTiming')
+  const timing = projectedTiming?.turns[String(data.turn)]
   const hasLaterChatNode = useChat(snapshot =>
     snapshot.locations.getTurn(data.turn).at(-1) !== node.key)
   // Turn-tail rows always disclose their actions: a past turn's billed usage,
@@ -35,9 +43,10 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
   const closing = data.closing
   const owner: TurnTailOwnerProps = { turn, seq: closing?.finalNode.seq ?? data.seq, openFile }
   const tail = renderSlotChain('conversation.chat.turnTail', owner)
-  const runMs = turn.start === undefined || turn.end === undefined
+  const windowRunMs = turn.start === undefined || turn.end === undefined
     ? undefined
     : Math.max(0, turn.end.time - turn.start.time)
+  const runMs = timing?.runMs ?? windowRunMs
   // Usage + time pills survive a turn with no text-bearing Assistant (the
   // error/abort path). They are the only artefacts that disclose without an
   // Assistant text to copy, branch from, or annotate; the parent TurnError
@@ -50,9 +59,9 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
         {runMs !== undefined && (
           <TurnTimePanel
             runMs={runMs}
-            tokensPerSecond={data.tokensPerSecond}
-            peakTokensPerSecond={data.peakTokensPerSecond}
-            ttftMs={data.ttftMs}
+            tokensPerSecond={timing?.tokensPerSecond ?? data.tokensPerSecond}
+            peakTokensPerSecond={timing?.peakTokensPerSecond ?? data.peakTokensPerSecond}
+            ttftMs={timing?.ttftMs ?? data.ttftMs}
             t={t}
           />
         )}

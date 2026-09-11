@@ -96,7 +96,13 @@ export interface Config {
   readonly heapWatchIntervalMs?: number
   /** Share of the V8 heap limit at which the watermark warns instead of reporting at info. */
   readonly heapWatchWarnRatio?: number
-  /** Heap snapshots Node keeps when the process nears its heap limit; `0` disables capture. */
+  /**
+   * Heap snapshots Node keeps when the process nears its heap limit; `0`
+   * disables capture. Capture is synchronous on the main thread and grows the
+   * footprint by multiples of the heap, so at a large heap it stalls the Host
+   * for as long as the snapshot takes to build; the watermark is the
+   * diagnostic that keeps the process serving.
+   */
   readonly heapWatchSnapshotNearLimit?: number
 }
 

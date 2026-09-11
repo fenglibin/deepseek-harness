@@ -18,13 +18,13 @@ Status: implemented
 
 **把三个速率指标移入「本轮用量」面板。** 否决：TTFT 与输出速度已归属用时面板，重复展示会让同一事实有两个出处。峰值与它们同类，归入同一面板。
 
-**新增 host 侧 per-turn 时序投影，按分页安全口径计算峰值。** 否决：现有 TTFT 与平均速度同样走客户端窗口口径（turn 的 `turn/start` 被分页切出窗口时两者都缺失）。为峰值单独引入 host 投影会让同面板三个指标口径不一，收益不抵新增的投影单元、schema 与快照成本。
+**新增 host 侧 per-turn 时序投影，按分页安全口径计算峰值。** 当时否决：现有 TTFT 与平均速度同样走客户端窗口口径，为峰值单独引入 host 投影会让同面板三个指标口径不一。该否决随后被推翻——分页切出的回合边界会让整轮缺少用时，[turnTiming 单元](../bug-fix/2026-09-11-turn-timing-paged-out-boundaries.zh.md)改为让三者一起走全量日志。
 
 ## Consequences
 
 单步骤 turn 的峰值恒等于平均速度：该 turn 只有一次模型调用，没有第二个步骤可供比较。多步骤 turn（发生工具调用）才可能出现峰值高于平均。这是所选口径的固有语义。
 
-峰值随窗口口径伸缩：turn 的 `turn/start` 不在已加载窗口内时，与 TTFT、平均速度一样不显示。
+峰值与同面板的 TTFT、平均速度同源：三者都由 `turnTiming` 单元按全量日志披露，见[分页切出的回合边界不再让该轮缺少用时](../bug-fix/2026-09-11-turn-timing-paged-out-boundaries.zh.md)。
 
 ## Testing
 

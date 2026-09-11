@@ -55,11 +55,36 @@ export interface TurnOutlineProjection {
   turns: readonly TurnOutlineEntry[]
 }
 
+/**
+ * One completed turn's timing and decode throughput, folded from the complete
+ * durable log rather than from the events a client happens to have paged in.
+ */
+export interface TurnTimingEntry {
+  /** `turn/start` → `turn/end` wall time, ms. */
+  runMs: number
+  /** Lowest step's `step/start` → first token, ms; absent when unrecorded. */
+  ttftMs?: number
+  /** Summed provider output tokens per second of decode over steps reporting both. */
+  tokensPerSecond?: number
+  /** Highest single-step decode throughput; equals `tokensPerSecond` on a one-step turn. */
+  peakTokensPerSecond?: number
+}
+
+/**
+ * Whole-log timing and decode throughput per turn, keyed by turn number. A turn
+ * whose boundaries lie outside a client's loaded window still discloses here.
+ */
+export interface TurnTimingProjection {
+  turns: Record<string, TurnTimingEntry>
+}
+
 declare module '@deepseek-ai/dsh-session-projection/types' {
   interface SessionProjectionMap {
     /** Whole-log turn/step counts and wall times; see {@link SessionStatsProjection}. */
     sessionStats: SessionStatsProjection
     /** Whole-log user-turn outline (turn + prompt); see {@link TurnOutlineProjection}. */
     turnOutline: TurnOutlineProjection
+    /** Whole-log per-turn timing and throughput; see {@link TurnTimingProjection}. */
+    turnTiming: TurnTimingProjection
   }
 }

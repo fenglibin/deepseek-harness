@@ -18,7 +18,7 @@
 
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { snapshotJsonValue } from '@deepseek-ai/dsh-util-values'
+import { isJsonValue } from '@deepseek-ai/dsh-util-values'
 import type { Session, SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type {
   ProjectionCheckpoint,
@@ -50,12 +50,57 @@ export interface Config {
   writeEveryEvents: number
   /** Longest time (milliseconds) a dirty checkpoint may stay unwritten between mandatory points. */
   writeIntervalMs: number
+  /**
+   * Largest checkpoint document worth caching, in estimated JSON bytes; `0`
+   * caches any size, and an absent value uses {@link DEFAULT_MAX_ROW_BYTES}.
+   * A larger row is never written and an already-stored one is dropped. One
+   * row is resident for every session the medium holds, so this is the bound
+   * that keeps one pathological projection state from costing its whole size
+   * per session.
+   */
+  maxRowBytes?: number
+  /**
+   * Total resident checkpoint bytes the cache keeps; `0` keeps every row, and
+   * an absent value uses {@link DEFAULT_BUDGET_BYTES}. Over budget, the
+   * coldest rows are dropped, which is what makes this service's memory a
+   * budget rather than a function of the session count. A row whose session is
+   * still attached is never a victim, so the budget is soft while every row
+   * belongs to a live session.
+   */
+  budgetBytes?: number
 }
+
+/** Default per-row cap: generous for a projection state, far below a session's own log. */
+export const DEFAULT_MAX_ROW_BYTES = 4 * 1024 * 1024
+
+/** Default resident budget: holds every ordinary deployment's rows, and far less than the heap. */
+export const DEFAULT_BUDGET_BYTES = 64 * 1024 * 1024
 
 export const Config: z<Config> = z.object({
   writeEveryEvents: z.natural().min(1).required(),
   writeIntervalMs: z.natural().min(1).required(),
+  maxRowBytes: z.natural().default(DEFAULT_MAX_ROW_BYTES),
+  budgetBytes: z.natural().default(DEFAULT_BUDGET_BYTES),
 })
+
+/** Retention policy with both optional fields resolved onto their defaults. */
+interface RetentionPolicy {
+  readonly maxRowBytes: number
+  readonly budgetBytes: number
+}
+
+/**
+ * Resolve the optional retention fields once, at construction, so every use
+ * site reads the same policy instead of repeating a fallback.
+ * @param config - the plugin config as loaded.
+ * @returns the resolved per-row cap and resident budget.
+ */
+function resolveRetention(config: Config): RetentionPolicy {
+  return {
+    maxRowBytes: config.maxRowBytes ?? DEFAULT_MAX_ROW_BYTES,
+    budgetBytes: config.budgetBytes ?? DEFAULT_BUDGET_BYTES,
+  }
+}
 
 /** Per-session write-behind bookkeeping (live sessions only; dropped at retire). */
 interface DirtyState {
@@ -81,16 +126,24 @@ export class SessionProjectionCache extends Service {
 
   private table?: KvTable<SessionId, CheckpointRecord>
   private readonly dirty = new Map<Session, DirtyState>()
+  /** Estimated resident bytes per cached row. */
+  private readonly sizes = new Map<SessionId, number>()
+  /** Last-touch order per cached row; higher is warmer. */
+  private readonly touched = new Map<SessionId, number>()
+  private readonly retention: RetentionPolicy
+  private clock = 0
 
   constructor(ctx: Context, public config: Config) {
     super(ctx, 'sessionProjectionCache')
+    this.retention = resolveRetention(config)
   }
 
-  /** Open the domain and install the write-behind listeners. */
+  /** Open the domain, bring already-stored rows inside the budget, then install the write-behind listeners. */
   protected async [Service.init](): Promise<void> {
     const domain = await this.ctx.storageDomain.open(projectionCacheDomainSpec)
     this.ctx.effect(() => () => domain.close(), 'sessionProjectionCache.domainClose')
     this.table = domain.table('sessions')
+    await this.sweep()
     this.installWritePath()
   }
 
@@ -223,6 +276,7 @@ export class SessionProjectionCache extends Service {
    * @returns whether a row existed.
    */
   async remove(id: SessionId): Promise<boolean> {
+    this.forget(id)
     return await this.requireTable().delete(id)
   }
 
@@ -306,13 +360,107 @@ export class SessionProjectionCache extends Service {
     }
   }
 
-  /** Replace one session's stored record with its log identity and a detached snapshot of `rows`. */
+  /**
+   * Replace one session's stored record with its log identity and `rows`.
+   *
+   * `rows` must already be detached from live unit state — the domain stores
+   * the object itself, so a shared reference would let later folds mutate a
+   * stored record. Both callers satisfy that: {@link write} passes the
+   * registry's checkpoint (a structured clone) and {@link coldSnapshot}
+   * passes a restore's freshly folded values.
+   *
+   * This therefore CHECKS the plain-JSON contract instead of re-cloning for
+   * it. Detaching again here would be a second full copy of a value that a
+   * turn-spanning projection can grow to tens of megabytes, allocated on
+   * every throttled write.
+   * @param id - the session whose record is replaced.
+   * @param identity - the log identity the rows were folded from.
+   * @param rows - the complete per-session checkpoint cut, already detached.
+   * @throws TypeError when a unit state violates the plain-JSON contract.
+   */
   private async put(id: SessionId, identity: CheckpointIdentity, rows: ProjectionCheckpoint): Promise<void> {
-    const detached = snapshotJsonValue(rows)
-    if (detached === undefined) {
+    if (!isJsonValue(rows)) {
       throw new TypeError('projection checkpoint is not losslessly JSON-serializable (a unit state violates the plain-JSON contract)')
     }
-    await this.requireTable().put(id, { identity, rows: detached as CheckpointRecord['rows'] })
+    const size = estimateRecordBytes(rows)
+    if (this.retention.maxRowBytes > 0 && size > this.retention.maxRowBytes) {
+      // Not a failure: the cache is a fold shortcut, so a row that costs more
+      // resident memory than the tail replay it saves is simply not cached.
+      this.ctx.logger.warn(
+        `session projection cache: checkpoint for "${id}" is about ${size} bytes, above the `
+        + `${this.retention.maxRowBytes}-byte row cap; not cached (the next cold read refolds the log)`,
+      )
+      await this.drop(id)
+      return
+    }
+    await this.requireTable().put(id, { identity, rows: rows as CheckpointRecord['rows'] })
+    this.sizes.set(id, size)
+    this.touched.set(id, ++this.clock)
+    await this.enforceBudget(id)
+  }
+
+  /**
+   * Bring already-stored rows inside the policy at open: drop the ones above
+   * the row cap, then hold the budget. Startup is the only moment an operator
+   * can act on a cache that grew under an older policy, so the sweep is what
+   * makes a lowered cap or budget take effect on the rows already on the
+   * medium.
+   */
+  private async sweep(): Promise<void> {
+    for (const [id, record] of [...this.requireTable().entries()]) {
+      const size = estimateRecordBytes(record)
+      if (this.retention.maxRowBytes > 0 && size > this.retention.maxRowBytes) {
+        await this.drop(id)
+        continue
+      }
+      this.sizes.set(id, size)
+      this.touched.set(id, ++this.clock)
+    }
+    await this.enforceBudget()
+  }
+
+  /**
+   * Drop the coldest rows until the resident total fits the budget.
+   *
+   * Two rows are never victims. One whose session is still attached: the next
+   * checkpoint would immediately rewrite it, so evicting it trades a bounded
+   * budget for write churn. And the row just written, which would otherwise be
+   * deleted in the same breath as its write. With no other candidate the
+   * budget stays soft — the alternative is evicting state a session is using.
+   * @param spare - the row the caller just wrote, if any.
+   */
+  private async enforceBudget(spare?: SessionId): Promise<void> {
+    const budget = this.retention.budgetBytes
+    if (budget <= 0) return
+    let resident = this.residentBytes()
+    if (resident <= budget) return
+    const coldest = [...this.sizes.keys()]
+      .filter(id => id !== spare && this.ctx.sessions.get(id) === undefined)
+      .sort((left, right) => (this.touched.get(left) ?? 0) - (this.touched.get(right) ?? 0))
+    for (const id of coldest) {
+      if (resident <= budget) return
+      resident -= this.sizes.get(id) ?? 0
+      await this.drop(id)
+    }
+  }
+
+  /** Sum the tracked sizes of every cached row. */
+  private residentBytes(): number {
+    let total = 0
+    for (const size of this.sizes.values()) total += size
+    return total
+  }
+
+  /** Drop one session's cached row and its accounting. */
+  private async drop(id: SessionId): Promise<void> {
+    this.forget(id)
+    await this.requireTable().delete(id)
+  }
+
+  /** Drop one session's accounting without touching the medium. */
+  private forget(id: SessionId): void {
+    this.sizes.delete(id)
+    this.touched.delete(id)
   }
 
   private requireTable(): KvTable<SessionId, CheckpointRecord> {
@@ -330,6 +478,35 @@ function identityOf(header: SessionHeader): CheckpointIdentity {
 /** Whether a stored record's bound identity names the caller's lifecycle. */
 function identityMatches(stored: CheckpointIdentity, expected: CheckpointIdentity): boolean {
   return stored.createdAt === expected.createdAt && stored.cwd === expected.cwd
+}
+
+/** Bytes one JSON value contributes beyond its own payload. */
+const VALUE_BYTES = 16
+
+/**
+ * Estimate the bytes one checkpoint record occupies once resident, without
+ * serializing it.
+ *
+ * The figure only has to rank and bound rows, so it counts each value's own
+ * payload — a string's UTF-8 length, plus a fixed per-value and per-key
+ * overhead — and never allocates. Serializing instead would cost exactly the
+ * multi-megabyte string this bound exists to avoid.
+ * @param value - the checkpoint record to measure.
+ * @returns an approximate resident byte count for the value.
+ */
+function estimateRecordBytes(value: unknown): number {
+  if (typeof value === 'string') return VALUE_BYTES + Buffer.byteLength(value, 'utf8')
+  if (value === null || typeof value !== 'object') return VALUE_BYTES
+  if (Array.isArray(value)) {
+    let total = VALUE_BYTES
+    for (const entry of value) total += estimateRecordBytes(entry)
+    return total
+  }
+  let total = VALUE_BYTES
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    total += VALUE_BYTES + Buffer.byteLength(key, 'utf8') + estimateRecordBytes(entry)
+  }
+  return total
 }
 
 export default SessionProjectionCache

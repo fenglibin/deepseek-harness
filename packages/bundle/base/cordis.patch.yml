@@ -204,12 +204,18 @@
     # Persisted projection cache: throttled write-behind over the
     # session_projcache domain (per-record layout — one version-stamped
     # checkpoint document per session), serving the session listing's
-    # projection column.
+    # projection column. The per-record layout keeps one row resident per
+    # stored session, so the two retention fields below are stated here: a
+    # projection state that grows with its session must not be cached at any
+    # size, and the resident total must be a budget rather than a function of
+    # how many sessions the medium happens to hold.
     - id: session-projection-cache
       name: '@deepseek-ai/dsh-session-projection-cache'
       config:
         writeEveryEvents: 200
         writeIntervalMs: 5000
+        maxRowBytes: 4194304
+        budgetBytes: 67108864
 
     # Session telemetry defaults to feedback-gated sharing: FEEDBACK_ONLY
     # uploads only when the user records /feedback, releasing the session

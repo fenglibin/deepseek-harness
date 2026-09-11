@@ -320,7 +320,13 @@ export interface Config {
   readonly heapWatchIntervalMs?: number
   /** Share of the V8 heap limit at which the watermark warns instead of reporting at info. */
   readonly heapWatchWarnRatio?: number
-  /** Heap snapshots Node keeps when the process nears its heap limit; `0` disables capture. */
+  /**
+   * Heap snapshots Node keeps when the process nears its heap limit; `0`
+   * disables capture. Capture is synchronous on the main thread and grows the
+   * footprint by multiples of the heap, so at a large heap it stalls the Host
+   * for as long as the snapshot takes to build; the watermark is the
+   * diagnostic that keeps the process serving.
+   */
   readonly heapWatchSnapshotNearLimit?: number
 }
 ```
@@ -2111,6 +2117,22 @@ export interface Config {
   writeEveryEvents: number
   /** Longest time (milliseconds) a dirty checkpoint may stay unwritten between mandatory points. */
   writeIntervalMs: number
+  /**
+   * Largest checkpoint document worth caching, in estimated JSON bytes; `0`
+   * caches any size. A larger row is never written and an already-stored one
+   * is dropped. One row is resident for every session the medium holds, so
+   * this is the bound that keeps one pathological projection state from
+   * costing its whole size per session.
+   */
+  maxRowBytes: number
+  /**
+   * Total resident checkpoint bytes the cache keeps; `0` keeps every row.
+   * Over budget, the coldest rows are dropped, which is what makes this
+   * service's memory a budget rather than a function of the session count. A
+   * row whose session is still attached is never a victim, so the budget is
+   * soft while every row belongs to a live session.
+   */
+  budgetBytes: number
 }
 ```
 
