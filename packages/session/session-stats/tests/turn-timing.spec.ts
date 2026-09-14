@@ -162,6 +162,44 @@ describe('turnTiming fold (controlled timestamps)', () => {
       at(600, 'step/end', { turn: 1, step: 1 }),
     ])).toEqual({ turns: {} })
   })
+
+  it('keeps the checkpoint state proportional to steps, not stream events', () => {
+    // 一个回合、一个 step、5000 个流式 chunk：状态必须只保留 step 边界，而不是这 5000 个事件。
+    const events: SessionEvent[] = [at(1_000, 'turn/start', { turn: 1 })]
+    events.push(at(1_000, 'step/start', { turn: 1, step: 1 }))
+    for (let index = 0; index < 5000; index++) {
+      events.push(at(1_001 + index, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'x' } }))
+    }
+    events.push(at(6_001, 'assistant/message', { turn: 1, step: 1, message, usage: { inputTokens: 1, outputTokens: 5000 } }))
+    events.push(at(6_002, 'step/end', { turn: 1, step: 1 }))
+    events.push(at(7_000, 'turn/end', { turn: 1, reason: { kind: 'completed' } }))
+
+    const state = events.reduce<Parameters<typeof turnTimingProjectionDefinition.apply>[0]>(
+      (folded, event) => turnTimingProjectionDefinition.apply(folded, event),
+      turnTimingProjectionDefinition.init(),
+    )
+    expect(JSON.stringify(state).length).toBeLessThan(1_000)
+  })
+
+  it('discloses the same entries the whole-log reference fold derives across turns', () => {
+    const events: SessionEvent[] = [
+      at(1_000, 'turn/start', { turn: 1 }),
+      at(1_000, 'step/start', { turn: 1, step: 1 }),
+      at(1_800, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'a' } }),
+      at(4_800, 'assistant/message', { turn: 1, step: 1, message, usage: { inputTokens: 10, outputTokens: 60 } }),
+      at(4_900, 'step/end', { turn: 1, step: 1 }),
+      at(9_000, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+      at(10_000, 'turn/start', { turn: 2 }),
+      at(10_000, 'step/start', { turn: 2, step: 1 }),
+      at(10_200, 'assistant/chunk', { turn: 2, step: 1, chunk: { type: 'text-delta', index: 0, text: 'b' } }),
+      at(12_000, 'assistant/message', { turn: 2, step: 1, message, usage: { inputTokens: 1, outputTokens: 40 } }),
+      at(12_100, 'step/end', { turn: 2, step: 1 }),
+      at(14_000, 'turn/end', { turn: 2, reason: { kind: 'completed' } }),
+    ]
+    const projected = fold(events)
+    expect(projected.turns['1']).toEqual(deriveTurnTiming(events.slice(0, 6)))
+    expect(projected.turns['2']).toEqual(deriveTurnTiming(events.slice(6)))
+  })
 })
 
 describe('turnTiming projection unit (registry drive)', () => {

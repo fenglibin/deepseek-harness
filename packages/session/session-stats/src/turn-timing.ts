@@ -9,6 +9,14 @@
  * complete durable log on the host instead, so a turn's timing is available
  * regardless of how much history the client has loaded.
  *
+ * The fold state is incremental — one {@link StepTiming} entry per `step/start`,
+ * advanced in place per event — and holds no raw events. That is a hard
+ * requirement of this unit, not a micro-optimization: this state is
+ * checkpointed to the projection cache, so an event-proportional state would
+ * put a whole session's log in every checkpoint document. A turn can span an
+ * entire session (one prompt, one long autonomous run), which is exactly the
+ * shape that made the former raw-event buffer unbounded and O(n²).
+ *
  * @module @deepseek-ai/dsh-session-stats/turn-timing
  */
 
@@ -18,13 +26,17 @@ import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
 import { isTokenDelta } from './chunk-delta.ts'
 import type { TurnTimingEntry, TurnTimingProjection } from './types.ts'
 
-/** Fold state: finalized timing plus the in-flight turn's raw event buffer. */
+/** Fold state: finalized timing plus the open turn's incremental step fold. */
 interface TurnTimingState {
   turns: Record<string, TurnTimingEntry>
-  /** Turn number of the open buffer; null between turns. */
+  /** Turn number of the open turn; null between turns. */
   currentTurn: number | null
-  /** Events from the open turn's `turn/start` through its `turn/end`. */
-  buffer: SessionEvent[]
+  /** The open turn's `turn/start` time; null between turns. */
+  turnStart: number | null
+  /** Closed steps in `step/start` order; each new step closes its predecessor. */
+  steps: StepTiming[]
+  /** The open step's boundary facts; null outside a step. */
+  open: StepTiming | null
 }
 
 /** One step's boundary facts accumulated while folding a turn. */
@@ -54,16 +66,26 @@ const turnTimingEntrySchema: z.ZodType<TurnTimingEntry> = z.object({
   ...entry.peakTokensPerSecond === undefined ? {} : { peakTokensPerSecond: entry.peakTokensPerSecond },
 }))
 
+const stepTimingSchema = z.object({
+  step: z.number().int().nonnegative(),
+  startTime: z.number().nonnegative(),
+  firstTokenTime: z.number().nonnegative().nullable(),
+  completedTime: z.number().nonnegative().nullable(),
+  outputTokens: z.number().int().nonnegative().nullable(),
+}).strict()
+
 const turnTimingStateSchema: z.ZodType<TurnTimingState> = z.object({
   turns: z.record(z.string(), turnTimingEntrySchema),
   currentTurn: z.number().int().nonnegative().nullable(),
-  // Session events are already validated at append/restore; the buffer only
-  // asserts array shape and trusts the elements.
-  buffer: z.array(z.unknown()),
-}).strict().transform(({ turns, currentTurn, buffer }) => ({
+  turnStart: z.number().nonnegative().nullable(),
+  steps: z.array(stepTimingSchema),
+  open: stepTimingSchema.nullable(),
+}).strict().transform(({ turns, currentTurn, turnStart, steps, open }) => ({
   turns,
   currentTurn,
-  buffer: buffer as SessionEvent[],
+  turnStart,
+  steps,
+  open,
 }))
 
 const turnTimingViewSchema: z.ZodType<TurnTimingProjection> = z.object({
@@ -83,7 +105,7 @@ function usageOutputTokens(usage: unknown): number | null {
 }
 
 /**
- * Fold one complete Turn's durable events into its timing facts.
+ * Fold one complete Turn's step facts into its timing entry.
  *
  * Wall time spans `turn/start` → `turn/end`. First-token latency is the turn's
  * lowest step's `step/start` → first token, and throughput divides summed
@@ -91,6 +113,45 @@ function usageOutputTokens(usage: unknown): number | null {
  * counting only steps that carry both; the peak is the highest such ratio over
  * a single step. An in-step retry keeps the step's recorded first token, the
  * same way the session fold and the window fold treat it.
+ * @param turnStart - the turn's `turn/start` time.
+ * @param turnEnd - the turn's `turn/end` time.
+ * @param steps - every step opened during the turn, in `step/start` order.
+ * @returns the turn's timing entry.
+ */
+function settleTurnTiming(turnStart: number, turnEnd: number, steps: readonly StepTiming[]): TurnTimingEntry {
+  const entry: TurnTimingEntry = { runMs: Math.max(0, turnEnd - turnStart) }
+  let lowest: StepTiming | undefined
+  let decodeMs = 0
+  let outputTokens = 0
+  let sampled = false
+  let peak: number | undefined
+  for (const step of steps) {
+    if (lowest === undefined || step.step < lowest.step) lowest = step
+    if (step.firstTokenTime === null || step.completedTime === null || step.outputTokens === null) continue
+    const decode = Math.max(0, step.completedTime - step.firstTokenTime)
+    decodeMs += decode
+    outputTokens += step.outputTokens
+    sampled = true
+    if (decode > 0) {
+      const rate = step.outputTokens / (decode / 1000)
+      peak = peak === undefined ? rate : Math.max(peak, rate)
+    }
+  }
+  if (lowest !== undefined && lowest.firstTokenTime !== null) {
+    entry.ttftMs = Math.max(0, lowest.firstTokenTime - lowest.startTime)
+  }
+  if (sampled && decodeMs > 0) entry.tokensPerSecond = outputTokens / (decodeMs / 1000)
+  if (peak !== undefined) entry.peakTokensPerSecond = peak
+  return entry
+}
+
+/**
+ * Fold one complete Turn's durable events into its timing facts.
+ *
+ * This is the whole-log reference fold: it buffers the turn's steps and reads
+ * the result in one pass, so tests can prove the incremental projection unit
+ * stays equivalent to it. The projection unit itself folds per event and never
+ * retains the events.
  * @param events - Turn-local durable events from `turn/start` through `turn/end`.
  * @returns the turn's timing, or undefined when its boundaries are missing.
  */
@@ -130,67 +191,82 @@ export function deriveTurnTiming(events: readonly SessionEvent[]): TurnTimingEnt
     }
   }
   if (turnStart === undefined || turnEnd === undefined) return undefined
-
-  const entry: TurnTimingEntry = { runMs: Math.max(0, turnEnd - turnStart) }
-  let lowest: StepTiming | undefined
-  let decodeMs = 0
-  let outputTokens = 0
-  let sampled = false
-  let peak: number | undefined
-  for (const step of steps) {
-    if (lowest === undefined || step.step < lowest.step) lowest = step
-    if (step.firstTokenTime === null || step.completedTime === null || step.outputTokens === null) continue
-    const decode = Math.max(0, step.completedTime - step.firstTokenTime)
-    decodeMs += decode
-    outputTokens += step.outputTokens
-    sampled = true
-    if (decode > 0) {
-      const rate = step.outputTokens / (decode / 1000)
-      peak = peak === undefined ? rate : Math.max(peak, rate)
-    }
-  }
-  if (lowest !== undefined && lowest.firstTokenTime !== null) {
-    entry.ttftMs = Math.max(0, lowest.firstTokenTime - lowest.startTime)
-  }
-  if (sampled && decodeMs > 0) entry.tokensPerSecond = outputTokens / (decodeMs / 1000)
-  if (peak !== undefined) entry.peakTokensPerSecond = peak
-  return entry
-}
-
-/** Empty in-flight buffer fold (the persisted-cache precondition). */
-function emptyBuffer(): SessionEvent[] {
-  return []
+  return settleTurnTiming(turnStart, turnEnd, steps)
 }
 
 /**
  * Session-stats' per-turn timing projection unit.
  *
- * The buffer carries every event between a turn's `turn/start` and `turn/end`;
- * at `turn/end` the buffered events fold into that turn's timing facts. An
- * event outside any turn leaves the state untouched, and a turn whose
+ * A `turn/start` opens the turn, each `step/start` opens a step (closing the
+ * previous one), `assistant/chunk` records the first token, and
+ * `assistant/message` records the decode completion. At `turn/end` the step
+ * facts fold into that turn's timing entry and the per-step state is dropped.
+ * An event outside any turn leaves the state untouched, and a turn whose
  * boundaries never both land is absent from the map.
  */
 export const turnTimingProjectionDefinition = {
   key: 'turnTiming',
-  stateVersion: 1,
+  stateVersion: 2,
   stateSchema: turnTimingStateSchema,
-  init: () => ({ turns: {}, currentTurn: null, buffer: emptyBuffer() }),
+  init: () => ({ turns: {}, currentTurn: null, turnStart: null, steps: [], open: null }),
   apply: (state, event) => {
     if (event.type === 'turn/start') {
-      return { turns: state.turns, currentTurn: event.data.turn, buffer: [event] }
+      return { turns: state.turns, currentTurn: event.data.turn, turnStart: event.time, steps: [], open: null }
     }
     if (state.currentTurn === null) return state
     if (event.type === 'turn/end') {
-      const timing = deriveTurnTiming([...state.buffer, event])
+      const turnStart = state.turnStart
+      const timing = turnStart === null
+        ? undefined
+        : settleTurnTiming(turnStart, event.time, state.open === null ? state.steps : [...state.steps, state.open])
       return timing === undefined
-        ? { turns: state.turns, currentTurn: null, buffer: emptyBuffer() }
+        ? { turns: state.turns, currentTurn: null, turnStart: null, steps: [], open: null }
         : {
           turns: { ...state.turns, [String(state.currentTurn)]: timing },
           currentTurn: null,
-          buffer: emptyBuffer(),
+          turnStart: null,
+          steps: [],
+          open: null,
         }
     }
-    return { ...state, buffer: [...state.buffer, event] }
+    if (event.type === 'step/start') {
+      const open: StepTiming = {
+        step: event.data.step,
+        startTime: event.time,
+        firstTokenTime: null,
+        completedTime: null,
+        outputTokens: null,
+      }
+      return {
+        turns: state.turns,
+        currentTurn: state.currentTurn,
+        turnStart: state.turnStart,
+        steps: state.open === null ? state.steps : [...state.steps, state.open],
+        open,
+      }
+    }
+    const open = state.open
+    if (open === null) return state
+    if (event.type === 'assistant/chunk') {
+      if (open.firstTokenTime !== null || !isTokenDelta(event.data.chunk)) return state
+      return {
+        turns: state.turns,
+        currentTurn: state.currentTurn,
+        turnStart: state.turnStart,
+        steps: state.steps,
+        open: { ...open, firstTokenTime: event.time },
+      }
+    }
+    if (event.type === 'assistant/message') {
+      return {
+        turns: state.turns,
+        currentTurn: state.currentTurn,
+        turnStart: state.turnStart,
+        steps: state.steps,
+        open: { ...open, completedTime: event.time, outputTokens: usageOutputTokens(event.data.usage) },
+      }
+    }
+    return state
   },
   wire: { viewSchema: turnTimingViewSchema, view: state => ({ turns: state.turns }) },
 } satisfies ProjectionDefinition<'turnTiming', TurnTimingState>
