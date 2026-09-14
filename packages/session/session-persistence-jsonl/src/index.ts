@@ -45,11 +45,67 @@ const DEFAULT_COMPRESSION: JsonlCompression = 'zstd'
  */
 const ZSTD_DECODE_YIELD_INTERVAL_MS = 500
 
+/**
+ * Internal scheduling constant, not deployment configuration: the bounded
+ * fan-out for the per-session-directory I/O in `listArtifacts`. An unbounded
+ * fan-out over a large session root exhausts the process file-descriptor table
+ * (EMFILE) instead of failing for a reason a caller can act on. The per-item
+ * work here is one `readdir` or one header read — far lighter than a full-log
+ * `inspect`, so this bound sits above the corpus inspection concurrency.
+ */
+const LIST_ARTIFACT_CONCURRENCY = 8
+
 /** Assert that the independently decodable first frame contains only the header record. */
 function assertZstdHeaderFrame(plaintext: Buffer): void {
   if (plaintext.length === 0 || plaintext.indexOf(0x0A) !== plaintext.length - 1) {
     throw new Error('corrupt Zstandard session log: first frame is not exactly one header line')
   }
+}
+
+/**
+ * Map `items` through `fn` with at most `limit` calls in flight, preserving
+ * input order in the results.
+ *
+ * A rejection is reported from the LOWEST input index that rejected, not the
+ * one that happened to settle first: callers use this where diagnostics matter
+ * (a store holding several distinct faults must report the same one on every
+ * run), so completion order is deliberately not observable. Settling every
+ * item before reporting is what makes that true; the cost is that one slow
+ * item delays a fault a faster item already found.
+ * @param items - inputs to map, in the order results are returned.
+ * @param limit - maximum concurrent `fn` calls; at least 1.
+ * @param fn - one async operation per item.
+ * @returns one result per item, in input order.
+ */
+async function mapBounded<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let cursor = 0
+  let firstFailure: { index: number; reason: unknown } | undefined
+  const worker = async (): Promise<void> => {
+    for (;;) {
+      const index = cursor
+      if (index >= items.length) return
+      cursor += 1
+      try {
+        results[index] = await fn(items[index] as T, index)
+      } catch (reason: unknown) {
+        if (firstFailure === undefined || index < firstFailure.index) {
+          firstFailure = { index, reason }
+        }
+      }
+    }
+  }
+  const workers = Array.from(
+    { length: Math.max(1, Math.min(limit, items.length)) },
+    () => worker(),
+  )
+  await Promise.all(workers)
+  if (firstFailure !== undefined) throw firstFailure.reason
+  return results
 }
 
 /** Loader schema for the JSONL artifact's physical encoding. */
@@ -506,43 +562,99 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     return snapshots
   }
 
+  /**
+   * Enumerate every stored session's artifact with its parsed header.
+   *
+   * Three ordered phases, and the order is load-bearing for diagnostics:
+   *
+   * 1. The root and project directories are walked serially, so a root that is
+   *    not a directory, or a project holding an obsolete flat-file artifact,
+   *    still rejects before any per-session work starts.
+   * 2. Each session directory is read once with `readdir`, which yields in one
+   *    call what the previous shape needed three `open()` probes for: whether
+   *    this backend's log is present, whether the opposite physical encoding is
+   *    present (a fatal mismatch), and the entry's file-ness. That replaces
+   *    `{@link exists}` here; the probe stays for paths whose parent may not
+   *    exist.
+   * 3. Only the surviving header reads fan out, bounded by
+   *    {@link LIST_ARTIFACT_CONCURRENCY}. A structural fault found in phase 2
+   *    therefore always precedes a header fault, so one corrupt store reports
+   *    the same failure on every run instead of racing it against a concurrent
+   *    header read.
+   *
+   * Phase 2 makes {@link ensureRootEncoding} redundant here: the walk it would
+   * run checks exactly the condition `sessionLogPath` already rejects, in the
+   * same order and with the same error, so awaiting it would only add one
+   * `open()` per session directory before the real work. It stays on the
+   * targeted paths (`loadStored`, `readRaw`, `deleteStored`), where one id is
+   * resolved without walking the root.
+   * @param signal - optional cancellation for the walk and every header read.
+   * @returns one header and artifact path per stored session.
+   */
   private async listArtifacts(signal?: AbortSignal): Promise<Array<{ header: SessionHeader; path: string }>> {
     signal?.throwIfAborted()
-    await this.ensureRootEncoding()
-    signal?.throwIfAborted()
-    const artifacts: Array<{ header: SessionHeader; path: string }> = []
-    const ids = new Set<SessionId>()
+    const candidates: string[] = []
     for (const project of await this.listProjectDirs(signal)) {
       signal?.throwIfAborted()
       for (const dir of await this.listSessionDirs(project, signal)) {
         signal?.throwIfAborted()
-        const opposite = join(dir, `session${logSuffix(this.oppositeCompression())}`)
-        const oppositeExists = await this.exists(opposite)
-        signal?.throwIfAborted()
-        if (oppositeExists) throw this.encodingMismatch(opposite)
-        const path = join(dir, `session${logSuffix(this.compression)}`)
-        const pathExists = await this.exists(path)
-        signal?.throwIfAborted()
-        if (!pathExists) continue
-        // Read only headers so listing scales with session count, not log size.
-        const first = this.compression === 'zstd'
-          ? await this.readFirstZstdLine(path, signal)
-          : await this.readFirstLine(path, signal)
-        signal?.throwIfAborted()
-        if (first === undefined) continue // empty/half-written file
-        const meta = parseHeaderMeta(first)
-        if (meta === undefined) continue // not a session header
-        await this.assertStoredIdentity(path, meta, undefined, signal)
-        signal?.throwIfAborted()
-        if (ids.has(meta.id)) {
-          throw new Error(`duplicate JSONL session id "${meta.id}" appears in multiple project directories`)
-        }
-        ids.add(meta.id)
-        artifacts.push({ header: meta, path })
+        const path = await this.sessionLogPath(dir, signal)
+        // `sessionLogPath` throws on an opposite-encoding artifact, so an
+        // undefined result here is exactly "this directory holds no log".
+        if (path !== undefined) candidates.push(path)
       }
     }
     signal?.throwIfAborted()
+
+    const artifacts: Array<{ header: SessionHeader; path: string }> = []
+    const ids = new Set<SessionId>()
+    const results = await mapBounded(candidates, LIST_ARTIFACT_CONCURRENCY, async (path) => {
+      // Read only headers so listing scales with session count, not log size.
+      const first = this.compression === 'zstd'
+        ? await this.readFirstZstdLine(path, signal)
+        : await this.readFirstLine(path, signal)
+      signal?.throwIfAborted()
+      if (first === undefined) return undefined // empty/half-written file
+      const meta = parseHeaderMeta(first)
+      if (meta === undefined) return undefined // not a session header
+      await this.assertStoredIdentity(path, meta, undefined, signal)
+      signal?.throwIfAborted()
+      return { header: meta, path }
+    })
+    for (const result of results) {
+      if (result === undefined) continue
+      if (ids.has(result.header.id)) {
+        throw new Error(`duplicate JSONL session id "${result.header.id}" appears in multiple project directories`)
+      }
+      ids.add(result.header.id)
+      artifacts.push(result)
+    }
+    signal?.throwIfAborted()
     return artifacts
+  }
+
+  /**
+   * Resolve one session directory's log path for this backend's encoding, or
+   * `undefined` when the directory holds no such log. A directory holding the
+   * opposite encoding is a fatal root mismatch, never a skip: the artifact is
+   * a session this backend is configured to read, so continuing would silently
+   * report the session as absent.
+   * @param dir - one session-owned directory under a project directory.
+   * @param signal - optional cancellation.
+   * @returns the log path, or `undefined` when this directory has no log.
+   */
+  private async sessionLogPath(dir: string, signal?: AbortSignal): Promise<string | undefined> {
+    const own = `session${logSuffix(this.compression)}`
+    const opposite = `session${logSuffix(this.oppositeCompression())}`
+    const entries = await readdir(dir, { withFileTypes: true })
+    signal?.throwIfAborted()
+    let found = false
+    for (const entry of entries) {
+      if (!entry.isFile()) continue
+      if (entry.name === own) found = true
+      else if (entry.name === opposite) throw this.encodingMismatch(join(dir, entry.name))
+    }
+    return found ? join(dir, own) : undefined
   }
 
   // --- materialization / append / repair (file mechanics) ---

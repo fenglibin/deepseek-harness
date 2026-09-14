@@ -51,6 +51,12 @@ async function bootWeb(
   profileBundles?: readonly string[],
 ): Promise<Context> {
   const storageRoot = join(dirname(settingsFile), 'storages')
+  // Session logs are anchored to the real $DSH_HOME too. Unpinned, every
+  // `SessionId('preset-*')` this file creates materializes a log under the
+  // developer's own `~/.dsh/sessions/_no-cwd/`, where it survives the run and
+  // is listed forever after — these sessions carry no cwd, so no surface ever
+  // shows them and nothing reclaims them.
+  const sessionsRoot = join(dirname(settingsFile), 'sessions')
   const overrides: PatchOptions[] = [
     // The settings row defaults to `$DSH_HOME/settings.yaml`. Left alone it
     // reads the developer's own document — and since the default preset is a
@@ -63,6 +69,7 @@ async function bootWeb(
     // back on the next run, so a stored document from any other build decides
     // this test's boot. Same reason the settings row above is pinned.
     { id: 'storage-json', config: { root: storageRoot } },
+    { id: 'session-persistence-jsonl', config: { root: sessionsRoot } },
     // Host rows with side effects outside this process: a bound port, a served
     // asset tree, a telemetry exporter. `api-gateway` and `directory-picker`
     // stay ENABLED on purpose — the api-proxy is the host row that injects

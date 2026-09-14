@@ -2,20 +2,25 @@
  * Turn-scoped produced-file Definition and readers. Client-only and
  * model-free: the vocabulary comes from successful first-party mutation
  * calls, never presentation data or the closing prose.
+ *
+ * The mutation vocabulary itself is owned by `dsh-file-changes`: its host
+ * `changedFiles` unit folds the same calls over the whole log, and a second
+ * copy of the rules here would have to agree with it forever on what counts as
+ * a mutation.
  */
 import { isAppendSurfaceEvent } from '@deepseek-ai/dsh-session/surface'
+import { mutationTarget, type MutationTarget } from '@deepseek-ai/dsh-file-changes/client'
 import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ConversationNodeDefinition } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
 
-/** A mutation's user-visible kind, for the session-changes surface. */
-export type MutationOperation = 'write' | 'edit'
+export type { MutationOperation } from '@deepseek-ai/dsh-file-changes/client'
 
 interface ProducedPath {
   readonly seq: number
   readonly path: string
   /** `write` (new/overwrite) or `edit` (in-place mutation). */
-  readonly operation: MutationOperation
+  readonly operation: MutationTarget['operation']
 }
 
 /** Immutable produced-file facts published against one Turn. */
@@ -30,104 +35,9 @@ declare module '@deepseek-ai/dsh-client-ui-conversation/client' {
   }
 }
 
-/** Path + operation resolved from one `tool/call`, before its result seq. */
-interface MutationTarget {
-  readonly path: string
-  readonly operation: MutationOperation
-}
-
 interface DeliverablesState extends DeliverablesTurnData {
   readonly turn: number
   readonly calls: ReadonlyMap<string, MutationTarget | null>
-}
-
-/**
- * Extract the path from a supported first-party mutation call. Session
- * `tool/call` events are root calls; Code Dispatch children do not enter this
- * Definition independently.
- * @param name - wire tool name.
- * @param argsRaw - model-produced JSON arguments.
- * @returns the mutation path, or null when the call is not a supported mutation.
- */
-function mutationPath(name: string, argsRaw: string): string | null {
-  let args: unknown
-  try {
-    args = JSON.parse(argsRaw) as unknown
-  } catch {
-    return null
-  }
-  if (!isRecord(args)) return null
-  switch (name) {
-    case 'write':
-      return typeof args.content === 'string' ? pathValue(args.file_path) : null
-    case 'edit':
-      return validEditArgs(args) ? pathValue(args.file_path) : null
-    case 'str_replace_editor':
-      return editorMutationPath(args)
-    default:
-      return null
-  }
-}
-
-/** The user-visible mutation kind for one supported wire tool name. */
-function mutationOperation(name: string): MutationOperation | null {
-  switch (name) {
-    case 'write': return 'write'
-    case 'edit':
-    case 'str_replace_editor': return 'edit'
-    default: return null
-  }
-}
-
-/** Resolve one supported mutation call to its path and operation, else null. */
-function mutationTarget(name: string, argsRaw: string): MutationTarget | null {
-  const path = mutationPath(name, argsRaw)
-  const operation = mutationOperation(name)
-  return path === null || operation === null ? null : { path, operation }
-}
-
-/** Validate the fields that an `edit` execution requires. */
-function validEditArgs(args: Readonly<Record<string, unknown>>): boolean {
-  return typeof args.old_string === 'string'
-    && args.old_string.length > 0
-    && typeof args.new_string === 'string'
-    && args.old_string !== args.new_string
-    && (args.replace_all === undefined || typeof args.replace_all === 'boolean')
-}
-
-/** Extract a path only from a complete mutating editor command. */
-function editorMutationPath(args: Readonly<Record<string, unknown>>): string | null {
-  const path = pathValue(args.path)
-  if (path === null) return null
-  switch (args.command) {
-    case 'create':
-      return typeof args.file_text === 'string' ? path : null
-    case 'str_replace':
-      return typeof args.old_str === 'string'
-        && args.old_str.length > 0
-        && (args.new_str === undefined || typeof args.new_str === 'string')
-        ? path
-        : null
-    case 'insert':
-      return typeof args.insert_line === 'number'
-        && Number.isInteger(args.insert_line)
-        && args.insert_line >= 0
-        && typeof args.new_str === 'string'
-        ? path
-        : null
-    default:
-      return null
-  }
-}
-
-/** A non-blank path preserves the exact spelling supplied to the tool. */
-function pathValue(value: unknown): string | null {
-  return typeof value === 'string' && value.trim().length > 0 ? value : null
-}
-
-/** Narrow parsed JSON to an argument object. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /**

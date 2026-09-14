@@ -85,12 +85,34 @@ describe('directiveText', () => {
     expect(zh).toContain('不是你撰写的既有注释维持其原有语言')
     expect(zh).toContain('字符串字面量')
   })
+
+  it('names the reasoning channel and forbids English-first reasoning', () => {
+    const zh = ResponseLanguage.directiveText('zh')
+    expect(zh).toContain('你的思考过程也用中文')
+    expect(zh).toContain('不要先用英文推理再转述成中文')
+  })
 })
 
 describe('the response-language row', () => {
-  it('defaults to auto and rejects an unknown language', () => {
-    expect(Config()).toEqual({ language: 'auto' })
+  it('defaults to Chinese and rejects an unknown language', () => {
+    expect(Config()).toEqual({ language: 'zh' })
     expect(() => Config({ language: 'de' } as never)).toThrow()
+  })
+
+  it('directs Chinese from the schema default alone, whatever the host locale is', async () => {
+    // The shipped `dsh-base` row passes `zh` explicitly; this case pins the
+    // schema default underneath it, so a deployment mounting the row with no
+    // config at all still answers in Chinese on an English host.
+    const previousLcAll = process.env.LC_ALL
+    process.env.LC_ALL = 'en_US.UTF-8'
+    try {
+      const { ctx, assembly } = await assemble(Config())
+      expect(renderPrompt(assembly)).toContain(ResponseLanguage.directiveText('zh'))
+      await ctx.fiber.dispose()
+    } finally {
+      if (previousLcAll === undefined) delete process.env.LC_ALL
+      else process.env.LC_ALL = previousLcAll
+    }
   })
 
   it('registers the directive directly after the harness identity', async () => {

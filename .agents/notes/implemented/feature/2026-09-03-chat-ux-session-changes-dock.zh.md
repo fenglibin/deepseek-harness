@@ -10,17 +10,23 @@ Status: implemented
 
 新增包 `packages/client/ui-session-changes`，向既有的 `conversation.input.dock`（composer 上方，todo / goal dock 之前）贡献一个 entry。这个 entry 把 per-turn 的 `deliverables` 词汇——`ui-deliverables` 已经从成功的 `write` / `edit` / `str_replace_editor` 调用里累积的产物——折叠成一张会话级、首次出现顺序的列表，并渲染一个可折叠/展开的卡片，带逐个文件的接受按钮和「全部接受」。
 
-**数据层新增了操作类型。** `turn-deliverables.ts` 现在在每个产物路径旁记录 `MutationOperation`（`'write' | 'edit'`）——`write` 映射为 `'write'`，`edit` 和 `str_replace_editor` 映射为 `'edit'`——通过新的 `mutationTarget()` 解析器和 `producedChangesForClosing()` 读取器。既有的 `producedForClosing()` 不变，turn-tail 的 chip 照常工作；`producedChangesForClosing()` 是同样的去重、首次顺序折叠，但返回 `{ path, operation }` 供会话面板使用。
+**数据层新增了操作类型。** `turn-deliverables.ts` 现在在每个产物路径旁记录 `MutationOperation`（`'write' | 'edit'`）——`write` 映射为 `'write'`，`edit` 和 `str_replace_editor` 映射为 `'edit'`——通过新的 `mutationTarget()` 解析器和 `producedChangesForClosing()` 读取器。既有的 `producedForClosing()` 不变，turn-tail 的 chip 照常工作。
 
-**UI 读 conversation，而不是新造一个 projection。** `SessionChangesDock`（adapter）通过 session 标准 `useConversation` 座位订阅，用 `producedChangesForClosing` 折叠 `conversation.views.get('chat').timeline.turns`，再渲染纯组件 `SessionChangesPanel`。面板持有组件本地的接受状态：接受一个文件只是把它从列表移除——磁盘上没有任何变化。纯组件 / adapter 的拆分对齐了 `ui-goal` 的 `GoalBar` / `GoalDock`，让面板可以在不涉及 `InputZone` owner 的情况下测试。
+该词汇此后已上移到宿主包 `dsh-file-changes`（宿主全会话折叠与浏览器轮次折叠共用的唯一一份），`ui-deliverables` 经其 `./client` 出口读取；`producedChangesForClosing` 这个名字已不存在，读取器现在是 `deliverables` 的 `produced` 字段本身。
+
+**UI 读 conversation，而不是新造一个 projection。** `SessionChangesDock`（adapter）通过 session 标准 `useConversation` 座位订阅，折叠 `conversation.views.get('chat').timeline.turns` 里已发布的 `deliverables`，再渲染纯组件 `SessionChangesPanel`。面板持有组件本地的接受状态：接受一个文件只是把它从列表移除——磁盘上没有任何变化。纯组件 / adapter 的拆分对齐了 `ui-goal` 的 `GoalBar` / `GoalDock`，让面板可以在不涉及 `InputZone` owner 的情况下测试。
+
+数据源此后已改：客户端窗口折叠只能看到已加载的分页，长会话会漏掉窗口外的早期改动，因此 dock 现在优先读宿主 `changedFiles` 投影（全会话日志），只在投影缺席时回退到这里的窗口折叠。该决定见 [2026-09-14-session-changed-files-whole-log](2026-09-14-session-changed-files-whole-log.zh.md)；adapter / 纯面板的拆分与组件本地接受状态不变。
 
 **拒绝被有意省略。** FS 工具下没有 per-call 的 prior-content 快照，真正的回滚不可能；确认的范围就是只做接受。
 
+**接受按变更身份记录。** 接受集记的是读者当时看到的那个变更（该文件的 `lastSeq`），不是「这个文件永远不再出现」：该文件此后被成功改动一次就重新回到列表。见 [2026-09-14-session-changed-files-whole-log](2026-09-14-session-changed-files-whole-log.zh.md)。
+
 ## Alternatives considered
 
-**新增 session 级 `ConversationNodeDefinition`。** 否决：`deliverables` 已经通过 `buildLocationData` 发布了 per-turn 的改动，而 assembler 的 start/update 契约没有天然的 session 级 start 事件。在 UI 里折叠已发布的 turn 数据更简单，而且读的是同一份事实来源。
+**新增 session 级 `ConversationNodeDefinition`。** 否决：`deliverables` 已经通过 `buildLocationData` 发布了 per-turn 的改动，而 assembler 的 start/update 契约没有天然的 session 级 start 事件。
 
-**做 session projection（像 `todos`）。** 否决：为单个消费者增加一个 host 侧累积器，而 conversation timeline 已经承载了这些数据。
+**做 session projection（像 `todos`）。** 当时否决：为单个消费者增加一个 host 侧累积器，而 conversation timeline 已经承载了这些数据。**该判断已被推翻**——客户端窗口折叠看不到被分页出去的轮次，全量事实只能由宿主提供，因此现在正是新增了一个 `changedFiles` 投影单元；见 [2026-09-14-session-changed-files-whole-log](2026-09-14-session-changed-files-whole-log.zh.md)。
 
 **接受状态持久化到 settings。** 否决：确认的范围是「仅表面移除」；组件本地状态让改动更小、更可逆。
 
@@ -28,15 +34,14 @@ Status: implemented
 
 ## Consequences
 
-改动过文件的会话现在会显示一个停靠的「本次修改的文件 / Changed files」卡片：折叠时显示数量，展开时逐行列出每个文件（操作 + 接受），带「全部接受」。接受把该条目从表面清除而不动磁盘；全部接受后 dock 消失。列表把「先写入后又编辑」的文件去重为一条首次出现的条目，保留最早的操作类型。每行显示完整路径并可点击打开宿主桌面，折叠键是规范化后的路径——见 [2026-09-08-session-changes-dock-paths](2026-09-08-session-changes-dock-paths.zh.md)。
+改动过文件的会话现在会显示一个停靠的「修改的文件」卡片：折叠时显示数量，展开时逐行列出每个文件（操作 + 接受），带「全部接受」。接受把该条目从表面清除而不动磁盘，并在该文件被再次改动时让它重新出现；全部接受后 dock 消失。列表把「先写入后又编辑」的文件去重为一条首次出现的条目，保留最早的操作类型。每行显示完整路径并可点击打开宿主桌面，折叠键是规范化后的路径——见 [2026-09-08-session-changes-dock-paths](2026-09-08-session-changes-dock-paths.zh.md)。
 
-代价是 composer 上方多了一个 input-dock entry，以及一个组件本地的接受集合——页面刷新后重置（刷新后会重新显示已接受的文件）。这两点都是 v1 的既定取舍。
+代价是 composer 上方多了一个 input-dock entry，以及一个组件本地的接受集合——页面刷新后重置（刷新后会重新显示已接受的文件）。这两点都是 v1 的既定取舍，且此后未变。
 
 ## Testing
 
-- `ui-deliverables/tests/produced-files.client.spec.tsx` —— 新增测试验证 `producedChangesForClosing` 对 `write`、`edit`、`str_replace_editor` 分别记录 `write` / `edit` / `edit`，且对缺失数据返回 `[]`。该包 32 条测试。
-- `ui-session-changes/tests/session-changes-dock.client.spec.tsx` —— 首版 7 条测试：折叠（跨 turn 首次顺序、保留最早操作、无 chat view / 空 timeline / 无 deliverables）、默认折叠后展开、逐个接受、全部接受后隐藏 dock。该文件的后续扩展（路径规范化、点击打开、注册注入）见 [2026-09-08-session-changes-dock-paths](2026-09-08-session-changes-dock-paths.zh.md)。
-- 两个包合计：39 通过，0 失败；lint 0 警告/错误；`tsc -b tsconfig.client.json` 对新包干净。
+- `ui-deliverables/tests/produced-files.client.spec.tsx` —— 验证变更词汇对 `write`、`edit`、`str_replace_editor` 分别记录 `write` / `edit` / `edit`，且对缺失数据返回 `[]`。该包的折叠测试此后随词汇上移，覆盖落在 `dsh-file-changes` 的 `tests/fold.spec.ts`。
+- `ui-session-changes/tests/session-changes-dock.client.spec.tsx` —— 首版 7 条测试：折叠（跨 turn 首次顺序、保留最早操作、无 chat view / 空 timeline / 无 deliverables）、默认折叠后展开、逐个接受、全部接受后隐藏 dock。该文件的后续扩展（路径规范化、点击打开、注册注入）见 [2026-09-08-session-changes-dock-paths](2026-09-08-session-changes-dock-paths.zh.md)；接受语义与投影数据源的重写见 [2026-09-14-session-changed-files-whole-log](2026-09-14-session-changed-files-whole-log.zh.md)（现 39 条）。
 
 ## Deferred
 

@@ -1,12 +1,18 @@
 /**
  * SessionChangesDock: the changed-files list docked above the message composer
- * (input dock strip). It folds the per-turn `deliverables` vocabulary — the
- * successful `write` / `edit` / `str_replace_editor` mutations the agent made
- * this session — into one session-wide, first-seen list, shows each file's
- * full path as an openable row, and lets the user accept a file to clear it
- * from the list. Accepting changes nothing on disk; it is a surface-only
- * dismissal. Reject is deliberately out of scope (no per-call prior-content
- * snapshot exists to roll a file back).
+ * (input dock strip). It shows every file the agent mutated in this Session and
+ * lets the user accept a file to clear it from the list.
+ *
+ * The list's source is the host `changedFiles` projection, which folds the
+ * COMPLETE durable log — a client that has paged in only the tail of a long
+ * Session still sees every changed file. When that projection is absent (a
+ * composition with no projection registry) the dock falls back to folding the
+ * Turns the client has loaded, which is the same shape over a smaller window.
+ *
+ * Accepting changes nothing on disk; it is a surface-only dismissal. Accept is
+ * remembered against the seq of the change the reader saw, so a file the agent
+ * mutates again AFTER the accept returns to the list. Reject is deliberately out
+ * of scope (no per-call prior-content snapshot exists to roll a file back).
  */
 
 import { useCallback, useMemo, useState } from 'react'
@@ -16,14 +22,21 @@ import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversati
 // mutation operation kind. Type imports are erased, so the shared vocabulary
 // reaches this plugin without a cross-plugin value import.
 import type { MutationOperation } from '@deepseek-ai/dsh-client-ui-deliverables/client'
+// Type-only: the `changedFiles` SessionProjectionMap key merge, so
+// `useProjection('changedFiles')` resolves to the whole-log list. The value
+// import of the shared vocabulary rides the same package's `/client` outlet.
+import type {} from '@deepseek-ai/dsh-file-changes/client'
+import { canonicalMutationPath } from '@deepseek-ai/dsh-file-changes/client'
 // Type-only: the `chat` ConversationViewSnapshotMap key merge, so
 // `conversation.views.get('chat')` resolves to the chat snapshot with its timeline.
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
-import { resolveWorkspacePath, workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
+import { workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
 import {
   IconCheckOutline16, IconChevronDownOutline14, IconChevronUpOutline14, IconEditOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import css from './SessionChangesDock.module.css'
+
+export { canonicalMutationPath }
 
 /**
  * Host capability facts the dock registration injects into the entry.
@@ -45,36 +58,25 @@ export interface SessionChangesInjected {
 export type SessionChangesDockProps =
   PropsRuntime<'conversation.input.dock'> & InjectFace<SessionChangesInjected> & PropsLocale<'session-changes'>
 
-/** One session change: the produced path plus its user-visible operation kind. */
-export interface ProducedChange {
+/**
+ * One session change: the produced path, its user-visible operation kind, and
+ * the seq bounds of the mutations that produced it.
+ *
+ * `lastSeq` is what accept acts against: it is the identity of the newest
+ * change the list is showing for this path, so a later mutation is
+ * distinguishable from the one the reader dismissed.
+ */
+export interface SessionChange {
   readonly path: string
   readonly operation: MutationOperation
+  /** Seq of this path's earliest mutation; decides the list's first-seen order. */
+  readonly firstSeq: number
+  /** Seq of this path's latest mutation; what an accept is recorded against. */
+  readonly lastSeq: number
 }
 
-/**
- * Canonical spelling of one mutation path: resolved against the Session
- * Workspace root, with both separators unified to `/` and empty, `.`, and
- * `..` segments collapsed. A Windows drive prefix survives verbatim.
- * Two calls naming the same file with different spellings — once absolute,
- * once Workspace-relative — yield one key, which is what keeps a file from
- * being listed twice.
- * @param path - path exactly as the tool call spelled it.
- * @param cwd - Session Workspace root; absent leaves a relative path relative.
- * @returns the canonical path.
- */
-export function canonicalMutationPath(path: string, cwd: string | undefined): string {
-  const resolved = resolveWorkspacePath(cwd, path)
-  const kept: string[] = []
-  for (const segment of resolved.split(/[/\\]+/)) {
-    if (segment === '' || segment === '.') continue
-    if (segment === '..' && kept.length > 0 && kept[kept.length - 1] !== '..') {
-      kept.pop()
-      continue
-    }
-    kept.push(segment)
-  }
-  return (resolved.startsWith('/') ? '/' : '') + kept.join('/')
-}
+/** Accept bookkeeping: one accepted `lastSeq` per path, owned by the dock adapter. */
+export type AcceptedChanges = Readonly<Record<string, number>>
 
 /** Leading directory of one path, kept with its trailing separator. */
 function directoryOf(path: string): string {
@@ -104,34 +106,82 @@ export function displayPath(path: string, cwd: string | undefined): string {
  * earliest operation kind, and so does a file the model spelled differently
  * across calls. `useConversation` returns a stable reference until the
  * conversation changes, so the memo re-runs only on new material.
+ *
+ * This is the FALLBACK reader: it sees only the Turns the client has paged in,
+ * so a long Session's earlier changes are invisible to it. The `changedFiles`
+ * projection is the primary source; this fold keeps the dock working in a
+ * composition that mounts no projection registry.
  * @param conversation - the current Session's assembled Conversation snapshot.
  * @param cwd - Session Workspace root used to canonicalize relative paths.
  * @returns the session's produced changes in first-seen order.
  */
-export function sessionChanges(conversation: ConversationSnapshot, cwd?: string): readonly ProducedChange[] {
+export function sessionChanges(conversation: ConversationSnapshot, cwd?: string): readonly SessionChange[] {
   const chat = conversation.views.get('chat')
   if (chat === undefined) return []
-  const seen = new Map<string, MutationOperation>()
+  const seen = new Map<string, SessionChange>()
+  // The fold below is seq-driven, so the order turns are visited in cannot
+  // change the result — which is what makes it safe to walk the turns Map
+  // directly rather than `turnOrder` (the two are derived from each other, and
+  // the Map is the one that always holds every turn).
   for (const turn of chat.timeline.turns.values()) {
     const deliverables = turn.data.get('deliverables')
     if (deliverables === undefined) continue
     for (const produced of deliverables.produced) {
       const path = canonicalMutationPath(produced.path, cwd)
-      if (!seen.has(path)) seen.set(path, produced.operation)
+      const previous = seen.get(path)
+      if (previous === undefined) {
+        seen.set(path, {
+          path, operation: produced.operation, firstSeq: produced.seq, lastSeq: produced.seq,
+        })
+        continue
+      }
+      // Fold by seq rather than by arrival: the EARLIEST mutation owns the
+      // operation kind and `firstSeq`, the LATEST owns `lastSeq`. Folding this
+      // way makes the result independent of arrival order — which is what keeps
+      // `lastSeq` monotonic. The accept rule compares against it, so a value
+      // that could move backwards would hide a change the reader never
+      // accepted.
+      seen.set(path, {
+        path,
+        operation: produced.seq < previous.firstSeq ? produced.operation : previous.operation,
+        firstSeq: Math.min(previous.firstSeq, produced.seq),
+        lastSeq: Math.max(previous.lastSeq, produced.seq),
+      })
     }
   }
-  return [...seen.entries()].map(([path, operation]) => ({ path, operation }))
+  return [...seen.values()].sort((left, right) => left.firstSeq - right.firstSeq)
+}
+
+/**
+ * The changes still awaiting the reader's attention: every path whose latest
+ * mutation is newer than the seq the reader accepted for it.
+ *
+ * A path with no accept at all is always pending; a path accepted at a seq the
+ * list has since moved past is pending again. That single comparison is what
+ * makes "accept, then the agent edits it again" put the file back.
+ * @param changes - the Session's changed files, in first-seen order.
+ * @param accepted - one accepted `lastSeq` per path.
+ * @returns the pending changes, in the input's order.
+ */
+export function pendingChanges(
+  changes: readonly SessionChange[],
+  accepted: AcceptedChanges,
+): readonly SessionChange[] {
+  return changes.filter((change) => {
+    const acceptedSeq = accepted[change.path]
+    return acceptedSeq === undefined || change.lastSeq > acceptedSeq
+  })
 }
 
 /** Props of the pure list panel: the folded changes plus the locale seat. */
 export type SessionChangesPanelProps = {
-  changes: readonly ProducedChange[]
-  /** Per-file accept set, owned by the dock adapter so it survives a new request. */
-  accepted: ReadonlySet<string>
-  /** Record one file's accept; the adapter keeps the canonical set. */
-  onAccept: (path: string) => void
-  /** Mark every pending file accepted. */
-  onAcceptAll: (paths: readonly string[]) => void
+  changes: readonly SessionChange[]
+  /** Accepted `lastSeq` per path, owned by the dock adapter so it survives a new request. */
+  accepted: AcceptedChanges
+  /** Record one file's accept at the seq the reader saw. */
+  onAccept: (change: SessionChange) => void
+  /** Mark every pending file accepted at the seq the reader saw. */
+  onAcceptAll: (changes: readonly SessionChange[]) => void
   /** Hand one changed file to the Host desktop opener; rejects when it refuses. */
   openFile: (path: string) => Promise<void>
   /** Session Workspace root; rows are spelled relative to it. */
@@ -154,7 +204,7 @@ export function SessionChangesPanel({
     )
   }
 
-  const pending = changes.filter(change => !accepted.has(change.path))
+  const pending = pendingChanges(changes, accepted)
   if (pending.length === 0) return null
 
   return (
@@ -176,7 +226,7 @@ export function SessionChangesPanel({
         <button
           type="button"
           className={css.bulkAccept}
-          onClick={() => { onAcceptAll(pending.map(change => change.path)) }}
+          onClick={() => { onAcceptAll(pending) }}
         >
           <IconCheckOutline16 size={14} />
           {t('acceptAll')}
@@ -206,7 +256,7 @@ export function SessionChangesPanel({
                 <button
                   type="button"
                   className={css.accept}
-                  onClick={() => { onAccept(change.path) }}
+                  onClick={() => { onAccept(change) }}
                   aria-label={t('accept')}
                 >
                   <IconCheckOutline16 size={14} />
@@ -224,35 +274,44 @@ export function SessionChangesPanel({
   )
 }
 
-/** Dock adapter: owns the accept set so a new request keeps prior accepts. */
-export function SessionChangesDock({ useConversation, cwd, openFile, t }: SessionChangesDockProps) {
+/**
+ * Dock adapter: reads the whole-log projection (falling back to the loaded
+ * window) and owns the accept set so a new request keeps prior accepts.
+ */
+export function SessionChangesDock({
+  useConversation, useProjection, cwd, openFile, t,
+}: SessionChangesDockProps) {
+  const projected = useProjection('changedFiles')
   const conversation = useConversation(snapshot => snapshot)
-  const changes = useMemo(() => sessionChanges(conversation, cwd), [conversation, cwd])
+  // The projection is the whole-log answer; the window fold is the fallback for
+  // a composition that mounts no projection registry. Both produce the same
+  // shape, so nothing downstream knows which one answered.
+  const changes = useMemo(
+    () => projected === undefined ? sessionChanges(conversation, cwd) : projected.files,
+    [projected, conversation, cwd],
+  )
   // The accept set lives on the adapter, not the panel: a new user request
   // adds new turns to the timeline without unmounting the dock, but a
   // panel that returns null while pending is empty would otherwise drop the
   // accepted set on the next mount. Keeping it here means the user's prior
   // accepts persist across every render of the same dock registration.
-  const [accepted, setAccepted] = useState<ReadonlySet<string>>(() => new Set())
-  const accept = useCallback((path: string): void => {
+  const [accepted, setAccepted] = useState<AcceptedChanges>({})
+  const accept = useCallback((change: SessionChange): void => {
     setAccepted((previous) => {
       // The row that calls this disappears once its path is accepted, so no
       // second call for one path can reach the fold.
       /* v8 ignore next -- an accepted path is dropped from the pending list that sources this call. */
-      if (previous.has(path)) return previous
-      const next = new Set(previous)
-      next.add(path)
-      return next
+      if (previous[change.path] === change.lastSeq) return previous
+      return { ...previous, [change.path]: change.lastSeq }
     })
   }, [])
-  const acceptAll = useCallback((paths: readonly string[]): void => {
+  const acceptAll = useCallback((changes: readonly SessionChange[]): void => {
     setAccepted((previous) => {
-      let next: Set<string> | null = null
-      for (const path of paths) {
-        /* v8 ignore next -- every path handed here is pending, hence absent from the accepted set. */
-        if (previous.has(path)) continue
-        if (next === null) next = new Set(previous)
-        next.add(path)
+      let next: AcceptedChanges | null = null
+      for (const change of changes) {
+        /* v8 ignore next -- every change handed here is pending, hence not accepted at this seq. */
+        if (previous[change.path] === change.lastSeq) continue
+        next = { ...next ?? previous, [change.path]: change.lastSeq }
       }
       /* v8 ignore next -- the bulk button renders only while at least one file is pending. */
       return next ?? previous

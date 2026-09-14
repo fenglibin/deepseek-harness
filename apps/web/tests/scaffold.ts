@@ -462,10 +462,9 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       },
     },
     { id: 'session-persistence-jsonl', config: { root: persistenceRoot } },
-    // `auto` resolves the response language from the host's own locale, so a
-    // golden's prompt would change with the machine that produced it. Pin
-    // English — which emits no directive — and every recorded prompt stays
-    // machine-independent.
+    // The base layer pins Chinese, whose directive would enter every golden's
+    // system prompt. Pin English — which emits no directive — so the recorded
+    // prompts stay free of it.
     { id: 'response-language', config: { language: 'en' } },
     // Content search is enabled here although the shipped bundles default it
     // off (`openAt: never`, pinned by apps/cli/tests/lazy-search-startup):

@@ -76,6 +76,14 @@ interface BootstrapGroup {
   readonly newestAt: number
 }
 
+/**
+ * One header cwd's canonical directory, or the reason it has none. Exactly one
+ * of the two fields is present.
+ */
+type CwdResolution =
+  | { readonly path: string; readonly reason?: undefined }
+  | { readonly path?: undefined; readonly reason: string }
+
 const sameIds = (left: readonly WorkspaceId[], right: readonly WorkspaceId[]): boolean =>
   left.length === right.length && left.every((id, index) => id === right[index])
 
@@ -99,6 +107,8 @@ export class WorkspaceRegistry extends Service {
   private readonly headers = new Map<SessionId, SessionHeader>()
   private readonly sessionPaths = new Map<SessionId, string>()
   private readonly invalidSessionPaths = new Map<SessionId, string>()
+  /** Canonical-directory answer per raw header cwd; see {@link resolveCwd}. */
+  private readonly cwdResolutions = new Map<string, CwdResolution>()
   private operationTail: Promise<void> = Promise.resolve()
 
   private readonly host: WorkspaceEntityHost = {
@@ -612,6 +622,7 @@ export class WorkspaceRegistry extends Service {
     this.headers.clear()
     this.sessionPaths.clear()
     this.invalidSessionPaths.clear()
+    this.cwdResolutions.clear()
     await this.indexHeaders(headers)
   }
 
@@ -626,17 +637,41 @@ export class WorkspaceRegistry extends Service {
       this.invalidSessionPaths.set(header.id, 'header has no cwd')
       return
     }
-    try {
-      const path = await realpathNormalize(header.cwd)
-      if (!(await stat(path)).isDirectory()) {
-        this.invalidSessionPaths.set(header.id, `cwd '${header.cwd}' is not a directory`)
-        return
-      }
-      this.sessionPaths.set(header.id, path)
+    const resolved = await this.resolveCwd(header.cwd)
+    if (resolved.path !== undefined) {
+      this.sessionPaths.set(header.id, resolved.path)
       this.invalidSessionPaths.delete(header.id)
-    } catch {
-      this.invalidSessionPaths.set(header.id, `cwd '${header.cwd}' does not resolve`)
+      return
     }
+    this.invalidSessionPaths.set(header.id, resolved.reason)
+  }
+
+  /**
+   * Resolve one header cwd to its canonical existing directory, or to the
+   * reason it does not qualify. Sessions cluster into far fewer directories
+   * than there are sessions — a workspace's whole membership shares one cwd —
+   * so the answer is memoized per raw cwd: `realpath` is idempotent for one
+   * input and a header's cwd is immutable, so a repeated cwd can only ever
+   * resolve the same way within one index. The memo lives with the rest of the
+   * index and is cleared by {@link replaceHeaderIndex}, so an incremental
+   * reindex never reuses an answer from a different listing.
+   * @param cwd - raw cwd from an immutable session header.
+   * @returns the canonical directory, or the reason no such directory exists.
+   */
+  private async resolveCwd(cwd: string): Promise<CwdResolution> {
+    const cached = this.cwdResolutions.get(cwd)
+    if (cached !== undefined) return cached
+    let resolution: CwdResolution
+    try {
+      const path = await realpathNormalize(cwd)
+      resolution = (await stat(path)).isDirectory()
+        ? { path }
+        : { reason: `cwd '${cwd}' is not a directory` }
+    } catch {
+      resolution = { reason: `cwd '${cwd}' does not resolve` }
+    }
+    this.cwdResolutions.set(cwd, resolution)
+    return resolution
   }
 
   private async indexLiveSessions(): Promise<void> {

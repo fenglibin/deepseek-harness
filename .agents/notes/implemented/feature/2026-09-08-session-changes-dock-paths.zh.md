@@ -24,8 +24,10 @@ Status: implemented
 
 同一文件无论被写成什么拼写都只占一行，列表行以工作区相对拼写带上目录上下文并可直接打开，与会话正文的产出文件芯片行为一致。代价是行内文本与折叠/打开所用的身份不再逐字相同（悬停才看到绝对路径），并且路径规范化不解析符号链接——指向同一文件的两条符号链接路径仍会各占一行。
 
+`canonicalMutationPath` 此后已上移到宿主包 `dsh-file-changes`：宿主侧的全会话 `changedFiles` 折叠与浏览器侧的窗口折叠必须用同一个键，两份实现会各自漂移。dock 经该包的 `./client` 出口读取，行为不变。该决定见 [2026-09-14-session-changed-files-whole-log](2026-09-14-session-changed-files-whole-log.zh.md)。
+
 ## Testing
 
-- `ui-session-changes/tests/session-changes-dock.client.spec.tsx` —— 31 条测试：`canonicalMutationPath` 的相对/绝对、反斜杠与盘符、`..` 回退与退无可退，`displayPath` 的工作区内/工作区外/无工作区根，折叠对两种拼写与两个同名文件的行为，行内相对路径 + 绝对路径悬停、点击打开、宿主拒绝与非 Error 拒绝的呈现，以及注册注入的 cwd 与 opener 转发。
+- `ui-session-changes/tests/session-changes-dock.client.spec.tsx` —— `canonicalMutationPath` 的相对/绝对、反斜杠与盘符、`..` 回退与退无可退，`displayPath` 的工作区内/工作区外/无工作区根，折叠对两种拼写与两个同名文件的行为，行内相对路径 + 绝对路径悬停、点击打开、宿主拒绝与非 Error 拒绝的呈现，以及注册注入的 cwd 与 opener 转发。该文件的测试此后随接受语义与数据源的重写扩展到 39 条，见 [2026-09-14-session-changed-files-whole-log](2026-09-14-session-changed-files-whole-log.zh.md)。
 - `src/client/SessionChangesDock.tsx` 与 `src/client/index.ts` 在 `vitest --coverage` 下达到 100% 语句/分支/函数/行；三条界面上不可达的防御分支带 `v8 ignore` 理由。
 - `tsc -b tsconfig.client.json` 干净；`run-oxlint` 对该包 0 警告/错误；`verify-package-dependencies`、`verify-client-packages`、`verify-client-ui-i18n`、`verify-package-readme-model-experience` 均通过。

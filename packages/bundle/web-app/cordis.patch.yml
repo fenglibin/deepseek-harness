@@ -230,12 +230,19 @@
     - id: ui-workflow-run
       name: '@deepseek-ai/dsh-client-ui-workflow-run'
 
+    # Whole-log changed-file facts behind the changed-files dock: the client
+    # pages in only a tail window, so the dock reads the Session's real change
+    # set from this projection instead of the loaded Turns. Without it the dock
+    # falls back to the window fold and a long Session under-reports.
+    - id: file-changes
+      name: '@deepseek-ai/dsh-file-changes'
+
     # Turn tail: the produced-files row under each closing assistant message.
     # Remove this entry to turn the surface off; the tail hole renders empty.
     - id: ui-deliverables
       name: '@deepseek-ai/dsh-client-ui-deliverables'
 
-    # Session changed-files dock above the composer: the list of files the agent
+    # Session changed-files dock above the composer: every file the agent
     # mutated this session, with per-file accept. Remove to turn the surface off.
     - id: ui-session-changes
       name: '@deepseek-ai/dsh-client-ui-session-changes'

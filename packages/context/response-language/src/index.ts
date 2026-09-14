@@ -2,10 +2,12 @@
  * Deployment-wide response-language directive.
  *
  * The row resolves which language the model must write user-visible prose in
- * and contributes one system-prompt section demanding it. `auto` follows the
- * Web GUI's stored language choice, then the host process's own locale, and
- * keeps the model silent about language when neither names a language this
- * row can direct — a French host should not be told to answer in English.
+ * and contributes one system-prompt section demanding it. `zh` is the product
+ * default, so a deployment answers in Chinese without configuring anything.
+ * `auto` instead follows the Web GUI's stored language choice and then the
+ * host process's own locale, keeping the model silent about language when
+ * neither names a language this row can direct — a French host should not be
+ * told to answer in English.
  *
  * The directive is a section, not a runtime context, so it survives
  * `includeRuntimeContext: false` and reaches subagent children, whose
@@ -39,7 +41,7 @@ export const RESPONSE_LANGUAGE_SETTINGS = ['auto', 'zh', 'en', 'off'] as const
  * which is the only honest instruction for a locale this row cannot name.
  */
 const DIRECTIVES = {
-  zh: '用简体中文回复用户。凡是人会读到的句子都用中文写：解释、计划、进度更新、总结、提问，以及你撰写的提交信息、报告与文档正文。你自己撰写的注释也用中文，包括行注释、块注释与文档注释（JSDoc、docstring 等）。标识符、关键字、字符串字面量、shell 命令、文件路径、工具名、JSON key、URL，以及引用的用户或工具输出保持原样，不是你撰写的既有注释维持其原有语言，只翻译它们周围的散文。复现标识符、路径、命令或引用的用户/工具输出时不要切换成英文；引文保持引用状态，周围的散文保持中文。即使用户用英文输入，也保持中文回复，除非用户明确要求用其他语言。',
+  zh: '用简体中文回复用户。凡是人会读到的句子都用中文写：解释、计划、进度更新、总结、提问，以及你撰写的提交信息、报告与文档正文。你的思考过程也用中文，包括推理、计划、自检与取舍说明，不要先用英文推理再转述成中文。你自己撰写的注释也用中文，包括行注释、块注释与文档注释（JSDoc、docstring 等）。标识符、关键字、字符串字面量、shell 命令、文件路径、工具名、JSON key、URL，以及引用的用户或工具输出保持原样，不是你撰写的既有注释维持其原有语言，只翻译它们周围的散文。复现标识符、路径、命令或引用的用户/工具输出时不要切换成英文；引文保持引用状态，周围的散文保持中文。即使用户用英文输入，也保持中文回复，除非用户明确要求用其他语言。',
 } as const
 
 /** A language this row can direct the model to write in. */
@@ -68,8 +70,9 @@ const UNSET_LOCALE_VALUES = new Set(['', 'C', 'POSIX'])
 /** Plugin config: which language the model writes user-visible prose in. */
 export interface Config {
   /**
-   * `auto` follows the Web GUI's stored language choice and then the host
-   * process's own locale. `zh` pins Chinese, `en` pins English, and `off`
+   * `zh` is the default: the model answers in Chinese regardless of the
+   * host's own locale. `auto` follows the Web GUI's stored language choice and
+   * then the host process's own locale instead, `en` pins English, and `off`
    * registers no section at all. English pins emit no directive because it is
    * the language the model reaches unaided.
    */
@@ -78,7 +81,7 @@ export interface Config {
 
 /** Runtime schema for the response-language row. */
 export const Config: z<Config> = z.object({
-  language: z.union([...RESPONSE_LANGUAGE_SETTINGS]).default('auto'),
+  language: z.union([...RESPONSE_LANGUAGE_SETTINGS]).default('zh'),
 })
 
 /**

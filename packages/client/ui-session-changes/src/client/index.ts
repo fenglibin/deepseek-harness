@@ -26,8 +26,9 @@ import { SessionChangesDock, type SessionChangesInjected } from './SessionChange
 import { zh, type SessionChangesKey } from './locales.ts'
 
 export {
-  SessionChangesDock, SessionChangesPanel, canonicalMutationPath, displayPath, sessionChanges,
-  type ProducedChange, type SessionChangesDockProps, type SessionChangesInjected,
+  SessionChangesDock, SessionChangesPanel, canonicalMutationPath, displayPath, pendingChanges,
+  sessionChanges,
+  type AcceptedChanges, type SessionChange, type SessionChangesDockProps, type SessionChangesInjected,
   type SessionChangesPanelProps,
 } from './SessionChangesDock.tsx'
 export type { SessionChangesKey } from './locales.ts'

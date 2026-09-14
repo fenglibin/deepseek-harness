@@ -728,6 +728,46 @@ describe('Workspace session ordering', () => {
 })
 
 describe('header-validated membership projection', () => {
+  it('resolves one shared cwd once for every session that carries it', async () => {
+    const shared = await makeDir('shared-cwd')
+    const id = WorkspaceId('00000000-0000-4000-8000-00000000000a')
+    const dirs = new Set(Array.from({ length: 8 }, (_, index) => `s${index}`))
+    const pool = storedPool(
+      [[id, record(shared, [...dirs])]],
+      { initialized: true, workspaceIds: [id] },
+    )
+    const result = await harness({
+      pool,
+      sessions: [...dirs].map(name => header(name, shared)),
+    })
+    const workspace = result.registry.list()[0]!
+    // Every session carries the same cwd, so all of them — not just the first —
+    // must land in `sessionIds`. A memo that recorded only the first caller, or
+    // that mixed up its hit and miss branches, would drop the rest.
+    expect(workspace.sessionIds).toEqual([...dirs])
+  })
+
+  it('keeps distinct cwd failures distinct while sharing one resolution per cwd', async () => {
+    const base = await makeDir('memo-failures')
+    const gone = await makeDir('memo-gone')
+    const file = join(base, 'cwd-file')
+    await writeFile(file, 'file')
+    const result = await harness()
+    result.setSessions([
+      header('gone-a', gone),
+      header('gone-b', gone),
+      header('file-a', file),
+      header('file-b', file),
+    ])
+    await rm(gone, { recursive: true })
+    const workspace = await result.registry.create(base)
+    await expect(workspace.attachSession(SessionId('gone-a'))).rejects.toThrow(/does not resolve/)
+    await expect(workspace.attachSession(SessionId('gone-b'))).rejects.toThrow(/does not resolve/)
+    await expect(workspace.attachSession(SessionId('file-a'))).rejects.toThrow(/not a directory/)
+    await expect(workspace.attachSession(SessionId('file-b'))).rejects.toThrow(/not a directory/)
+    expect(workspace.sessionIds).toEqual([])
+  })
+
   it('requires both candidate id and matching canonical cwd without re-reading on list()', async () => {
     const owned = await makeDir('owned')
     const elsewhere = await makeDir('projection-elsewhere')

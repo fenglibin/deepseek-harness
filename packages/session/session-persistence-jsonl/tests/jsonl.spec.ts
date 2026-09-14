@@ -18,6 +18,17 @@ const statRace = vi.hoisted(() => ({
   reads: 0,
 }))
 
+/**
+ * Counts `open()` calls so a test can assert how much per-session I/O a
+ * listing performs instead of timing it. Wall-clock assertions are flaky under
+ * CI concurrency; the syscall count is deterministic and is exactly the
+ * quantity the listing shape exists to minimize.
+ */
+const openCount = vi.hoisted(() => ({
+  enabled: false,
+  paths: [] as string[],
+}))
+
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
   return {
@@ -29,6 +40,10 @@ vi.mock('node:fs/promises', async (importOriginal) => {
       if (statRace.reads !== 2) return identity
       return { ...identity, mtimeNs: identity.mtimeNs + 1n }
     }) as typeof actual.stat,
+    open: async (...args: Parameters<typeof actual.open>) => {
+      if (openCount.enabled) openCount.paths.push(String(args[0]))
+      return await actual.open(...args)
+    },
   }
 })
 
@@ -1387,6 +1402,55 @@ describe('JsonlSessionPersistence: edge cases', () => {
 
     await expect(ctx.sessionPersistence.load(id)).rejects.toThrow(/appears in multiple project directories/)
     await expect(ctx.sessionPersistence.list()).rejects.toThrow(/appears in multiple project directories/)
+  })
+
+  it('list opens each session log at most once, whatever the session count', async () => {
+    const count = 24
+    for (let index = 0; index < count; index += 1) {
+      const id = SessionId(`counted-${index}`)
+      await ctx.sessionPersistence.create(meta(`counted-${index}`, '/counted'))
+      await ctx.sessionPersistence.append(id, oneTurnLog())
+    }
+
+    openCount.enabled = true
+    openCount.paths.length = 0
+    try {
+      const listed = await ctx.sessionPersistence.list()
+      expect(listed).toHaveLength(count)
+    } finally {
+      openCount.enabled = false
+    }
+
+    // One `open()` per stored log for the header read, at most: the walk finds
+    // the log with `readdir` and rejects the opposite encoding from the same
+    // listing, so no existence probe may precede it.
+    const logs = openCount.paths.filter(path => path.includes('session.jsonl'))
+    expect(logs).toHaveLength(count)
+    expect(new Set(logs).size).toBe(count)
+  })
+
+  it('list reports a structural fault ahead of a concurrent header fault', async () => {
+    // Two faults in one store: a session directory holding the opposite
+    // physical encoding (structural, found by the walk) and a header whose cwd
+    // does not identify its log (found by a header read). The structural one is
+    // the actionable diagnosis, so it must win regardless of which read settles
+    // first — the header fan-out must not let its own rejection race ahead.
+    await ctx.sessionPersistence.create(meta('well-formed', '/stable'))
+    await ctx.sessionPersistence.append(SessionId('well-formed'), oneTurnLog())
+
+    const bad = SessionId('misplaced')
+    const dir = sessionDir(root, '/stable', bad)
+    await mkdir(dir, { recursive: true })
+    await writeFile(rawLogPath(root, '/stable', bad), [
+      JSON.stringify({ type: 'session', version: 0, id: bad, createdAt: 1, delegationDepth: 0, cwd: '/elsewhere' }),
+      '',
+    ].join('\n'))
+
+    const mismatched = sessionDir(root, '/stable', SessionId('mismatched'))
+    await mkdir(mismatched, { recursive: true })
+    await writeFile(join(mismatched, 'session.jsonl.zstd'), 'opposite encoding\n')
+
+    await expect(ctx.sessionPersistence.list()).rejects.toThrow(/uses \.jsonl\.zstd, but this backend is configured/)
   })
 
   it('a DIFFERENT live session object reusing a disposed id gets its own init (no stale cache)', async () => {

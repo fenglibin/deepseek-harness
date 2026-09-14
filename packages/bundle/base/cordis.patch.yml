@@ -548,13 +548,15 @@
       config:
         persona: ''
 
-    # Which language the model writes user-visible prose in. `auto` follows the
-    # Web GUI's stored language choice, then the host process's own locale, and
-    # stays silent about language when neither names a language this row directs.
+    # Which language the model writes user-visible prose in. `zh` is the
+    # product default: every session the base layer mounts answers in Chinese
+    # regardless of the host's own locale. A deployment that wants the model to
+    # follow the interface language and the host locale sets `auto` here, and
+    # one that wants no directive at all sets `off`.
     - id: response-language
       name: '@deepseek-ai/dsh-response-language'
       config:
-        language: auto
+        language: zh
 
     # Agents created at startup. The base stays empty; raw overlays may create
     # agents, while Web creates sessions on client request.

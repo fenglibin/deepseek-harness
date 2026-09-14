@@ -42,6 +42,9 @@
       "path": "../ui-slots"
     },
     {
+      "path": "../../fs/file-changes"
+    },
+    {
       "path": "../../util/workspace-path"
     },
     {

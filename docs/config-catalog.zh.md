@@ -1882,8 +1882,9 @@ export interface Config {
 /** Plugin config: which language the model writes user-visible prose in. */
 export interface Config {
   /**
-   * `auto` follows the Web GUI's stored language choice and then the host
-   * process's own locale. `zh` pins Chinese, `en` pins English, and `off`
+   * `zh` is the default: the model answers in Chinese regardless of the
+   * host's own locale. `auto` follows the Web GUI's stored language choice and
+   * then the host process's own locale instead, `en` pins English, and `off`
    * registers no section at all. English pins emit no directive because it is
    * the language the model reaches unaided.
    */
@@ -1894,7 +1895,7 @@ export interface Config {
 export type ResponseLanguageSetting = 'auto' | 'zh' | 'en' | 'off'
 ```
 
-来源：[`packages/context/response-language/src/index.ts:69`](../packages/context/response-language/src/index.ts)
+来源：[`packages/context/response-language/src/index.ts:70`](../packages/context/response-language/src/index.ts)
 
 <a id="deepseek-aidsh-sandbox-local"></a>
 
