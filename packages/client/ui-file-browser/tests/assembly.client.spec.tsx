@@ -1,0 +1,168 @@
+// @vitest-environment jsdom
+/**
+ * The assembled chain a product user actually walks: ui-workspace's row menu →
+ * the contributed "工作区文件" entry → the file-browser dialog over
+ * `ctx.remote.fileBrowser`.
+ *
+ * Both plugins run their real `apply` here — the contribution rides the real
+ * `ctx.workspaceRowMenu` registry rather than a stub — and a FakeRemote answers
+ * the workspace namespace. Unloading the browser plugin is asserted too: the
+ * entry is a registry contribution, so disposing its fiber must take the menu
+ * row and the overlay registration with it.
+ *
+ * The dialog's own arms live in file-browser.client.spec.tsx, and the
+ * workspace-scoped filesystem contract in the Host package's suite; this file
+ * owns only the wiring between them.
+ */
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, waitFor, within } from '@testing-library/react'
+import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { FileBrowserRemote } from '@deepseek-ai/dsh-client-ui-file-browser/client'
+import { SlotTestRuntime, TestRemote, usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
+import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
+import { apply as applyWorkspace, inject as injectWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
+import { apply as applyFileBrowser, inject as injectFileBrowser } from '@deepseek-ai/dsh-client-ui-file-browser/client'
+
+// The services read their initial locale from the browser; these specs assert
+// the shipped Chinese copy, so they state the browser they assume.
+usePinnedBrowserLanguages('zh-CN')
+
+const WID = 'w1' as WorkspaceId
+
+afterEach(cleanup)
+beforeEach(() => { localStorage.clear() })
+
+/** The workspace listing the row menu is built from. */
+const workspaceRow = {
+  workspaceId: WID,
+  title: 'alpha',
+  path: '/w/alpha',
+  sessionIds: [],
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+}
+
+/**
+ * Mount ui-workspace plus the file browser over a FakeRemote. `fileBrowser`
+ * records its requests so the assertions can see the dialog's first listing.
+ */
+async function mountComposition() {
+  const runtime = await SlotTestRuntime.create()
+  runtime.releaseWorkspaceSource()
+  const fileBrowser: FileBrowserRemote & { calls: string[] } = Object.assign({
+    list: (request: { path?: string }) => {
+      fileBrowser.calls.push(`list:${request.path ?? ''}`)
+      return Promise.resolve({
+        ok: true as const,
+        value: { path: request.path ?? '', entries: [{ name: 'README.md', path: 'README.md', kind: 'file' as const }], truncated: false },
+      })
+    },
+    read: () => Promise.resolve({
+      ok: true as const,
+      value: { kind: 'text' as const, text: '# hi', version: 'v1', size: 4 },
+    }),
+    write: () => Promise.resolve({ ok: true as const, value: { version: 'v2' } }),
+    create: () => Promise.resolve({ ok: true as const, value: { path: 'new.txt' } }),
+    rename: () => Promise.resolve({ ok: true as const, value: { path: 'renamed.txt' } }),
+    delete: () => Promise.resolve({ ok: true as const, value: undefined }),
+    search: () => Promise.resolve({ ok: true as const, value: { matches: [], truncated: false } }),
+  }, { calls: [] as string[] })
+  // One TestRemote registers ctx.remote plus a service per scripted namespace,
+  // so both plugins' inject declarations unpark.
+  new TestRemote(runtime.ctx, { fileBrowser, directoryPicker: {} })
+  const locale = new LocaleRuntime(runtime.ctx)
+  runtime.ctx.provide('locale', locale)
+  runtime.slots.installLocale(locale)
+  // ui-workspace's navigation policy lazily creates a blank Session when it
+  // restores a Workspace selection; nothing in this chain needs one, so it is
+  // stubbed to keep the automatic selection quiet.
+  runtime.sessions.stubCreate(async () => 'stub-session' as never)
+  await runtime.workspaces.update((draft) => {
+    draft.items = [workspaceRow] as never
+  })
+  await runtime.root.declare(
+    // The real composition has ui-layout declaring both seats; this test owns
+    // the shell role instead, so it declares and renders exactly the two holes
+    // the chain needs: the browsing region and the frame-wide overlay the
+    // dialog lands in.
+    {
+      'sidebar.workspaces': { kind: 'single', scope: 'root' },
+      'shell.overlay': { kind: 'list', scope: 'root' },
+    } as never,
+    ShellFrame as never,
+  )
+  return { runtime, fileBrowser }
+}
+
+/** Test-owned shell role: declares and renders the browsing region plus the overlay layer. */
+function ShellFrame({ renderSlot }: { renderSlot: (name: string, owner: object) => React.ReactNode }) {
+  return (
+    <>
+      {renderSlot('sidebar.workspaces', { wide: true, expandSidebar: () => {} })}
+      {renderSlot('shell.overlay', {})}
+    </>
+  )
+}
+
+describe('workspace file browser through the assembled browser', () => {
+  /**
+   * Mount both plugins the way a deployment composes them. ui-workspace goes
+   * first because it provides `workspaceRowMenu`, the service the browser
+   * plugin injects; the returned fiber is the browser plugin's, so a test can
+   * dispose exactly that contribution.
+   */
+  async function mountBoth() {
+    const harness = await mountComposition()
+    await harness.runtime.mount({ inject: [...injectWorkspace], apply: applyWorkspace })
+    const browserFiber = await harness.runtime.mount({
+      inject: [...injectFileBrowser],
+      apply: applyFileBrowser,
+    })
+    return { ...harness, browserFiber }
+  }
+
+  it('the row menu carries the contributed entry that ui-workspace did not write', async () => {
+    const { runtime } = await mountBoth()
+    const view = runtime.renderRoot()
+    const row = (await view.findByText('alpha')).closest('[role="treeitem"]') as HTMLElement
+    fireEvent.click(within(row).getByLabelText('工作区“alpha”的操作'))
+    expect(await view.findByRole('menuitem', { name: '工作区文件', hidden: true })).toBeTruthy()
+    // The built-in verbs keep their places around the contribution.
+    expect(view.getByRole('menuitem', { name: '重命名', hidden: true })).toBeTruthy()
+    expect(view.getByRole('menuitem', { name: '删除工作区', hidden: true })).toBeTruthy()
+    await runtime.dispose()
+  })
+
+  it('clicking the entry opens the dialog over the requested workspace', async () => {
+    const { runtime, fileBrowser } = await mountBoth()
+    const view = runtime.renderRoot()
+    const row = (await view.findByText('alpha')).closest('[role="treeitem"]') as HTMLElement
+    fireEvent.click(within(row).getByLabelText('工作区“alpha”的操作'))
+    fireEvent.click(await view.findByRole('menuitem', { name: '工作区文件', hidden: true }))
+
+    // The dialog lands and lists the requested Workspace's root.
+    await view.findByRole('dialog', { name: /工作区文件/ })
+    await waitFor(() => { expect(fileBrowser.calls).toContain('list:') })
+    expect(await view.findByText('README.md')).toBeTruthy()
+    await runtime.dispose()
+  })
+
+  it('unloading the browser plugin withdraws its entry and its dialog', async () => {
+    const { runtime, browserFiber } = await mountBoth()
+    const view = runtime.renderRoot()
+    const row = (await view.findByText('alpha')).closest('[role="treeitem"]') as HTMLElement
+    fireEvent.click(within(row).getByLabelText('工作区“alpha”的操作'))
+    await view.findByRole('menuitem', { name: '工作区文件', hidden: true })
+    // Close the menu so the surviving-verbs assertion below reopens it cleanly.
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    await browserFiber.dispose()
+    await runtime.flush()
+
+    fireEvent.click(within(row).getByLabelText('工作区“alpha”的操作'))
+    // The contributed row is gone; the built-in verbs survive it.
+    expect(view.queryByRole('menuitem', { name: '工作区文件', hidden: true })).toBeNull()
+    expect(view.getByRole('menuitem', { name: '重命名', hidden: true })).toBeTruthy()
+    await runtime.dispose()
+  })
+})

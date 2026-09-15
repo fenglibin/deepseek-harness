@@ -504,28 +504,22 @@ describe('tool-str-replace-editor', () => {
     })).error).toMatchObject({ info: { code: 'FS_NOT_REGULAR_FILE' } })
   })
 
-  it('delegates read-before-edit decisions to fs-observation-policy', async () => {
+  it('settles the read-before-edit gate on the read str_replace already performs', async () => {
     const { ctx, root, owner } = await setup({}, { fsPolicy: true })
     const existing = join(root, 'existing.txt')
     const created = join(root, 'created.txt')
     await writeFile(existing, 'before')
 
+    // No `view` first: str_replace must read the file to match `old_str` anyway,
+    // and that read is recorded as the observation, so the policy's unread-target
+    // refusal never reaches the model.
     const blindEdit = await call(ctx, owner, {
       command: 'str_replace',
       path: existing,
       old_str: 'before',
       new_str: 'after',
     })
-    expect(blindEdit.error).toMatchObject({ info: { code: 'FS_NOT_OBSERVED' } })
-    expect(await readFile(existing, 'utf8')).toBe('before')
-
-    await call(ctx, owner, { command: 'view', path: existing })
-    expect((await call(ctx, owner, {
-      command: 'str_replace',
-      path: existing,
-      old_str: 'before',
-      new_str: 'after',
-    })).isError).toBe(false)
+    expect(blindEdit.isError).toBe(false)
     expect(await readFile(existing, 'utf8')).toBe('after')
 
     expect((await call(ctx, owner, {
@@ -542,6 +536,43 @@ describe('tool-str-replace-editor', () => {
       file_text: 'new',
     })).isError).toBe(false)
     expect(await readFile(created, 'utf8')).toBe('new')
+  })
+
+  it('applies str_replace against the content it just read, not a stale snapshot', async () => {
+    const { ctx, root, owner } = await setup({}, { fsPolicy: true })
+    const existing = join(root, 'fresh.txt')
+    await writeFile(existing, 'before')
+    await call(ctx, owner, { command: 'view', path: existing })
+    await writeFile(existing, 'changed-out-of-band')
+
+    // The call reads current content and records it, so the match runs against
+    // what is actually on disk and the guarded write CASes the version actually
+    // read. A change BEFORE the call is therefore picked up rather than reported
+    // stale; a change DURING it still fails closed at the provider's lock.
+    const applied = await call(ctx, owner, {
+      command: 'str_replace',
+      path: existing,
+      old_str: 'changed',
+      new_str: 'after',
+    })
+    expect(applied.isError).toBe(false)
+    expect(await readFile(existing, 'utf8')).toBe('after-out-of-band')
+  })
+
+  it('still fails an unmatchable str_replace against the content it just read', async () => {
+    const { ctx, root, owner } = await setup({}, { fsPolicy: true })
+    const existing = join(root, 'missing-match.txt')
+    await writeFile(existing, 'actual content')
+
+    const unmatchable = await call(ctx, owner, {
+      command: 'str_replace',
+      path: existing,
+      old_str: 'guessed text',
+      new_str: 'after',
+    })
+    // Reading settles the observation, never the literal match.
+    expect(unmatchable.error).toMatchObject({ info: { code: 'FS_EDIT_NOT_FOUND' } })
+    expect(await readFile(existing, 'utf8')).toBe('actual content')
   })
 
   it('passes the session sandbox policy to every mutation', async () => {

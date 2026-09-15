@@ -1,0 +1,167 @@
+/*
+ * The editor's two layers are one grid: the gutter, the highlight layer, and
+ * the transparent textarea share a single line-height, font, and padding so the
+ * caret lands on the glyph the operator sees. `--dsl-editor-line` is the shared
+ * metric — every layer and every row references it rather than repeating a
+ * pixel value.
+ */
+.editor {
+  --dsl-editor-line: calc(20px + var(--dsh-content-font-delta, 0px));
+  --dsl-editor-pad-y: 10px;
+  --dsl-editor-pad-x: 10px;
+
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  background: var(--dsw-alias-markdown-code-block);
+  color: var(--dsw-alias-label-primary);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-markdown-code-block-banner);
+}
+
+.path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  direction: rtl;
+  text-align: left;
+}
+
+.status {
+  flex: none;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.muted {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.unsaved {
+  color: var(--dsw-alias-state-warn-label);
+}
+
+.error,
+.conflict {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.error {
+  color: var(--dsw-alias-state-error-primary);
+  background: var(--dsw-alias-state-warn-tertiary);
+}
+
+.conflict {
+  color: var(--dsw-alias-state-warn-label);
+  background: var(--dsw-alias-state-warn-tertiary);
+}
+
+.panes {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.gutter {
+  flex: none;
+  width: max(44px, calc(4ch + 16px));
+  overflow: hidden;
+  padding: var(--dsl-editor-pad-y) 8px var(--dsl-editor-pad-y) 0;
+  border-right: 1px solid var(--dsw-alias-border-l2);
+  text-align: right;
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  line-height: var(--dsl-editor-line);
+  color: var(--dsw-alias-label-tertiary);
+  user-select: none;
+}
+
+.gutterLine {
+  height: var(--dsl-editor-line);
+  line-height: var(--dsl-editor-line);
+}
+
+.scroll {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.highlight,
+.input {
+  margin: 0;
+  padding: var(--dsl-editor-pad-y) var(--dsl-editor-pad-x);
+  border: 0;
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  line-height: var(--dsl-editor-line);
+  tab-size: 2;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.highlight {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.line {
+  height: var(--dsl-editor-line);
+  line-height: var(--dsl-editor-line);
+}
+
+.input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  resize: none;
+  overflow: auto;
+  background: transparent;
+  /* The textarea owns the caret and selection; its own glyphs stay invisible so
+     the colored layer beneath supplies their appearance. */
+  color: transparent;
+  caret-color: var(--dsw-alias-label-primary);
+  outline: none;
+}
+
+.input::selection {
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

@@ -14,8 +14,11 @@ import {
   relativeTime, StateDot,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { StateDotState } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { abbreviateHomePath } from '@deepseek-ai/dsh-util-workspace-path'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
+import type { WorkspaceRowMenuContribution } from '../row-menu.ts'
 import type { GroupNode, SearchResultNode, SessionNode } from '../tree.ts'
 import css from './Rows.module.css'
 
@@ -104,17 +107,24 @@ function rowHalf(e: { clientY: number; currentTarget: HTMLElement }): 'before' |
  * @param props.group - derived group node.
  * @param props.onToggle - expand/collapse the group.
  * @param props.onCreate - start a frontend Session inside this Workspace.
+ * @param props.actions - real-Workspace rename/delete actions; absent for the ungrouped bucket (no menu shown).
+ * @param props.contributions - entries other plugins contributed, in render order.
+ * @param props.workspace - the Workspace this row represents; absent for the ungrouped bucket.
  * @param props.drag - optional workspace-row drag wiring.
  * @param props.home - host account home for POSIX hover-path abbreviation.
  * @param props.t - the browser root's locale seat.
  * @returns the row element.
  */
-export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home, t }: {
+export function ProjectRowItem({ group, onToggle, onCreate, actions, contributions = [], workspace, drag, home, t }: {
   group: GroupNode
   onToggle: () => void
   onCreate: () => void
   /** Real-Workspace actions; absent for the ungrouped bucket (no menu shown). */
   actions?: { rename: () => void; delete: () => void } | undefined
+  /** Contributed entries; the destructive delete row stays last regardless. */
+  contributions?: readonly WorkspaceRowMenuContribution[] | undefined
+  /** The Workspace this row lists; a contributed entry is invoked with it. */
+  workspace?: WorkspaceView | undefined
   /** Present only for real Workspace rows in the grouped view. */
   drag?: WorkspaceRowDragProps | undefined
   /** Host account home; POSIX home-rooted hover paths display as `~`. */
@@ -126,8 +136,15 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
   const label = row.workspaceId === undefined ? t('group.ungrouped') : row.label
   const active = group.expanded && group.containsCurrent
   const [menuOpen, setMenuOpen] = useState(false)
-  const workspaceMenuItems = [
+  const workspaceMenuItems: MenuEntry[] = [
     { id: 'rename', label: t('rename'), icon: <IconEditOutline16 /> },
+    // Contributions sit between Rename and Delete: the destructive verb stays
+    // last whatever order a contributor asked for.
+    ...contributions.map(entry => ({
+      id: `contributed:${entry.id}`,
+      label: entry.label,
+      ...(entry.danger === true ? { danger: true } : {}),
+    })),
     { id: 'delete', label: t('delete.workspace'), icon: <IconTrashOutline16 />, danger: true },
   ]
   const ownRow = (
@@ -163,9 +180,15 @@ export function ProjectRowItem({ group, onToggle, onCreate, actions, drag, home,
             items={workspaceMenuItems}
             onSelect={(id) => {
               setMenuOpen(false)
-              // Unknown ids leave before the dispatch: a future menu row must
-              // not inherit the destructive branch as an else fallback.
-              /* v8 ignore next -- Menu can emit only the rename and delete rows supplied above. */
+              // Contributed ids are namespaced so a contributor can never
+              // collide with the two built-in rows; the destructive branch is
+              // reached only by its own id, never as an else fallback.
+              if (id.startsWith('contributed:')) {
+                const entry = contributions.find(candidate => `contributed:${candidate.id}` === id)
+                if (entry !== undefined && workspace !== undefined) entry.onSelect(workspace)
+                return
+              }
+              /* v8 ignore next -- Menu can emit only the rows supplied above. */
               if (id !== 'rename' && id !== 'delete') return
               if (id === 'rename') actions.rename()
               else actions.delete()

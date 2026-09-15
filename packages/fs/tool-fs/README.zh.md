@@ -63,11 +63,11 @@ kind: "package-reference"
 
 ### 策略与沙箱行为
 
-挂载策略插件后，`write` 与 `edit` 从 `fs/*` 意图槽位取得防护，因此未读目标或陈旧观察会以 `FS_NOT_OBSERVED` 或 `FS_STALE_VERSION` 失败。这类失败共享同一个补救——重新读取目标——所以工具在当次调用内完成它：重新读取目标、记录该次观察，并把文件的当前内容附在失败消息里。模型因此不必再花一轮往返去发现自己本该先读，直接用已经拿到的内容重试即可；失败本身仍是 `isError`，结构化错误码不变。目标无法重新读取时（不存在、不可读、是目录，或调用已取消）保留原有的纯恢复指令。使用施加沙箱限制的后端（`fs-sandbox`）时，`write`/`edit` 还会公开 `sandbox_permissions` 与 `justification`；被拒绝的变更返回 `[sandbox: file access denied under <mode> mode]` 标记与同轮次升级提示，获批的重试可以在该次调用中加盖严格更宽的模式。
+挂载策略插件后，`write` 与 `edit` 从 `fs/*` 意图槽位取得防护：未见目标解析为带防护的创建，已观察目标在最后看到的版本上替换。策略对未见目标的拒绝（`FS_NOT_OBSERVED`）不是模型的义务——工具在当次调用内自行读取目标、记录该次观察并重新分发意图槽位，于是同一个变更紧接着原样成功。那次拒绝从不进入会话日志，也不会在界面上渲染成错误行。真正陈旧的观察（`FS_STALE_VERSION`）仍然失败，因为模型无法在没有新内容的情况下安全地重新定位改动；此时工具重新读取目标并把当前内容附在失败消息里，省掉它的一轮发现往返。目标无法读取时（不存在、不可读、是目录，或调用已取消）保留原有的纯恢复指令。已观察路径的预算不变：不读取、也不探测 `stat`。使用施加沙箱限制的后端（`fs-sandbox`）时，`write`/`edit` 还会公开 `sandbox_permissions` 与 `justification`；被拒绝的变更返回 `[sandbox: file access denied under <mode> mode]` 标记与同轮次升级提示，获批的重试可以在该次调用中加盖严格更宽的模式。
 
 ### 失败与恢复
 
-失败被规范化为 `Error: <message>`，并为调用方保留结构化错误码。稳定消息包括 `file_path must be a non-empty string`、`limit must be less than or equal to <max>`、`cannot read "<path>": not found`、`cannot read "<path>": not a regular file`，以及图像路由拒绝 `cannot read "<path>" as an image: model "<model>" does not declare image input; switch to an image-capable model to read images`。防护变更失败在可重新读取目标时以 `<原消息> — its current content follows; retry now.` 加上该文件的读取信封返回，否则追加恢复指令：`FS_STALE_VERSION` 追加 `— re-read the file, then retry`，`FS_NOT_OBSERVED` 追加 `— read the file, then retry`。该次重新读取确认缺失后，`edit` 报告 `FS_NOT_FOUND` 而不会重复陈旧恢复指令，`write` 则使用防护创建。
+失败被规范化为 `Error: <message>`，并为调用方保留结构化错误码。稳定消息包括 `file_path must be a non-empty string`、`limit must be less than or equal to <max>`、`cannot read "<path>": not found`、`cannot read "<path>": not a regular file`，以及图像路由拒绝 `cannot read "<path>" as an image: model "<model>" does not declare image input; switch to an image-capable model to read images`。缺失观测不再是一种模型可见的失败：工具自行补读并重试，模型只看到成功。仍然失败的防护变更（`FS_STALE_VERSION`，即变更期间文件被外部改写）在可重新读取目标时以 `<原消息> — its current content follows; retry now.` 加上该文件的读取信封返回，否则追加恢复指令 `— re-read the file, then retry`。该次重新读取确认缺失后，`edit` 报告 `FS_NOT_FOUND`，`write` 则使用防护创建。
 
 -----
 
@@ -94,11 +94,11 @@ kind: "package-reference"
 | [`src/edit.ts`](src/edit.ts) | `edit` 执行器：意图 waterfall、字面量编辑、观察 |
 | [`src/read-render.ts`](src/read-render.ts) | 不依赖 Cordis 的窗口构建与信封格式化 |
 | [`src/sandbox.ts`](src/sandbox.ts) | `write`/`edit` 共享的升权 API：策略解析与拒绝标记映射 |
-| [`src/error.ts`](src/error.ts) | 防护变更失败的当次调用恢复：重新读取目标并附加其内容，或追加恢复指令 |
+| [`src/error.ts`](src/error.ts) | 防护变更的观测结算（`mutateWithObservedBasis`）与仍失败时的恢复指令 |
 
 ### 各工具流程
 
-四个工具共享同一种流程形态：用调用会话的 cwd 解析路径、运行适用的门禁、恰好执行一次提供方操作，并且只在成功后发出 `fs/observed`。`read` 与 `read_image` 为类型与大小路由付出一次 `stat`；`write` 与 `edit` 不执行 stat，因为防护来自意图槽位，提供方失败以类型化 `FsError` 结果呈现。各工具执行器位于 `src/read.ts`、`src/read-image.ts`、`src/write.ts` 与 `src/edit.ts`。
+四个工具共享同一种流程形态：用调用会话的 cwd 解析路径、运行适用的门禁、恰好执行一次提供方操作，并且只在成功后发出 `fs/observed`。`read` 与 `read_image` 为类型与大小路由付出一次 `stat`；`write` 与 `edit` 在已观察路径上不执行 stat，因为防护来自意图槽位——只有当策略拒绝未见目标时，它们才补读一次（`stat` + 读取）来结算观测。各工具执行器位于 `src/read.ts`、`src/read-image.ts`、`src/write.ts` 与 `src/edit.ts`。
 
 ### 观察与并发
 
@@ -140,13 +140,13 @@ Use the read tool — not shell commands like cat — to inspect text files. Res
 ##### Write 指导
 
 ```markdown
-Use the write tool to create files or completely replace file contents. Existing files are overwritten, so read an existing file first (the default fs-observation-policy requires it) and prefer edit for targeted changes.
+Use the write tool to create files or completely replace file contents. Existing files are overwritten. The tool settles its own file observation, so do not read a file merely to satisfy it; read it when you need its contents to decide what to write, and prefer edit for targeted changes.
 ```
 
 ##### Edit 指导
 
 ```markdown
-Use the edit tool for targeted changes to existing UTF-8 text files. It replaces literal old_string with new_string; by default old_string must appear exactly once. If old_string appears multiple times, provide a more specific old_string or set replace_all to true. Read the file first (the default fs-observation-policy requires it), unless you just created or edited it in this session.
+Use the edit tool for targeted changes to existing UTF-8 text files. It replaces literal old_string with new_string; by default old_string must appear exactly once. If old_string appears multiple times, provide a more specific old_string or set replace_all to true. The tool settles its own file observation, so do not read a file merely to satisfy it; read it when you need its contents to write an old_string that matches, and skip that read when you already know them.
 ```
 
 #### Token 影响
@@ -217,7 +217,7 @@ Use the edit tool for targeted changes to existing UTF-8 text files. It replaces
 
 #### 模型看到的内容
 
-失败会规范化为 `Error: <message>`。本包稳定的校验和读取消息是 `file_path must be a non-empty string`、`limit must be less than or equal to <max>`、`old_string must be a non-empty string`、`old_string and new_string must differ`、`cannot read "<path>": not found`、`cannot read "<path>": not a regular file`、`offset <offset> is out of range for "<path>" (<total> lines)`、`cannot read "<path>": read_image only accepts PNG/JPEG/WebP/GIF paths`、`cannot read "<path>" as an image: model "<model>" does not declare image input; switch to an image-capable model to read images`，以及类型不匹配的修复消息 `cannot read "<path>": the <ext> extension declares <type>, but the bytes use a different image format; rename the file to match its actual format if it is PNG/JPEG/WebP/GIF, or convert it to one of those formats`。16-bit 转换失败会报告 `cannot read "<path>": the 16-bit PNG could not be converted to the normalized 8-bit sRGB form; convert it to an 8-bit PNG/JPEG/WebP and retry`。提供方和策略模板在各自包的 README 中逐字列出。防护变更失败在目标可重新读取时返回 `<原消息> — its current content follows; retry now.` 加上该文件的有界读取信封，使模型无需额外一轮 `read` 即可用真实内容重试；否则追加恢复指令：`FS_STALE_VERSION` 追加 `— re-read the file, then retry`，`FS_NOT_OBSERVED` 追加 `— read the file, then retry`。两种情况都保持结构化错误码不变。该次重新读取确认缺失后，`edit` 会报告 `FS_NOT_FOUND`，而不会重复陈旧恢复指令；`write` 则使用带防护的创建。
+失败会规范化为 `Error: <message>`。本包稳定的校验和读取消息是 `file_path must be a non-empty string`、`limit must be less than or equal to <max>`、`old_string must be a non-empty string`、`old_string and new_string must differ`、`cannot read "<path>": not found`、`cannot read "<path>": not a regular file`、`offset <offset> is out of range for "<path>" (<total> lines)`、`cannot read "<path>": read_image only accepts PNG/JPEG/WebP/GIF paths`、`cannot read "<path>" as an image: model "<model>" does not declare image input; switch to an image-capable model to read images`，以及类型不匹配的修复消息 `cannot read "<path>": the <ext> extension declares <type>, but the bytes use a different image format; rename the file to match its actual format if it is PNG/JPEG/WebP/GIF, or convert it to one of those formats`。16-bit 转换失败会报告 `cannot read "<path>": the 16-bit PNG could not be converted to the normalized 8-bit sRGB form; convert it to an 8-bit PNG/JPEG/WebP and retry`。提供方和策略模板在各自包的 README 中逐字列出。缺失观测不是模型可见的失败：工具自行补读并重试，只返回成功。仍然失败的防护变更（真正陈旧的观察）在目标可重新读取时返回 `<原消息> — its current content follows; retry now.` 加上该文件的有界读取信封，使模型无需额外一轮 `read` 即可用真实内容重试；否则追加恢复指令 `— re-read the file, then retry`。两种情况都保持结构化错误码不变。该次重新读取确认缺失后，`edit` 会报告 `FS_NOT_FOUND`；`write` 则使用带防护的创建。
 
 #### Token 影响
 

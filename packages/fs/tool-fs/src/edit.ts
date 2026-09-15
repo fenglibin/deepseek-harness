@@ -10,7 +10,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { DiffCallView, DiffResultView, ToolResult } from '@deepseek-ai/dsh-tools'
 import type {} from '@deepseek-ai/dsh-fs'
 import { computeHunkDiffs, diffsFromMeta } from './diff.ts'
-import { recoverMutationFailure } from './error.ts'
+import { mutateWithObservedBasis, recoverMutationFailure } from './error.ts'
 import { sessionResolveOptions } from './session-cwd.ts'
 import type { ReadToolCaps } from './read.ts'
 import type { FsSandboxController } from './sandbox.ts'
@@ -78,7 +78,7 @@ export function applyEditTool(ctx: Context, sandbox: FsSandboxController, caps: 
   ctx.systemPrompt.section({
     name: 'tool:edit',
     order: ctx.systemPrompt.getSectionOrder('TOOL_EDIT'),
-    text: 'Use the edit tool for targeted changes to existing UTF-8 text files. It replaces literal old_string with new_string; by default old_string must appear exactly once. If old_string appears multiple times, provide a more specific old_string or set replace_all to true. Read the file first (the default fs-observation-policy requires it), unless you just created or edited it in this session.',
+    text: 'Use the edit tool for targeted changes to existing UTF-8 text files. It replaces literal old_string with new_string; by default old_string must appear exactly once. If old_string appears multiple times, provide a more specific old_string or set replace_all to true. The tool settles its own file observation, so do not read a file merely to satisfy it; read it when you need its contents to write an old_string that matches, and skip that read when you already know them.',
   })
 
   ctx.tools.register(defineTool({
@@ -118,26 +118,30 @@ export function applyEditTool(ctx: Context, sandbox: FsSandboxController, caps: 
       const target = await ctx.fs.resolve(input.filePath, sessionResolveOptions(exec, input.filePath, sandboxPolicy?.workspaceRoot))
       // Single-slot decision: the policy plugin returns { version: vObserved } or
       // throws FS_NOT_OBSERVED; the bare default is undefined (unconditional edit).
-      // No stat — the bare default never manufactures a version basis. The intent
-      // slot itself can throw FS_NOT_OBSERVED for an unread target, so it sits
-      // inside the try: both that refusal and the provider's guarded-mutation
-      // failure get the model-facing remedy below.
+      // No stat on the observed path. A target this session never read is read
+      // here and the slot re-dispatched, so the policy's missing-observation
+      // refusal never becomes a logged failure the page has to render.
       let outcome
       try {
-        const intent = await ctx.waterfall('fs/edit-intent', target, exec, () => undefined)
-        outcome = await ctx.fs.editText(
+        outcome = await mutateWithObservedBasis(
+          ctx,
+          exec,
           target,
-          { oldString: input.oldString, newString: input.newString, replaceAll: input.replaceAll },
-          intent,
-          exec.signal,
-          sandboxPolicy,
+          caps,
+          () => ctx.waterfall('fs/edit-intent', target, exec, () => undefined),
+          intent => ctx.fs.editText(
+            target,
+            { oldString: input.oldString, newString: input.newString, replaceAll: input.replaceAll },
+            intent,
+            exec.signal,
+            sandboxPolicy,
+          ),
         )
       } catch (error: unknown) {
         // A sandbox denial becomes the shared [sandbox: …] marker (the model
-        // recognizes it from bash); a refusal that only lacks a fresh
-        // observation is recovered in place by re-reading the target and
-        // returning its content; anything else keeps its remedy or passes
-        // through.
+        // recognizes it from bash); a genuinely stale target is re-read so the
+        // failure carries the content the retry must rebase onto; anything
+        // else keeps its remedy or passes through.
         throw await recoverMutationFailure(ctx, exec, sandbox.mapError(error, sandboxPolicy), target, caps)
       }
       ctx.emit('fs/observed', target, { kind: 'present', version: outcome.version }, exec)

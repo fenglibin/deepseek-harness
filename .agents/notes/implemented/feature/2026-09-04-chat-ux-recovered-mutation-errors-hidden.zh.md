@@ -13,7 +13,9 @@ Status: implemented
 - `replace` 对整个窗口重建：收集每个路径的最新成功 mutation 锚点，然后隐藏锚点早于它的任何可恢复失败。
 - `apply` 增量更新：一处新到达的成功会通过重新评估它登记过的失败，把该路径早先的可恢复失败重新隐藏。
 
-只有 `FS_NOT_OBSERVED` 与 `FS_STALE_VERSION` 会被隐藏——这是两个补救指令本身即为「read the file, then retry」的受防护 mutation 错误码。其他所有失败（如 `FS_EDIT_NOT_FOUND`、`FS_PERMISSION_DENIED`）保持可见，因为它们按契约并非临时性错误。
+只有 `FS_NOT_OBSERVED` 与 `FS_STALE_VERSION` 会被**本投影**隐藏——这是两个补救指令本身即为「read the file, then retry」的受防护 mutation 错误码，其隐藏以「后续同路径成功」为条件。按契约并非临时性的失败（如 `FS_PERMISSION_DENIED`、`FS_NOT_FOUND`）保持可见，因为它们可能需要用户授权或告知路径问题。
+
+`FS_EDIT_NOT_FOUND` / `FS_AMBIGUOUS_EDIT` 曾按同一理由保持可见，现由 [`HiddenToolFailureProjector`](2026-09-16-unactionable-edit-failure-rows-hidden.zh.md) 无条件隐藏：这两个码只表示模型自己撰写的搜索文本写错了，读者无从处置。该判定独立于本投影，不进入本投影的错误码集合。
 
 ### 为什么是 hidden 而不是移除
 
@@ -21,11 +23,11 @@ Status: implemented
 
 ## Alternatives considered
 
-**在 `toolDefinition.buildViewNode` 内隐藏。** 否决：覆盖判定需要「后续成功」，而单个 tool-call Definition 看不到——它的上下文只含自己的 `tool/call` 与 `tool/result` 事件。
+**在 `toolDefinition.buildViewNode` 内隐藏。** 否决：本投影的覆盖判定需要「后续成功」，而单个 tool-call Definition 看不到——它的上下文只含自己的 `tool/call` 与 `tool/result` 事件。（该理由只对本投影的条件式判定成立；[无条件判定](2026-09-16-unactionable-edit-failure-rows-hidden.zh.md)可以在 Definition 内完成，仍选择投影层是为了让同类规则只有一处归属。）
 
 **在渲染层（`ui-tool`）隐藏。** 否决：可见性判定应归属视图投影，这样 chat 快照的每个消费方看到的都是同一份已恢复状态，其他读取方无需各自重算。
 
-**隐藏所有失败的 mutation，而非仅可恢复错误码。** 否决：非临时性失败（无匹配、权限拒绝）是有意义的，必须保持可见。
+**隐藏所有失败的 mutation，而非仅可恢复错误码。** 否决于本投影：非临时性失败（权限拒绝、目标不存在）是有意义的，必须保持可见。由模型自身撰写的搜索文本错误是这条界线上的狭窄例外，由[独立投影](2026-09-16-unactionable-edit-failure-rows-hidden.zh.md)承担，理由是读者对它无从处置。
 
 ## Consequences
 

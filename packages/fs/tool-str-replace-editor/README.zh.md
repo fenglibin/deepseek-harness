@@ -48,7 +48,7 @@ kind: "package-reference"
 
 ### 失败与恢复
 
-`view`、`str_replace` 或 `insert` 发生元数据未命中时，工具会在返回 `FS_NOT_FOUND` 前记录确认缺失，因此后续 `create` 可以通过已挂载策略的防护创建流程恢复外部删除的路径；缺失状态绝不会授权 `str_replace` 或 `insert`。防护变更继承策略插件的错误码与恢复指令——`FS_NOT_OBSERVED`（先读取文件再重试）、`FS_STALE_VERSION`（先重新读取再重试）——沙箱拒绝则表现为 `[sandbox: file access denied under <mode> mode]` 标记。路径必须是绝对路径；相对路径会被拒绝并给出提示。
+`view`、`str_replace` 或 `insert` 发生元数据未命中时，工具会在返回 `FS_NOT_FOUND` 前记录确认缺失，因此后续 `create` 可以通过已挂载策略的防护创建流程恢复外部删除的路径；缺失状态绝不会授权 `str_replace` 或 `insert`。`str_replace` 与 `insert` 本就必须读取文件内容，因此它们在分发意图槽位**之前**读取并记录该观察，未见目标不会产生策略拒绝。仍会失败的防护变更是真正陈旧的观察（`FS_STALE_VERSION`，即变更期间文件被外部改写）以及字面量不匹配（`FS_EDIT_NOT_FOUND`/`FS_AMBIGUOUS_EDIT`）；沙箱拒绝表现为 `[sandbox: file access denied under <mode> mode]` 标记。路径必须是绝对路径；相对路径会被拒绝并给出提示。
 
 -----
 
@@ -62,7 +62,7 @@ kind: "package-reference"
 
 ### 设计理念
 
-该工具是基于 `ctx.fs` 的单一 schema、四个命令。修改操作绝不带着自己的假设直接触碰提供方：每个操作都运行 `fs/write-intent` 或 `fs/edit-intent` waterfall 以取得策略插件的防护，在已挂载的 `ctx.fs` 实施沙箱限制时解析按调用沙箱策略，并把强制执行委托给提供方。`str_replace` 与 `insert` 还会重新读取文件，并在没有策略插件提供防护时把观察到的版本作为比较并交换的基础。
+该工具是基于 `ctx.fs` 的单一 schema、四个命令。修改操作绝不带着自己的假设直接触碰提供方：每个操作都运行 `fs/write-intent` 或 `fs/edit-intent` waterfall 以取得策略插件的防护，在已挂载的 `ctx.fs` 实施沙箱限制时解析按调用沙箱策略，并把强制执行委托给提供方。`str_replace` 与 `insert` 本就要读取文件内容来定位字面量或插入边界，因此它们先读取并记录该观察、再分发意图槽位——策略对未见目标的拒绝因此不会发生，且提供方的版本基准始终对应该次读取到的内容。
 
 ### 源码地图
 

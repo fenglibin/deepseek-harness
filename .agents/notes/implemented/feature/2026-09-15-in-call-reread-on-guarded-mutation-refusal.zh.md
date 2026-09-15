@@ -2,6 +2,8 @@
 
 Status: implemented
 
+**本记录已被[先读后写由工具在变更前自动完成](2026-09-15-observation-settled-before-mutation.zh.md)部分取代。** 它仍然准确的描述是：`FS_STALE_VERSION` 仍以「重新读取目标并附加当前内容」的方式向模型报告；`remediateFsError` 仍是目标不可重新读取时的回落路径。被取代的是决策本身——它选择在**失败之后**补救，因此那次 `isError` 仍会渲染成页面上的红色错误行。后续记录改为在**变更之前**结算观察，从源头不产生该失败。
+
 ## 问题
 
 策略插件对未观测目标的拒绝（`FS_NOT_OBSERVED`，消息 `edit requires reading "<path>" first`）以及陈旧观察的拒绝（`FS_STALE_VERSION`）共享同一个补救：重新读取目标。此前 [受防护变更错误在模型边界追加恢复指令](2026-08-03-fs-tool-error-remedy.zh.md) 只是把这条补救写成文本追加到失败消息上——`— read the file, then retry`——把执行它的责任完全留给模型。

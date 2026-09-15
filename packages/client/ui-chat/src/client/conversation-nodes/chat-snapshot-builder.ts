@@ -11,6 +11,7 @@ import type {
 } from '../contract/snapshot.ts'
 import { TURN_PROCESS_INDEPENDENT_KINDS } from '../contract/turn-process.ts'
 import { sessionRecallLabels } from './event-projection.ts'
+import { HiddenToolFailureProjector } from './hidden-tool-failure.ts'
 import { RecoveredMutationProjector } from './recovered-mutation.ts'
 import { sameTurnNavigationItem, turnNavigationItem } from './turn-navigation.ts'
 
@@ -635,6 +636,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
   private readonly legacy = new LegacySliceBuilder()
   private readonly referenceLabels = new ReferenceLabelProjector()
   private readonly recoveredMutation = new RecoveredMutationProjector()
+  private readonly hiddenFailures = new HiddenToolFailureProjector()
   private order: readonly string[] = EMPTY_KEYS
   /** Last published timeline: a Turn boundary can land without a new node. */
   private timeline: ConversationTimelineSnapshot | null = null
@@ -648,7 +650,7 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
     readonly nodes: readonly ChatConversationViewNode[]
     readonly timeline: ConversationTimelineSnapshot
   }): ChatSnapshot {
-    const nodes = this.recoveredMutation.replace(this.referenceLabels.replace(input.nodes))
+    const nodes = this.hiddenFailures.replace(this.recoveredMutation.replace(this.referenceLabels.replace(input.nodes)))
     this.store.replace(nodes)
     this.order = orderedVisibleChatNodes(nodes).map(node => node.key)
     this.locations.rebuild(this.order, this.store)
@@ -661,7 +663,9 @@ export class ChatSnapshotBuilder implements ConversationViewBuilder<ChatConversa
     readonly upserts: readonly ChatConversationViewNode[]
     readonly timeline: ConversationTimelineSnapshot
   }): ChatSnapshot {
-    const upserts = this.recoveredMutation.apply(this.referenceLabels.apply(input.upserts, this.store), this.store)
+    const upserts = this.hiddenFailures.apply(
+      this.recoveredMutation.apply(this.referenceLabels.apply(input.upserts, this.store), this.store),
+    )
     let structural = false
     const contentOnly: ChatConversationViewNode[] = []
     for (const node of upserts) {

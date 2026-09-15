@@ -11,6 +11,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import type { SessionDeleteOutcome, WorkspaceBrowserProps } from '../src/client/contract/slots.ts'
 import { createWorkspaceViewStore } from '../src/client/stores.ts'
+import type { WorkspaceRowMenuContribution } from '../src/client/row-menu.ts'
 import { WorkspaceBrowser } from '../src/client/rows/WorkspaceBrowser.tsx'
 import { zh } from '../src/client/locales.ts'
 
@@ -46,6 +47,12 @@ const workspaceState = (
 const noPendingInteraction: SessionPendingInteractionSnapshot = new Map()
 /** No Session carries an unsent draft until a test says otherwise. */
 const noDrafts: ReadonlySet<SessionId> = new Set()
+/**
+ * No plugin contributes a Workspace row menu entry until a test says so. One
+ * module-level reference, because a snapshot source must return the identical
+ * value between changes or React re-renders forever.
+ */
+const noRowMenuEntries: readonly WorkspaceRowMenuContribution[] = []
 /** A delete the Host accepted; a refusal names why nothing was removed. */
 const DELETED: SessionDeleteOutcome = { ok: true }
 const refused = (message: string, refusal: 'live' | 'failed' = 'failed'): SessionDeleteOutcome =>
@@ -92,6 +99,7 @@ function mount(overrides: Partial<WorkspaceBrowserProps> = {}) {
     insertSessionBefore: vi.fn(async () => {}),
     createWorkspace: vi.fn(async () => workspace('created', [])),
     useDirectoryFlow: bindSnapshotSelector({ getSnapshot: () => true, subscribe: () => () => {} }),
+    useWorkspaceRowMenu: bindSnapshotSelector({ getSnapshot: () => noRowMenuEntries, subscribe: () => () => {} }),
     useHostInfo: selector => selector({ home: undefined, isLoopback: true }),
     renderSlot: ((_name: string, owner: { open: boolean }) => (owner.open ? <div data-testid="directory-flow" /> : null)) as never,
     t,

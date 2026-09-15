@@ -285,14 +285,19 @@ async function replaceInFile(
   }
   const sandboxPolicy = policy.resolve(exec)
   const target = await resolveTarget(ctx, path, exec.signal)
-  const intent = await ctx.waterfall('fs/edit-intent', target, exec, () => undefined)
   const oldValue = requiredForCommand(oldStr, 'old_str', 'str_replace', false)
   const newValue = newStr ?? ''
   const info = await statExisting(ctx, target, 'str_replace', exec)
   if (info.type !== 'file') {
     throw new FsError(`cannot edit "${target.displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
   }
+  // Read BEFORE dispatching the intent. `str_replace` must read the file to
+  // match `old_str` at all, and that read is exactly the observation the policy
+  // wants, so recording it here means the intent slot supplies the version basis
+  // instead of refusing an unread target. The model never sees that refusal.
   const before = await ctx.fs.readText(target, exec.signal)
+  ctx.emit('fs/observed', target, { kind: 'present', version: info.version }, exec)
+  const intent = await ctx.waterfall('fs/edit-intent', target, exec, () => undefined)
   const offsets = matchOffsets(before, oldValue)
   const offset = offsets[0]
   if (offset === undefined) {
@@ -338,12 +343,16 @@ async function insertInFile(
   const value = requiredForCommand(newStr, 'new_str', 'insert')
   const sandboxPolicy = policy.resolve(exec)
   const target = await resolveTarget(ctx, path, exec.signal)
-  const intent = await ctx.waterfall('fs/edit-intent', target, exec, () => undefined)
   const info = await statExisting(ctx, target, 'insert', exec)
   if (info.type !== 'file') {
     throw new FsError(`cannot insert into "${target.displayPath}": not a regular file`, 'FS_NOT_REGULAR_FILE')
   }
+  // Read BEFORE dispatching the intent, for the same reason as `str_replace`:
+  // the read is the observation the policy requires, so recording it keeps the
+  // intent slot supplying a version basis rather than refusing an unread target.
   const before = await ctx.fs.readText(target, exec.signal)
+  ctx.emit('fs/observed', target, { kind: 'present', version: info.version }, exec)
+  const intent = await ctx.waterfall('fs/edit-intent', target, exec, () => undefined)
   const lines = before.split('\n')
   if (!Number.isInteger(insertLine) || insertLine < 0 || insertLine > lines.length) {
     throw new Error(

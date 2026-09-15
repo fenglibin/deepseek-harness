@@ -14,6 +14,7 @@ Conversation 组装的浏览器 Chat target。本包注册 Chat event definition
 - [轮次 token 用量](#turn-token-usage)
 - [轮次过程折叠](#turn-process-folding)
 - [用户消息抽屉](#user-message-drawer)
+- [不可操作的工具失败行](#unactionable-tool-failure-rows)
 - [模型体验](#model-experience)
 - [已知限制与暂缓事项](#known-limitations-and-deferred-work)
 - [开发备注](#dev-note)
@@ -48,6 +49,15 @@ Chat 会为每个非空的初始或恢复请求、显式消息序列起点或真
 
 -----
 
+<a id="unactionable-tool-failure-rows"></a>
+## 不可操作的工具失败行
+
+`edit` 的搜索文本由模型自己撰写，因此「字面量在文件中找不到」与「字面量匹配到多处」这两类失败，读者既没有参与也没有处置权：改写搜索文本、改用 `replace_all` 都是模型的下一步动作。这两类失败的行从对话流中隐藏，判定只依据 `tool/result` 事件上持久化的 `error.code`（`FS_EDIT_NOT_FOUND` / `FS_AMBIGUOUS_EDIT`），不解析结果文本——同一条件在各文件系统后端措辞不同，按文本匹配既脆弱又必然漏掉后端。隐藏无条件成立，不要求存在任何后续成功的调用，因为模型常常放弃该路径而不是重试。
+
+只有页面上不展示：模型收到的结果文本与错误码原样保留。权限与沙箱拒绝、目标不存在一类的失败保持可见，因为它们可能需要用户授权或告知路径问题。该判定由独立的节点投影承担，与「被后续同文件成功覆盖」的条件式隐藏互不重叠。
+
+-----
+
 <a id="model-experience"></a>
 ## 模型体验
 
@@ -62,6 +72,8 @@ Chat 会为每个非空的初始或恢复请求、显式消息序列起点或真
 <a id="known-limitations-and-deferred-work"></a>
 
 - **视图只反映已加载的 Session 窗口**——只有 Session Controller 加载前一页 event 后，更早的 transcript node 才会出现。轮次导航同样只表示已加载的 Turn；加载更早一页时，已有 Turn 刻度保持身份不变，完整的已加载集合在紧凑轨道中重新排布，不显示未加载历史占位。刻度默认相隔 10px，仅在已加载集合超过可用高度时压缩间距。用户消息抽屉至少需要一条已加载的用户提示词，因此打开一个窗口内没有任何提示词的会话时，会自动加载更早的分页直到出现一条。
+
+- **不可操作的失败行只覆盖顶层调用**——PTC 模式下 `edit` 会作为 `run_code` 的嵌套子调用出现，而 `tool/code-dispatch` 事件只记录 `isError` 与 `content`，不带 `{ name, code }`。子调用因此没有可判定的错误码，其失败行不因该判定而隐藏。要覆盖它需要扩展事件格式并连带更新快照与两个 SDK 的期望输出，在 PTC 呈现模式的部署中该事件确有产出之前不做。
 
 
 <a id="dev-note"></a>

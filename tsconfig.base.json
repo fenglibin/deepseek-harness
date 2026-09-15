@@ -67,6 +67,12 @@
       "@deepseek-ai/dsh-api-workspace-controller/client": ["./packages/api/workspace-controller/src/client/index.ts"],
       "@deepseek-ai/dsh-api-workspace-controller/invariant": ["./packages/api/workspace-controller/src/invariant.ts"],
       "@deepseek-ai/dsh-api-workspace-controller/types": ["./packages/api/workspace-controller/src/types.ts"],
+      // The api group prefixes its directory names, so the generated aliases
+      // (which map a package only when its name is exactly dsh-<dir>) skip them;
+      // api/file-browser carries the same two shapes as workspace-controller.
+      "@deepseek-ai/dsh-api-file-browser": ["./packages/api/file-browser/src/index.ts"],
+      "@deepseek-ai/dsh-api-file-browser/invariant": ["./packages/api/file-browser/src/invariant.ts"],
+      "@deepseek-ai/dsh-api-file-browser/types": ["./packages/api/file-browser/src/types.ts"],
       "@deepseek-ai/dsh-typert-protocol": ["./packages/typert/protocol/src/index.ts"],
       "@deepseek-ai/dsh-typert-protocol/types": ["./packages/typert/protocol/src/types.ts"],
       "@deepseek-ai/dsh-typert-loader": ["./packages/typert/loader/src/index.ts"],
@@ -223,6 +229,9 @@
       "@deepseek-ai/dsh-client-ui-user-questions": ["./packages/client/ui-user-questions/src"],
       "@deepseek-ai/dsh-client-ui-trajectory": ["./packages/client/ui-trajectory/src"],
       "@deepseek-ai/dsh-client-ui-workspace": ["./packages/client/ui-workspace/src"],
+      "@deepseek-ai/dsh-client-ui-file-browser": ["./packages/client/ui-file-browser/src"],
+      "@deepseek-ai/dsh-client-ui-file-browser/client": ["./packages/client/ui-file-browser/src/client/index.ts"],
+      "@deepseek-ai/dsh-client-ui-file-browser/invariant": ["./packages/client/ui-file-browser/src/invariant.ts"],
       "@deepseek-ai/dsh-client-ui-theme": ["./packages/client/ui-theme/src"],
       "@deepseek-ai/dsh-client-ui-settings": ["./packages/client/ui-settings/src"],
       "@deepseek-ai/dsh-client-ui-settings-general": ["./packages/client/ui-settings-general/src"],

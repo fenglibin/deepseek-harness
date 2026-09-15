@@ -32,6 +32,7 @@ import type { RemoteHostFacts } from '@deepseek-ai/dsh-api-remotes/client'
 import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { createWorkspaceViewStore } from '../stores.ts'
+import type { WorkspaceRowMenuContribution } from '../row-menu.ts'
 
 /**
  * Owner share of the directory-flow holes: the complete conversation between
@@ -116,6 +117,12 @@ export type WorkspaceBrowserInjected = {
      * away, so typed-but-unsent content stays reachable.
      */
     sessionDrafts: HostObservable<ReadonlySet<SessionId>>
+    /**
+     * Entries other plugins contribute to every real Workspace row menu, in
+     * render order. Read through a hook because the set changes with plugin
+     * load and unload, long after this registration's inject factory ran.
+     */
+    workspaceRowMenu: HostObservable<readonly WorkspaceRowMenuContribution[]>
   }
   /**
    * Start a New Session in a Workspace: reuse-or-create its blank session and

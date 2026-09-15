@@ -463,12 +463,34 @@ describe('edit tool', () => {
     expect(text(result)).toContain('file_path must be a non-empty string')
   })
 
-  it('propagates FS_NOT_OBSERVED when the file was never read (the gate decides)', async () => {
+  it('settles an unread edit by reading the target and re-dispatching the intent slot', async () => {
     const { ctx, fs } = await setup()
     fs.files.set('key:a.txt', 'hello')
+    const statSpy = vi.spyOn(fs, 'stat')
     const result = await call(ctx, 'edit', { file_path: 'a.txt', old_string: 'a', new_string: 'b' }, { session: { header: {} } })
-    expect(result.isError).toBe(true)
-    expect(result.error).toMatchObject({ info: { code: 'FS_NOT_OBSERVED' } })
+    // The gate refuses an unobserved target; the tool reads it and re-dispatches.
+    // A successful mutation carrying a version is itself the proof: an unobserved
+    // slot never yields one, it refuses. The read is what produced it.
+    expect(result.isError).toBe(false)
+    expect(fs.editIntents).toEqual([{ version: 'v1' }])
+    expect(statSpy).toHaveBeenCalledTimes(1)
+    statSpy.mockRestore()
+  })
+
+  it('pays neither a read nor a probe stat when the target was already observed', async () => {
+    const { ctx, fs } = await setup()
+    fs.files.set('key:a.txt', 'hello')
+    // ONE session object: observed state is keyed by owner identity, so a fresh
+    // literal per call would be a different owner and force the recovery read.
+    const session = { header: {} }
+    expect((await call(ctx, 'read', { file_path: 'a.txt' }, { session })).isError).toBe(false)
+    const statSpy = vi.spyOn(fs, 'stat')
+    const result = await call(ctx, 'edit', { file_path: 'a.txt', old_string: 'hello', new_string: 'bye' }, { session })
+    expect(result.isError).toBe(false)
+    // The observed path is unchanged: zero stat, one mutation, no reread.
+    expect(statSpy).not.toHaveBeenCalled()
+    expect(fs.editIntents).toEqual([{ version: 'v1' }])
+    statSpy.mockRestore()
   })
 })
 

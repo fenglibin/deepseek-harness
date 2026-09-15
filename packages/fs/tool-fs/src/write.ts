@@ -11,7 +11,7 @@ import type { DiffCallView, DiffResultView, ToolResult } from '@deepseek-ai/dsh-
 import type { FsWriteOutcome } from '@deepseek-ai/dsh-fs'
 import type {} from '@deepseek-ai/dsh-fs'
 import { computeHunkDiffs, diffsFromMeta } from './diff.ts'
-import { recoverMutationFailure } from './error.ts'
+import { mutateWithObservedBasis, recoverMutationFailure } from './error.ts'
 import { sessionResolveOptions } from './session-cwd.ts'
 import type { ReadToolCaps } from './read.ts'
 import type { FsSandboxController } from './sandbox.ts'
@@ -64,7 +64,7 @@ export function applyWriteTool(ctx: Context, sandbox: FsSandboxController, caps:
   ctx.systemPrompt.section({
     name: 'tool:write',
     order: ctx.systemPrompt.getSectionOrder('TOOL_WRITE'),
-    text: 'Use the write tool to create files or completely replace file contents. Existing files are overwritten, so read an existing file first (the default fs-observation-policy requires it) and prefer edit for targeted changes.',
+    text: 'Use the write tool to create files or completely replace file contents. Existing files are overwritten. The tool settles its own file observation, so do not read a file merely to satisfy it; read it when you need its contents to decide what to write, and prefer edit for targeted changes.',
   })
 
   ctx.tools.register(defineTool({
@@ -108,17 +108,26 @@ export function applyWriteTool(ctx: Context, sandbox: FsSandboxController, caps:
       const sandboxPolicy = await sandbox.resolvePolicy('write', args, exec)
       const target = await ctx.fs.resolve(input.filePath, sessionResolveOptions(exec, input.filePath, sandboxPolicy?.workspaceRoot))
       // Single-slot decision: the policy plugin produces createIfAbsent/
-      // replaceIfVersion; the bare default is undefined (unconditional). No stat.
-      const intent = await ctx.waterfall('fs/write-intent', target, exec, () => undefined)
+      // replaceIfVersion; the bare default is undefined (unconditional). No stat
+      // on the observed path. An unobserved target resolves to createIfAbsent,
+      // which the provider refuses when the file exists; that refusal is settled
+      // by reading the target and re-dispatching the slot, so the overwrite the
+      // model asked for succeeds without a transient failure row.
       let outcome: FsWriteOutcome
       try {
-        outcome = await ctx.fs.writeText(target, input.content, intent, exec.signal, sandboxPolicy)
+        outcome = await mutateWithObservedBasis(
+          ctx,
+          exec,
+          target,
+          caps,
+          () => ctx.waterfall('fs/write-intent', target, exec, () => undefined),
+          intent => ctx.fs.writeText(target, input.content, intent, exec.signal, sandboxPolicy),
+        )
       } catch (error: unknown) {
         // A sandbox denial becomes the shared [sandbox: …] marker (the model
-        // recognizes it from bash); a refusal that only lacks a fresh
-        // observation is recovered in place by re-reading the target and
-        // returning its content; anything else keeps its remedy or passes
-        // through.
+        // recognizes it from bash); a genuinely stale target is re-read so the
+        // failure carries the content the retry must rebase onto; anything
+        // else keeps its remedy or passes through.
         throw await recoverMutationFailure(ctx, exec, sandbox.mapError(error, sandboxPolicy), target, caps)
       }
       ctx.emit('fs/observed', target, { kind: 'present', version: outcome.version }, exec)

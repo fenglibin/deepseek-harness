@@ -100,6 +100,12 @@
     - id: workspace-controller
       name: '@deepseek-ai/dsh-api-workspace-controller'
 
+    # Workspace-scoped file operations behind the browser file manager: the
+    # fileBrowser Remote namespace and the /api/file.asset bytes route. Its
+    # client half (ui-file-browser) contributes the entry that calls it.
+    - id: file-browser
+      name: '@deepseek-ai/dsh-api-file-browser'
+
     - id: cordis-host-runner
       name: '@deepseek-ai/dsh-cordis-host-runner'
 
@@ -258,6 +264,12 @@
 
     - id: ui-workspace
       name: '@deepseek-ai/dsh-client-ui-workspace'
+
+    # Workspace file browser: a "工作区文件" entry on each Workspace row menu
+    # opening a tree-and-editor dialog over the workspace directory. Remove to
+    # take the entry and its dialog out of the composition.
+    - id: ui-file-browser
+      name: '@deepseek-ai/dsh-client-ui-file-browser'
 
     # Input triggers: the '/' | '@' pipeline (ui-input-trigger), the command surface over
     # it (ui-commands), and the reference sources (ui-skill / ui-reference).

@@ -19,6 +19,7 @@ import type { SessionSearchResultItem } from '@deepseek-ai/dsh-api-session-contr
 import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceBrowserProps } from '../contract/slots.ts'
+import type { WorkspaceRowMenuContribution } from '../row-menu.ts'
 import type { SessionNode, SessionOrderBy } from '../tree.ts'
 import { deriveArchived, deriveFlat, deriveGroups, deriveSearchResults, UNGROUPED_KEY } from '../tree.ts'
 import { ProjectRowItem, SearchResultItem, SessionNodeItem } from './Rows.tsx'
@@ -168,6 +169,8 @@ type SessionTreeProps = Pick<
   /** Host account home for POSIX hover-path abbreviation. */
   home?: string | undefined
   workspaces: readonly WorkspaceView[]
+  /** Entries other plugins contribute to every real Workspace row menu. */
+  workspaceRowMenu: readonly WorkspaceRowMenuContribution[]
   /** Explicit persisted zero-or-five-session state by Workspace group. */
   groupExpansion: Readonly<Record<string, boolean>>
   /** Persist one Workspace group's zero-or-five-session state. */
@@ -201,7 +204,7 @@ function SessionTree({
   archivedExpanded, setArchivedExpanded, onSessionRestore, onSessionDelete,
   onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive,
   insertWorkspaceBefore, insertSessionBefore, orderBy,
-  groupExpansion, setGroupExpanded, home, t,
+  groupExpansion, setGroupExpanded, home, workspaceRowMenu, t,
 }: SessionTreeProps) {
   const list = useSessions(s => s)
   const pendingInteractions = useSessionPendingInteraction(s => s)
@@ -382,6 +385,8 @@ function SessionTree({
                 group={group}
                 home={home}
                 t={t}
+                contributions={workspaceRowMenu}
+                workspace={workspaces.find(item => item.workspaceId === group.workspaceId)}
                 onToggle={() => {
                   if (group.expanded) {
                     setExpandedSessionGroups(keys => keys.filter(key => key !== group.key))
@@ -742,10 +747,12 @@ export function WorkspaceBrowser({
   useDirectoryFlow,
   useHostInfo,
   useSessionDrafts,
+  useWorkspaceRowMenu,
   renderSlot,
   t,
 }: WorkspaceBrowserProps) {
   const home = useHostInfo(info => info.home)
+  const rowMenuContributions = useWorkspaceRowMenu(entries => entries)
   const workspaces = useWorkspaces(state => state.items)
   const workspacePhase = useWorkspaces(state => state.phase)
   const archivedSessionIds = useWorkspaces(state => state.archivedSessionIds)
@@ -1173,6 +1180,7 @@ export function WorkspaceBrowser({
                 onSessionArchive={onSessionArchive}
                 forkSession={forkSession}
                 workspaces={workspaces}
+                workspaceRowMenu={rowMenuContributions}
                 groupExpansion={groupExpansion}
                 setGroupExpanded={actions.setGroupExpanded}
                 archivedSessionIds={archivedSessionIds}

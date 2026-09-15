@@ -1979,8 +1979,8 @@ describe('built-in conversation node Definitions', () => {
       }),
       at(4, 'tool/result', {
         turn: 1, step: 1,
-        message: toolResult('edit-1', 'no match for old_string', true),
-        error: { name: 'FsError', code: 'FS_EDIT_NOT_FOUND' },
+        message: toolResult('edit-1', 'permission denied for a.txt', true),
+        error: { name: 'FsError', code: 'FS_PERMISSION_DENIED' },
       }, { surfaceOp: 'append' }),
       at(5, 'tool/call', {
         turn: 1, step: 1, callId: 'edit-2', name: 'edit',
@@ -1998,6 +1998,126 @@ describe('built-in conversation node Definitions', () => {
     const byCallId = new Map(calls.map(candidate => [(candidate.data as ToolChatData).root.callId, candidate]))
     expect(byCallId.get('edit-1')?.visibility).toBe('visible')
     expect(byCallId.get('edit-2')?.visibility).toBe('visible')
+  })
+
+  it('hides an unactionable edit failure without waiting for any later success', () => {
+    // The model usually abandons a wrong search text instead of retrying it, so
+    // the hiding must not be conditioned on a later mutation of the same path.
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'tool/call', {
+        turn: 1, step: 1, callId: 'edit-ambiguous', name: 'edit',
+        arguments: '{"file_path":"tsconfig.client.json","old_string":"x","new_string":"y"}',
+      }),
+      at(4, 'tool/result', {
+        turn: 1, step: 1,
+        message: toolResult('edit-ambiguous', 'old_string matched 2 times in "tsconfig.client.json"', true),
+        error: { name: 'FsError', code: 'FS_AMBIGUOUS_EDIT' },
+      }, { surfaceOp: 'append' }),
+      at(5, 'tool/call', {
+        turn: 1, step: 1, callId: 'edit-missing', name: 'edit',
+        arguments: '{"file_path":"Browser.tsx","old_string":"absent","new_string":"y"}',
+      }),
+      at(6, 'tool/result', {
+        turn: 1, step: 1,
+        message: toolResult('edit-missing', 'old_string was not found in "Browser.tsx"', true),
+        error: { name: 'FsError', code: 'FS_EDIT_NOT_FOUND' },
+      }, { surfaceOp: 'append' }),
+      at(7, 'step/end', { turn: 1, step: 1 }),
+      at(8, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+    ])
+    const snap = snapshot(value)
+    const calls = snap.nodes.values().filter(candidate => candidate.kind === 'tool-call')
+    const byCallId = new Map(calls.map(candidate => [(candidate.data as ToolChatData).root.callId, candidate]))
+    expect(byCallId.get('edit-ambiguous')?.visibility).toBe('hidden')
+    expect(byCallId.get('edit-missing')?.visibility).toBe('hidden')
+    // A hidden row leaves the visible order but stays materialized, because the
+    // assembler forbids withdrawing a node it already published.
+    expect(snap.order).not.toContain(byCallId.get('edit-ambiguous')?.key)
+  })
+
+  it('hides an unactionable edit failure that lands incrementally, like a full window would', () => {
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'tool/call', {
+        turn: 1, step: 1, callId: 'edit-running', name: 'edit',
+        arguments: '{"file_path":"a.txt","old_string":"x","new_string":"y"}',
+      }),
+    ])
+    // Still running: no result has settled, so nothing is hidden yet.
+    const running = snapshot(value).nodes.values().find(candidate => candidate.kind === 'tool-call')
+    expect(running?.visibility).toBe('visible')
+
+    value.append(at(4, 'tool/result', {
+      turn: 1, step: 1,
+      message: toolResult('edit-running', 'old_string was not found in "a.txt"', true),
+      error: { name: 'FsError', code: 'FS_EDIT_NOT_FOUND' },
+    }, { surfaceOp: 'append' }))
+    value.flush()
+
+    const call = snapshot(value).nodes.values().find(candidate => candidate.kind === 'tool-call')
+    expect(call?.visibility).toBe('hidden')
+  })
+
+  it('keeps every failure outside the unactionable set visible', () => {
+    const codes = [
+      'FS_PERMISSION_DENIED',
+      'FS_SANDBOX_DENIED',
+      'FS_STALE_VERSION',
+      'FS_NOT_FOUND',
+      'FS_NOT_REGULAR_FILE',
+      'failed',
+    ]
+    for (const code of codes) {
+      const value = assembler([
+        at(1, 'turn/start', { turn: 1 }),
+        at(2, 'step/start', { turn: 1, step: 1 }),
+        at(3, 'tool/call', {
+          turn: 1, step: 1, callId: `call-${code}`, name: 'edit',
+          arguments: '{"file_path":"a.txt","old_string":"x","new_string":"y"}',
+        }),
+        at(4, 'tool/result', {
+          turn: 1, step: 1,
+          message: toolResult(`call-${code}`, `${code} on a.txt`, true),
+          error: { name: 'FsError', code },
+        }, { surfaceOp: 'append' }),
+        at(5, 'step/end', { turn: 1, step: 1 }),
+        at(6, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+      ])
+      const call = snapshot(value).nodes.values().find(candidate => candidate.kind === 'tool-call')
+      expect(call?.visibility).toBe('visible')
+    }
+  })
+
+  it('keeps a successful call and an error without a code visible', () => {
+    const value = assembler([
+      at(1, 'turn/start', { turn: 1 }),
+      at(2, 'step/start', { turn: 1, step: 1 }),
+      at(3, 'tool/call', {
+        turn: 1, step: 1, callId: 'edit-ok', name: 'edit',
+        arguments: '{"file_path":"a.txt","old_string":"x","new_string":"y"}',
+      }),
+      at(4, 'tool/result', {
+        turn: 1, step: 1, message: toolResult('edit-ok', 'Updated file'),
+      }, { surfaceOp: 'append' }),
+      at(5, 'tool/call', {
+        turn: 1, step: 1, callId: 'edit-codeless', name: 'edit',
+        arguments: '{"file_path":"a.txt","old_string":"x","new_string":"x"}',
+      }),
+      at(6, 'tool/result', {
+        turn: 1, step: 1,
+        message: toolResult('edit-codeless', 'old_string and new_string must differ', true),
+      }, { surfaceOp: 'append' }),
+      at(7, 'step/end', { turn: 1, step: 1 }),
+      at(8, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+    ])
+    const snap = snapshot(value)
+    const calls = snap.nodes.values().filter(candidate => candidate.kind === 'tool-call')
+    const byCallId = new Map(calls.map(candidate => [(candidate.data as ToolChatData).root.callId, candidate]))
+    expect(byCallId.get('edit-ok')?.visibility).toBe('visible')
+    expect(byCallId.get('edit-codeless')?.visibility).toBe('visible')
   })
 
   it('re-hides an earlier recoverable failure when a later success lands incrementally', () => {

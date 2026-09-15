@@ -66,26 +66,21 @@ describe('default deployment (with dsh-fs-observation-policy)', () => {
       expect(await readFile(join(dir, 'new.txt'), 'utf8')).toBe('line one\nline two\n')
     })
 
-    it('rejects overwriting an existing file without reading it first, returning its content', async () => {
+    it('overwrites an existing unread file by reading it first, with no failure surfaced', async () => {
       await writeFile(join(dir, 'a.txt'), 'original')
       const result = await call('write', { file_path: 'a.txt', content: 'clobber' })
-      expect(result.isError).toBe(true)
-      expect(result.error).toMatchObject({ info: { code: 'FS_NOT_OBSERVED' } })
-      // The refusal carries the file's current content, so the retry needs no
-      // separate read: the recovery reread is what satisfies the gate.
-      expect(text(result)).toContain('without reading it first')
-      expect(text(result)).toContain('1: original')
-      expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('original')
+      // The policy's createIfAbsent refusal is settled inside the call: the tool
+      // reads the target, which records the observation, and re-dispatches the
+      // intent slot. The model sees one successful result, never an error row.
+      expect(result.isError).toBe(false)
+      expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('clobber')
     })
 
-    it('the returned content is actionable: retrying the refused write needs no read', async () => {
+    it('the in-call read authorizes the overwrite without a separate read call', async () => {
       await writeFile(join(dir, 'a.txt'), 'original')
-      const refused = await call('write', { file_path: 'a.txt', content: 'replaced' })
-      expect(refused.isError).toBe(true)
-      expect(refused.error).toMatchObject({ info: { code: 'FS_NOT_OBSERVED' } })
-      // No `read` call in between: the recovery reread already recorded the observation.
-      const retried = await call('write', { file_path: 'a.txt', content: 'replaced' })
-      expect(retried.isError).toBe(false)
+      // No `read` tool call anywhere: the overwrite succeeds on its own.
+      const written = await call('write', { file_path: 'a.txt', content: 'replaced' })
+      expect(written.isError).toBe(false)
       expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('replaced')
     })
 
@@ -158,27 +153,32 @@ describe('default deployment (with dsh-fs-observation-policy)', () => {
       expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('hello there')
     })
 
-    it('rejects an edit before any read, returning the content it must match', async () => {
+    it('edits an unread file by reading it first, with no failure surfaced', async () => {
       await writeFile(join(dir, 'a.txt'), 'hello world')
       const result = await call('edit', { file_path: 'a.txt', old_string: 'world', new_string: 'there' })
-      expect(result.isError).toBe(true)
-      expect(result.error).toMatchObject({ info: { code: 'FS_NOT_OBSERVED' } })
-      // The refusal reaches the model with the file's current content, so the
-      // retry is grounded in what it must literally match.
-      expect(text(result)).toContain('edit requires reading')
-      expect(text(result)).toContain('1: hello world')
-      expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('hello world')
+      // The policy's missing-observation refusal is settled inside the call: the
+      // tool reads the target (recording the observation) and re-dispatches the
+      // intent slot, so the edit applies without a transient error row.
+      expect(result.isError).toBe(false)
+      expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('hello there')
     })
 
-    it('the returned content is actionable: retrying the refused edit needs no read', async () => {
+    it('the in-call read authorizes the edit without a separate read call', async () => {
       await writeFile(join(dir, 'a.txt'), 'hello world')
-      const refused = await call('edit', { file_path: 'a.txt', old_string: 'world', new_string: 'there' })
-      expect(refused.isError).toBe(true)
-      expect(refused.error).toMatchObject({ info: { code: 'FS_NOT_OBSERVED' } })
-      // The recovery reread recorded the observation, so the retry lands directly.
-      const retried = await call('edit', { file_path: 'a.txt', old_string: 'world', new_string: 'there' })
-      expect(retried.isError).toBe(false)
+      // No `read` tool call anywhere: the edit succeeds on its own.
+      const edited = await call('edit', { file_path: 'a.txt', old_string: 'world', new_string: 'there' })
+      expect(edited.isError).toBe(false)
       expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('hello there')
+    })
+
+    it('still reports a genuinely unmatchable edit against the content it just read', async () => {
+      await writeFile(join(dir, 'a.txt'), 'hello world')
+      const result = await call('edit', { file_path: 'a.txt', old_string: 'absent', new_string: 'x' })
+      // The read settles the observation, not the literal match: a guess that
+      // does not appear still fails, and fails against the real content.
+      expect(result.isError).toBe(true)
+      expect(result.error).toMatchObject({ info: { code: 'FS_EDIT_NOT_FOUND' } })
+      expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('hello world')
     })
 
     it('lets a WINDOWED read authorize an edit when the file is unchanged (freshness, not full-view)', async () => {
@@ -247,43 +247,72 @@ describe('default deployment (with dsh-fs-observation-policy)', () => {
   })
 
   describe('the gate records only through the events (no method coupling)', () => {
-    it('a direct ctx.fs.readText records no observed-state, so a later edit rejects', async () => {
+    it('a direct ctx.fs.readText records no observed-state, so the intent slot still refuses', async () => {
       await writeFile(join(dir, 'a.txt'), 'hello world')
       // Reach AROUND the tool — an explicit escape hatch for non-tool consumers.
       await ctx.fs.readText(await ctx.fs.resolve('a.txt'))
-      // The model-facing edit still rejects: the read did not emit fs/observed.
-      const result = await call('edit', { file_path: 'a.txt', old_string: 'world', new_string: 'there' })
-      expect(result.isError).toBe(true)
-      expect(result.error).toMatchObject({ info: { code: 'FS_NOT_OBSERVED' } })
+      // The intent slot still refuses: that read never emitted fs/observed. The
+      // slot is dispatched directly here so the assertion targets the gate's own
+      // record, not the tool's in-call recovery that would otherwise settle it.
+      const target = await ctx.fs.resolve('a.txt')
+      await expect(ctx.waterfall('fs/edit-intent', target, { agent: { session } }, () => undefined))
+        .rejects.toMatchObject({ code: 'FS_NOT_OBSERVED' })
     })
   })
 
-  describe('deleted observed target', () => {
-    it('a failed reread records absence so write can safely recreate the file', async () => {
+  describe('the recovery read is the policy\'s own answer, not a shortcut past it', () => {
+    it('an edit of a MISSING target reports FS_NOT_FOUND rather than FS_NOT_OBSERVED', async () => {
+      // The recovery read records authoritative absence, so the policy answers
+      // "not found" — accurate and permanently visible — instead of the
+      // transient-looking "you never read it".
+      const result = await call('edit', { file_path: 'gone.txt', old_string: 'a', new_string: 'b' })
+      expect(result.isError).toBe(true)
+      expect(result.error).toMatchObject({ info: { code: 'FS_NOT_FOUND' } })
+    })
+
+    it('a write to a MISSING target still creates it (absence authorizes a guarded create)', async () => {
+      const result = await call('write', { file_path: 'fresh.txt', content: 'made' })
+      expect(result.isError).toBe(false)
+      expect(await readFile(join(dir, 'fresh.txt'), 'utf8')).toBe('made')
+    })
+
+    it('a failed recovery records absence, so a write can then recreate an externally deleted file', async () => {
       await writeFile(join(dir, 'a.txt'), 'original')
       await call('read', { file_path: 'a.txt' })
       await rm(join(dir, 'a.txt')) // out-of-band deletion
 
-      // The original positive observation still protects the first mutation.
+      // The stale observation still guards the first write...
+      const stale = await call('write', { file_path: 'a.txt', content: 'premature' })
+      expect(stale.isError).toBe(true)
+      expect(stale.error).toMatchObject({ info: { code: 'FS_STALE_VERSION' } })
+
+      // ...and that failure's own recovery read recorded the absence, so the
+      // retried write takes the guarded create path and succeeds.
+      const recreated = await call('write', { file_path: 'a.txt', content: 'fresh' })
+      expect(recreated.isError).toBe(false)
+      expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('fresh')
+    })
+  })
+
+  describe('deleted observed target', () => {
+    it('the first failed mutation discovers the deletion, so the next write recreates the file', async () => {
+      await writeFile(join(dir, 'a.txt'), 'original')
+      await call('read', { file_path: 'a.txt' })
+      await rm(join(dir, 'a.txt')) // out-of-band deletion
+
+      // The original positive observation still protects the first mutation, and
+      // its recovery re-read records the absence it finds.
       const edit = await call('edit', { file_path: 'a.txt', old_string: 'original', new_string: 'x' })
       expect(edit.isError).toBe(true)
       expect(edit.error).toMatchObject({ info: { code: 'FS_STALE_VERSION' } })
-      const write = await call('write', { file_path: 'a.txt', content: 'premature' })
-      expect(write.isError).toBe(true)
-      expect(write.error).toMatchObject({ info: { code: 'FS_STALE_VERSION' } })
 
-      // A read-not-found is an authoritative negative observation for this
-      // owner. It still fails as a read, but changes the next write guard.
-      const reread = await call('read', { file_path: 'a.txt' })
-      expect(reread.isError).toBe(true)
-      expect(reread.error).toMatchObject({ info: { code: 'FS_NOT_FOUND' } })
-
-      // Absence never authorizes edit: there is no content/version to edit.
+      // Absence never authorizes edit: there is no content/version to edit, and
+      // now the policy can say so plainly instead of reporting staleness.
       const retriedEdit = await call('edit', { file_path: 'a.txt', old_string: 'original', new_string: 'x' })
       expect(retriedEdit.isError).toBe(true)
       expect(retriedEdit.error).toMatchObject({ info: { code: 'FS_NOT_FOUND' } })
 
-      // The retried write uses createIfAbsent; the provider remains responsible
+      // The write takes the guarded create path; the provider remains responsible
       // for rejecting a concurrent creator at publication time.
       const recovered = await call('write', { file_path: 'a.txt', content: 'fresh' })
       expect(recovered.isError).toBe(false)
