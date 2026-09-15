@@ -490,11 +490,6 @@
         subagentProvider: spawn
         maxRounds: 64
 
-    - id: tool-str-replace-editor
-      name: '@deepseek-ai/dsh-tool-str-replace-editor'
-      config:
-        maxOutputChars: 16000
-
     # Consecutive-repeat reminders on the tool chain. The first threshold fires
     # at the second repeat: a model stuck in a loop costs a full round trip per
     # attempt, and the reminder is advice the model may ignore on the first call.
@@ -504,16 +499,16 @@
         thresholds: [2, 4, 6]
         argumentsPreviewChars: 500
 
-    # Every mode enables the stable model-facing web_search tool. The Web app's
-    # per-agent presets additionally enable web_fetch; other products opt in by
-    # overriding tool-web. DeepSeek search resolves the same DEEPSEEK_API_KEY
-    # credential the Models page manages for chat, at each search; its Messages
-    # endpoint is separate from the chat-completions endpoint, so it takes its own
-    # base-URL override. Anonymous fetch accepts only public HTTP(S) destinations,
-    # resolves and validates every destination, and pins every actual connection.
-    # Search is a full auxiliary model request with server-side retrieval, so this
-    # shipped DeepSeek route gets 60s while the provider-neutral tool default
-    # remains 30s.
+    # The shared base enables the stable model-facing web_search and web_fetch
+    # tools. The Web app disables this host row and composes both tools per agent
+    # preset; products with a stricter network policy override tool-web. DeepSeek
+    # search resolves the same DEEPSEEK_API_KEY credential the Models page manages
+    # for chat, at each search; its Messages endpoint is separate from the
+    # chat-completions endpoint, so it takes its own base-URL override. Anonymous
+    # fetch accepts only public HTTP(S) destinations, resolves and validates every
+    # destination, and pins every actual connection. Search is a full auxiliary
+    # model request with server-side retrieval, so this shipped DeepSeek route
+    # gets 60s while the provider-neutral tool default remains 30s.
     - id: web
       name: '@deepseek-ai/dsh-web'
       config:
@@ -531,7 +526,7 @@
     - id: tool-web
       name: '@deepseek-ai/dsh-tool-web'
       config:
-        fetch: false
+        fetch: true
         searchTimeoutMs: 60000
 
     # ── rows every mode mounts, whose values each overlay may state ──────────────

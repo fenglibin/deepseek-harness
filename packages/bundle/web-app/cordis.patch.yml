@@ -388,9 +388,6 @@
 - id: tool-fs-search
   disabled: true
 
-- id: tool-str-replace-editor
-  disabled: true
-
 # The `skill` REGISTRY stays in the host plane. It is host+per-scope layered
 # (the tools-registry shape): the host `skill-filesystem` row and repository
 # plugins register into its global layer, while a preset's `skill-filesystem`

@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import * as yaml from 'js-yaml'
-import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
+import { applyEntryPatches, entryListSchema, type PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import { evaluate } from '@deepseek-ai/cordis-plugin-loader'
 
 describe('dsh-base bundle', () => {
@@ -43,7 +43,12 @@ describe('dsh-base bundle', () => {
     expect(rows.filter(row => row.id === 'subagent-claude-code')).toHaveLength(0)
     expect(rows.find(row => row.id === 'web')?.config).toMatchObject({ fetchProvider: 'http' })
     expect(rows.find(row => row.id === 'web-fetch-http')).toBeDefined()
-    expect(rows.find(row => row.id === 'tool-web')?.config).toMatchObject({ fetch: false })
+    expect(rows.find(row => row.id === 'tool-web')?.config).toMatchObject({ fetch: true })
+    // One file-editing interface: `read`/`write`/`edit` come from tool-fs, and
+    // the overlapping `str_replace_editor` stays available only to a
+    // composition that inserts it explicitly.
+    expect(rows.find(row => row.id === 'tool-fs')).toBeDefined()
+    expect(rows.filter(row => row.id === 'tool-str-replace-editor')).toHaveLength(0)
     // The shipped default answers in Chinese; `auto` here would hand the
     // language back to each host's own locale and the directive would vanish
     // on an English host.
@@ -51,6 +56,27 @@ describe('dsh-base bundle', () => {
     expect(manifest.dependencies).not.toHaveProperty('@deepseek-ai/dsh-subagent-codex')
     expect(manifest.dependencies).not.toHaveProperty('@deepseek-ai/dsh-subagent-claude-code')
     expect(manifest.dependencies).toHaveProperty('@deepseek-ai/dsh-web-fetch-http')
+  })
+
+  it('leaves the overlapping editor to a composition that inserts it explicitly', () => {
+    const root = fileURLToPath(new URL('..', import.meta.url))
+    const base = yaml.load(
+      readFileSync(resolve(root, 'cordis.patch.yml'), 'utf8'),
+      { schema: entryListSchema },
+    ) as PatchOptions[]
+    const inserted = applyEntryPatches([], [...base, {
+      insert: [{
+        id: 'tool-str-replace-editor',
+        name: '@deepseek-ai/dsh-tool-str-replace-editor',
+        config: { maxOutputChars: 16000 },
+      }],
+    }], () => {})
+    // The overlapping tool is reachable only by naming it: base no longer
+    // carries a row for it, so a `disabled: false` override has nothing to
+    // address and the row must arrive through `insert`.
+    expect(inserted.find(entry => entry.id === 'tool-str-replace-editor')?.name)
+      .toBe('@deepseek-ai/dsh-tool-str-replace-editor')
+    expect(inserted.filter(entry => entry.id === 'tool-fs')).toHaveLength(1)
   })
 
   it('gates each shell stack by platform with a symmetric disabled expression', () => {
