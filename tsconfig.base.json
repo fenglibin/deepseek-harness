@@ -266,6 +266,8 @@
       // so these aliases stay hand-written like dsh-util-crypto above.
       "@deepseek-ai/dsh-util-time": ["./packages/util/time/src"],
       "@deepseek-ai/dsh-util-time/invariant": ["./packages/util/time/src/invariant.ts"],
+      "@deepseek-ai/dsh-http-proxy": ["./packages/util/http-proxy/src"],
+      "@deepseek-ai/dsh-http-proxy/invariant": ["./packages/util/http-proxy/src/invariant.ts"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp/invariant": ["./packages/acp/acp/src/invariant.ts"],

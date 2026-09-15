@@ -9,7 +9,7 @@
 import { lookup as systemLookup } from 'node:dns/promises'
 import type { LookupAddress, LookupOptions } from 'node:dns'
 import { isIP } from 'node:net'
-import type { Response } from 'undici'
+import type { Dispatcher, Response } from 'undici'
 import ipaddr from 'ipaddr.js'
 import { WebError } from '@deepseek-ai/dsh-web'
 
@@ -158,14 +158,33 @@ function embeddedIpv4Address(bytes: readonly number[], prefixLength: Nat64Prefix
 }
 
 /**
- * Fetch through an Undici agent whose lookup callback returns only the already
- * validated address set. The URL hostname remains intact for HTTP Host and TLS SNI.
+ * 判断一个主机名是否为 IP 字面量，且 {@link resolvePublicAddresses} 会拒绝它。
  *
- * @param url - validated HTTP(S) URL.
- * @param addresses - public addresses returned by {@link resolvePublicAddresses}.
- * @param headers - request headers.
- * @param signal - request and body-read cancellation signal.
- * @returns a response plus the dispatcher disposer its consumer must call.
+ * 经代理的跳转跳过这些检查，因为由代理解析源站；但字面量无需解析：地址已经写明，
+ * 而把它交给一个运行在本机上的代理，恰恰会抵达这些检查本就要挡住的 loopback 或私有服务。
+ *
+ * @param hostname - URL 的主机名，可带方括号。
+ * @returns 当该主机是任何请求都不应发送到的字面量地址时为 true。
+ */
+export function isNonPublicIpLiteral(hostname: string): boolean {
+  const unbracketed = stripIpv6Brackets(hostname)
+  return isIP(unbracketed) !== 0 && !isPublicIpAddress(unbracketed)
+}
+
+/**
+ * 通过一个 agent 抓取，其 lookup 回调只返回已经校验过的地址集合。URL 主机名保持原样，
+ * 以供 HTTP Host 与 TLS SNI 使用。
+ *
+ * 该 agent 属于这一次请求，因为地址集合就是它的：钉扎（pinning）正是本包拒绝
+ * 「在校验与连接之间发生变化的 DNS 答案」的方式，而它不能进程级生效——运维配置在
+ * loopback 上的 MCP 服务器或模型端点是被支持的终点，只有本工具抓取的 URL 才是
+ * 模型可以选择的。
+ *
+ * @param url - 已校验的 HTTP(S) URL，策略不会把它路由到代理。
+ * @param addresses - {@link resolvePublicAddresses} 返回的公共地址。
+ * @param headers - 请求头。
+ * @param signal - 请求与响应体读取的取消信号。
+ * @returns 一个响应，以及消费方必须调用的 disposer。
  */
 export async function requestPinned(
   url: URL,
@@ -173,15 +192,18 @@ export async function requestPinned(
   headers: Record<string, string>,
   signal: AbortSignal,
 ): Promise<PinnedResponse> {
-  // Keep the Node-only transport out of browser-worker startup. The preview
-  // can load the provider and fail loud at its DNS stub without evaluating
-  // Undici; a real request on Node resolves this maintained dependency here.
+  // 让仅限 Node 的传输不要进入浏览器 worker 的启动图。预览环境可以加载提供方并在它的
+  // DNS stub 上大声失败，而不必求值 Undici；Node 上的真实请求会在此处解析这个有维护的依赖。
   const { Agent, fetch } = await import('undici')
+  // 只有 `proxyRouteFor` 未报告代理的 URL 才会走到这里，而这个 agent 携带的钉扎 lookup
+  // 是单次请求的状态，进程级 dispatcher 无法承载。
+  // proxy-exempt: 为一次请求钉住已校验的地址集合，且该 URL 是策略判定直连的。
   const dispatcher = new Agent({
     autoSelectFamily: true,
     connect: { lookup: createPinnedLookup(addresses) },
   })
   try {
+    // proxy-exempt: 用的是上面那个 agent，其生命周期就是这一次请求。
     const response = await fetch(url, { method: 'GET', redirect: 'manual', headers, signal, dispatcher })
     return { response, close: async () => { await dispatcher.close() } }
   } catch (error: unknown) {
@@ -190,10 +212,36 @@ export async function requestPinned(
   }
 }
 
-/** Production network operations kept as an object so provider tests can replace resolution only. */
+/**
+ * 通过代理策略已经安装好的 dispatcher 抓取，让代理解析源站。
+ *
+ * 不钉任何地址集合，因为根本没有可钉的：解析由代理完成，而钉在本地解析出的地址上的连接
+ * 会直连源站，从而绕过代理。该 dispatcher 是进程级的，因此各次跳转共用它的连接池，
+ * 也没有调用方会去关闭它。
+ *
+ * @param dispatcher - 该路由的 dispatcher，来自 `proxyRouteFor`。
+ * @param url - 已校验的 HTTP(S) URL，策略会把它路由到代理。
+ * @param headers - 请求头。
+ * @param signal - 请求与响应体读取的取消信号。
+ * @returns 一个响应，以及一个不释放任何东西的 disposer，使两条路径的关闭方式一致。
+ */
+export async function requestVia(
+  dispatcher: Dispatcher,
+  url: URL,
+  headers: Record<string, string>,
+  signal: AbortSignal,
+): Promise<PinnedResponse> {
+  const { fetch } = await import('undici')
+  // proxy-exempt: 该 dispatcher 是已安装策略自己的，由 `proxyRouteFor` 交过来。
+  const response = await fetch(url, { method: 'GET', redirect: 'manual', headers, signal, dispatcher })
+  return { response, close: () => Promise.resolve() }
+}
+
+/** 生产网络操作保留为对象，使提供方测试只替换解析环节。 */
 export const publicHttpNetwork = {
   resolve: resolvePublicAddresses,
   request: requestPinned,
+  requestVia,
 }
 
 type LookupCallback = (

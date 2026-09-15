@@ -10,7 +10,8 @@ import { WebError } from '@deepseek-ai/dsh-web'
 import type { WebFetchBody, WebFetchProvider, WebFetchRequest, WebFetchResult } from '@deepseek-ai/dsh-web'
 import { deadline, timeoutOf } from '@deepseek-ai/dsh-timeout'
 import type { Response } from 'undici'
-import { publicHttpNetwork } from './network.ts'
+import { proxyRouteFor } from '@deepseek-ai/dsh-http-proxy'
+import { isNonPublicIpLiteral, publicHttpNetwork } from './network.ts'
 import type { PublicAddress } from './network.ts'
 import { classifyContentType, decoderForCharset, isSameOrigin, parseCharset, validateFetchUrl } from './policy.ts'
 
@@ -114,12 +115,26 @@ export class HttpFetchProvider implements WebFetchProvider {
   }
 
   private async requestOnce(url: URL, signal: AbortSignal) {
+    const headers = {
+      'user-agent': this.limits.userAgent,
+      'accept': 'text/html,application/xhtml+xml,text/*;q=0.9,application/json;q=0.8',
+    }
     try {
+      // 经代理的跳转跳过公共地址解析与钉扎：源站的 DNS 由代理完成，因此本地没有地址可校验，
+      // 而钉住一个地址会直连并绕过代理。策略放行直连的跳转——每一个 loopback 以及每一个
+      // `NO_PROXY` 条目——仍然原样走「解析并钉扎」的路径。
+      //
+      // 一次路由同时决定分支与 dispatcher，因此两次读取之间发生的挂载或卸载，不可能为
+      // 这个已被判定为经代理的 URL 返回一个直连、未钉扎的 agent。
+      //
+      // 地址检查会拒绝的 IP 字面量绝不走这条捷径。代理无从解析——地址已经写明——因此走它
+      // 只会白白花掉这些检查，并让本机上的代理抵达这些检查本就要挡在门外的那个服务。
+      const route = proxyRouteFor(url)
+      if (route.proxied && !isNonPublicIpLiteral(url.hostname)) {
+        return await publicHttpNetwork.requestVia(route.dispatcher, url, headers, signal)
+      }
       const addresses = await this.resolveAddresses(url.hostname, signal)
-      return await publicHttpNetwork.request(url, addresses, {
-        'user-agent': this.limits.userAgent,
-        'accept': 'text/html,application/xhtml+xml,text/*;q=0.9,application/json;q=0.8',
-      }, signal)
+      return await publicHttpNetwork.request(url, addresses, headers, signal)
     } catch (error: unknown) {
       if (error instanceof WebError) throw error
       throw translateAbortOrNetwork(error, signal)

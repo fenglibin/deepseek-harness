@@ -1,6 +1,8 @@
 import { access, mkdir, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   COVERAGE_PARTITION_MODE_ENV,
@@ -19,6 +21,10 @@ import {
   type CoverageCommandResult,
   type CoveragePartitionCoordinatorOptions,
 } from './coverage-partitions.ts'
+import {
+  END_OF_LINE_COLUMN,
+  canonicalizeEndOfLineColumns,
+} from './coverage-canonical-locations.ts'
 
 const passed: CoverageCommandResult = { exitCode: 0, signalCode: null }
 
@@ -244,6 +250,155 @@ describe('coverage file inventory', () => {
   })
 })
 
+/**
+ * 一条源语句在两种 Vite 环境中的写法：ssr 映射把声明结束在标识符处，
+ * jsdom/client 映射结束在嵌套调用处，两者都止于各自的行尾。
+ */
+const CRASH_LOOP = { start: { line: 36, column: 2 }, end: { line: 54, column: Infinity } }
+
+/** 规范化 fixture 共用的文件路径。 */
+const CANONICALIZED_FILE = 'packages/util/home-paths/src/index.ts'
+
+/** fixture 自身口径下的 istanbul 语句位置。 */
+interface StatementLocation {
+  start: { line: number; column: number }
+  end: { line: number; column: number }
+}
+
+/** 从合并后的 istanbul 映射读回的语句命中数与位置。 */
+interface MergedStatements {
+  s: Record<string, number>
+  statementMap: Record<string, StatementLocation>
+}
+
+/** 合并断言使用的 istanbul 入口。 */
+interface CoverageLibrary {
+  createCoverageMap: (data: unknown) => {
+    merge: (data: unknown) => void
+    fileCoverageFor: (file: string) => MergedStatements
+  }
+}
+
+/**
+ * istanbul-lib-coverage 是分区 blob 所喂给的合并实现。它作为已声明的
+ * istanbul-lib-report 开发依赖的依赖到达，因此本 spec 经该属主解析它，
+ * 而不是自己再声明一份。
+ */
+const coverageLibrary = createRequire(
+  createRequire(import.meta.url).resolve('istanbul-lib-report'),
+)('istanbul-lib-coverage') as CoverageLibrary
+
+/**
+ * 一个文件的语句覆盖率，形状与分区 blob 所携带的一致。
+ * @param statements - 语句位置，索引即 istanbul 的语句键。
+ * @param hits - 与位置一一对应的命中次数。
+ * @returns 以文件路径为键的单文件覆盖记录。
+ */
+function statementRecord(statements: StatementLocation[], hits: number[]): Record<string, unknown> {
+  return {
+    [CANONICALIZED_FILE]: {
+      path: CANONICALIZED_FILE,
+      statementMap: Object.fromEntries(statements.map((location, index) => [index, location])),
+      s: Object.fromEntries(hits.map((hit, index) => [index, hit])),
+      fnMap: {},
+      f: {},
+      branchMap: {},
+      b: {},
+    },
+  }
+}
+
+/**
+ * 按合并命令的方式合并分区记录。blob 序列化器的 JSON 跳转把非有限的结束列
+ * 变成 `null`，这正是 istanbul 用来调和记录的范围包含关系所依赖的东西。
+ * 规范化作用于 reporter 钩子收到的 `CoverageMap`，其 `data` 持有此处合并的
+ * 原始单文件记录。
+ * @param records - 待合并的分区记录。
+ * @param canonicalize - 是否在合并前规范化结束列。
+ * @returns 合并后该文件的语句覆盖。
+ */
+function mergePartitionRecords(
+  records: Array<Record<string, unknown>>,
+  canonicalize: boolean,
+): MergedStatements {
+  const map = coverageLibrary.createCoverageMap({})
+  for (const record of records) {
+    if (canonicalize) canonicalizeEndOfLineColumns({ data: record })
+    map.merge(JSON.parse(JSON.stringify(record)) as unknown)
+  }
+  return map.fileCoverageFor(CANONICALIZED_FILE)
+}
+
+/**
+ * 合并映射仍报告为未命中的语句起始位置。
+ * @param coverage - 合并后的语句覆盖。
+ * @returns 未命中语句的起始位置，按语句键顺序。
+ */
+function uncoveredStarts(coverage: MergedStatements): Array<{ line: number; column: number }> {
+  return Object.entries(coverage.s)
+    .filter(([, hits]) => hits === 0)
+    .map(([index]) => coverage.statementMap[index])
+    .filter((location): location is StatementLocation => location !== undefined)
+    .map(location => location.start)
+}
+
+describe('coverage location canonicalization', () => {
+  // index.ts:48 在 ssr 环境中的写法（定位到 `parent`）与在 client 环境中的
+  // 写法（定位到 `dirname(current)`）；持有两种写法的循环在两边都跑过，
+  // 只有 client 记录从未走进拥有该语句的 catch 分支。
+  const ssrRecord = statementRecord(
+    [CRASH_LOOP, { start: { line: 48, column: 12 }, end: { line: 48, column: Infinity } }],
+    [3, 2],
+  )
+  const clientRecord = statementRecord(
+    [CRASH_LOOP, { start: { line: 48, column: 21 }, end: { line: 48, column: Infinity } }],
+    [5, 0],
+  )
+
+  it('drops the phantom statement a client-only spelling leaves after the blob merge', () => {
+    // ssr 写法被命中，同一源语句的 client 写法仍为未命中，因此一个每条语句
+    // 都跑过的文件会未通过逐文件 100% 门禁。
+    expect(uncoveredStarts(mergePartitionRecords([ssrRecord, clientRecord], false)))
+      .toEqual([{ line: 48, column: 21 }])
+
+    expect(uncoveredStarts(mergePartitionRecords([ssrRecord, clientRecord], true))).toEqual([])
+  })
+
+  it('canonicalizes line-end columns in statement, function, and branch locations', () => {
+    const lineEnd = (line: number): StatementLocation => ({
+      start: { line, column: 4 },
+      end: { line, column: Infinity },
+    })
+    const record = {
+      [CANONICALIZED_FILE]: {
+        path: CANONICALIZED_FILE,
+        statementMap: { 0: lineEnd(10), 1: { start: { line: 11, column: 4 }, end: { line: 11, column: 9 } } },
+        s: { 0: 1, 1: 1 },
+        fnMap: { 0: { name: 'probe', decl: lineEnd(10), loc: lineEnd(10) } },
+        f: { 0: 1 },
+        branchMap: { 0: { type: 'if', loc: lineEnd(12), locations: [lineEnd(12), lineEnd(13)] } },
+        b: { 0: [1, 1] },
+      },
+    }
+
+    canonicalizeEndOfLineColumns({ data: record })
+
+    const file = record[CANONICALIZED_FILE]
+    expect(file.statementMap[0]?.end.column).toBe(END_OF_LINE_COLUMN)
+    expect(file.statementMap[1]?.end.column).toBe(9)
+    expect(file.fnMap[0]?.decl.end.column).toBe(END_OF_LINE_COLUMN)
+    expect(file.fnMap[0]?.loc.end.column).toBe(END_OF_LINE_COLUMN)
+    expect(file.branchMap[0]?.loc.end.column).toBe(END_OF_LINE_COLUMN)
+    expect(file.branchMap[0]?.locations[0]?.end.column).toBe(END_OF_LINE_COLUMN)
+    expect(file.branchMap[0]?.locations[1]?.end.column).toBe(END_OF_LINE_COLUMN)
+  })
+
+  it('rejects a payload that carries no istanbul coverage data', () => {
+    expect(() => canonicalizeEndOfLineColumns({ notAReport: true }))
+      .toThrow(/not an istanbul CoverageMap/)
+  })
+})
+
 describe('coverage partition coordinator', () => {
   const weightedFiles = ['a.spec.ts', 'b.spec.ts', 'c.spec.ts']
   const weightedDurations = new Map([
@@ -256,6 +411,31 @@ describe('coverage partition coordinator', () => {
     ['b.spec.ts', 'process-bound'],
     ['c.spec.ts', 'process-bound'],
   ])
+  it('canonicalizes each partition before its blob is written', async () => {
+    const root = await temporaryRoot()
+    const commands: CoverageCommand[] = []
+    const runCommand = successfulCommandRecorder(commands)
+    const coordinator = new CoveragePartitionCoordinator({
+      root,
+      partitions: 2,
+      pnpmEntrypoint: '/pnpm.cjs',
+      files: ['a.spec.ts', 'b.spec.ts'],
+      runCommand,
+    })
+
+    await expect(coordinator.run()).resolves.toBe(0)
+
+    // 每个分区都把覆盖率映射序列化进一个 blob，因此每个分区都必须指名那个
+    // 在序列化之前先规范化的 reporter。
+    const reporterPath = join(dirname(fileURLToPath(import.meta.url)), 'coverage-canonical-locations.ts')
+    for (const command of commands.slice(0, 2)) {
+      const argument = command.args.find(candidate => candidate.startsWith('--reporter=') && candidate.endsWith('coverage-canonical-locations.ts'))
+      if (argument === undefined) throw new Error(`${command.label} does not wire the coverage canonicalizer`)
+      // 子进程从仓库根运行，因此该 reporter 在那里解析。
+      expect(resolve(argument.slice('--reporter='.length))).toBe(reporterPath)
+    }
+  })
+
   it('runs every single-worker partition before one merged threshold check', async () => {
     const root = await temporaryRoot()
     const commands: CoverageCommand[] = []
