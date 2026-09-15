@@ -52,9 +52,14 @@ interface PromptSection {
   /**
    * Static text or a provider evaluated at each assembly with that assembly's
    * {@link AssembleContext}. The text may reference `{{variable}}`s — they are
-   * interpolated later, by {@link renderPrompt}.
+   * interpolated later, by {@link renderPrompt}, unless {@link PromptSection.interpolate} is `false`.
    */
   readonly text: string | ((context: AssembleContext) => string)
+  /**
+   * 是否参与 `{{variable}}` 插值。缺省按 `true` 处理；设为 `false` 时文本作为字面量
+   * 直接进入组装结果，其中的花括号保持原样（外部文本可能含花括号，按变量解析会抛错）。
+   */
+  readonly interpolate?: boolean
   /**
    * Treat this contribution as the complete system prompt. Assembly still
    * runs the cooperative waterfall so tools, contexts, and variables can be

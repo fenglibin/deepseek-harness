@@ -545,7 +545,7 @@ describe('server instructions', () => {
     // 同样的文本刚好落在上限内时连接成功，指令进入提示词且花括号保持字面量。
     const valid = await mountRegistry()
     const validSpy = vi.spyOn(MockClient.prototype, 'getInstructions')
-      .mockReturnValue(`Keep {{server.template}} literal.`)
+      .mockReturnValue('Keep {{server.template}} literal.')
     try {
       await apply(valid, {
         ...stdioConfig, failOnStartupError: true, reconnect: { enabled: false },

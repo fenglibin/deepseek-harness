@@ -20,10 +20,12 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { z } from 'zod'
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { ToolCallId, LlmAdapter, LlmRuntime } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@deepseek-ai/dsh-llm'
+import McpResources from '@deepseek-ai/dsh-mcp-resources'
+import { BINARY_BASE64 } from './fixtures/resources-server.ts'
 import { apply } from '@deepseek-ai/dsh-mcp-client/src/index.ts'
 import { publicToolName } from '@deepseek-ai/dsh-mcp-client/src/tools.ts'
 import type { Config } from '@deepseek-ai/dsh-mcp-client'
@@ -31,6 +33,8 @@ import type { Config } from '@deepseek-ai/dsh-mcp-client'
 const testToolSignal = new AbortController().signal
 
 const fixtureServerPath = fileURLToPath(new URL('./fixture-server.ts', import.meta.url))
+// 资源场景的 fixture 由 tests/fixtures/resources-server.ts 单一拥有（e2e 与 spec 共用）。
+const resourcesServerPath = fileURLToPath(new URL('./fixtures/resources-server.ts', import.meta.url))
 
 // Resolve package-local .bin for pnpm-hoisted MCP server binaries.
 const packageDir = fileURLToPath(new URL('..', import.meta.url))
@@ -591,5 +595,109 @@ describe('streamable-http — in-process MCP server', () => {
   it('sends configured headers on every HTTP request', () => {
     expect(seenAuth.length).toBeGreaterThan(0)
     for (const auth of seenAuth) expect(auth).toBe('Bearer e2e-test-token')
+  })
+})
+
+describe('resources fixture server — real MCP resources and instructions', () => {
+  let ctx: Context
+
+  const resourceConfig: Config = {
+    transport: 'stdio',
+    serverName: 'catalog',
+    command: process.execPath,
+    args: ['--import', 'tsx/esm', resourcesServerPath],
+    env: {},
+    cwd: packageDir,
+    toolCallTimeoutMs: 15_000,
+    failOnStartupError: true,
+    // 白名单只剪枝服务器自报工具；三个共享资源工具由 mcp-resources 注册，
+    // 不经 syncTools，因此不受它影响。
+    allowedTools: ['resource_catalog_ping'],
+  }
+
+  beforeAll(async () => {
+    ctx = await mountRegistry()
+    await ctx.plugin(McpResources)
+    await apply(ctx, resourceConfig)
+  }, 30_000)
+
+  afterAll(async () => {
+    if (ctx) await ctx.fiber.dispose()
+    await sleep(200)
+  })
+
+  it('三个共享资源工具随已连接服务器出现，且不受工具白名单影响', () => {
+    const names = ctx.tools.schemas().map(s => s.name)
+    expect(names).toEqual(expect.arrayContaining([
+      'list_mcp_resources', 'list_mcp_resource_templates', 'read_mcp_resource',
+    ]))
+    // 白名单放行了 ping、拦截了 muted，却没碰到共享资源工具。
+    expect(names).toContain('mcp__catalog__resource_catalog_ping')
+  })
+
+  it('把服务器指令作为字面量段落注入，花括号保持原样', async () => {
+    const prompt = renderPrompt(await ctx.systemPrompt.assemble())
+    expect(prompt).toContain('MCP_RESOURCE_INSTRUCTION: keep {{braces}} literal')
+    // 服务器名段落列出了当前可见的服务器。
+    expect(prompt).toContain('"catalog"')
+  })
+
+  it('读取文本资源并标明来源服务器', async () => {
+    const result = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: nextCallId(), name: 'read_mcp_resource',
+      arguments: { server: 'catalog', uri: 'memo://text' },
+    })
+    expect(result.isError).toBe(false)
+    const text = result.content[0]!.type === 'text' ? result.content[0].text : ''
+    expect(text).toContain('MCP server: catalog')
+    expect(text).toContain('MCP resource text with {{braces}} intact.')
+  })
+
+  it('二进制载荷以说明文字呈现，原始数据保留在结果 JSON 中', async () => {
+    const result = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: nextCallId(), name: 'read_mcp_resource',
+      arguments: { server: 'catalog', uri: 'memo://binary' },
+    })
+    expect(result.isError).toBe(false)
+    const text = result.content[0]!.type === 'text' ? result.content[0].text : ''
+    expect(text).toContain(`[binary resource: ${BINARY_BASE64.length} base64 characters; available to programmatic callers]`)
+    expect(text).not.toContain(BINARY_BASE64)
+  })
+
+  it('列出资源与 URI 模板，并透传游标与 URI', async () => {
+    const listed = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: nextCallId(), name: 'list_mcp_resources', arguments: { server: 'catalog' },
+    })
+    expect(listed.isError).toBe(false)
+    expect(listed.content[0]!.type === 'text' ? listed.content[0].text : '').toContain('memo://text')
+
+    const templates = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: nextCallId(), name: 'list_mcp_resource_templates', arguments: { server: 'catalog' },
+    })
+    expect(templates.isError).toBe(false)
+    expect(templates.content[0]!.type === 'text' ? templates.content[0].text : '')
+      .toContain('memo://greeting/{name}')
+
+    // 展开后的模板 URI 可直接读取。
+    const greeting = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: nextCallId(), name: 'read_mcp_resource',
+      arguments: { server: 'catalog', uri: 'memo://greeting/Ada' },
+    })
+    expect(greeting.isError).toBe(false)
+    expect(greeting.content[0]!.type === 'text' ? greeting.content[0].text : '').toContain('Hello, Ada.')
+  })
+
+  it('不可用的服务器名在发起网络操作之前失败', async () => {
+    const result = await ctx.tools.execute({
+      signal: testToolSignal,
+      callId: nextCallId(), name: 'list_mcp_resources', arguments: { server: 'absent' },
+    })
+    expect(result.isError).toBe(true)
+    expect(JSON.stringify(result)).toContain("unavailable in this agent's scope")
   })
 })

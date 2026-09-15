@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-mcp-client` 把外部 MCP（Model Context Protocol）服务器挂载到 harness 上，让它们的工具像原生工具一样可用。每台服务器一条配置项，模型就能调用该服务器的工具——文件系统、GitHub、数据库或记忆服务器——名称稳定，例如 `mcp__github__create_issue`。当模型需要使用外部工具服务器时添加它；默认不启用任何服务器，因此由你开启。主要成本是这些工具定义给每次请求增加的 token，而且缓慢或崩溃的服务器可能延迟启动，或在恢复前让它的工具一直调用失败。只桥接工具能力：MCP resources 与 prompts 不受支持。
+`dsh-mcp-client` 把外部 MCP（Model Context Protocol）服务器挂载到 harness 上，让它们的工具像原生工具一样可用。每台服务器一条配置项，模型就能调用该服务器的工具——文件系统、GitHub、数据库或记忆服务器——名称稳定，例如 `mcp__github__create_issue`。当模型需要使用外部工具服务器时添加它；默认不启用任何服务器，因此由你开启。主要成本是这些工具定义给每次请求增加的 token，而且缓慢或崩溃的服务器可能延迟启动，或在恢复前让它的工具一直调用失败。另行挂载 [MCP 资源服务](../mcp-resources/README.zh.md) 后，可按需发现和读取服务器的资源；服务器指令作为字面文本加入已记录的系统提示词段落。MCP 提示词模板（Prompts）不受支持。
 
 ## 目录
 
@@ -57,6 +57,7 @@ kind: "package-reference"
 | `command` / `args` / `env` / `cwd` | — | stdio：可执行文件、参数、合并到清洗过的环境之上的额外环境变量、工作目录 |
 | `url` / `headers` | — | streamable-http：端点 URL 与额外请求标头 |
 | `toolCallTimeoutMs` | `60,000` | 每次 `tools/call` 调用的超时 |
+| `maxInstructionBytes` | `32,768` | 包括来源标注在内的服务器指令 UTF-8 字节上限；超出时该次连接失败 |
 | `failOnStartupError` | `false` | 初始连接或工具同步失败时拒绝插件激活 |
 | `allowedTools` | 未设置 | 只桥接这些 MCP 原始工具名；省略则桥接服务器列出的全部工具 |
 | `reconnect.enabled` | `true` | 连接丢失后自动重新连接 |
@@ -203,6 +204,20 @@ kind: "package-reference"
 
 仅追加；新可见内容位于可复用请求前缀之后，不会使现有 KV-cache 条目失效。
 
+### 服务器指令
+
+#### 模型看到什么
+
+每个成功连接返回的非空白指令保存在一个以服务器名标识的段落（`mcp:<serverName>`）中。未返回指令或指令仅含空白时，该段落的文本是空字符串，因此不进入最终提示词。段落以 `interpolate: false` 注册，其中的花括号保持字面值。替代连接只在发现成功后发布其指令；断开、放弃重连或释放时清空该段落。
+
+#### Token 影响
+
+段落生效期间，服务器指令为每次请求贡献文本。资源文档只在显式调用资源读取工具后进入历史。
+
+#### KV Cache 影响
+
+未变化的指令保留相同的提示词文本。更新或移除指令会改变下一次组装的系统消息及其可复用前缀。
+
 ## 已知限制与延期工作
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -210,7 +225,7 @@ kind: "package-reference"
 
 这些限制说明你无法用本插件做什么、以及何时需要运维注意。它们是当前包约束，不是与其他 MCP 客户端的对比，也不是任务积压。
 
-- **只桥接 MCP 的工具能力**——Resources 与 Prompts 没有 harness 消费机制，暂缓实现。
+- **资源需要单独挂载服务**——挂载 `@deepseek-ai/dsh-mcp-resources` 后才能发现和读取资源；资源订阅、资源变更推送与 MCP 提示词模板（Prompts）不受支持。
 - **启动与发现超时继承自 MCP SDK**——插件不暴露连接或发现超时；每次 `initialize` 与分页 `tools/list` 请求都使用 SDK 默认的 60 秒请求超时，因此无响应的服务器或 cursor chain 在初始同步完成期间可能同时延迟激活与 teardown。
 - **重连在传输关闭时触发**——崩溃的 stdio 子进程会触发重连；Streamable HTTP 失败按请求经 SDK 传输自身的恢复机制暴露，因此不可达的 HTTP 服务器会按调用重试，而非由 supervisor 重新 spawn。
 - **图片是唯一的持久丰富结果桥接**——PNG、JPEG、WebP 与 GIF 在确切能力得到证明后进入 Native 上下文。音频与嵌入资源载荷仍只存在于执行局部并带明确诊断，资源链接只以文本保留名称与 URI。

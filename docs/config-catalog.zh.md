@@ -1625,6 +1625,11 @@ export interface StdioConfig {
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
   failOnStartupError: boolean
+  /**
+   * 带来源标注的服务器指令的字节上限（缺省 32768）。超限使该次连接失败而非截断：
+   * 截断后的指令可能语义不完整。
+   */
+  maxInstructionBytes?: number
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
 }
@@ -1648,6 +1653,11 @@ export interface StreamableHttpConfig {
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
   failOnStartupError: boolean
   /**
+   * 带来源标注的服务器指令的字节上限（缺省 32768）。超限使该次连接失败而非截断：
+   * 截断后的指令可能语义不完整。
+   */
+  maxInstructionBytes?: number
+  /**
    * Raw MCP tool names admitted to registration; omission registers every tool
    * the server lists. Entries are the server's own wire names — never the
    * `mcp__<serverName>__` public names — and an empty list is refused.
@@ -1670,7 +1680,7 @@ export interface ReconnectConfig {
 }
 ```
 
-来源：[`packages/mcp/mcp-client/src/index.ts:113`](../packages/mcp/mcp-client/src/index.ts)
+来源：[`packages/mcp/mcp-client/src/index.ts:125`](../packages/mcp/mcp-client/src/index.ts)
 
 <a id="deepseek-aidsh-message-feedback"></a>
 

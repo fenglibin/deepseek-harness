@@ -37,9 +37,9 @@
 | 6 | `add-agent-loop-message-freeze-reuse` | ✅ 完成并提交 | 3 个新测试，**守卫已验证**：无优化时失败（spread 23>4），有优化时通过 |
 | 7 | `add-typert-lazy-schema-materialization` | ✅ 完成并提交 | 500 测试通过（2 个 cordis-catalog 预先存在失败已对照确认） |
 | 8 | `add-lazy-require-utility` | ✅ 完成并提交 | 2 个新测试 + 依赖门禁 17 测试 |
-| 9 | `add-deferred-native-dependency-loading` | ⬜ 未开始 | — |
+| 9 | `add-deferred-native-dependency-loading` | ✅ 完成并提交 | 441 测试通过；实测启动省 sharp 55-79ms 等 |
 | 10 | `update-slash-menu-shared-ranker` | ✅ 完成并提交 | 702 测试通过；行为增强已实测验证 |
-| 11 | `add-archived-sessions-page` | ⬜ 未开始 | — |
+| 11 | `add-archived-sessions-page` | ✅ 完成并提交 | 100 测试通过；竞态守卫已验证有效（移除后失败） |
 | 12 | `add-client-keyed-standard-hooks` | ⬜ 未开始 | — |
 | 13 | `add-mcp-resource-access` | ⬜ 未开始 | — |
 
@@ -59,6 +59,8 @@
 - `f3e7a491b0` 变更 7（typert 惰性 schema + 产物清理）
 - `38f791b8c7` 变更 8（lazy-require 原语 + 依赖识别）
 - `3528c3a166` 变更 10（共享名称排序器）
+- `207da07632` 变更 9（原生依赖延迟加载）
+- `27125ee937` 变更 11（归档会话页 + 竞态修复）
 
 ## 已知的非本次引入问题（清理 debris 后需重新评估，勿轻信此前结论）
 
@@ -71,11 +73,23 @@
 
 ## 进行中（子代理）
 
-- 变更 9 `add-deferred-native-dependency-loading`
-- 变更 12 `add-client-keyed-standard-hooks` 与 13 `add-mcp-resource-access`
-- 变更 11 `add-archived-sessions-page`（竞态守卫已由我完成，页面包交给子代理）
+- 变更 12 `add-client-keyed-standard-hooks` 与 13 `add-mcp-resource-access`（同一子代理）
 
 ## 待收尾事项
 
 - 变更 5 需要：更新 `README.zh.md`、`docs/subsystems/session-projection.zh.md`、`invariant.ts` 描述，写 Agent Note，勾选 tasks。
 - 变更 4 需要：由我独立复核子代理的四项判据与门禁结果。
+
+
+## 广域回归（变更 1-3、6-11 提交后）
+
+`npx vitest run` 覆盖 packages/util、packages/session、packages/core/agent-loop、packages/bundle、packages/web/web-fetch-http 与 5 个门禁 spec：**108 文件 / 1878 测试全部通过**。
+
+### 已验证的守卫（移除实现后会失败）
+
+| 守卫 | 验证方式 | 结果 |
+|---|---|---|
+| agent-loop 冻结复用 | 用 `git show HEAD~1:` 换回旧版源码 | 无优化时 spread 23 > 4 失败 ✓ |
+| 归档集合竞态 | 脚本移除 `requestSeq === this.archiveReqestSeq` 判断 | 无守卫时 `[]` ≠ `['archived','fresh']` 失败 ✓ |
+| 代理门禁 `verify-no-bare-dispatcher` | `scanRepository()` 在本地树返回空 | 通过 ✓ |
+| sharp 延迟加载 | 加载 attachment-local 后 `require.cache` 中 sharp 模块数为 0 | 通过 ✓ |
