@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "remote": {
+      "url": "https://example.com/mcp-v2",
+      "headers": {},
+      "authMode": "oauth",
+      "clientId": "client-1",
+      "authorizationUrl": "https://example.com/authorize",
+      "tokenUrl": "https://example.com/token"
+    }
+  }
+}

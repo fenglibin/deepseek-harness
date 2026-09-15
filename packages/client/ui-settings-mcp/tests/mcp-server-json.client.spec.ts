@@ -91,7 +91,7 @@ describe('entryToServerJson', () => {
   it('renders the allowlist for both transports and omits it when absent', () => {
     const maskedStdio: McpServerEntry = { ...stdio('github'), allowedTools: ['search'] }
     const http: McpServerEntry = {
-      serverName: 'web', enabled: true, transport: 'streamable-http', url: 'http://x', headers: {}, allowedTools: ['ping'],
+      serverName: 'web', enabled: true, transport: 'streamable-http', url: 'http://x', headers: {}, auth: { kind: 'none' }, allowedTools: ['ping'],
     }
     expect((JSON.parse(entryToServerJson(maskedStdio)) as McpJsonServer).allowedTools).toEqual(['search'])
     expect((JSON.parse(entryToServerJson(http)) as McpJsonServer).allowedTools).toEqual(['ping'])
@@ -107,7 +107,7 @@ describe('serverJsonToEntry', () => {
 
   it('converts a url object back to an http entry', () => {
     const entry = serverJsonToEntry('web', { url: 'http://x', headers: { A: 'b' } })
-    expect(entry).toEqual({ serverName: 'web', enabled: true, transport: 'streamable-http', url: 'http://x', headers: { A: 'b' } })
+    expect(entry).toEqual({ serverName: 'web', enabled: true, transport: 'streamable-http', url: 'http://x', headers: { A: 'b' }, auth: { kind: 'none' } })
   })
 
   it('carries the allowlist back into both transports and leaves it absent when unlisted', () => {
@@ -132,5 +132,88 @@ describe('serverJsonToEntry', () => {
 describe('renderDocument', () => {
   it('wraps a server map back into mcp.json text', () => {
     expect(renderDocument({ a: { command: 'x' } })).toBe('{\n  "mcpServers": {\n    "a": {\n      "command": "x"\n    }\n  }\n}\n')
+  })
+})
+
+/** One OAuth HTTP server: the shape the editor must show and preserve. */
+const oauthEntry: McpServerEntry = {
+  serverName: 'remote',
+  enabled: true,
+  transport: 'streamable-http',
+  url: 'https://example.com/mcp',
+  headers: {},
+  auth: {
+    kind: 'oauth',
+    clientId: 'client-1',
+    authorizationUrl: 'https://example.com/authorize',
+    tokenUrl: 'https://example.com/token',
+  },
+}
+
+describe('oauth in the edit round trip', () => {
+  it('shows the OAuth fields so the editor can present them', () => {
+    const shown = JSON.parse(entryToServerJson(oauthEntry)) as McpJsonServer
+    expect(shown).toMatchObject({
+      authMode: 'oauth',
+      clientId: 'client-1',
+      authorizationUrl: 'https://example.com/authorize',
+      tokenUrl: 'https://example.com/token',
+    })
+  })
+
+  it('preserves the OAuth configuration across an edit save', () => {
+    // The editor is a mcp.json round trip, so an omitted field is one the user
+    // cannot see and the next save would erase.
+    const shown = entryToServerJson(oauthEntry)
+    const back = serverJsonToEntry('remote', JSON.parse(shown))
+    expect(back).toMatchObject({
+      auth: {
+        kind: 'oauth',
+        clientId: 'client-1',
+        authorizationUrl: 'https://example.com/authorize',
+        tokenUrl: 'https://example.com/token',
+      },
+    })
+  })
+
+  it('carries scopes only when the entry has them', () => {
+    const withScopes: McpServerEntry = {
+      ...oauthEntry,
+      auth: {
+        kind: 'oauth',
+        clientId: 'client-1',
+        authorizationUrl: 'https://example.com/authorize',
+        tokenUrl: 'https://example.com/token',
+        scopes: ['a', 'b'],
+      },
+    }
+    expect(JSON.parse(entryToServerJson(withScopes))).toMatchObject({ scopes: ['a', 'b'] })
+    expect('scopes' in (JSON.parse(entryToServerJson(oauthEntry)) as McpJsonServer)).toBe(false)
+  })
+
+  it('writes no OAuth field for a server that uses none', () => {
+    // Every entry that predates this capability renders exactly as before.
+    const plain: McpServerEntry = { ...oauthEntry, serverName: 'plain', auth: { kind: 'none' } }
+    const shown = JSON.parse(entryToServerJson(plain)) as McpJsonServer
+    expect('authMode' in shown).toBe(false)
+    expect('clientId' in shown).toBe(false)
+    expect('authorizationUrl' in shown).toBe(false)
+    expect('tokenUrl' in shown).toBe(false)
+  })
+
+  it('accepts pasted OAuth config when adding a server', () => {
+    const pasted = JSON.stringify({
+      remote: {
+        url: 'https://example.com/mcp',
+        authMode: 'oauth',
+        clientId: 'client-1',
+        authorizationUrl: 'https://example.com/authorize',
+        tokenUrl: 'https://example.com/token',
+      },
+    })
+    const servers = parsePastedServers(pasted)
+    expect(serverJsonToEntry('remote', servers['remote']!)).toMatchObject({
+      auth: { kind: 'oauth', clientId: 'client-1' },
+    })
   })
 })

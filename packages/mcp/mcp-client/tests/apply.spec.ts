@@ -49,7 +49,10 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
   StdioClientTransport: vi.fn(),
 }))
 
-vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
+vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', async importOriginal => ({
+  // The real module supplies StreamableHTTPError, which the supervisor matches
+  // to distinguish a rejected credential from any other failure.
+  ...await importOriginal<typeof import('@modelcontextprotocol/sdk/client/streamableHttp.js')>(),
   StreamableHTTPClientTransport: vi.fn(),
 }))
 

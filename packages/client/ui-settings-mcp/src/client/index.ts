@@ -24,7 +24,7 @@ import type { McpSettings } from './types.ts'
 import { zh, type McpKey } from './locales.ts'
 
 export type { McpSectionInjected, McpSectionProps } from './McpSection.tsx'
-export type { McpServerEntry, McpHttpServer, McpSettings, McpStdioServer } from './types.ts'
+export type { McpHttpAuth, McpServerEntry, McpHttpServer, McpSettings, McpStdioServer } from './types.ts'
 export type { McpKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

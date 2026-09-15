@@ -1,0 +1,72 @@
+/* Help dialog: wider than the primitive's 380px default, and taller, because it
+   carries three multi-line examples. `width`, not `max-width`: the primitive's
+   own rule is `width: min(380px, 100%)`, so a later single-class rule wins. */
+.dialog {
+  width: min(760px, 100%);
+}
+
+/* Only the example list scrolls, so the title and the close action stay put
+   while a user reads the format. */
+.body {
+  overflow-y: auto;
+  max-height: min(60vh, 520px);
+}
+
+.intro,
+.footnote {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text, #1f1f1f);
+}
+
+.footnote {
+  color: var(--color-text-secondary, #666);
+}
+
+.section {
+  margin-top: 16px;
+}
+
+.heading {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.note {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-secondary, #666);
+}
+
+/* `pre` keeps the example's own line breaks and indentation, so it can be
+   pasted into the editor unchanged. */
+.example {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 6px;
+  background: var(--shiki-background, rgba(0, 0, 0, 0.03));
+  font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.example code {
+  font: inherit;
+  white-space: pre;
+}
+
+/* Sibling examples sharing one heading: the label names the variant, so the
+   heading is stated once instead of repeated per transport. */
+.label {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--color-text, #1f1f1f);
+}

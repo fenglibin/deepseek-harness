@@ -14,6 +14,7 @@ import {
   metadataExpressionErrors,
   packageTestFixtureDependencyErrors,
   packageTestPluginDependencyErrors,
+  presetPlaneViolations,
 } from './verify-cordis-config.ts'
 
 describe('verify-cordis-config metadata expressions', () => {
@@ -85,6 +86,32 @@ describe('workspace Bundle discovery and product dependency closures', () => {
       { file, name: '@deepseek-ai/dsh-missing-plugin' },
     ])).toEqual([
       `${file}: @deepseek-ai/dsh-missing-plugin must be declared in ${manifestPath} dependencies`,
+    ])
+  })
+})
+
+describe('preset plane separation', () => {
+  const file = 'packages/preset/agent-presets/presets/standard/agent.cordis.yml'
+
+  it('rejects a preset row that also runs on the host plane', () => {
+    expect(presetPlaneViolations(new Set(['tool-skill']), file, new Set(['tool-skill']))).toEqual([
+      `${file}: row "tool-skill" is also active in the host composition; `
+      + 'a row belongs to exactly one plane',
+    ])
+  })
+
+  it('accepts a per-scope layered contributor on both planes', () => {
+    expect(presetPlaneViolations(new Set(['skill-filesystem']), file, new Set(['skill-filesystem']))).toEqual([])
+  })
+
+  it('keeps the exemption narrow: an unrelated row beside it still fails', () => {
+    expect(presetPlaneViolations(
+      new Set(['skill-filesystem', 'tool-skill']),
+      file,
+      new Set(['skill-filesystem', 'tool-skill']),
+    )).toEqual([
+      `${file}: row "tool-skill" is also active in the host composition; `
+      + 'a row belongs to exactly one plane',
     ])
   })
 })

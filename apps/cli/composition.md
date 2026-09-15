@@ -44,6 +44,10 @@ flowchart LR
   cfg --> plugin_dsh_base_agent_default_model
   plugin_dsh_base_jobs["jobs<br/>@deepseek-ai/dsh-jobs-local"]
   cfg --> plugin_dsh_base_jobs
+  plugin_dsh_base_llm_round_robin["llm-round-robin<br/>@deepseek-ai/dsh-llm-round-robin"]
+  cfg --> plugin_dsh_base_llm_round_robin
+  plugin_dsh_base_llm_failover["llm-failover<br/>@deepseek-ai/dsh-llm-failover"]
+  cfg --> plugin_dsh_base_llm_failover
   plugin_dsh_base_llm_retry["llm-retry<br/>@deepseek-ai/dsh-llm-retry"]
   cfg --> plugin_dsh_base_llm_retry
   plugin_dsh_base_settings["settings<br/>@deepseek-ai/dsh-settings-file"]
@@ -216,6 +220,8 @@ flowchart LR
 | `plugin-package-inventory-deepseek` | `@deepseek-ai/dsh-plugin-package-inventory-deepseek` |
 | `agent-default-model` | `@deepseek-ai/dsh-agent-default-model` |
 | `jobs` | `@deepseek-ai/dsh-jobs-local` |
+| `llm-round-robin` | `@deepseek-ai/dsh-llm-round-robin` |
+| `llm-failover` | `@deepseek-ai/dsh-llm-failover` |
 | `llm-retry` | `@deepseek-ai/dsh-llm-retry` |
 | `settings` | `@deepseek-ai/dsh-settings-file` |
 | `mcp-manager` | `@deepseek-ai/dsh-mcp-manager` |

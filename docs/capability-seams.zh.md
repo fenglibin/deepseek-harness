@@ -118,6 +118,8 @@ flowchart LR
   svc_skills["ctx.skills<br/>Skill provider registry"]
   pkg_skill_badge["skill-badge"]
   pkg_skill_filesystem["skill-filesystem"]
+  svc_skillRoots["ctx.skillRoots<br/>Read-only view of the roots the local skill provider scans"]
+  pkg_skill_manager["skill-manager"]
   svc_agents["ctx.agents<br/>Agent service"]
   pkg_acp["acp"]
   pkg_agent_default_model["agent-default-model"]
@@ -309,6 +311,7 @@ flowchart LR
   pkg_shell_env --> svc_shellEnv
   pkg_skill --> svc_skills
   pkg_skill_badge --> svc_skills
+  pkg_skill_filesystem --> svc_skillRoots
   pkg_skill_filesystem --> svc_skills
   pkg_spill --> svc_spillStore
   pkg_spill_local --> svc_spillStore
@@ -429,6 +432,7 @@ flowchart LR
   svc_shell --> pkg_tool_pwsh
   svc_shellEnv --> pkg_tool_bash
   svc_shellEnv --> pkg_tool_pwsh
+  svc_skillRoots --> pkg_skill_manager
   svc_skills --> pkg_tool_skill
   svc_spillStore --> pkg_spill_policy
   svc_storage --> pkg_storage_domain
@@ -519,6 +523,7 @@ flowchart LR
 | `ctx.sessionProjections` | `core` | [`session-projection`](../packages/session/session-projection) | - | [`api-session-controller`](../packages/api/session-controller), [`tool-todo`](../packages/todo/tool-todo), [`session-title`](../packages/session/session-title) | - | 各 domain 注册状态驱动的折叠单元；急切驱动器维护按会话的水位状态，Session 控制器提供基线并推送变化值。 |
 | `ctx.sessionProjectionCache` | `core` | [`session-projection-cache`](../packages/session/session-projection-cache) | - | [`api-session-controller`](../packages/api/session-controller), [`session-query`](../packages/session-query/session-query), [`session-reference`](../packages/context/session-reference), [`subagent`](../packages/subagent/subagent) | - | 按会话持久化检查点投影单元状态（节流 + turn/end/detach 必检点），并提供冷读取阶梯：缓存行 + 持久化尾部回放，使列表永不加载完整日志。 |
 | `ctx.skills` | `seam` | [`skill`](../packages/skill/skill) | [`skill-badge`](../packages/skill/skill-badge), [`skill-filesystem`](../packages/skill/skill-filesystem) | [`tool-skill`](../packages/skill/tool-skill) | - | 合并提供方的技能目录；tool-skill 渲染会话前缀目录并加载完整技能体。 |
+| `ctx.skillRoots` | `core` | [`skill-filesystem`](../packages/skill/skill-filesystem) | - | `skill-manager` | - | 由本地文件系统提供方的部署级实例发布（scope 实例只向本 scope 的注册表层贡献目录，因为一个服务只有一个提供方），复用其自身的根解析（dshHome、agentsHome、customSkillDirs、bundledSkillDir 与项目根查找），使管理面的写入落在发现器真正扫描的目录，而不是第二份配置推导出的位置。 |
 | `ctx.agents` | `core` | [`agent`](../packages/core/agent) | - | [`agent-loop`](../packages/core/agent-loop), [`acp`](../packages/acp/acp), [`subagent-in-process-driver`](../packages/subagent/subagent-in-process-driver) | - | 拥有实时 Agent 句柄、create/resume 工厂 seam 以及进程本地的发起者传播。 |
 | `ctx.agentDefaultModel` | `core` | [`agent-default-model`](../packages/core/agent-default-model) | - | [`api-session-controller`](../packages/api/session-controller), [`headless`](../packages/bundle/headless) | - | 通过设置分层默认 ModelSelection，使直接与 Host 支撑的 Agent 入口共享同一状态所有者。 |
 | `ctx.agentLoop` | `bundle` | [`agent-loop`](../packages/core/agent-loop) | - | [`agent-spine-demo`](../packages/examples/agent-spine-demo) | - | 唯一的具体 loop 插件；扩展包依赖 dsh-agent 事件与服务，而非本包。 |

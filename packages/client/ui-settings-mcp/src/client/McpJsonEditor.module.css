@@ -111,3 +111,27 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+/* Hint line above the editor. It sits here rather than in the Modal's
+   `description` seat because that seat takes a string and this line ends with a
+   button. The help entry belongs beside the sentence it explains, not in the
+   footer — the footer is the save/cancel decision. */
+.hint {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.helpLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary, #1971c2);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+  text-decoration: underline;
+  vertical-align: baseline;
+}

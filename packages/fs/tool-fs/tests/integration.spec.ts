@@ -66,15 +66,27 @@ describe('default deployment (with dsh-fs-observation-policy)', () => {
       expect(await readFile(join(dir, 'new.txt'), 'utf8')).toBe('line one\nline two\n')
     })
 
-    it('rejects overwriting an existing file without reading it first', async () => {
+    it('rejects overwriting an existing file without reading it first, returning its content', async () => {
       await writeFile(join(dir, 'a.txt'), 'original')
       const result = await call('write', { file_path: 'a.txt', content: 'clobber' })
       expect(result.isError).toBe(true)
       expect(result.error).toMatchObject({ info: { code: 'FS_NOT_OBSERVED' } })
-      // The model-facing text names the remedy, not just the condition.
+      // The refusal carries the file's current content, so the retry needs no
+      // separate read: the recovery reread is what satisfies the gate.
       expect(text(result)).toContain('without reading it first')
-      expect(text(result)).toContain('read the file, then retry')
+      expect(text(result)).toContain('1: original')
       expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('original')
+    })
+
+    it('the returned content is actionable: retrying the refused write needs no read', async () => {
+      await writeFile(join(dir, 'a.txt'), 'original')
+      const refused = await call('write', { file_path: 'a.txt', content: 'replaced' })
+      expect(refused.isError).toBe(true)
+      expect(refused.error).toMatchObject({ info: { code: 'FS_NOT_OBSERVED' } })
+      // No `read` call in between: the recovery reread already recorded the observation.
+      const retried = await call('write', { file_path: 'a.txt', content: 'replaced' })
+      expect(retried.isError).toBe(false)
+      expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('replaced')
     })
 
     it('allows overwriting after a read', async () => {
@@ -85,16 +97,16 @@ describe('default deployment (with dsh-fs-observation-policy)', () => {
       expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('replaced')
     })
 
-    it('rejects a full overwrite when the file changed since the read (stale)', async () => {
+    it('rejects a full overwrite when the file changed since the read, returning the new content', async () => {
       await writeFile(join(dir, 'a.txt'), 'original')
       await call('read', { file_path: 'a.txt' })
       await writeFile(join(dir, 'a.txt'), 'changed-externally') // out-of-band change
       const result = await call('write', { file_path: 'a.txt', content: 'replaced' })
       expect(result.isError).toBe(true)
       expect(result.error).toMatchObject({ info: { code: 'FS_STALE_VERSION' } })
-      // The model-facing text names the remedy, not just the condition.
+      // The refusal names the condition AND shows what the file now holds.
       expect(text(result)).toContain('file changed since it was read')
-      expect(text(result)).toContain('re-read the file, then retry')
+      expect(text(result)).toContain('1: changed-externally')
     })
 
     it('the stale remedy is actionable: re-reading the changed file unblocks the retried write', async () => {
@@ -146,15 +158,27 @@ describe('default deployment (with dsh-fs-observation-policy)', () => {
       expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('hello there')
     })
 
-    it('rejects an edit before any read, leaving the file untouched', async () => {
+    it('rejects an edit before any read, returning the content it must match', async () => {
       await writeFile(join(dir, 'a.txt'), 'hello world')
       const result = await call('edit', { file_path: 'a.txt', old_string: 'world', new_string: 'there' })
       expect(result.isError).toBe(true)
       expect(result.error).toMatchObject({ info: { code: 'FS_NOT_OBSERVED' } })
-      // The policy's refusal reaches the model with the read remedy appended.
+      // The refusal reaches the model with the file's current content, so the
+      // retry is grounded in what it must literally match.
       expect(text(result)).toContain('edit requires reading')
-      expect(text(result)).toContain('read the file, then retry')
+      expect(text(result)).toContain('1: hello world')
       expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('hello world')
+    })
+
+    it('the returned content is actionable: retrying the refused edit needs no read', async () => {
+      await writeFile(join(dir, 'a.txt'), 'hello world')
+      const refused = await call('edit', { file_path: 'a.txt', old_string: 'world', new_string: 'there' })
+      expect(refused.isError).toBe(true)
+      expect(refused.error).toMatchObject({ info: { code: 'FS_NOT_OBSERVED' } })
+      // The recovery reread recorded the observation, so the retry lands directly.
+      const retried = await call('edit', { file_path: 'a.txt', old_string: 'world', new_string: 'there' })
+      expect(retried.isError).toBe(false)
+      expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe('hello there')
     })
 
     it('lets a WINDOWED read authorize an edit when the file is unchanged (freshness, not full-view)', async () => {
@@ -171,16 +195,16 @@ describe('default deployment (with dsh-fs-observation-policy)', () => {
       expect(await readFile(join(dir, 'a.txt'), 'utf8')).toBe(lines.map(l => l === 'line 12' ? 'LINE 12' : l).join('\n'))
     })
 
-    it('rejects an edit when the file changed since the windowed read (stale before matching)', async () => {
+    it('rejects an edit when the file changed since the windowed read, returning the new content', async () => {
       await writeFile(join(dir, 'a.txt'), 'hello world')
       await call('read', { file_path: 'a.txt', offset: 1, limit: 1 })
       await writeFile(join(dir, 'a.txt'), 'goodbye') // out-of-band change removes 'world'
       const result = await call('edit', { file_path: 'a.txt', old_string: 'world', new_string: 'there' })
       expect(result.isError).toBe(true)
       expect(result.error).toMatchObject({ info: { code: 'FS_STALE_VERSION' } })
-      // The model-facing text names the remedy, not just the condition.
+      // The refusal names the condition AND shows what the file now holds.
       expect(text(result)).toContain('file changed since it was read')
-      expect(text(result)).toContain('re-read the file, then retry')
+      expect(text(result)).toContain('1: goodbye')
     })
 
     it('the stale remedy is actionable: re-reading the changed file unblocks the retried edit', async () => {

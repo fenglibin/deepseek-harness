@@ -410,6 +410,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: '合并提供方的技能目录；tool-skill 渲染会话前缀目录并加载完整技能体。',
   },
   {
+    key: 'skillRoots',
+    pkg: 'skill-filesystem',
+    title: 'Read-only view of the roots the local skill provider scans',
+    mode: 'core',
+    consumers: ['skill-manager'],
+    note: '由本地文件系统提供方的部署级实例发布（scope 实例只向本 scope 的注册表层贡献目录，因为一个服务只有一个提供方），复用其自身的根解析（dshHome、agentsHome、customSkillDirs、bundledSkillDir 与项目根查找），使管理面的写入落在发现器真正扫描的目录，而不是第二份配置推导出的位置。',
+  },
+  {
     key: 'agents',
     pkg: 'agent',
     title: 'Agent service',

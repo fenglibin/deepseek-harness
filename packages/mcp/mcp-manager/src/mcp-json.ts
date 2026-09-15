@@ -9,7 +9,7 @@
  */
 
 import { createHash } from 'node:crypto'
-import type { McpServerEntry, McpSettings } from './config.ts'
+import type { McpHttpAuth, McpServerEntry, McpSettings } from './config.ts'
 import { SERVER_NAME_PATTERN } from './config.ts'
 
 /** Filename of the user-editable MCP document, beside the settings document. */
@@ -38,6 +38,16 @@ export interface McpJsonServer {
   transportType?: string
   timeout?: number
   disabled?: boolean
+  /** Read but never written: `oauth` marks an OAuth server dsh can recognize. */
+  authMode?: string
+  /** Read but never written; required with `authMode: "oauth"`. */
+  clientId?: string
+  /** Read but never written; required with `authMode: "oauth"`. */
+  authorizationUrl?: string
+  /** Read but never written; required with `authMode: "oauth"`. */
+  tokenUrl?: string
+  /** Read but never written; requested scopes for an OAuth server. */
+  scopes?: string[]
 }
 
 /** Human message for any thrown value, kept local so errors stay plain strings. */
@@ -119,6 +129,46 @@ export function sanitizeServerName(raw: string): string {
 }
 
 /**
+ * Read one `mcp.json` entry's auth mode. Recognition is one-way on purpose: the
+ * cross-vendor document carries `authMode: "oauth"` with a vendor's own
+ * endpoint conventions, and rendering dsh's endpoint fields back would
+ * publish a shape no other platform agrees on. An entry that names OAuth
+ * without the endpoints dsh needs therefore fails rather than producing a
+ * half-configured server.
+ *
+ * Because the render omits OAuth, an entry that says nothing about
+ * authentication keeps whatever the current section already holds for that
+ * server; only an entry with no prior OAuth state resolves to `none`.
+ * @param raw - the entry as written in `mcp.json`.
+ * @param rawName - the entry's key, for the message of an unusable value.
+ * @param previous - the current section's entry of the same name, when one exists.
+ * @returns the auth mode the manager should use.
+ */
+function authOf(raw: Record<string, unknown>, rawName: string, previous?: McpServerEntry): McpHttpAuth {
+  if (raw.authMode !== 'oauth') {
+    // The render omits OAuth, so the document's silence cannot be read as "no
+    // authentication": the entry the manager itself wrote for an authorized
+    // server carries no marker, and treating silence as `none` would erase
+    // that server's OAuth configuration the next time the user hand-edited an
+    // unrelated entry. Silence keeps what the current section already holds.
+    if (previous !== undefined && previous.transport === 'streamable-http' && previous.auth?.kind === 'oauth') {
+      return previous.auth
+    }
+    return { kind: 'none' }
+  }
+  const clientId = typeof raw.clientId === 'string' ? raw.clientId : undefined
+  const authorizationUrl = typeof raw.authorizationUrl === 'string' ? raw.authorizationUrl : undefined
+  const tokenUrl = typeof raw.tokenUrl === 'string' ? raw.tokenUrl : undefined
+  if (clientId === undefined || authorizationUrl === undefined || tokenUrl === undefined) {
+    throw new Error(
+      `mcp.json server "${rawName}" names OAuth but is missing clientId, authorizationUrl, or tokenUrl`,
+    )
+  }
+  const scopes = optionalStringArray(raw.scopes, rawName, 'scopes')
+  return { kind: 'oauth', clientId, authorizationUrl, tokenUrl, ...scopes === undefined ? {} : { scopes } }
+}
+
+/**
  * Convert a parsed `mcp.json` into the manager's settings section. Each map
  * entry becomes one server: presence of `command` makes it stdio, presence of
  * `url` makes it Streamable HTTP, and `disabled` maps to the inverse of
@@ -126,11 +176,16 @@ export function sanitizeServerName(raw: string): string {
  * one rather than refusing the document; a server with neither command nor
  * url still throws, so a half-edited document never reaches settings.
  * @param json - the parsed document.
+ * @param current - the section the document is being synced over. An entry
+ *   that says nothing about authentication inherits the auth mode this
+ *   section already holds for it, because the render omits OAuth details and
+ *   silence must not erase them.
  * @returns the equivalent settings section.
  * @throws {Error} when any entry cannot be converted.
  */
-export function mcpJsonToSettings(json: McpJson): McpSettings {
+export function mcpJsonToSettings(json: McpJson, current?: McpSettings): McpSettings {
   const servers: McpServerEntry[] = []
+  const previousByName = new Map((current?.servers ?? []).map(entry => [entry.serverName, entry]))
   for (const [rawName, raw] of Object.entries(json.mcpServers)) {
     if (!isPlainObject(raw)) {
       throw new Error(`mcp.json server "${rawName}" must be an object`)
@@ -162,6 +217,7 @@ export function mcpJsonToSettings(json: McpJson): McpSettings {
         transport: 'streamable-http',
         url: raw.url,
         headers: stringRecord(raw.headers, rawName, 'headers'),
+        auth: authOf(raw, rawName, previousByName.get(serverName)),
         ...allowed === undefined ? {} : { allowedTools: allowed },
       })
     } else {
@@ -172,12 +228,38 @@ export function mcpJsonToSettings(json: McpJson): McpSettings {
 }
 
 /**
+ * The `mcp.json` fields one auth mode writes, or none for `none`.
+ *
+ * `scopes` follows the same rule as `allowedTools`: written only when the
+ * entry carries one, so an omitted list stays omitted rather than becoming an
+ * empty array the sync would read back as "request no scopes".
+ * @param auth - the entry's auth mode.
+ * @returns the document fields to merge into the entry.
+ */
+function oauthFieldsOf(auth: McpHttpAuth | undefined): Partial<McpJsonServer> {
+  if (auth?.kind !== 'oauth') return {}
+  return {
+    authMode: 'oauth',
+    clientId: auth.clientId,
+    authorizationUrl: auth.authorizationUrl,
+    tokenUrl: auth.tokenUrl,
+    ...auth.scopes === undefined ? {} : { scopes: [...auth.scopes] },
+  }
+}
+
+/**
  * Render the manager's settings section back into `mcp.json` shape. Used to
  * seed a missing `mcp.json` so the first hand-edit starts from what settings
- * already holds. `timeout`/`transportType` are dsh-unmanaged and therefore
- * omitted, keeping the document to the fields the sync reads back;
- * `allowedTools` is a dsh extension the sync reads back and is written only
- * when the entry carries one.
+ * already holds, and to re-render one entry on a settings-page edit.
+ * `timeout`/`transportType` are dsh-unmanaged and therefore omitted, keeping
+ * the document to the fields the sync reads back.
+ *
+ * `allowedTools` and the OAuth fields are dsh extensions the sync reads back,
+ * so both are written whenever the entry carries them. Writing the OAuth fields
+ * is what makes a settings-page edit lossless: that editor is a `mcp.json`
+ * round trip, so a field the render omits is a field the editor cannot show
+ * and the next save therefore erases. An entry that uses no OAuth writes none
+ * of them, so its document text is unchanged by this capability.
  * @param settings - the manager's current server list.
  * @returns the equivalent `mcp.json` document.
  */
@@ -186,6 +268,7 @@ export function settingsToMcpJson(settings: McpSettings): McpJson {
   for (const server of settings.servers) {
     const base: McpJsonServer = server.enabled ? {} : { disabled: true }
     const allowed = server.allowedTools === undefined ? {} : { allowedTools: server.allowedTools }
+    const auth = server.transport === 'streamable-http' ? oauthFieldsOf(server.auth) : {}
     mcpServers[server.serverName] = server.transport === 'stdio'
       ? {
         ...base,
@@ -200,6 +283,7 @@ export function settingsToMcpJson(settings: McpSettings): McpJson {
         ...base,
         url: server.url,
         headers: server.headers,
+        ...auth,
         ...allowed,
       }
   }

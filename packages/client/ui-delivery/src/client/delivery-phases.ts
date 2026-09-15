@@ -33,6 +33,17 @@ export const LEVEL_PHASES: Record<DeliveryLevel, readonly DeliveryPhase[]> = {
 }
 
 /**
+ * Derive the design document path a task's design records were appended to.
+ * Separate from {@link deliveryArtifacts} because a reader opens the design
+ * document by name, while the artifact list is an unordered inventory.
+ * @param task - current task snapshot.
+ * @returns the design record path, or undefined before the first design record.
+ */
+export function designArtifact(task: DeliverySnapshot): string | undefined {
+  return task.designCount > 0 ? `.dsh/design/${String(task.id)}.md` : undefined
+}
+
+/**
  * Derive the artifact paths a task's record counts imply. The OpenSpec change
  * lives under its own change id rather than the task id, so that path is only
  * listed once a checklist has named the change.
@@ -41,8 +52,9 @@ export const LEVEL_PHASES: Record<DeliveryLevel, readonly DeliveryPhase[]> = {
  */
 export function deliveryArtifacts(task: DeliverySnapshot, changeId?: string): readonly string[] {
   const artifacts: string[] = []
-  if (task.changeCount > 0) artifacts.push(`.dsh/changes/${task.id}.md`)
-  if (task.designCount > 0) artifacts.push(`.dsh/design/${task.id}.md`)
+  if (task.changeCount > 0) artifacts.push(`.dsh/changes/${String(task.id)}.md`)
+  const design = designArtifact(task)
+  if (design !== undefined) artifacts.push(design)
   if (task.specCount > 0 && changeId !== undefined) artifacts.push(`openspec/changes/${changeId}/`)
   return artifacts
 }

@@ -6,9 +6,11 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import type { GenericCallView, ReadResultView, ToolResult } from '@deepseek-ai/dsh-tools'
+import type { GenericCallView, ReadResultView, ToolExecution, ToolResult } from '@deepseek-ai/dsh-tools'
+import type { FsInfo, FsTarget } from '@deepseek-ai/dsh-fs'
 import type {} from '@deepseek-ai/dsh-fs'
 import { buildWindow, formatReadOutput, langFromPath, readMetaFromMeta } from './read-render.ts'
+import type { WindowResult } from './read-render.ts'
 import { resolveRegularReadTarget } from './read-target.ts'
 
 /** Default and maximum number of lines returned by one `read` call (the `readLimit` config). */
@@ -58,6 +60,40 @@ export function parseReadArgs(args: { file_path: string; offset?: number; limit?
   const limit = args.limit === undefined ? maxLimit : parsePositiveInteger(args.limit, 'limit')
   if (limit > maxLimit) throw new Error(`limit must be less than or equal to ${maxLimit}`)
   return { filePath: args.file_path, offset, limit }
+}
+
+/**
+ * Read one bounded window from an already-resolved regular file and record the
+ * observation. Streaming is chosen from the stat's size, so a size-less backend
+ * never buffers an arbitrarily large file. The observation is emitted only after
+ * the window is built: the read has succeeded by then, and an `fs/observed`
+ * listener is contractually a synchronous, side-effect-only recorder.
+ * @param ctx - the plugin context providing the filesystem service and observation events.
+ * @param exec - the current tool execution, including cancellation.
+ * @param target - the resolved regular file to read.
+ * @param info - the target's stat result: the observed version plus size routing.
+ * @param caps - the deployment's resolved read caps.
+ * @param window - the 1-based first line and the maximum number of lines to return.
+ * @returns the windowed lines, the total line count, and the byte-cap truncation flag.
+ */
+export async function readFileWindow(
+  ctx: Context,
+  exec: ToolExecution,
+  target: FsTarget,
+  info: FsInfo,
+  caps: ReadToolCaps,
+  window: { offset: number; limit: number },
+): Promise<WindowResult> {
+  const chunks = info.size === undefined || info.size >= caps.streamMinSize
+    ? await ctx.fs.streamText(target, exec.signal)
+    : [await ctx.fs.readText(target, exec.signal)]
+  const result = await buildWindow(
+    chunks,
+    { offset: window.offset, limit: window.limit, maxLineLength: caps.maxLineLength, maxBytes: caps.maxBytes },
+    target.displayPath,
+  )
+  ctx.emit('fs/observed', target, { kind: 'present', version: info.version }, exec)
+  return result
 }
 
 /**
@@ -137,29 +173,17 @@ export function applyReadTool(ctx: Context, caps: ReadToolCaps): void {
       // One stat: absence observation OR type check + size routing + present version.
       // A concurrent write can only make a later guarded mutation fail stale and require reread.
       const { target, info } = await resolveRegularReadTarget(ctx, exec, input.filePath)
+      const window = await readFileWindow(ctx, exec, target, info, caps, {
+        offset: input.offset,
+        limit: input.limit,
+      })
 
-      // Stream when the file is large OR size is unknown, so a size-less backend
-      // never buffers an arbitrarily large file.
-      const chunks = info.size === undefined || info.size >= caps.streamMinSize
-        ? await ctx.fs.streamText(target, exec.signal)
-        : [await ctx.fs.readText(target, exec.signal)]
-      const window = await buildWindow(
-        chunks,
-        { offset: input.offset, limit: input.limit, maxLineLength: caps.maxLineLength, maxBytes: caps.maxBytes },
-        target.displayPath,
-      )
-
-      const outcome = {
+      return {
         path: target.displayPath,
         offset: input.offset,
         lines: window.lines,
         totalLines: window.totalLines,
       }
-      // Record the present observation (a no-op when no policy plugin listens). The
-      // read already succeeded; an fs/observed listener is contractually a
-      // synchronous, side-effect-only recorder.
-      ctx.emit('fs/observed', target, { kind: 'present', version: info.version }, exec)
-      return outcome
     },
     // Result-time display: a `read` card carrying the structured line window a
     // capable UI renders as a line-numbered, syntax-highlighted view. The

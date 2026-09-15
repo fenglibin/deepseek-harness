@@ -11,7 +11,7 @@ Status: implemented
 `@deepseek-ai/dsh-tool-delivery` 现在以两层协同自动启动纪律。
 
 - **Rubric 驱动的模型判定。** `create_delivery_task` 工具描述与 `tool:delivery` 系统提示词段携带一套规模判定 rubric——强信号 S1（结构契约变更）与 S4（非小微 bug 或风险/不可逆变更）分级为 `l2`；强信号 S2（跨端或 ≥3 个包）与 S3（完整功能或大重构）分级为 `l1`；两个及以上弱信号（W1 ≥2 个设计决策、W2 ≥3 个子任务、W3 多角色协同）分级为 `l1`；否则 `l0`。这套 rubric 把"这个需求大不大"翻译成模型可勾选的客观信号。
-- **`agent/pre-step` 的机械地板。** 一个 waterfall 监听器兜底模型漏判：当无当前任务、存在直接人类请求、且拼接后的请求文本达到 `designThreshold` 时，用推断的分级与请求文本作为 objective 调用 `ctx.delivery.create()`。监听器幂等（存在任务或文本过短即短路），且永不阻塞步骤——失败只记录警告并落到 `next()`。
+- **`agent/pre-step` 的机械地板。** 一个 waterfall 监听器兜底模型漏判：当无当前任务、存在直接人类请求、且 `gradeObjective` 判定为 `l2`（命中强信号或超过 `openspecThreshold.descriptionChars`）时，用该分级与请求文本作为 objective 调用 `ctx.delivery.create()`。判定为 `l0` 或 `l1` 时改为注入一次规模判据提示，由模型按内容决定是否建任务及其级别——这部分由[交付分级复核范围与悬浮卡片可用性](2026-09-15-delivery-grading-review-and-float-card-visibility.zh.md)收紧。监听器幂等（存在任务即短路），且永不阻塞步骤——失败只记录警告并落到 `next()`。
 - 配置新增 `autoDetect`（默认 `true`）；关闭它即移除监听器。
 
 ## 备选方案
@@ -24,6 +24,6 @@ Status: implemented
 
 ## 后果
 
-- **获得** 交付纪律的程序化起点：大需求无需模型配合即创建任务，且模型自己的判定由 rubric 驱动而非猜测。
+- **获得** 交付纪律的程序化起点：确定性的大需求（强信号或超长）无需模型配合即创建任务，且模型自己的判定由 rubric 驱动而非猜测。
 - **代价** 工具包新增一个 `agent/pre-step` 监听器，以及 `@deepseek-ai/dsh-session` peer 依赖（用于 `UserMessage` 类型）。监听器解析一次当前任务即短路，因此每步开销仅一次 map 读取。
 - **延后** 默认 `postHooks` 基线与 openspec `tasks.md` checkbox 检查；验收门禁（C2）与自动变更记录（C3）已落入 [acceptance-gate note](2026-09-05-delivery-discipline-acceptance-gate.zh.md)。

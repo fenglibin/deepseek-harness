@@ -16,6 +16,8 @@ import { applyChildComposition, childSessionMeta } from '@deepseek-ai/dsh-subage
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-compaction-basic'
 import type {} from '@deepseek-ai/dsh-skill'
+// Type-only: resolves `ctx.skillRoots`, the view the management surface reads.
+import type {} from '@deepseek-ai/dsh-skill-filesystem'
 import type {} from '@deepseek-ai/dsh-tools'
 // Type-only: resolves `ctx.get('sessionProjections')` and `ctx.get('tokenMeter')`.
 import type {} from '@deepseek-ai/dsh-session-projection'
@@ -70,6 +72,20 @@ async function bootWeb(
     // this test's boot. Same reason the settings row above is pinned.
     { id: 'storage-json', config: { root: storageRoot } },
     { id: 'session-persistence-jsonl', config: { root: sessionsRoot } },
+    // The host `skill-filesystem` row is the deployment-level instance: it
+    // publishes `ctx.skillRoots` for the skill-management surface and scans the
+    // real user roots unless pinned. The developer's own `~/.dsh/skills` would
+    // then decide what the global-catalog assertion below sees. The presets'
+    // rows keep the ambient roots — that test only asserts containment for them.
+    {
+      id: 'skill-filesystem',
+      config: {
+        dshHome: join(dirname(settingsFile), 'skill-home'),
+        agentsHome: join(dirname(settingsFile), 'skill-agents'),
+        bundledSkillDir: join(dirname(settingsFile), 'skill-bundled'),
+        watch: false,
+      },
+    },
     // Host rows with side effects outside this process: a bound port, a served
     // asset tree, a telemetry exporter. `api-gateway` and `directory-picker`
     // stay ENABLED on purpose — the api-proxy is the host row that injects
@@ -412,7 +428,7 @@ describe('the shipped Web composition', () => {
     expect((await readFile(skill, 'utf8')).startsWith('---\nname: editing-cordis-compositions')).toBe(true)
   })
 
-  it('merges the global skill layer into a preset agent\'s catalog, keeping local discovery preset-side', async () => {
+  it('merges the global skill layer into a preset agent\'s catalog beside its own roots', async () => {
     const proj = await mkdtemp(join(tmpdir(), 'dsh-preset-skill-proj-'))
     await mkdir(join(proj, '.dsh', 'skills', 'project-proof'), { recursive: true })
     await writeFile(join(proj, '.dsh', 'skills', 'project-proof', 'SKILL.md'), [
@@ -432,9 +448,15 @@ describe('the shipped Web composition', () => {
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'standard').then(() => undefined),
     })
     try {
-      // The host (global) view carries the deployment-level provider alone:
-      // local discovery moved behind the presets with `skill-filesystem`.
-      expect((await ctx.skills.list({ cwd: proj })).map(skill => skill.name)).toEqual(['dsh-badge'])
+      // The host (global) view carries the deployment-level provider and the
+      // deployment row's own discovery: that row is what publishes
+      // `ctx.skillRoots` for the skill-management surface, and a Cordis service
+      // admits one provider, so the presets' rows contribute catalog only.
+      expect((await ctx.skills.list({ cwd: proj })).map(skill => skill.name)).toEqual(['dsh-badge', 'project-proof'])
+
+      // The management surface's roots come from that same deployment row, so a
+      // write lands in a directory discovery scans.
+      expect((await ctx.skillRoots.list(proj)).map(root => root.path)).toContain(join(proj, '.dsh', 'skills'))
 
       // The standard agent's view merges the global layer with its preset's
       // own local discovery over the session cwd.

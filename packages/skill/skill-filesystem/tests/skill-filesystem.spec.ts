@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, rename, rm, stat, symlink, writeFile } from '
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { Context } from '@deepseek-ai/cordis'
+import { createScope } from '@deepseek-ai/dsh-scope'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
 import { FileSystem, FsError, FsVersion, type FsDirEntry, type FsEditOutcome, type FsEditRequest, type FsInfo, type FsPathInfo, type FsTarget, type FsWriteOutcome } from '@deepseek-ai/dsh-fs'
 import * as SkillFileSystem from '../src/index.ts'
@@ -167,6 +168,35 @@ describe('dsh-skill-filesystem plugin exports', () => {
   })
 })
 
+describe('skill root view publication', () => {
+  /** Stand-in registry that accepts any number of same-name providers. */
+  const stubRegistry = { registerProvider: () => () => {} }
+
+  it('publishes the deployment root view from an unscoped instance', async () => {
+    const home = await tempDir('skill-roots-home')
+
+    const ctx = await setupLocal(home)
+
+    const roots = await ctx.skillRoots.list()
+    expect(roots.some(root => root.path === join(home, '.dsh/skills'))).toBe(true)
+  })
+
+  it('leaves the root view unpublished from a scoped instance', async () => {
+    const ctx = new Context()
+    ctx.provide('skills', stubRegistry as never)
+    const key = {}
+    const preset = createScope(ctx, key)
+
+    await preset.ctx.plugin(SkillFileSystem, { watch: false })
+
+    // A Cordis service admits one provider, so a preset's instance publishes
+    // nothing: the deployment row owns the view every management surface reads.
+    expect(preset.ctx.get('skillRoots')).toBeUndefined()
+
+    await preset.dispose()
+  })
+})
+
 describe('FileSystemSkillProvider', () => {
   it('discovers project, custom, user, and agents skill roots in priority order', async () => {
     const home = await tempDir('skill-home')
@@ -203,6 +233,24 @@ describe('FileSystemSkillProvider', () => {
     const noGit = await tempDir('skill-no-git')
     await writeSkill(join(noGit, '.dsh/skills'), 'fallback-root', 'Fallback root')
     expect((await ctx.skills.list({ cwd: noGit })).map(skill => skill.name)).toContain('fallback-root')
+  })
+
+  it('never reads the parking directory as a skill', async () => {
+    const home = await tempDir('skill-disabled')
+    // A management surface parks a disabled skill as `.disabled/<name>`. The
+    // directory itself is never a skill — not even when a stray entry point sits
+    // directly inside it, which is the shape the explicit skip exists to refuse.
+    await writeSkill(join(home, '.dsh/skills/.disabled'), 'parked', 'parked skill')
+    await mkdir(join(home, '.dsh/skills/.disabled'), { recursive: true })
+    await writeFile(
+      join(home, '.dsh/skills/.disabled/SKILL.md'),
+      '---\nname: stray\ndescription: stray entry point\n---\n\nBody.\n',
+    )
+    await writeSkill(join(home, '.dsh/skills'), 'live', 'live skill')
+
+    const ctx = await setupLocal(home)
+    const skills = await ctx.skills.list({ cwd: home })
+    expect(skills.map(skill => skill.name)).toEqual(['live'])
   })
 
   it('lets project skills override runtime while runtime overrides custom and user skills', async () => {

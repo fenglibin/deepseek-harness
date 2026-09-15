@@ -10,8 +10,13 @@
 // non-root type subpath.
 export type { McpServerEntry } from './config.ts'
 
-/** Connection lifecycle a mounted server reports, plus `unknown` for an unobserved one. */
-export type McpServerStatusKind = 'connecting' | 'connected' | 'reconnecting' | 'failed' | 'unknown'
+/**
+ * Connection lifecycle a mounted server reports, plus `unknown` for an
+ * unobserved one. `needs-auth` is distinct from `failed`: the server answered
+ * and the credential is the only thing missing, so authorizing fixes it —
+ * whereas `failed` covers what a user's action cannot repair.
+ */
+export type McpServerStatusKind = 'connecting' | 'connected' | 'reconnecting' | 'failed' | 'needs-auth' | 'unknown'
 
 /**
  * One tool a server currently registers. The view carries both the raw

@@ -10,7 +10,7 @@
  * `writeMcpDocument`, which refuses a malformed entry and reports it back.
  */
 
-import type { McpJsonServer, McpServerEntry } from './types.ts'
+import type { McpHttpAuth, McpJsonServer, McpServerEntry } from './types.ts'
 
 /** Human message for any thrown value, kept local so errors stay plain strings. */
 function messageOf(error: unknown): string {
@@ -100,17 +100,43 @@ export function parseSingleServer(text: string): McpJsonServer {
 }
 
 /**
+ * The `mcp.json` fields one auth mode writes, or none for `none`.
+ *
+ * This mirrors the Host's own render exactly: the editor's output is handed to
+ * the Host's single-server update, so the two must agree on which fields an
+ * entry carries or the update would drop what the editor showed.
+ * @param auth - the entry's auth mode.
+ * @returns the document fields to merge into the entry.
+ */
+function oauthFieldsOf(auth: McpHttpAuth | undefined): Partial<McpJsonServer> {
+  if (auth?.kind !== 'oauth') return {}
+  return {
+    authMode: 'oauth',
+    clientId: auth.clientId,
+    authorizationUrl: auth.authorizationUrl,
+    tokenUrl: auth.tokenUrl,
+    ...auth.scopes === undefined ? {} : { scopes: [...auth.scopes] },
+  }
+}
+
+/**
  * Render one server entry as pretty cross-vendor JSON for the edit editor.
  * `enabled: false` maps to `disabled: true` (the inverse of the Host's
  * `disabled !== true` read), and `cwd` is omitted when empty so the shape stays
- * the fields the document sync reads back. `allowedTools` is a dsh extension
- * and is written only when the entry carries one.
+ * the fields the document sync reads back.
+ *
+ * `allowedTools` and the OAuth fields are dsh extensions written whenever the
+ * entry carries them. The editor is a `mcp.json` round trip, so a field this
+ * render omits is a field the user cannot see — and the save that follows
+ * would write the entry back without it. An entry using no OAuth therefore
+ * renders exactly as it did before this capability.
  * @param entry - the server entry to render.
  * @returns the pretty JSON text with a trailing newline.
  */
 export function entryToServerJson(entry: McpServerEntry): string {
   const base: McpJsonServer = entry.enabled ? {} : { disabled: true }
   const allowed = entry.allowedTools === undefined ? {} : { allowedTools: entry.allowedTools }
+  const auth = entry.transport === 'streamable-http' ? oauthFieldsOf(entry.auth) : {}
   const server: McpJsonServer = entry.transport === 'stdio'
     ? {
       ...base,
@@ -125,6 +151,7 @@ export function entryToServerJson(entry: McpServerEntry): string {
       ...base,
       url: entry.url,
       headers: entry.headers,
+      ...auth,
       ...allowed,
     }
   return `${JSON.stringify(server, null, 2)}\n`
@@ -137,6 +164,27 @@ export function entryToServerJson(entry: McpServerEntry): string {
  */
 export function renderDocument(servers: Record<string, McpJsonServer>): string {
   return `${JSON.stringify({ mcpServers: servers }, null, 2)}\n`
+}
+
+/**
+ * Read one cross-vendor entry's auth mode. Recognition is symmetric with the
+ * render: `authMode: "oauth"` with dsh's endpoint fields becomes an OAuth
+ * entry, and anything else is `none`. An entry that names OAuth without the
+ * required fields is reported rather than silently degraded, so a
+ * half-configured server never appears to be a working one.
+ * @param name - the entry's key, for the message of an unusable value.
+ * @param json - the entry as written in the document.
+ * @returns the auth mode the entry declares.
+ * @throws {Error} when the entry names OAuth but lacks a required field.
+ */
+export function authOfServerJson(name: string, json: McpJsonServer): McpHttpAuth {
+  if (json.authMode !== 'oauth') return { kind: 'none' }
+  const { clientId, authorizationUrl, tokenUrl } = json
+  if (clientId === undefined || authorizationUrl === undefined || tokenUrl === undefined) {
+    throw new Error(`server "${name}" names OAuth but is missing clientId, authorizationUrl, or tokenUrl`)
+  }
+  const scopes = json.scopes
+  return { kind: 'oauth', clientId, authorizationUrl, tokenUrl, ...scopes === undefined ? {} : { scopes } }
 }
 
 /**
@@ -172,6 +220,7 @@ export function serverJsonToEntry(name: string, json: McpJsonServer): McpServerE
       transport: 'streamable-http',
       url: json.url,
       headers: json.headers ?? {},
+      auth: authOfServerJson(name, json),
       ...allowed,
     }
   }

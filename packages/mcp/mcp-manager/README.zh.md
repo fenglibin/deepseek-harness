@@ -64,6 +64,58 @@ mcp:
 
 `allowedTools` 是可选的原始工具名白名单，语义与 [mcp-client](../mcp-client/README.zh.md) 的同名字段完全一致：只注册名单内的工具，其余工具既不出现在模型的工具列表里也不可调用；省略则注册该服务器列出的全部工具。空列表会在挂载时被拒绝——manager 收容该失败并把该服务器记为带诊断文本的 `failed`，因此一台配错了白名单的服务器不会拖垮它的同伴。改动它会触发重新挂载，因为那是条目值的变化。
 
+### 如何配置一个 OAuth 服务器
+
+在设置 → MCP 中，OAuth 服务器与其他 HTTP 服务器用同一条路径添加：点「增加MCP」，粘贴配置并保存。「增加MCP」与「编辑」的弹框都带一段简短提示，右上角的**帮助**链接会打开完整说明——基础配置示例（stdio 与 streamable-http）、OAuth 服务器的字段与授权步骤、以及各可选字段的含义，示例可直接粘贴。
+
+```json
+{
+  "mcpServers": {
+    "remote": {
+      "url": "https://example.com/mcp",
+      "authMode": "oauth",
+      "clientId": "你的-client-id",
+      "authorizationUrl": "https://example.com/authorize",
+      "tokenUrl": "https://example.com/token"
+    }
+  }
+}
+```
+
+保存后该服务器出现在列表中，状态为**需要授权**。点行内的**去认证**，浏览器打开服务端的同意页；同意后回调落到 DSH webserver，Host 换取令牌并自动重连，状态变为**已连接**，其工具随即可用。
+
+`clientId` 与两个端点由 MCP 服务器提供方给出——本包不做服务端发现，也不做动态客户端注册，因此这三项必须显式填写。`scopes` 可选。
+
+**编辑已有服务器**时，编辑器会显示上述 OAuth 字段并原样保存，因此改动 URL 或请求头不会影响认证配置。这些字段是 dsh 在跨厂商格式之外的扩展，其他平台读到会按未知字段忽略——与 `allowedTools` 的约定一致。
+
+### HTTP 服务器的认证
+
+`streamable-http` 条目带一个可选的 `auth` 字段，省略时按 `{ kind: 'none' }` 解析，因此变更之前写入的条目行为不变：
+
+```yaml
+mcp:
+  servers:
+    - serverName: remote
+      transport: streamable-http
+      url: https://example.com/mcp
+      auth:
+        kind: oauth
+        clientId: 'your-client-id'
+        authorizationUrl: https://example.com/authorize
+        tokenUrl: https://example.com/token
+        scopes: ['mcp:read']
+```
+
+`oauth` 条目走授权码 + PKCE 流程，并注册为一个 authorization flow：设置页的**去认证**向 Host 索取一个授权 URL 并在浏览器中打开，服务端的同意页重定向回 DSH webserver 的回调路由，Host 用授权码换取令牌并写入该服务器的凭据记录。令牌与刷新令牌存放在凭据 seam 的 `GrantRecord` 中，既不进入 `mcp` 命名空间，也不进入 `mcp.json`；每次建立连接前重新解析，因此刷新后的令牌无需重启即生效。401 会触发一次强制换发并重试一次，换发被拒则该服务器转入 `needs-auth`。
+
+回调地址的 origin 由设置页在发起时报告，因为只有浏览器知道它用哪个地址访问了这个部署：经 LAN 或代理访问的 GUI 会把用户重定向回同一地址。Host 仍会校验该 origin 的端口与本部署一致，拒绝指向别处的重定向；PKCE 才是安全边界——授权码离开本进程即无效，因为 verifier 从不外发。
+
+**没有 webserver 时仍可授权。** 授权流程经由 `dsh-authorization` seam 运行，该 seam 的提问通道在 headless 下就是答案通道：回调无法被路由接收时，Host 改为请用户粘贴浏览器被重定向到的 URL（或其中的 `code`），授权照常完成。这是 seam 提供的能力，不是本包的特例。`authorization` 与 `webServer` 一样是可选服务：组合中没有它时，服务器照常挂载、已存储的令牌照常使用，只是无法发起**新的**授权。
+
+`needs-auth` 与 `failed` 是两个不同的状态：前者的判别是"用户动作可以修复"——服务器可达，缺的只是凭据；后者覆盖用户动作无法修复的故障。一台等待授权的服务器不会进入重连退避，因为退避只会重复一次本来就正确的请求。
+
+`stdio` 条目不接受 `auth`：它没有 HTTP 端点可供授权，携带该字段的分节会在持久化之前被拒绝。
+
 ### 协调过程
 
 每次被接受的设置变更都会跑一轮协调：先丢弃、后挂载，因此在启用状态下发生变化的条目会先释放旧桥接，再由新桥接占用命名空间。挂载失败会被就地收容并记入日志，同时被记录为带诊断文本的 `failed` 状态，因此一个坏掉的服务器绝不会阻塞它的同伴，界面也能解释某个服务器为何始终没起来，而不是永远回答 `unknown`。
@@ -136,7 +188,12 @@ manager 是建在两条 seam 上的一个服务：一条是它拥有的 settings
 这些限制定义了 manager 能协调什么、以及配置界面能从中了解到什么；它们是当前包约束。
 
 - **服务器面向整个用户，而非按会话**——列表存在于一份设置文档中，因此用户添加的条目对该进程服务的每个会话都可见；不存在按会话或按项目的服务器列表。
-- **没有 secret 角色字段**——`env` 与 `headers` 以纯文本存储，因为列表是从线缆视图整体编辑的；需要这些值在静态存储时脱敏的部署，必须不把它们放进本命名空间。
+- **没有 secret 角色字段**——`env` 与 `headers` 以纯文本存储，因为列表是从线缆视图整体编辑的；需要这些值在静态存储时脱敏的部署，必须不把它们放进本命名空间。OAuth 令牌不属于此限制：它们存放在凭据 seam 中，从不进入本命名空间。
+- **OAuth 需要一次人工授权**——`auth: { kind: 'oauth' }` 的服务器必须完成一次授权才能连接；有 webserver 时由回调自动完成，没有时需用户粘贴重定向 URL。组合中缺少 `authorization` seam 时无法发起新授权，已存储的令牌照常使用，未授权的服务器停留在 `needs-auth`。
+- **一次授权只在一个进程内有效**——attempt 存活于发起它的进程，因此登录途中重启 Host 会丢弃它，用户需要重来。
+- **OAuth 不支持服务端发现与动态注册**——条目必须显式给出 `authorizationUrl` 与 `tokenUrl` 并使用预注册的 `clientId`；要求 RFC 7591 动态客户端注册或元数据发现的服务器本期无法接入。
+- **静态令牌没有独立模式**——`auth` 目前只有 `none` 与 `oauth` 两项；静态 Bearer 令牌继续经由 `headers` 承载，因此以明文进入设置文档。
+- **OAuth 配置只有 JSON 一种入口**——设置页提供「增加MCP」与「编辑」的 JSON 编辑器，尚未提供 `clientId`、端点与 scope 的独立表单控件；字段名与形状见上文。
 - **重连策略在此处不可配置**——退避、尝试次数上限与单次调用超时沿用 mcp-client 的默认值，因此调整某个服务器的韧性意味着配置它自己的条目，而非 manager。
 - **状态是最近一次已知值，而非实时推送**——`mcp/status` 事件不携带载荷，界面因此在收到事件后重读 `list()`；与重新拉取竞争的状态迁移，要等下一次事件或刷新才可见。
 

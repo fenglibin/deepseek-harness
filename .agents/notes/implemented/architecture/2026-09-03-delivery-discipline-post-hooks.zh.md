@@ -12,6 +12,7 @@ B1–B3 为任务提供了只进不退的生命周期与记录、门禁前置条
 
 - `@deepseek-ai/dsh-tool-delivery` 的 `Config` 新增 `postHooks?: string[]`（默认 `[]`），在 `apply` 时校验为非空命令字符串。包现在也注入 `shell`。
 - `advance_delivery_task` 推进到 `accepted` 时，按序在调用 agent 的会话 `header.cwd` 下执行每个 hook。任一命令非零退出、超时或中止即为首个失败：`stateful` 下以 `DELIVERY_POST_HOOK_FAILED` 阻止验收；`advisory` 下以提醒形式呈现，验收仍继续。
+- 配置的 hook 之前先插入一条按 change id 定向的 `openspec validate <change_id> --strict --json`：只校验本次任务自己的 change，因此 `openspec/changes/` 下无关的历史变更不能阻塞验收。该命令只在清单记录了合法 change id 时插入——即 `l2` 任务；非 `l2` 任务没有 OpenSpec 变更，其 `record_tasks` 记录的是空字符串，空目标会拼出无目标的 `openspec validate` 并必然失败，所以空白或不合法的 id 按「没有变更可校验」处理，不插入该命令。这个判断在推进时重新做一次，而不是沿用记录时的结论：只有 `l2` 任务在记录时被校验过，而该 id 会被拼进 shell 命令。
 
 这是[交付纪律设计](../../../../docs/design/delivery-discipline-rationale.zh.md)的 B4 批次：后置命令框架与失败回注。把 `openspec validate --strict` 接入默认 `postHooks` 是部署选择（bundle 可以列出它），深度自检驱动是同一机制指向自定义脚本。
 
@@ -22,6 +23,8 @@ B1–B3 为任务提供了只进不退的生命周期与记录、门禁前置条
 **在领域服务里阻止验收。** 否决：执行 shell 命令是工具层的部署策略；领域保持基于 durable 事件的纯状态机。
 
 **只拒绝非零退出。** 否决：挂起或被杀的进程也必须让门禁失败，所以超时与中止都是一等失败。
+
+**非 `l2` 任务也执行 `openspec validate`。** 否决：非 `l2` 任务根本没有 OpenSpec 变更，没有可校验的目标，命令只会报「Nothing to validate」而失败。给没有变更的任务强加一条校验，等于要求它去伪造一个变更来通过验收。
 
 ## 后果
 

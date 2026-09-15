@@ -16,6 +16,7 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js'
 import type { Context } from '@deepseek-ai/cordis'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
@@ -58,7 +59,7 @@ export type ResolvedReconnectPolicy = Readonly<Required<ReconnectConfig>>
  * that drive its reconnect loop, so a sink observes exactly the transitions
  * the supervisor already logs.
  */
-export type McpConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'failed' | 'disposed'
+export type McpConnectionStatus = 'connecting' | 'connected' | 'reconnecting' | 'failed' | 'needs-auth' | 'disposed'
 
 /** Optional detail carried with one {@link McpStatusSink} report. */
 export interface McpStatusDetail {
@@ -93,6 +94,91 @@ declare module '@deepseek-ai/cordis' {
     /** Optional connection-status sink shared by every mcp-client instance in scope. */
     mcpStatusSink?: McpStatusSink
   }
+}
+
+/**
+ * Why a server's credential could not be resolved. The supervisor turns
+ * `unauthorized` into the `needs-auth` status and every other value into
+ * `failed`: a missing or expired credential is something the user can fix by
+ * authorizing, while an unusable credential store is not.
+ */
+export type McpAuthFailure = 'unauthorized' | 'unavailable'
+
+/** Outcome of one credential resolution attempt. */
+export type McpAuthResolution =
+  | { readonly ok: true; readonly authorization: string }
+  | { readonly ok: false; readonly reason: McpAuthFailure; readonly error?: string }
+
+/**
+ * Resolver for the bearer credential one HTTP server needs, provided by the
+ * management surface that mounted this instance (the MCP manager) through
+ * `ctx.provide('mcpAuthSink', …)`. Absent by default, in which case the
+ * transport carries only the headers the config named.
+ *
+ * The resolver runs before each transport generation is created, so a refreshed
+ * token reaches the very next connection without a restart. It is the only
+ * channel by which a token enters this package: the config carries no secret.
+ */
+export interface McpAuthSink {
+  /**
+   * Resolve the `Authorization` header value for one server.
+   * Implementations MUST NOT throw: the supervisor contains and logs a failure,
+   * so an authorization problem can never break the connection loop it feeds.
+   * @param serverName - the requesting instance's configured `serverName`.
+   * @param options - `force` asks for a token obtained by renewing rather than
+   *   reusing one the resolver still considers valid; the supervisor sets it
+   *   only for the single retry that follows a 401.
+   * @returns the header value to send, why it could not be produced, or
+   *   `undefined` when this server needs no credential — in which case the
+   *   transport sends only the headers its config named.
+   */
+  resolve(serverName: string, options?: { force?: boolean }): Promise<McpAuthResolution | undefined>
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Optional credential resolver shared by every mcp-client instance a surface mounts. */
+    mcpAuthSink?: McpAuthSink
+  }
+}
+
+/** Result of one credential resolution, or `undefined` when no resolver is mounted. */
+type ResolvedAuthorization = McpAuthResolution | undefined
+
+/**
+ * Ask the mounted credential resolver for one server's `Authorization` value.
+ * A stdio server has no HTTP endpoint to authenticate against, so it never
+ * asks; without a resolver the transport falls back to the configured headers.
+ *
+ * The resolver's contract forbids throwing, but a sink is contributed by
+ * another plugin, so a rejection is contained here rather than trusted: an
+ * authorization problem degrades to "no credential" instead of taking down the
+ * connection loop it only feeds.
+ *
+ * @param ctx - context optionally carrying `mcpAuthSink`.
+ * @param config - this instance's resolved config.
+ * @returns the resolution to apply, or `undefined` to send only config headers.
+ */
+async function resolveAuthorization(ctx: Context, config: Config, force = false): Promise<ResolvedAuthorization> {
+  const sink = ctx.get('mcpAuthSink')
+  if (sink === undefined || config.transport !== 'streamable-http') return undefined
+  try {
+    return await sink.resolve(config.serverName, force ? { force: true } : undefined)
+  } catch (error) {
+    ctx.logger.warn(`mcp-client(${config.serverName}): credential resolver failed: ${String(error)}`)
+    return { ok: false, reason: 'unavailable', error: `credential resolver failed: ${String(error)}` }
+  }
+}
+
+/**
+ * Whether one failure means "the server rejected our credential". The MCP SDK
+ * surfaces an HTTP status as a `StreamableHTTPError` code; only 401 says the
+ * token is the problem, so every other status keeps its ordinary meaning.
+ * @param error - the thrown value from a connect attempt.
+ * @returns true when a fresh token could plausibly fix it.
+ */
+function isUnauthorizedError(error: unknown): boolean {
+  return error instanceof StreamableHTTPError && error.code === 401
 }
 
 /**
@@ -200,6 +286,8 @@ export function startConnection(
   let connectedAt: number | undefined
   /** The real error from the first connection attempt, for startup-await diagnostics. */
   let firstAttemptError: unknown
+  /** Whether this outage already spent its one post-401 renewal retry. */
+  let authRetried = false
 
   /**
    * Report one status change to the optional sink. A sink failure is contained
@@ -306,6 +394,24 @@ export function startConnection(
    * @param startup - Whether this is the plugin's activation attempt.
    */
   async function connectGeneration(startup: boolean): Promise<void> {
+    // Resolve the credential before anything else: a transport is built from
+    // it, so an unresolvable credential must cost nothing — no client, no
+    // transport, and no reconnect attempt.
+    const auth = await resolveAuthorization(ctx, config)
+    if (auth !== undefined && !auth.ok) {
+      // A credential the user can supply by authorizing stops the loop
+      // outright rather than retrying on a backoff schedule: the server is
+      // answering correctly, and hammering it would bury the one fact the
+      // user needs under repeated warnings.
+      const unauthorized = auth.reason === 'unauthorized'
+      const credentialError = auth.error ?? (unauthorized
+        ? `server "${config.serverName}" requires authorization`
+        : `no credential store is available for "${config.serverName}"`)
+      ctx.logger.warn(`${label}: ${credentialError}`)
+      report(unauthorized ? 'needs-auth' : 'failed', { error: credentialError })
+      if (firstAttemptError === undefined) firstAttemptError = new Error(credentialError)
+      return
+    }
     const generation = new Client(
       { name: 'dsh-mcp-client', version: '0.0.1' },
       { capabilities: {} },
@@ -344,7 +450,7 @@ export function startConnection(
       },
     )
     try {
-      await generation.connect(createTransport(config))
+      await generation.connect(createTransport(config, auth?.authorization))
       if (hasClosed()) {
         attemptSettled = true
         generationDown(generation)
@@ -353,6 +459,38 @@ export function startConnection(
       await enqueueSync(generation, startup ? startupOpts : opts)
     } catch (error) {
       if (firstAttemptError === undefined) firstAttemptError = error
+      // A 401 says the token, not the server, is the problem: renew once and
+      // retry this attempt before handing the failure to the reconnect loop.
+      // Retrying here rather than through the backoff schedule is what keeps a
+      // rotated token from costing a full delay, and doing it at most once
+      // keeps a server that rejects every token from becoming a retry storm.
+      if (isCurrent(generation) && !authRetried && isUnauthorizedError(error)) {
+        authRetried = true
+        const renewed = await resolveAuthorization(ctx, config, true)
+        if (renewed !== undefined && renewed.ok) {
+          try { await generation.close() } catch { /* transport already gone */ }
+          const requiesced = hasClosed() || await waitForClose(closed.promise)
+          attemptSettled = true
+          if (!isCurrent(generation)) return
+          if (requiesced) {
+            ctx.logger.info(`${label}: server rejected the credential; retrying once with a renewed token`)
+            await connectGeneration(startup); return
+          }
+        } else if (renewed !== undefined && renewed.reason === 'unauthorized') {
+          // The renewal itself was refused: the user must authorize again, so
+          // report that instead of a connection fault.
+          try { await generation.close() } catch { /* transport already gone */ }
+          const requiesced = hasClosed() || await waitForClose(closed.promise)
+          attemptSettled = true
+          if (!isCurrent(generation)) return
+          if (requiesced) {
+            const message = renewed.error ?? `server "${config.serverName}" rejected the credential`
+            ctx.logger.warn(`${label}: ${message}`)
+            report('needs-auth', { error: message })
+            return
+          }
+        }
+      }
       // Disposal clears current ownership before it closes the generation, so
       // only a live supervisor reports an attempt failure.
       if (isCurrent(generation)) ctx.logger.warn(`${label}: connection attempt failed: ${String(error)}`)
@@ -378,6 +516,9 @@ export function startConnection(
     }
     if (!isCurrent(generation)) return
     connectedAt = Date.now()
+    // A live connection closes the outage, so the next one earns its own
+    // single post-401 renewal retry.
+    authRetried = false
     report('connected')
     if (failedAttempts > 0) ctx.logger.info(`${label}: reconnected and re-synced tools (attempt ${failedAttempts}/${policy.maxAttempts})`)
   }

@@ -175,14 +175,52 @@
   color: var(--dsw-alias-label-primary);
 }
 
-/* The tasks group stacks its label over the list: "任务列表" owns its line
-   and the first task item wraps under it, instead of the label and the first
-   item sharing a baseline row. `align-items: stretch` lets the <ol> take the
-   panel width so titles still get the full 360px instead of shrink-wrapping. */
+/* The design document link follows the status text on the same row. It reads
+   as a link by behavior (it opens the file) and a chip by shape: the path is
+   long, so it truncates inside the panel width instead of pushing the status
+   text off the row. */
+.designLink {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--ds-font-family-code);
+  font-size: 11px;
+  color: var(--dsw-alias-state-business-primary);
+  text-decoration: underline;
+}
+
+.designLink:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.openError {
+  font-size: 11px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+/* The tasks group stacks its content: the header row ("任务列表" plus the
+   source marker) owns its line and the list wraps under it, instead of the
+   label and the first item sharing a baseline row. `align-items: stretch`
+   lets the <ol> take the panel width so titles still get the full width
+   instead of shrink-wrapping. */
 .group[data-group='tasks'] {
   flex-direction: column;
   align-items: stretch;
   gap: 4px;
+}
+
+.groupHead {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
 }
 
 .taskList {

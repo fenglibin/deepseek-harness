@@ -36,7 +36,10 @@ const { mockConnect, mockClose, mockListTools, MockClient, instances } = vi.hois
 
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({ Client: MockClient }))
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({ StdioClientTransport: vi.fn() }))
-vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({ StreamableHTTPClientTransport: vi.fn() }))
+vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', async importOriginal => ({
+  ...await importOriginal<typeof import('@modelcontextprotocol/sdk/client/streamableHttp.js')>(),
+  StreamableHTTPClientTransport: vi.fn(),
+}))
 
 // ---- Mock filesystem and watcher ----
 

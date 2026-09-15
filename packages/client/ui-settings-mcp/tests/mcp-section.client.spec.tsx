@@ -31,6 +31,8 @@ interface RenderOptions {
   documentText?: string
   documentWrite?: (text: string) => Promise<boolean>
   storeUpdate?: (entry: McpServerEntry) => Promise<boolean>
+  server?: McpServerEntry
+  startAuth?: (serverName: string, origin: string) => Promise<{ ok: true; url: string } | { ok: false; error: string }>
 }
 
 /** Render the section with one server whose live status is `statuses.get(serverName)`. */
@@ -41,10 +43,12 @@ function renderSection(
   refresh: ReturnType<typeof vi.fn>
   documentWrite: ReturnType<typeof vi.fn>
   storeUpdate: ReturnType<typeof vi.fn>
+  startAuth: ReturnType<typeof vi.fn>
 } {
   const refresh = vi.fn(() => Promise.resolve())
   const documentWrite = vi.fn(options.documentWrite ?? (() => Promise.resolve(true)))
   const storeUpdate = vi.fn(options.storeUpdate ?? (() => Promise.resolve(true)))
+  const startAuth = vi.fn(options.startAuth ?? (() => Promise.resolve({ ok: true as const, url: 'https://example.com/authorize' })))
   const props = {
     store: {
       update: storeUpdate,
@@ -54,19 +58,20 @@ function renderSection(
     status: {
       load: () => Promise.resolve(),
       refresh,
+      startAuth,
     },
     document: {
       load: () => Promise.resolve(),
       read: () => Promise.resolve(),
       write: documentWrite,
     },
-    useMcp: () => ({ available: true, writable: true, servers: [server], saving: false, failed: false }),
+    useMcp: () => ({ available: true, writable: true, servers: [options.server ?? server], saving: false, failed: false }),
     useStatus: () => ({ statuses, loading: false, refreshing: false }),
     useDocument: () => ({ status: 'ready' as const, opening: false, error: null, text: options.documentText ?? '{"mcpServers":{}}' }),
     t,
   } as unknown as McpSectionProps
   render(<McpSection {...props} />)
-  return { refresh, documentWrite, storeUpdate }
+  return { refresh, documentWrite, storeUpdate, startAuth }
 }
 
 describe('McpSection connection error', () => {
@@ -252,5 +257,97 @@ describe('McpSection edit flow', () => {
       env: {},
       cwd: '',
     })
+  })
+})
+
+/** One OAuth HTTP server: the only shape that offers an authorization entry. */
+const oauthServerEntry: McpServerEntry = {
+  serverName: 'remote',
+  enabled: true,
+  transport: 'streamable-http',
+  url: 'https://example.com/mcp',
+  headers: {},
+  auth: {
+    kind: 'oauth',
+    clientId: 'client-1',
+    authorizationUrl: 'https://example.com/authorize',
+    tokenUrl: 'https://example.com/token',
+  },
+}
+
+/** One status view with the given kind. */
+function statusOf(serverName: string, kind: McpServerStatusView['status']): McpServerStatusView {
+  return { serverName, status: kind, tools: [] }
+}
+
+describe('needs-auth presentation', () => {
+  it('offers an authorization entry and opens the URL the Host returns', async () => {
+    const opened: string[] = []
+    const open = vi.spyOn(window, 'open').mockImplementation((url) => {
+      opened.push(String(url))
+      return null
+    })
+    const { startAuth } = renderSection(
+      new Map([['remote', statusOf('remote', 'needs-auth')]]),
+      { server: oauthServerEntry },
+    )
+    fireEvent.click(screen.getByRole('button', { name: '去认证' }))
+    // The page reports its own origin: only the browser knows which address it
+    // reached this deployment on, and the OAuth redirect must return there.
+    await vi.waitFor(() => { expect(startAuth).toHaveBeenCalledWith('remote', window.location.origin) })
+    await vi.waitFor(() => { expect(opened).toEqual(['https://example.com/authorize']) })
+    open.mockRestore()
+  })
+
+  it('surfaces the Host refusal instead of opening a page', async () => {
+    const opened: string[] = []
+    const open = vi.spyOn(window, 'open').mockImplementation((url) => {
+      opened.push(String(url))
+      return null
+    })
+    renderSection(new Map([['remote', statusOf('remote', 'needs-auth')]]), {
+      server: oauthServerEntry,
+      startAuth: () => Promise.resolve({ ok: false, error: 'this deployment has no web server' }),
+    })
+    fireEvent.click(screen.getByRole('button', { name: '去认证' }))
+    // A profile that cannot complete the flow says so; it never opens a page
+    // the user would land on with nothing to come back to.
+    await vi.waitFor(() => { expect(screen.getByRole('alert').textContent).toContain('no web server') })
+    expect(opened).toEqual([])
+    open.mockRestore()
+  })
+
+  it('does not offer an authorization entry for a connected server', () => {
+    renderSection(new Map([['remote', statusOf('remote', 'connected')]]), { server: oauthServerEntry })
+    expect(screen.queryByRole('button', { name: '去认证' })).toBeNull()
+  })
+
+  it('keeps the OAuth configuration when an edit is saved', () => {
+    // The regression this guards: the editor renders from the entry, so an
+    // OAuth field it fails to render is silently erased by the save.
+    const { storeUpdate } = renderSection(new Map(), { server: oauthServerEntry })
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
+    // The editor is seeded with the server's config, which must include OAuth.
+    const editor = screen.getByRole<HTMLTextAreaElement>('textbox')
+    expect(editor.value).toContain('authMode')
+    expect(editor.value).toContain('client-1')
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    expect(storeUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      serverName: 'remote',
+      auth: {
+        kind: 'oauth',
+        clientId: 'client-1',
+        authorizationUrl: 'https://example.com/authorize',
+        tokenUrl: 'https://example.com/token',
+      },
+    }))
+  })
+
+  it('does not try to reconnect a server that awaits authorization', async () => {
+    // Reconnecting cannot supply a missing credential: it would repeat a
+    // request the server already answered correctly.
+    const { refresh } = renderSection(new Map([['remote', statusOf('remote', 'needs-auth')]]), { server: oauthServerEntry })
+    await new Promise(resolve => setTimeout(resolve, 20))
+    expect(refresh).not.toHaveBeenCalled()
   })
 })

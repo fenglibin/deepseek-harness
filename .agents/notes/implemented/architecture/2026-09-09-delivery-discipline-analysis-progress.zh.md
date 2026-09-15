@@ -11,7 +11,7 @@ Status: implemented
 - **需求分析前置。** `DeliverySnapshot` 新增 `analysisDone: boolean`（默认 `false`），`DeliveryOperation` 新增 `mark-analyzed` 变体；`DeliveryService.markAnalyzed(agent, ref)` 提交它，工具层新增 `mark_analysis_done`。`record_design` 在 `analysisDone === false` 时按 enforcement 档返回 blocking 或提醒，因此需求分析完成前无法写设计文档。旧事件无该键时按 `false` 折叠。
 - **任务清单三态。** `DeliveryTaskItem.done: boolean` 改为 `status: 'pending' | 'in_progress' | 'completed'`，`delivery-tasks` 投影的 `progress` 只把 `completed` 计为完成。`l2` 的 `tasks.md` checkbox 映射为 `- [x]`→`completed`、`- [ ]`→`pending`。
 - **非 `l2` 统一落盘。** `record_tasks` 的 `change_id` 对非 `l2` 允许空串（`l2` 仍强制 kebab-case），`checklistMismatch` 对空 change id 跳过磁盘核对。`todo_write` 仅作当轮临时清单。
-- **进度语义化。** `DeliveryFloatCard` 重构为「需求分析 / 设计文档 / 任务列表 / 实现验证」四组，默认展开，随投影实时更新；`l0` 省略设计文档组。
+- **进度语义化。** `DeliveryFloatCard` 重构为「需求分析 / 设计文档 / 任务列表 / 实现验证」四组，随投影实时更新；`l0` 省略设计文档组。该卡片的默认可见性、设计文档链接与 `todos` 回落由[交付分级复核范围与悬浮卡片可用性](2026-09-15-delivery-grading-review-and-float-card-visibility.zh.md)持有。
 - **验证分级。** `l2` 维持 coverage 与 validate；非 `l2` 推进到 `verified` 时校验清单全部 `completed`，未完成则 blocking 并列出差异。
 
 ## 备选方案

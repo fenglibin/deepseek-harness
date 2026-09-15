@@ -54,6 +54,19 @@ const CHOOSER_BACKEND_PACKAGES = [
   '@deepseek-ai/dsh-client-ui-directory-picker-browse',
   '@deepseek-ai/dsh-client-ui-directory-picker-native',
 ]
+
+/**
+ * Rows that may be active on both planes because they contribute into a
+ * per-scope layered registry rather than into a host singleton: the host row
+ * registers into the registry's global layer and a preset row into that
+ * preset's layer, so neither mount displaces or collides with the other.
+ *
+ * `skill-filesystem` is the shipped case. It also publishes `ctx.skillRoots`
+ * for the skill-management surface, and it must keep publishing it from the
+ * host-plane instance only — a second `provide` for one service fails the
+ * preset's mount.
+ */
+export const BOTH_PLANE_ROWS: ReadonlySet<string> = new Set(['skill-filesystem'])
 const errors: string[] = []
 const pluginReferences: PluginReference[] = []
 
@@ -117,6 +130,27 @@ function validateClientHalvesDeclared(): string[] {
 }
 
 /**
+ * Diagnose one preset's rows against the host plane's active rows.
+ * @param active - row ids the host composition runs.
+ * @param file - preset config path, for the diagnostic.
+ * @param presetRows - row ids the preset declares.
+ * @returns one diagnostic per preset row that also runs on the host plane.
+ */
+export function presetPlaneViolations(
+  active: ReadonlySet<string>,
+  file: string,
+  presetRows: ReadonlySet<string>,
+): string[] {
+  return [...presetRows].flatMap((id) => {
+    if (!active.has(id) || BOTH_PLANE_ROWS.has(id)) return []
+    return [
+      `${file}: row "${id}" is also active in the host composition; `
+      + 'a row belongs to exactly one plane',
+    ]
+  })
+}
+
+/**
  * No shipped agent preset may repeat a row the host composition still runs.
  *
  * A preset contributes what ONE session adds to the host's registries. A row
@@ -131,10 +165,12 @@ function validateClientHalvesDeclared(): string[] {
  * session until the second registration threw. Neither changes a tool catalog,
  * so no catalog assertion can see them — and the shipped presets are near-copies
  * of each other, so a fix applied to three of four is the normal failure.
+ *
+ * Rows that contribute into a per-scope layered registry are exempt
+ * ({@link BOTH_PLANE_ROWS}): mounting them per session is the intended shape.
  * @returns one diagnostic per preset row that is also active on the host plane.
  */
 function validatePresetPlaneSeparation(): string[] {
-  const problems: string[] = []
   // The shipped Web surface is two bundle patch layers over an empty root.
   const hostFile = 'packages/bundle/base/cordis.patch.yml'
   const overlayFile = 'packages/bundle/web-app/cordis.patch.yml'
@@ -147,16 +183,8 @@ function validatePresetPlaneSeparation(): string[] {
   }
   // The overlay's own inserts are host-plane too; its disables take them back out.
   const active = new Set([...hostRows, ...rowIds(overlayFile)].filter(id => !disabled.has(id)))
-  for (const file of globSync('packages/preset/agent-presets/presets/*/agent.cordis.yml', { cwd: root })) {
-    for (const id of rowIds(file)) {
-      if (!active.has(id)) continue
-      problems.push(
-        `${file}: row "${id}" is also active in the host composition; `
-        + 'a row belongs to exactly one plane',
-      )
-    }
-  }
-  return problems
+  return globSync('packages/preset/agent-presets/presets/*/agent.cordis.yml', { cwd: root })
+    .flatMap(file => presetPlaneViolations(active, file, rowIds(file)))
 }
 
 /** Every entry of one config file, or an empty list when it is not an entry array. */

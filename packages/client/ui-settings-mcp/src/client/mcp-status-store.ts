@@ -89,6 +89,28 @@ export class McpStatusStore {
     await this.load()
   }
 
+  /**
+   * Ask the Host to begin OAuth authorization for one server and open the
+   * server's consent page. The Host completes the exchange when the browser
+   * lands back on its callback route; this page only opens the URL it is
+   * handed, and never sees a token.
+   * @param serverName - the server to authorize.
+   * @param origin - this page's own origin. The Host builds the OAuth redirect
+   *   from it, because only the browser knows which address it reached this
+   *   deployment on — a LAN or proxied address must redirect back to itself.
+   * @returns the authorization URL, or an error when the Host cannot start one
+   *   (an unknown, disabled, or non-OAuth server, a refusal of this origin, or
+   *   an attempt already in progress).
+   */
+  async startAuth(
+    serverName: string,
+    origin: string,
+  ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+    const response = await this.ctx.remote.mcp.startAuth(serverName, origin)
+    if (!response.ok) return { ok: false, error: response.error.message }
+    return { ok: true, url: response.value.url }
+  }
+
   /** The last reported status for one server, or undefined while unobserved. */
   statusOf(serverName: string): McpServerStatusView | undefined {
     return this.statuses.get(serverName)

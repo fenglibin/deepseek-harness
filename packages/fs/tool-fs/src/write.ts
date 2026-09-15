@@ -11,8 +11,9 @@ import type { DiffCallView, DiffResultView, ToolResult } from '@deepseek-ai/dsh-
 import type { FsWriteOutcome } from '@deepseek-ai/dsh-fs'
 import type {} from '@deepseek-ai/dsh-fs'
 import { computeHunkDiffs, diffsFromMeta } from './diff.ts'
-import { remediateFsError } from './error.ts'
+import { recoverMutationFailure } from './error.ts'
 import { sessionResolveOptions } from './session-cwd.ts'
+import type { ReadToolCaps } from './read.ts'
 import type { FsSandboxController } from './sandbox.ts'
 
 /**
@@ -57,8 +58,9 @@ interface WriteToolArgs {
  * Register the `write` tool and its system-prompt guidance.
  * @param ctx - the plugin context; registrations are effects scoped to it, and execution uses its `fs` service.
  * @param sandbox - the shared sandbox-escalation API (advertisement, mode stamping, denial mapping).
+ * @param caps - the deployment's resolved read caps, used to bound the recovery reread.
  */
-export function applyWriteTool(ctx: Context, sandbox: FsSandboxController): void {
+export function applyWriteTool(ctx: Context, sandbox: FsSandboxController, caps: ReadToolCaps): void {
   ctx.systemPrompt.section({
     name: 'tool:write',
     order: ctx.systemPrompt.getSectionOrder('TOOL_WRITE'),
@@ -113,9 +115,11 @@ export function applyWriteTool(ctx: Context, sandbox: FsSandboxController): void
         outcome = await ctx.fs.writeText(target, input.content, intent, exec.signal, sandboxPolicy)
       } catch (error: unknown) {
         // A sandbox denial becomes the shared [sandbox: …] marker (the model
-        // recognizes it from bash); stale/not-observed failures gain their
-        // model-facing remedy; anything else passes through.
-        throw remediateFsError(sandbox.mapError(error, sandboxPolicy))
+        // recognizes it from bash); a refusal that only lacks a fresh
+        // observation is recovered in place by re-reading the target and
+        // returning its content; anything else keeps its remedy or passes
+        // through.
+        throw await recoverMutationFailure(ctx, exec, sandbox.mapError(error, sandboxPolicy), target, caps)
       }
       ctx.emit('fs/observed', target, { kind: 'present', version: outcome.version }, exec)
       return {

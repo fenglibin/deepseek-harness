@@ -72,7 +72,7 @@ interface SkillProviderControl {
 | 500 | `user-agents` | `<agentsHome>/skills` |
 | 600 | `bundled` | 配置了 `Config.bundledSkillDir` 时使用该目录 |
 
-项目根目录为包含 `.git` 的最近祖先目录；找不到时使用当前 cwd。当 `ctx.fs` 可用时，git-root 向上查找通过文件系统服务探测 `.git`，使远程或沙箱工作区不会回退到宿主文件系统边界。用户 DSH 根目录会跳过其 `.system` 子目录。本地提供方不会合成内置系统 skill；部署方通过已配置的 bundled 根目录或专用提供方提供随包 skill。
+项目根目录为包含 `.git` 的最近祖先目录；找不到时使用当前 cwd。当 `ctx.fs` 可用时，git-root 向上查找通过文件系统服务探测 `.git`，使远程或沙箱工作区不会回退到宿主文件系统边界。用户 DSH 根目录会跳过其 `.system` 子目录。每个根目录还会跳过其 `.disabled` 子目录：管理面把停用的 skill 停放在那里，因此该目录永不参与发现。本地提供方不会合成内置系统 skill；部署方通过已配置的 bundled 根目录或专用提供方提供随包 skill。
 
 `dsh-skill-badge` 在 `BUNDLED_SKILL_RANK` 注册一个不可变的 `bundled` 候选项，并通过 `resourceBase` 公开其随包资产目录。交付的 CLI（命令行界面）将该插件声明为禁用，因此启用其组合配置行即为显式选择加入。
 
@@ -235,6 +235,20 @@ interface Config {
 ## 浏览器 Session 目录
 
 `SkillListRequest` 通过 `sessionId` 指定一个 Session；`SkillListValue` 返回允许用户调用的条目，其中包含名称、描述、可选使用提示与模型调用可用性。`SessionSkillCatalog` 在不激活 Agent 的前提下读取 Session cwd 与记录的 preset。live Agent 可以提供其作用域 registry，冷 Session 则使用 preset 的 standing scope。
+
+## 管理面
+
+发现注册表回答「哪个 skill 对某个 agent 胜出」，管理面回答「磁盘上有什么」。二者服务不同的消费方，因此是两条独立的读路径：注册表返回合并去重后的摘要、不含路径与 rank、静默跳过 frontmatter 非法的文件；管理面需要被遮蔽项、非法项与绝对路径，因为它要支持改写与删除。
+
+根的定义只有一个来源。[dsh-skill-filesystem](../../packages/skill/skill-filesystem) 暴露只读服务 `ctx.skillRoots`，报告它当前扫描的根。每个根描述携带：绝对目录（无论是否已存在）、该根贡献的发现来源标签、决定同名裁决的 rank、仅项目级根才有的项目根，以及是否为部署随包交付因而不可写。
+
+发布该服务的是**部署级实例**，即 Web 组合里启用 `skill-filesystem` 行的那一行。Cordis 服务只有一个提供方，而 preset 也会挂载自己的实例，因此 scope 实例只向本 scope 的注册表层贡献目录、不发布服务：管理面读到的根永远是部署的根，preset 自带的技能目录（如 cordis preset 的 `skills/`）属于该 preset，不由没有会话的设置面板编辑。
+
+消费方是 [dsh-host-skill-manager](../../packages/host/skill-manager)，它通过 `skillAdmin` Remote 命名空间提供 `list`、`read`、`create`、`update` 与 `delete`。它自身不推导根，因此写入一定落在发现器扫描的目录。`bundled` 根只读，其余根可写。
+
+管理面的写入不走 `ctx.fs`：该服务没有删除与建目录能力，混用会让部分操作受沙箱约束、部分不受。它直接用 Node 文件系统并复用 `@deepseek-ai/dsh-atomic-write` 做原子替换。
+
+写入后的模型侧可见性依赖文件监视器。`fs/observed` 的同步失效路径只对第一方 `write`/`edit` **工具**生效，界面写入没有工具身份，因此刷新由 Chokidar 完成：已存在的根在下一个模型步骤前刷新，此前不存在的根按路径段轮询。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

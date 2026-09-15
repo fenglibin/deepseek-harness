@@ -74,6 +74,7 @@ describe('mcpJsonToSettings', () => {
       transport: 'streamable-http',
       url: 'https://example.com/mcp',
       headers: { Authorization: 'Bearer token' },
+      auth: { kind: 'none' },
     }])
   })
 
@@ -153,7 +154,7 @@ describe('settingsToMcpJson and renderMcpJson', () => {
     const settings: McpSettings = {
       servers: [
         { serverName: 'a', enabled: true, transport: 'stdio', command: 'npx', args: ['-y'], env: {}, cwd: '' },
-        { serverName: 'b', enabled: false, transport: 'streamable-http', url: 'https://example.com', headers: { A: 'b' } },
+        { serverName: 'b', enabled: false, transport: 'streamable-http', url: 'https://example.com', headers: { A: 'b' }, auth: { kind: 'none' } },
       ],
     }
     const json = settingsToMcpJson(settings)
@@ -167,7 +168,7 @@ describe('settingsToMcpJson and renderMcpJson', () => {
     const settings: McpSettings = {
       servers: [
         { serverName: 'a', enabled: true, transport: 'stdio', command: 'npx', args: [], env: {}, cwd: '', allowedTools: ['search'] },
-        { serverName: 'b', enabled: true, transport: 'streamable-http', url: 'https://example.com', headers: {} },
+        { serverName: 'b', enabled: true, transport: 'streamable-http', url: 'https://example.com', headers: {}, auth: { kind: 'none' } },
       ],
     }
     const json = settingsToMcpJson(settings)
@@ -187,5 +188,117 @@ describe('settingsToMcpJson and renderMcpJson', () => {
 describe('MCP_JSON_FILENAME', () => {
   it('names the document mcp.json', () => {
     expect(MCP_JSON_FILENAME).toBe('mcp.json')
+  })
+})
+
+describe('mcp.json auth handling', () => {
+  it('recognizes an oauth entry and keeps its endpoints', () => {
+    const settings = mcpJsonToSettings({
+      mcpServers: {
+        remote: {
+          url: 'https://example.com/mcp',
+          authMode: 'oauth',
+          clientId: 'client-1',
+          authorizationUrl: 'https://example.com/authorize',
+          tokenUrl: 'https://example.com/token',
+        },
+      },
+    })
+    expect(settings.servers[0]).toMatchObject({
+      auth: {
+        kind: 'oauth',
+        clientId: 'client-1',
+        authorizationUrl: 'https://example.com/authorize',
+        tokenUrl: 'https://example.com/token',
+      },
+    })
+  })
+
+  it('refuses an entry that names oauth without its endpoints', () => {
+    // One-way recognition: the cross-vendor document may name OAuth with a
+    // vendor's own conventions. Rather than degrade silently to `none`, the
+    // sync names what is missing so the document can be fixed.
+    expect(() => mcpJsonToSettings({
+      mcpServers: { remote: { url: 'https://example.com/mcp', authMode: 'oauth' } },
+    })).toThrow(/missing clientId, authorizationUrl, or tokenUrl/)
+  })
+
+  it('renders oauth details so a settings-page edit cannot erase them', () => {
+    // The settings editor is a mcp.json round trip: a field the render omits is
+    // a field the editor cannot show, and the save that follows writes the
+    // entry back without it.
+    const json = settingsToMcpJson({
+      servers: [{
+        serverName: 'remote',
+        enabled: true,
+        transport: 'streamable-http',
+        url: 'https://example.com/mcp',
+        headers: {},
+        auth: {
+          kind: 'oauth',
+          clientId: 'client-1',
+          authorizationUrl: 'https://example.com/authorize',
+          tokenUrl: 'https://example.com/token',
+        },
+      }],
+    })
+    expect(json.mcpServers['remote']).toMatchObject({
+      authMode: 'oauth',
+      clientId: 'client-1',
+      authorizationUrl: 'https://example.com/authorize',
+      tokenUrl: 'https://example.com/token',
+    })
+  })
+
+  it('round-trips an oauth entry through the document unchanged', () => {
+    const settings: McpSettings = {
+      servers: [{
+        serverName: 'remote',
+        enabled: true,
+        transport: 'streamable-http',
+        url: 'https://example.com/mcp',
+        headers: { 'X-Extra': 'v' },
+        auth: {
+          kind: 'oauth',
+          clientId: 'client-1',
+          authorizationUrl: 'https://example.com/authorize',
+          tokenUrl: 'https://example.com/token',
+          scopes: ['a', 'b'],
+        },
+      }],
+    }
+    const back = mcpJsonToSettings(parseMcpJson(renderMcpJson(settingsToMcpJson(settings))))
+    expect(back.servers[0]).toMatchObject({
+      serverName: 'remote',
+      url: 'https://example.com/mcp',
+      headers: { 'X-Extra': 'v' },
+      auth: {
+        kind: 'oauth',
+        clientId: 'client-1',
+        authorizationUrl: 'https://example.com/authorize',
+        tokenUrl: 'https://example.com/token',
+        scopes: ['a', 'b'],
+      },
+    })
+  })
+
+  it('writes no oauth field for an entry that uses none', () => {
+    // Every entry that predates this capability renders exactly as before.
+    const json = settingsToMcpJson({
+      servers: [{
+        serverName: 'plain',
+        enabled: true,
+        transport: 'streamable-http',
+        url: 'https://example.com/mcp',
+        headers: {},
+        auth: { kind: 'none' },
+      }],
+    })
+    const entry = json.mcpServers['plain']!
+    expect('authMode' in entry).toBe(false)
+    expect('clientId' in entry).toBe(false)
+    expect('authorizationUrl' in entry).toBe(false)
+    expect('tokenUrl' in entry).toBe(false)
+    expect('scopes' in entry).toBe(false)
   })
 })

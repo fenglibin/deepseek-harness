@@ -79,7 +79,7 @@ function mirroredPages(pages: MirroredPage[]): DocsPage[] {
       locale,
       contentLocale: localized(page.contentLocale, locale),
       source: localized(page.source, locale),
-      route: locale === 'root' ? page.route : `en/${page.route}`,
+      route: page.route,
       label: page.label[locale],
       sidebar: page.sidebar[locale],
       section: page.section[locale],
@@ -411,7 +411,7 @@ const reference = [
     sidebar: { root: 'zh-reference', en: 'en-reference' },
     section: { root: '生成参考', en: 'Generated reference' },
     order: order + 2,
-    ...(outline === undefined ? {} : { outline }),
+    outline,
   }))),
   ...pairedPages(([
     ['context.md', 'Context', 'Context'],

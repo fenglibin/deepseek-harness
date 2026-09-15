@@ -8,17 +8,18 @@
  * exercised over the same Context.
  */
 import { Context } from '@deepseek-ai/cordis'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import {
   ConversationEventRegistry, ConversationViewRegistry,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { apply, inject } from '../src/client/index.ts'
+import type { DeliveryFloatCardInjected } from '../src/client/DeliveryFloatCard.tsx'
 import { apply as nodeApply } from '../src/index.ts'
 
-/** Boot the plugin over fake slots/locale/uiConversation faces. */
-async function bench() {
+/** Boot the plugin over fake slots/locale/uiConversation/remote faces. */
+async function bench(openWorkspacePath?: (path: string) => Promise<unknown>) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
   ctx.slots.register({
@@ -36,6 +37,11 @@ async function bench() {
     views: new ConversationViewRegistry(ctx),
   } as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
+  // The design-document opener reaches the Session Remote, so the fake carries
+  // both the service and the namespaced face the plugin's inject reads.
+  const session = { openWorkspacePath: openWorkspacePath ?? (() => Promise.resolve({ ok: true })) }
+  ctx.provide('remote', { session } as never)
+  ctx.provide('remote.session', session as never)
   const fiber = ctx.plugin({ inject: [...inject], apply })
   return {
     ctx,
@@ -43,9 +49,15 @@ async function bench() {
     entry: () => {
       const entry = ctx.slots.entries('conversation.side.float')[0]
       if (entry === undefined) return undefined
-      return { ...entry.options, locale: entry.locale }
+      return { ...entry.options, locale: entry.locale, inject: entry.inject }
     },
   }
+}
+
+/** Read the floating card's injected opener through the registered entry. */
+function openerOf(b: Awaited<ReturnType<typeof bench>>): (path: string) => Promise<void> {
+  const injected = b.entry()?.inject?.() as unknown as DeliveryFloatCardInjected
+  return injected.openFile
 }
 
 describe('ui-delivery browser plugin', () => {
@@ -54,6 +66,20 @@ describe('ui-delivery browser plugin', () => {
     await b.fiber.await()
     const entry = b.entry()
     expect(entry).toMatchObject({ id: 'delivery', locale: 'delivery' })
+  })
+
+  it('hands a design artifact path to the Host opener', async () => {
+    const openWorkspacePath = vi.fn<(path: string) => Promise<unknown>>(() => Promise.resolve({ ok: true }))
+    const b = await bench(openWorkspacePath)
+    await b.fiber.await()
+    await openerOf(b)('.dsh/design/task-1.md')
+    expect(openWorkspacePath).toHaveBeenCalledWith({ path: '.dsh/design/task-1.md' })
+  })
+
+  it('surfaces a refused open as a rejected promise', async () => {
+    const b = await bench(() => Promise.resolve({ ok: false, error: { message: 'no opener' } }))
+    await b.fiber.await()
+    await expect(openerOf(b)('.dsh/design/task-1.md')).rejects.toThrow('no opener')
   })
 
   it('no longer registers the composer input dock the two cards replaced', async () => {

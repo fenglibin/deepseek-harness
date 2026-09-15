@@ -113,6 +113,12 @@
   background: var(--color-danger, #c62828);
 }
 
+/* Authorizing is a pending action rather than a fault, so it reads like
+   reconnecting instead of like a failure. */
+.statusDotNeedsAuth {
+  background: var(--color-warning, #f57c00);
+}
+
 .statusDotUnknown {
   background: var(--color-text-disabled, #bbb);
 }

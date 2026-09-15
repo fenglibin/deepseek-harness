@@ -43,7 +43,10 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
   StdioClientTransport: vi.fn(),
 }))
 
-vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
+vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', async importOriginal => ({
+  // The real module supplies StreamableHTTPError, which the supervisor matches
+  // to distinguish a rejected credential from any other failure.
+  ...await importOriginal<typeof import('@modelcontextprotocol/sdk/client/streamableHttp.js')>(),
   StreamableHTTPClientTransport: vi.fn(),
 }))
 
@@ -187,7 +190,7 @@ describe('mcp-manager', () => {
   it('mounts an allowlisted http server and registers only its listed tools', async () => {
     mockListTools.mockResolvedValue(listing('remote', 'other'))
     const server: McpServerEntry = {
-      serverName: 'web', enabled: true, transport: 'streamable-http', url: 'http://localhost/mcp', headers: {}, allowedTools: ['remote'],
+      serverName: 'web', enabled: true, transport: 'streamable-http', url: 'http://localhost/mcp', headers: {}, auth: { kind: 'none' }, allowedTools: ['remote'],
     }
     const ctx = await boot({ [MCP_SETTINGS_NAMESPACE]: { servers: [server] } })
 

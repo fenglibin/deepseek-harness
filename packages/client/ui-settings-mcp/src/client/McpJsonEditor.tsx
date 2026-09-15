@@ -15,6 +15,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
+import { McpHelp } from './McpHelp.tsx'
 import type { McpKey } from './locales.ts'
 import styles from './McpJsonEditor.module.css'
 
@@ -116,6 +117,7 @@ export function McpJsonEditor(props: McpJsonEditorProps): ReactNode {
   const { text, opening, error, onSave, onClose, title, t } = props
   const [draft, setDraft] = useState(text)
   const [invalid, setInvalid] = useState<string | undefined>(undefined)
+  const [helpOpen, setHelpOpen] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
   // Pull the freshly read text once the read settles; a later save closes the
@@ -163,46 +165,62 @@ export function McpJsonEditor(props: McpJsonEditorProps): ReactNode {
   const tokens = tokenizeJson(draft)
 
   return (
-    <Modal
-      open
-      onClose={onClose}
-      title={title ?? t('editorTitle')}
-      closeLabel={t('close')}
-      className={styles['dialog'] as string}
-      footer={(
-        <>
-          <Button variant="outline" disabled={opening} onClick={format}>
-            {t('format')}
-          </Button>
-          <Button variant="outline" autoFocus disabled={opening} onClick={onClose}>
-            {t('cancel')}
-          </Button>
-          <Button variant="outline" disabled={opening} onClick={submit}>
-            {opening ? t('saving') : t('save')}
-          </Button>
-        </>
-      )}
-    >
-      <div className={styles['scroller']}>
-        <div className={styles['content']}>
-          <div className={styles['highlight']} aria-hidden="true" data-testid="mcp-json-highlight">
-            <Highlight tokens={tokens} />
+    <>
+      <Modal
+        open
+        onClose={onClose}
+        title={title ?? t('editorTitle')}
+        closeLabel={t('close')}
+        className={styles['dialog'] as string}
+        footer={(
+          <>
+            <Button variant="outline" disabled={opening} onClick={format}>
+              {t('format')}
+            </Button>
+            <Button variant="outline" autoFocus disabled={opening} onClick={onClose}>
+              {t('cancel')}
+            </Button>
+            <Button variant="outline" disabled={opening} onClick={submit}>
+              {opening ? t('saving') : t('save')}
+            </Button>
+          </>
+        )}
+      >
+        {/* The hint and its help link are one sentence, so they render as one
+          line: the Modal's `description` seat takes a string only, and the
+          link has to sit inside the sentence rather than under it. */}
+        <p className={styles['hint']}>
+          <span>{t('editorHint')}</span>{' '}
+          <button
+            type="button"
+            className={styles['helpLink']}
+            onClick={() => { setHelpOpen(true) }}
+          >
+            {t('help')}
+          </button>
+        </p>
+        <div className={styles['scroller']}>
+          <div className={styles['content']}>
+            <div className={styles['highlight']} aria-hidden="true" data-testid="mcp-json-highlight">
+              <Highlight tokens={tokens} />
+            </div>
+            <textarea
+              ref={inputRef}
+              className={styles['input']}
+              value={draft}
+              wrap="soft"
+              spellCheck={false}
+              onChange={(event) => {
+                setDraft(event.target.value)
+                setInvalid(undefined)
+              }}
+            />
           </div>
-          <textarea
-            ref={inputRef}
-            className={styles['input']}
-            value={draft}
-            wrap="soft"
-            spellCheck={false}
-            onChange={(event) => {
-              setDraft(event.target.value)
-              setInvalid(undefined)
-            }}
-          />
         </div>
-      </div>
-      {invalid === undefined ? null : <p className={styles['error']} role="alert">{invalid}</p>}
-      {error === null || invalid !== undefined ? null : <p className={styles['error']} role="alert">{t('saveFailed')}: {error}</p>}
-    </Modal>
+        {invalid === undefined ? null : <p className={styles['error']} role="alert">{invalid}</p>}
+        {error === null || invalid !== undefined ? null : <p className={styles['error']} role="alert">{t('saveFailed')}: {error}</p>}
+      </Modal>
+      <McpHelp open={helpOpen} onClose={() => { setHelpOpen(false) }} t={t} />
+    </>
   )
 }

@@ -24,6 +24,12 @@ import { MCP_JSON_FILENAME, mcpJsonToSettings, parseMcpJson, renderMcpJson, sani
 import type { McpJson } from './mcp-json.ts'
 import { reconcile } from './reconcile.ts'
 import type { McpDocumentTextValue, McpDocumentWriteValue, McpServerStatusKind, McpServerStatusView, McpToolInfo } from './status.ts'
+import { createAuthSink } from './auth-sink.ts'
+import { createOAuthFlow } from './oauth-flow.ts'
+// Side-effect type imports: declaration-merge `ctx.credentials` and `ctx.webServer`.
+import type {} from '@deepseek-ai/dsh-authorization'
+import type {} from '@deepseek-ai/dsh-credentials'
+import type {} from '@deepseek-ai/dsh-host-webserver'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -100,6 +106,8 @@ export class McpManager extends TypertRemoteService {
   private readonly scope: SettingsScope<McpSettings>
   /** Absolute path of the user-editable `mcp.json`, or undefined without a file settings provider. */
   private readonly mcpJsonPath: string | undefined
+  /** Host half of the OAuth flow; `start` refuses in a profile with no webserver. */
+  private readonly oauth: ReturnType<typeof createOAuthFlow>
 
   constructor(ctx: Context) {
     super(ctx, 'mcpManager', { namespace: 'mcp' })
@@ -117,11 +125,27 @@ export class McpManager extends TypertRemoteService {
     }
     ctx.provide('mcpStatusSink', this.sink)
 
+    // The credential resolver the mounted mcp-client instances read. It is
+    // contributed before any mount so the first connection already sees a
+    // stored grant.
+    ctx.provide('mcpAuthSink', createAuthSink(ctx, serverName => this.serverOf(serverName)))
+
     this.scope = ctx.settings.register<typeof MCP_SETTINGS_NAMESPACE, McpSettings>(
       MCP_SETTINGS_NAMESPACE,
       MCP_SETTINGS_SCHEMA,
       { applies: 'live', validate: validateServers },
     )
+
+    // Built after the scope exists: the callback resolves the server entry,
+    // and a route that could answer before settings were readable would 404
+    // on a race rather than by fact.
+    this.oauth = createOAuthFlow(
+      ctx,
+      serverName => this.serverOf(serverName),
+      (serverName) => { void this.refresh(serverName) },
+    )
+    ctx.effect(() => () => { this.oauth.dispose() }, 'mcp-manager: oauth flow')
+
     this.scope.watch((next, prev) => {
       void this.apply(prev.servers, next.servers)
     })
@@ -139,6 +163,27 @@ export class McpManager extends TypertRemoteService {
   /** Current status for one server, or undefined while unobserved. */
   statusOf(serverName: string): McpServerStatus | undefined {
     return this.statuses.get(serverName)
+  }
+
+  /** One server's current settings entry, or undefined when it was removed. */
+  private serverOf(serverName: string): McpServerEntry | undefined {
+    return this.scope.get().servers.find(candidate => candidate.serverName === serverName)
+  }
+
+  /**
+   * Begin OAuth authorization for one server. The returned URL is opened in the
+   * user's browser; the Host completes the exchange when the server redirects
+   * back, and the surface re-reads `list` for the resulting status.
+   * @param serverName - the server to authorize.
+   * @returns the authorization URL to open.
+   * @throws RemoteError when the server is unknown, does not use OAuth, or this
+   *   deployment cannot receive the callback.
+   */
+  @Remote
+  async startAuth(serverName: string, origin: string): Promise<{ url: string }> {
+    const started = await this.oauth.start(serverName, origin)
+    if (!started.ok) throw new RemoteError('gateway/internal', started.error, {})
+    return { url: started.url }
   }
 
   /**
@@ -205,6 +250,15 @@ export class McpManager extends TypertRemoteService {
       const config = toMcpClientConfig(server)
       const fiber = await this.ctx.plugin(McpClient, config)
       this.disposers.set(server.serverName, () => fiber.dispose())
+      // An OAuth entry needs its flow registered for as long as the manager
+      // mounts it: authorizing an unmounted server would store a grant
+      // nothing reads.
+      // An OAuth entry needs its flow registered for as long as the manager
+      // mounts it: authorizing an unmounted server would store a grant
+      // nothing reads.
+      if (server.transport === 'streamable-http' && server.auth?.kind === 'oauth') {
+        this.oauth.registerFlow(server.serverName)
+      }
     } catch (error) {
       // A mount that fails at load (duplicate serverName, invalid config)
       // records a failed status so a configuration surface can explain why
@@ -218,6 +272,7 @@ export class McpManager extends TypertRemoteService {
     const disposer = this.disposers.get(serverName)
     if (disposer === undefined) return
     this.disposers.delete(serverName)
+    this.oauth.unregisterFlow(serverName)
     await disposer()
     this.statuses.delete(serverName)
   }
@@ -430,7 +485,9 @@ export class McpManager extends TypertRemoteService {
     }
     let settings: McpSettings
     try {
-      settings = mcpJsonToSettings(parseMcpJson(text))
+      // The current section is passed in so a document that omits OAuth
+      // details keeps the OAuth entries this section already holds.
+      settings = mcpJsonToSettings(parseMcpJson(text), this.scope.get())
     } catch (error) {
       // A malformed or invalid document must never reach settings; leave it
       // for the user to fix and keep the last good section in place.

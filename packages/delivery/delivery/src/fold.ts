@@ -364,7 +364,7 @@ export function applyDeliveryChange(state: DeliveryFoldState, change: DeliveryCh
   if (change.operation === 'create') {
     if (change.task.revision !== 1 || change.task.phase !== 'created' || change.task.changeCount !== 0
       || change.task.designCount !== 0 || change.task.specCount !== 0
-      || change.task.analysisDone !== false
+      ||  change.task.analysisDone
       || (state.task !== undefined && state.task.phase !== 'accepted')
       || state.seenTaskIds.has(change.task.id)) {
       throw new Error('delivery create requires a fresh created revision-one task with zero changes')

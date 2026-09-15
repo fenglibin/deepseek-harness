@@ -418,6 +418,7 @@ describe('describeForRoute', () => {
     const ctx = await llmContext()
     ctx.llm.registerAdapter(['vision'], new ScriptedAdapter(TEXT, [visionModel()]))
     ctx.provide('imageUnderstanding', {
+      // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- the non-Error rejection is the scenario under test
       describe: () => Promise.reject('bare string failure'),
     } as never)
 

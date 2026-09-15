@@ -9,6 +9,7 @@ import goalsRemote from '@deepseek-ai/dsh-goal/remote'
 import llmRemote from '@deepseek-ai/dsh-llm/remote'
 import dynamicRemote from '@deepseek-ai/dsh-cordis-host-runner/remote'
 import pluginInventoryRemote from '@deepseek-ai/dsh-host-plugin-inventory/remote'
+import skillManagerRemote from '@deepseek-ai/dsh-host-skill-manager/remote'
 import messageFeedbackRemote from '@deepseek-ai/dsh-message-feedback/remote'
 import sessionReferencesRemote from '@deepseek-ai/dsh-session-reference/remote'
 import subagentsRemote from '@deepseek-ai/dsh-subagent/remote'
@@ -18,6 +19,18 @@ import type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
 
 export type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
 export type { PluginDescribeResult, PluginInventorySnapshot } from '@deepseek-ai/dsh-host-plugin-inventory/types'
+// Skill management vocabulary for the skillAdmin namespace. It travels with its
+// seam so a Settings contribution names what it sends without importing a Host
+// package: this assembly is the one place both planes legitimately meet.
+export type {
+  ImportCommitRequest, ImportFilePreview, ImportPreview, ImportPreviewFile, ImportPreviewFileRequest,
+  ImportPreviewId, ImportPreviewRequest,
+  SkillAdminEntry, SkillAdminSnapshot, SkillCreateRequest, SkillDocument, SkillEntryForm, SkillEntryId,
+  SkillFileDocument, SkillFileListRequest, SkillFileNode, SkillFileReadOnlyReason, SkillFileReadRequest,
+  SkillFileTree, SkillFileWriteRequest, SkillRootView, SkillSetEnabledRequest, SkillUpdateRequest,
+  SkillUploadRequest,
+} from '@deepseek-ai/dsh-host-skill-manager/types'
+export type {} from '@deepseek-ai/dsh-host-skill-manager/remote'
 export type {} from '@deepseek-ai/dsh-agent-presets/remote'
 export type {} from '@deepseek-ai/dsh-commands/remote'
 export type {} from '@deepseek-ai/dsh-api-settings-controller/remote'
@@ -149,7 +162,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   try {
     for (const contribution of [
       agentPresetsRemote, commandsRemote, settingsControllerRemote, goalsRemote, llmRemote, dynamicRemote,
-      pluginInventoryRemote, messageFeedbackRemote, sessionReferencesRemote,
+      pluginInventoryRemote, skillManagerRemote, messageFeedbackRemote, sessionReferencesRemote,
       subagentsRemote, sessionRemote, workspaceRemote, mcpRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))

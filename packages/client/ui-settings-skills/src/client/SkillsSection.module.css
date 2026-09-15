@@ -1,0 +1,434 @@
+/*
+ * The skills Settings section. Colors come from the theme package's
+ * `--dsw-alias-*` tokens; the fallbacks only keep a token-less host readable.
+ */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.grow {
+  flex: 1;
+}
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-l2, #f0f0f0);
+}
+
+.tab,
+.tabActive {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--dsw-alias-text-secondary, #666);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.tabActive {
+  background: var(--dsw-alias-bg-base, #fff);
+  color: inherit;
+  font-weight: 600;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--dsw-alias-text-secondary, #666);
+}
+
+.control,
+.textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--dsw-alias-border-l2, #e0e0e0);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-base, #fff);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.textarea {
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.primary,
+.danger,
+.secondary {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.primary,
+.danger {
+  border: none;
+}
+
+/*
+ * A lesser action than `.primary` but still a button, unlike `.link`: the
+ * import footer offers "preview" and "save" as two real choices, and a preview
+ * styled as a text link would read as an escape hatch from the dialog.
+ */
+.secondary {
+  border: 1px solid var(--dsw-alias-border-l2, #e0e0e0);
+  background: var(--dsw-alias-bg-base, #fff);
+  color: inherit;
+}
+
+.primary {
+  background: var(--dsw-alias-brand-primary, #1a73e8);
+  color: #fff;
+}
+
+.danger {
+  background: var(--dsw-alias-state-error-primary, #c62828);
+  color: #fff;
+}
+
+.primary:disabled,
+.danger:disabled,
+.secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--dsw-alias-brand-primary, #1a73e8);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.hint {
+  margin: 0;
+  color: var(--dsw-alias-text-secondary, #666);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.error {
+  margin: 0;
+  color: var(--dsw-alias-state-error-primary, #c62828);
+  font-size: 12px;
+}
+
+/*
+ * Each skill is a two-line card: identity and actions share the first line, the
+ * description takes the second. The description clamps to three lines so one
+ * verbose skill cannot push every other row off the pane.
+ */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * The card frame belongs to both states, as it does for every other either/or
+ * pair on this page. A modifier that replaces the base class rather than
+ * accompanying it takes the border, padding, and layout with it — a disabled
+ * row is dimmed, not stripped.
+ */
+.row,
+.rowDisabled {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2, #e0e0e0);
+  border-radius: 8px;
+}
+
+.rowDisabled {
+  opacity: 0.55;
+}
+
+.rowHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.name {
+  font-size: 13px;
+  font-weight: 600;
+  word-break: break-all;
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--dsw-alias-text-secondary, #666);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.description {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.descriptionClamped,
+.descriptionFull {
+  margin: 0;
+  color: var(--dsw-alias-text-secondary, #666);
+  font-size: 12px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.descriptionClamped {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.badgeMuted,
+.badgeWarn {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.badgeMuted {
+  background: var(--dsw-alias-bg-l2, #f0f0f0);
+  color: var(--dsw-alias-text-secondary, #666);
+}
+
+.badgeWarn {
+  background: var(--dsw-alias-state-warning-primary, #fff4e5);
+  color: var(--dsw-alias-state-warning-primary-text, #8a5300);
+}
+
+.rootPath {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.entries {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dialogActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.editorDialog {
+  width: min(1100px, 92vw);
+}
+
+.editorBody {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.importDialog {
+  width: min(680px, 92vw);
+}
+
+/*
+ * The preview takes the editor's width rather than the import form's: it shows
+ * the same tree-beside-content layout, and a narrow column would wrap the file
+ * bodies a reader came to judge.
+ */
+.previewDialog {
+  width: min(1100px, 92vw);
+}
+
+.previewHead {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.editorLayout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 12px;
+  height: min(62vh, 620px);
+  min-height: 0;
+}
+
+.editorSidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 4px;
+  overflow: auto;
+  border: 1px solid var(--dsw-alias-border-l2, #e0e0e0);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-l1, #fafafa);
+}
+
+.editorMain {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editorPath {
+  margin: 0;
+  color: var(--dsw-alias-text-secondary, #666);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+/*
+ * Every row of the tree is a direct child here, nested ones included (see
+ * `SkillFileTree`): a flex item takes a line of its own, and the column also
+ * stretches it, so the active file's fill spans the sidebar. Rows wrapped in
+ * per-directory blocks would fall back into an ordinary inline flow, where a
+ * nested file's inline-block button lands beside its directory's.
+ */
+.tree {
+  display: flex;
+  flex-direction: column;
+}
+
+.treeDirectory,
+.treeFile,
+.treeFileActive {
+  padding: 4px 8px 4px calc(var(--tree-depth, 0) * 12px + 8px);
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  word-break: break-all;
+  cursor: pointer;
+}
+
+.treeDirectory {
+  color: var(--dsw-alias-text-secondary, #666);
+}
+
+.treeFileActive {
+  background: var(--dsw-alias-brand-primary, #1a73e8);
+  color: #fff;
+}
+
+.treeTruncated {
+  margin: 0;
+  padding: 4px 8px;
+  color: var(--dsw-alias-text-secondary, #666);
+  font-size: 12px;
+}
+
+/*
+ * The editor stacks a highlighted layer under a transparent textarea. Both
+ * layers share every metric that decides where a glyph sits — font, size, line
+ * height, padding, tab width — or the caret drifts from the character it edits.
+ * Soft wrapping is off in the textarea for the same reason: a wrapped line
+ * occupies one row here and several there.
+ */
+.editor {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--dsw-alias-border-l2, #e0e0e0);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-base, #fff);
+}
+
+.editorHighlight,
+.editorInput {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.editorHighlight {
+  /* The textarea owns both scroll axes and drives this layer's offset, so this
+   * layer clips instead of exposing a second pair of scrollbars. */
+  overflow: hidden;
+  pointer-events: none;
+  color: inherit;
+}
+
+.editorLine {
+  display: block;
+  min-height: 1.55em;
+}
+
+.editorInput {
+  overflow: auto;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--dsw-alias-text-primary, #111);
+  outline: none;
+}

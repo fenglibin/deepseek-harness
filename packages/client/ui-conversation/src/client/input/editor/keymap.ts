@@ -42,6 +42,7 @@ export interface ComposerKeymapHandlers {
 /** Composition state a keydown can trust (see the module doc's Safari note). */
 function isComposingEvent(event: KeyboardEvent, recentlyComposing: () => boolean): boolean {
   // keyCode 229 is the legacy IME-composition signal engines emit without isComposing.
+  // oxlint-disable-next-line typescript/no-deprecated -- the deprecated property is the only signal those engines emit
   return event.isComposing || event.keyCode === 229 || recentlyComposing()
 }
 

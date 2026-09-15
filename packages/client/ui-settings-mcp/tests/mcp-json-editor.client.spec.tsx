@@ -92,3 +92,58 @@ describe('McpJsonEditor', () => {
     expect(screen.getByRole('heading', { name: '增加 MCP 服务器' })).toBeTruthy()
   })
 })
+
+describe('editor help', () => {
+  it('shows a hint above the editor and opens the help dialog from its link', () => {
+    renderEditor()
+    // The hint is on screen without any interaction: a user who has never
+    // written an entry should not have to find the help link first.
+    expect(screen.getByText(zh.editorHint)).toBeDefined()
+    expect(screen.queryByText(zh.helpTitle)).toBeNull()
+    const link = screen.getByRole('button', { name: zh.help })
+    // The link continues the hint rather than sitting under it: one sentence,
+    // one line, so the reference reads as part of the guidance.
+    const hint = screen.getByText(zh.editorHint)
+    expect(hint.parentElement).toBe(link.parentElement)
+    expect(hint.parentElement?.tagName).toBe('P')
+    fireEvent.click(link)
+    expect(screen.getByText(zh.helpTitle)).toBeDefined()
+  })
+
+  it('carries the format examples and the OAuth steps', () => {
+    renderEditor()
+    fireEvent.click(screen.getByRole('button', { name: zh.help }))
+    // The three answers a user comes here for: how to write a server, how to
+    // write an OAuth one, and which fields are optional.
+    expect(screen.getByText(zh.helpBasicStdioNote)).toBeDefined()
+    expect(screen.getByText(zh.helpOAuthNote)).toBeDefined()
+    expect(screen.getByText(zh.helpOAuthSteps)).toBeDefined()
+    expect(screen.getByText(zh.helpOptionalNote)).toBeDefined()
+    // The two transports share one heading and are told apart by label, so the
+    // heading is stated once rather than repeated per example.
+    expect(screen.getAllByText(zh.helpBasicHeading)).toHaveLength(1)
+    expect(screen.getByText(zh.helpBasicStdioLabel)).toBeDefined()
+    expect(screen.getByText(zh.helpBasicHttpLabel)).toBeDefined()
+    // The examples must be present verbatim so they can be pasted as-is. They
+    // are matched through the document text because a multi-line `pre` is
+    // normalized by the text matcher rather than compared literally.
+    const shown = document.body.textContent ?? ''
+    expect(shown).toContain(zh.helpOAuthExample)
+    expect(shown).toContain(zh.helpBasicStdioExample)
+    expect(shown).toContain(zh.helpBasicHttpExample)
+    expect(shown).toContain(zh.helpOptionalExample)
+  })
+
+  it('closes the help dialog without touching the editor draft', () => {
+    renderEditor()
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '{"a":{"command":"echo"}}' } })
+    fireEvent.click(screen.getByRole('button', { name: zh.help }))
+    expect(screen.getByText(zh.helpTitle)).toBeDefined()
+    // The help dialog's own Close: the editor dialog must stay open with the
+    // user's draft intact.
+    const closeButtons = screen.getAllByRole('button', { name: zh.close })
+    fireEvent.click(closeButtons[closeButtons.length - 1]!)
+    expect(screen.queryByText(zh.helpTitle)).toBeNull()
+    expect(screen.getByRole<HTMLTextAreaElement>('textbox').value).toBe('{"a":{"command":"echo"}}')
+  })
+})

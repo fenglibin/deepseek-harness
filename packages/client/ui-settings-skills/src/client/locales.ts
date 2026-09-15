@@ -1,0 +1,86 @@
+/** Copy dictionaries for the skills Settings section. */
+
+/** Simplified Chinese dictionary and key source of truth. */
+export const zh = {
+  nav: '技能',
+  title: '技能',
+
+  scopeGlobal: '全局',
+  scopeApp: '应用',
+  scopeWorkspace: '工作区',
+  workspaceLabel: '工作区',
+  workspaceEmpty: '还没有已打开的工作区。',
+  workspacePlaceholder: '选择一个工作区',
+
+  loading: '正在读取技能…',
+  error: '暂时无法读取技能。',
+  retry: '重试',
+  empty: '这个作用域下还没有技能。',
+  readOnlyRoot: '只读',
+  sharedRoot: '.agents 目录与其他 agent 共享，这里的改动对使用该目录的所有 agent 生效。',
+
+  columnName: '名称',
+  columnDescription: '描述',
+  columnStatus: '状态',
+  columnEnabled: '启用',
+  columnActions: '操作',
+
+  entryShadowed: '被更高优先级覆盖',
+  entryInvalid: '无法加载',
+
+  enable: '启用',
+  disable: '停用',
+  stateDisabled: '已禁用',
+  expand: '展开',
+  collapse: '收起',
+  noDescription: '（没有描述）',
+
+  edit: '编辑',
+  editTitle: '编辑 {name}',
+  editorFiles: '文件',
+  editorLoading: '正在读取文件…',
+  editorLoadError: '暂时无法读取这个文件。',
+  editorTreeError: '暂时无法列出技能文件。',
+  editorBinary: '这是二进制文件，不能在这里编辑。',
+  editorTooLarge: '文件太大，不能在这里编辑。',
+  editorUnsaved: '有未保存的修改',
+  editorSave: '保存',
+  editorSaving: '正在保存…',
+  editorSaved: '已保存',
+  editorCancel: '关闭',
+  editorDirtyConfirm: '还有未保存的修改，确定关闭吗？',
+  editorRequiresFrontmatter: 'SKILL.md 需要保留 kebab-case 的 name 与非空 description，否则模型将读不到这个技能。',
+
+  remove: '删除',
+  removeTitle: '删除技能',
+  removeBody: '将删除 {path}。目录包内的全部文件一并删除，此操作不可撤销。',
+  removeConfirm: '确认删除',
+  removing: '正在删除…',
+  removeCancel: '取消',
+
+  importSkill: '导入技能',
+  importTitle: '导入技能',
+  importTabUrl: '从 URL',
+  importTabUpload: '上传文件',
+  importSource: '来源',
+  importSourceHint: 'GitHub 仓库或目录（owner/repo[/路径][@ref]），或 zip / tar.gz 直链',
+  importFile: '压缩包',
+  importFileHint: '支持 .zip、.tar、.tar.gz',
+  importFileChosen: '已选择 {name}（{bytes} 字节）',
+  importFileTooLarge: '文件超过 {bytes} 字节的上传上限，请改用 URL 导入。',
+  importTargetRoot: '写入到',
+  importPreview: '预览',
+  importPreviewTitle: '预览 {name}',
+  importPreviewBack: '返回导入',
+  importPreviewClose: '关闭',
+  importLoading: '正在获取并校验…',
+  importCancel: '取消',
+  importTarget: '将写入',
+  importFiles: '{count} 个文件，共 {bytes} 字节',
+  importReplaces: '该目录已存在，写入会被拒绝；请先删除或改名。',
+  importSave: '保存',
+  importSaving: '正在写入…',
+} satisfies Record<string, string>
+
+/** Skills settings locale key union. */
+export type SkillsLocaleKey = keyof typeof zh

@@ -248,7 +248,9 @@ function guidance(): string {
     + 'and an optional level: l0 for a small fix, l1 to add a design, l2 to add an openspec split; omit '
     + 'level and it is inferred from the objective length and any todo_count/touched_files estimates. '
     + 'After creating the task, first clarify and align the requirement with the user, then call '
-    + 'mark_analysis_done to mark analysis complete; writing a design is blocked until then. '
+    + 'mark_analysis_done to mark analysis complete; writing a design is blocked until then. Every level '
+    + 'follows that order, l1 included: confirm the requirement before implementing, and record the '
+    + 'breakdown with record_tasks so the task list reflects the real plan. '
     + 'Write full analysis or design drafts to ordinary project paths (e.g. docs/); record_design then '
     + 'records a concise summary pointing at those drafts, not a duplicate full document. '
     + 'Before advancing to designed, record at least one design with record_design (writes '
@@ -810,14 +812,14 @@ const TODO_BLOCKED_REASON = 'this delivery task is l2, so its work is tracked by
   + 'instead: write openspec/changes/<change_id>/tasks.md with record_spec(kind: \'tasks\') and report the '
   + 'same checklist with record_tasks. todo_write is disabled while this task is l2.'
 
-/** Ask the model to grade a request the programmatic scan could not classify. */
-const GRADING_RUBRIC = 'Delivery grading: this request matched no automatic size signal, so decide whether it '
-  + 'still needs a delivery task. Classify as l2 when it changes a structure contract (a capability seam, a '
-  + 'session event, a persisted schema or projection, a public API or protocol, or a cross-version data '
-  + 'format), or when it is a non-small bug fix touching data format, protocol, compatibility, or security. '
-  + 'Classify as l1 when it spans host and client, touches at least three packages, changes a widely '
-  + 'referenced public symbol, or adds a whole feature. Call create_delivery_task with that level when one '
-  + 'applies, and do nothing when the request is a small fix.'
+/** Ask the model to grade a request the programmatic scan did not classify as `l2`. */
+const GRADING_RUBRIC = 'Delivery grading: the automatic size scan did not classify this request as l2, so '
+  + 'decide whether it needs a delivery task and at which level. Call create_delivery_task with l2 when it '
+  + 'changes a structure contract (a capability seam, a session event, a persisted schema or projection, a '
+  + 'public API or protocol, or a cross-version data format), or when it is a non-small bug fix touching '
+  + 'data format, protocol, compatibility, or security. Call it with l1 when it spans host and client, '
+  + 'touches at least three packages, changes a widely referenced public symbol, or adds a whole feature. '
+  + 'Do nothing when the request is a small fix.'
 
 /** The settings slice this plugin uses, kept local to avoid a hard dependency. */
 interface SettingsSectionHost {
@@ -882,12 +884,16 @@ export function apply(ctx: Context, config: Config): void {
           if (objective.length > 0) {
             // The automatic path grades the text alone; the model's own size
             // estimates only exist when it calls create_delivery_task itself.
+            // Only a graded l2 creates a task here: l0 and l1 both go to the
+            // model, because a single medium or two weak keyword hits are too
+            // thin a basis for imposing the discipline on a request the model
+            // may read as a small fix.
             const level = gradeObjective(objective, gradingPolicyOf(policy()))
-            if (level === 'l1' || level === 'l2') {
+            if (level === 'l2') {
               ctx.delivery.create(agent, { objective, level })
             } else {
-              // Nothing automatic matched: hand the rubric to the model once
-              // per turn so it can still declare a level for a short request.
+              // Hand the rubric to the model once per turn so it can declare
+              // a level for a request the scan could not settle.
               const key = `${agent.id}:${turn}`
               if (!rubricInjected.has(key)) {
                 rubricInjected.add(key)
@@ -1079,7 +1085,10 @@ export function apply(ctx: Context, config: Config): void {
     description: 'Record the implementation checklist for the current delivery task, replacing any earlier '
       + 'list. Each item is { content, phase, status }: a short description, the lifecycle phase it belongs to '
       + '(created/designed/specified/implemented/verified/accepted), and its progress status '
-      + '(pending/in_progress/completed). The checklist drives the per-phase progress shown for the task and '
+      + '(pending/in_progress/completed). Call this for every level, l1 included, before starting the work: '
+      + 'todo_write is only a per-turn scratch list and is cleared at the next turn, while this checklist '
+      + 'persists and is what the progress panel and verification read. The checklist drives the per-phase '
+      + 'progress shown for the task and '
       + 'is checked against openspec tasks.md before the task may reach implemented, so keep it aligned with '
       + 'that file.',
     parameters: {
@@ -1244,10 +1253,14 @@ export function apply(ctx: Context, config: Config): void {
       }
       if (args.phase === 'accepted') {
         // Validation targets this task's own change id, so unrelated legacy
-        // changes under openspec/changes/ cannot block acceptance. The id was
-        // checked against the kebab-case change-id grammar when recorded.
+        // changes under openspec/changes/ cannot block acceptance. The grammar
+        // is re-checked here rather than trusted from the recording: only an l2
+        // task is validated when it records, and the id is interpolated into a
+        // shell command below. A non-l2 task records an empty id, and a blank
+        // target would turn the command into a bare `openspec validate`, which
+        // validates nothing and always fails.
         const changeId = ctx.delivery.getTasks(agent)?.changeId
-        const hooks = changeId === undefined
+        const hooks = changeId === undefined || !isValidChangeId(changeId)
           ? policy().postHooks
           : [`openspec validate ${changeId} --strict --json`, ...policy().postHooks]
         if (hooks.length > 0) {

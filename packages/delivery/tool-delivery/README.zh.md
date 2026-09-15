@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-tool-delivery` 为模型提供七个操作持久化同会话交付任务的工具：`get_delivery_task` 读取当前任务，`create_delivery_task` 创建任务（根据目标长度自动分级），`record_change` 记录一条变更，`mark_analysis_done` 标记需求分析完成，`record_design` 记录一条设计，`record_spec` 记录一条 spec，`record_tasks` 记录实施清单，`advance_delivery_task` 推进阶段。门禁强度是部署选择：`stateful`（默认）在至少存在一条变更记录之前阻止推进到 `implemented`，在至少存在一条设计记录之前阻止推进到 `designed`，在至少存在一条 spec 记录之前阻止推进到 `specified`；`advisory` 只提醒而不阻止，`off`（或 `enabled: false`）完全不注册工具。当 agent 应当保持一个可见、可追溯变更并按纪律生命周期推进的任务时选择它。
+`dsh-tool-delivery` 为模型提供七个操作持久化同会话交付任务的工具：`get_delivery_task` 读取当前任务，`create_delivery_task` 创建任务（按目标内容与规模信号分级），`record_change` 记录一条变更，`mark_analysis_done` 标记需求分析完成，`record_design` 记录一条设计，`record_spec` 记录一条 spec，`record_tasks` 记录实施清单，`advance_delivery_task` 推进阶段。门禁强度是部署选择：`stateful`（默认）在至少存在一条变更记录之前阻止推进到 `implemented`，在至少存在一条设计记录之前阻止推进到 `designed`，在至少存在一条 spec 记录之前阻止推进到 `specified`；`advisory` 只提醒而不阻止，`off`（或 `enabled: false`）完全不注册工具。当 agent 应当保持一个可见、可追溯变更并按纪律生命周期推进的任务时选择它。
 
 ## 目录
 
@@ -55,6 +55,7 @@ kind: "package-reference"
 | `strongSignals` | 内置词表 | 命中任一即分级为 `l2` 的模式（关键词或路径片段） |
 | `mediumSignals` | 内置词表 | 命中两个分级为 `l2`、命中一个分级为 `l1` 的模式 |
 | `weakSignals` | 内置词表 | 命中两个分级为 `l1` 的模式 |
+| `autoDetect` | `true` | 直接人类请求命中 `l2` 时自动创建任务；`l0`/`l1` 改为注入分级判据由模型决定 |
 | `maxReviewRounds` | `2` | 门禁差异允许的模型复核轮次，超过即硬阻断 |
 
 阈值与信号清单同时注册为设置服务的 `delivery` namespace：组合配置作为 `base` 层，用户覆盖优先且实时生效；未挂载设置服务时回退到组合配置，行为不变。
@@ -62,6 +63,7 @@ kind: "package-reference"
 ### 每次调用的作用
 
 - `create_delivery_task` 以目标和可选 `level`（`l0`/`l1`/`l2`）在 `created` 阶段启动一个任务；省略 `level` 时按三层判定推断：目标长度超过 `openspecThreshold.descriptionChars` 直接为 `l2`，否则扫描强/中/弱信号——命中任一强信号为 `l2`，命中一个中等信号或两个弱信号为 `l1`，都不命中为 `l0`；bug（`is_bug`）可能强制 `l2`。
+- 直接人类请求到达时 `autoDetect` 先跑同一套程序化判定，但只有判定为 `l2` 才自动创建任务。判定为 `l0` 或 `l1` 时改为注入一次分级判据提示（每个 turn 至多一次），由模型按内容决定是否创建任务及其级别——单个中等或两个弱关键词命中不足以据此对请求施加交付纪律。
 - `record_change` 针对精确的 `{ task_id, revision }` 记录一条变更（`text`），递增变更数，并把记录追加到 `.dsh/changes/<task-id>.md`。
 - `mark_analysis_done` 针对精确的 `{ task_id, revision }` 标记需求分析已完成。任务创建后应先澄清并对齐需求，再调用它；`record_design` 在分析完成前会被阻止。
 - `record_design` 针对精确的 `{ task_id, revision }` 记录一条设计（`text`），递增设计数，并把记录追加到 `.dsh/design/<task-id>.md`。
@@ -72,7 +74,7 @@ kind: "package-reference"
 
 在 `stateful` 下，直到至少存在一条变更记录之前，推进到 `implemented` 会被阻止；直到至少存在一条设计记录之前，推进到 `designed` 会被阻止；直到至少存在一条 spec 记录之前，推进到 `specified` 会被阻止。在 `advisory` 下，同样的条件会产出一条对话内提醒但不阻止。
 
-在任务到达 `accepted` 之前，每个配置的 `postHooks` 命令都会按序在会话工作目录下执行。`stateful` 下任何非零退出、超时或中止都会阻止验收；`advisory` 下失败只会以提醒形式呈现，验收仍会继续。
+在任务到达 `accepted` 之前，每个配置的 `postHooks` 命令都会按序在会话工作目录下执行。`stateful` 下任何非零退出、超时或中止都会阻止验收；`advisory` 下失败只会以提醒形式呈现，验收仍会继续。清单记录了合法 change id 的 `l2` 任务会额外先执行 `openspec validate <change_id> --strict --json`，只校验本次任务自己的 change，因此 `openspec/changes/` 下无关的历史变更不能阻塞验收；非 `l2` 任务没有 OpenSpec 变更，不会执行该命令。
 
 -----
 

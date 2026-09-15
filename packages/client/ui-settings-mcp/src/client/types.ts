@@ -24,6 +24,27 @@ export interface McpStdioServer {
   allowedTools?: string[]
 }
 
+/**
+ * How one HTTP server authenticates. `none` sends no credential beyond the
+ * entry's own `headers`; `oauth` obtains a bearer token through the
+ * authorization-code flow. The token itself never reaches this package: it
+ * lives in the Host credential store.
+ */
+export type McpHttpAuth =
+  | { /** Send no credential beyond `headers`. */ kind: 'none' }
+  | {
+    /** Obtain a bearer token through authorization code + PKCE. */
+    kind: 'oauth'
+    /** OAuth client identifier registered with the server. */
+    clientId: string
+    /** Authorization endpoint the browser is sent to. */
+    authorizationUrl: string
+    /** Token endpoint the code and refresh exchanges POST to. */
+    tokenUrl: string
+    /** Scopes requested from the server; omission requests none. */
+    scopes?: string[]
+  }
+
 /** One Streamable HTTP MCP server. */
 export interface McpHttpServer {
   /** Stable local namespace for this server's model-facing tools. */
@@ -36,6 +57,8 @@ export interface McpHttpServer {
   url: string
   /** Additional headers attached to MCP requests. */
   headers: Record<string, string>
+  /** Authentication mode; the Host resolves it to `{ kind: 'none' }` when absent. */
+  auth: McpHttpAuth
   /** Raw MCP tool names admitted to registration; omission registers every tool the server lists. */
   allowedTools?: string[]
 }
@@ -68,4 +91,14 @@ export interface McpJsonServer {
   transportType?: string
   timeout?: number
   disabled?: boolean
+  /** Read but never written: `oauth` marks an OAuth server dsh can recognize. */
+  authMode?: string
+  /** Read but never written; required with `authMode: "oauth"`. */
+  clientId?: string
+  /** Read but never written; required with `authMode: "oauth"`. */
+  authorizationUrl?: string
+  /** Read but never written; required with `authMode: "oauth"`. */
+  tokenUrl?: string
+  /** Read but never written; requested scopes for an OAuth server. */
+  scopes?: string[]
 }

@@ -41,7 +41,7 @@ kind: "package-reference"
 
 ### 失败与恢复
 
-没有先前观测的编辑以代码 `FS_NOT_OBSERVED` 和消息 `edit requires reading "<path>" first` 失败；编辑被观测为缺失的目标以 `FS_NOT_FOUND` 失败。工具会追加恢复指令——先重新读取文件再重试——同时保留错误码。在外部删除的文件上遵循该恢复指令会记录缺失，因此下一次防护写入可以重新创建它，而不会覆盖并发创建者。
+没有先前观测的编辑以代码 `FS_NOT_OBSERVED` 和消息 `edit requires reading "<path>" first` 失败；编辑被观测为缺失的目标以 `FS_NOT_FOUND` 失败。这类拒绝的补救就是重新读取目标，因此 [`dsh-tool-fs`](../tool-fs/README.zh.md) 在当次调用内完成它：重新读取目标、记录该次观察，并把文件的当前内容附在失败消息里——模型不必再花一轮往返，直接用已经拿到的内容重试即可。工具保留错误码；目标无法重新读取时则追加纯恢复指令——先重新读取文件再重试。在外部删除的文件上遵循该恢复指令会记录缺失，因此下一次防护写入可以重新创建它，而不会覆盖并发创建者。
 
 -----
 
@@ -104,7 +104,7 @@ kind: "package-reference"
 
 #### 模型看到的内容
 
-该插件不添加提示词或 schema。没有先前观测时，它会以代码 `FS_NOT_OBSERVED` 和精确消息 `edit requires reading "<path>" first` 拒绝编辑；编辑被观测为缺失的目标返回 `FS_NOT_FOUND`。正向观测陈旧时，带防护的变更会传播由提供方拥有的 `FS_STALE_VERSION` 错误。[`dsh-tool-fs`](../tool-fs/README.zh.md) 拥有面向模型的错误包装，会为 `FS_STALE_VERSION` 消息追加恢复指令（`— re-read the file, then retry`）、为 `FS_NOT_OBSERVED` 消息追加恢复指令（`— read the file, then retry`），同时保留错误码。外部删除目标后，遵循陈旧恢复指令会记录缺失：下一次带防护的写入可以通过 `createIfAbsent` 重新创建该目标，而提供方会以原子方式保留任何并发创建者写入的文件。
+该插件不添加提示词或 schema。没有先前观测时，它会以代码 `FS_NOT_OBSERVED` 和精确消息 `edit requires reading "<path>" first` 拒绝编辑；编辑被观测为缺失的目标返回 `FS_NOT_FOUND`。正向观测陈旧时，带防护的变更会传播由提供方拥有的 `FS_STALE_VERSION` 错误。[`dsh-tool-fs`](../tool-fs/README.zh.md) 拥有面向模型的错误包装：目标可重新读取时，它在该次调用中重新读取目标（这一步正是策略要求的观察）并返回文件的当前内容；否则为 `FS_STALE_VERSION` 消息追加恢复指令（`— re-read the file, then retry`）、为 `FS_NOT_OBSERVED` 消息追加恢复指令（`— read the file, then retry`），两种情况都保留错误码。外部删除目标后，遵循陈旧恢复指令会记录缺失：下一次带防护的写入可以通过 `createIfAbsent` 重新创建该目标，而提供方会以原子方式保留任何并发创建者写入的文件。
 
 #### Token 影响
 

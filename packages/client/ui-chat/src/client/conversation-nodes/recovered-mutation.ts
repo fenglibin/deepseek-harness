@@ -6,8 +6,9 @@ import { isSettledTool } from '../contract/chat-nodes.ts'
  * `edit` / `write` / `str_replace_editor` call that failed with a recoverable
  * code (`FS_NOT_OBSERVED` / `FS_STALE_VERSION`) and was followed — same file,
  * later anchor — by a successful mutation of the same path. The failure is
- * transient by contract: its own remedy is "read the file, then retry", so
- * once a later call succeeded, the page must not keep the stale error row.
+ * transient by contract: its own remedy is to re-read the file and retry, and
+ * the tool performs that re-read in-call, so once a later call succeeded the
+ * page must not keep the stale error row.
  *
  * The model-retry projection (retry.ts) hides a recovered request retry chain
  * by the owning turn's terminal outcome; this projection is the tool-call

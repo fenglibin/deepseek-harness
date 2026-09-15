@@ -369,6 +369,7 @@ describe('Web session model selection', () => {
     }))
     ctx.llm.registerAdapter(['string-failure'], new class extends CatalogAdapter {
       override listModels(): Promise<readonly LlmModelInfo[]> {
+        // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- the non-Error rejection is the scenario under test
         return Promise.reject('string catalog failure')
       }
     }('String Failure', []))
@@ -627,6 +628,7 @@ describe('Web session model selection', () => {
     }('Image Capable', []))
     ctx.llm.registerAdapter(['string-error'], new class extends CatalogAdapter {
       override resolveModel(): Promise<LlmResolvedModelInfo> {
+        // oxlint-disable-next-line typescript/prefer-promise-reject-errors -- the non-Error rejection is the scenario under test
         return Promise.reject('string selection failure')
       }
     }('String Error', []))

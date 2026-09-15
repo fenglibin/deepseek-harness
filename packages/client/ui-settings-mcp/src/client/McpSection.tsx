@@ -51,7 +51,7 @@ export type McpSectionProps = Partial<InjectFace<McpSectionInjected>>
 type McpSectionFace = InjectFace<McpSectionInjected>
 
 /** The status-dot kind for one server row. */
-type StatusDot = 'disabled' | 'connected' | 'reconnecting' | 'failed' | 'unknown'
+type StatusDot = 'disabled' | 'connected' | 'reconnecting' | 'failed' | 'needs-auth' | 'unknown'
 
 /** Project one server's enabled flag and live status onto the dot kind. */
 function statusDot(server: McpServerEntry, view: McpServerStatusView | undefined): StatusDot {
@@ -61,6 +61,7 @@ function statusDot(server: McpServerEntry, view: McpServerStatusView | undefined
     case 'connecting':
     case 'reconnecting': return 'reconnecting'
     case 'failed': return 'failed'
+    case 'needs-auth': return 'needs-auth'
     default: return 'unknown'
   }
 }
@@ -93,6 +94,8 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
   const [deleting, setDeleting] = useState(false)
   const [savedName, setSavedName] = useState<string | undefined>(undefined)
   const [failure, setFailure] = useState<string | undefined>(undefined)
+  /** The server whose authorization page is being opened; absent once it settles. */
+  const [authorizing, setAuthorizing] = useState<string | undefined>(undefined)
   /** Per-server tool list expansion: only a name in the set is currently open. */
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   /** Servers already force-reconnected on entry, so a re-pull never re-triggers. */
@@ -118,7 +121,11 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
     const pending = state.servers.filter((server) => {
       if (!server.enabled || autoConnected.current.has(server.serverName)) return false
       const view = statusState.statuses.get(server.serverName)
-      return view !== undefined && view.status !== 'connected'
+      if (view === undefined) return false
+      // A server awaiting authorization cannot be connected by reconnecting:
+      // only the user's authorization supplies the missing credential.
+      if (view.status === 'needs-auth') return false
+      return view.status !== 'connected'
     })
     if (pending.length === 0) return
     void (async () => {
@@ -128,6 +135,24 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
       }
     })()
   }, [status, state.available, state.servers, statusState.statuses])
+
+  /**
+   * Open one server's OAuth consent page. The Host performs the exchange and
+   * stores the token; this page only opens the URL and then re-pulls status,
+   * so the row shows `connected` as soon as the Host finishes.
+   */
+  const authenticate = (serverName: string): void => {
+    setFailure(undefined)
+    setAuthorizing(serverName)
+    void status.startAuth(serverName, window.location.origin).then((started) => {
+      setAuthorizing(undefined)
+      if (!started.ok) {
+        setFailure(t('authFailed').replace('{error}', started.error))
+        return
+      }
+      window.open(started.url, '_blank', 'noopener,noreferrer')
+    })
+  }
 
   /** Open the `mcp.json` editor after pulling the latest document text. */
   const openDocumentEditor = (): void => {
@@ -306,6 +331,7 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
                 connected: styles['statusDotConnected'],
                 reconnecting: styles['statusDotReconnecting'],
                 failed: styles['statusDotFailed'],
+                'needs-auth': styles['statusDotNeedsAuth'],
                 unknown: styles['statusDotUnknown'],
               }[dot]
               const transport = server.transport === 'stdio' ? t('transportStdio') : t('transportStreamableHttp')
@@ -347,6 +373,20 @@ function Loaded({ injected }: { injected: McpSectionFace }): ReactNode {
                       </button>
                     </span>
                     <span className={styles['rowActions']}>
+                      {dot === 'needs-auth'
+                        ? (
+                          <button
+                            type="button"
+                            className={styles['secondaryButton']}
+                            disabled={authorizing !== undefined}
+                            aria-label={t('authenticate')}
+                            title={t('authenticate')}
+                            onClick={() => { authenticate(server.serverName) }}
+                          >
+                            {authorizing === server.serverName ? t('authenticating') : t('authenticate')}
+                          </button>
+                        )
+                        : null}
                       <button
                         type="button"
                         className={styles['secondaryButton']}

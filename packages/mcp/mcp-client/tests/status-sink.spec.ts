@@ -49,13 +49,17 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
   StdioClientTransport: vi.fn(),
 }))
 
-vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
+vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', async importOriginal => ({
+  // The real module supplies StreamableHTTPError, which the supervisor matches
+  // to distinguish a rejected credential from any other failure.
+  ...await importOriginal<typeof import('@modelcontextprotocol/sdk/client/streamableHttp.js')>(),
   StreamableHTTPClientTransport: vi.fn(),
 }))
 
 // vi.mock is hoisted above static imports, so the modules under test see the
 // mocked SDK even through a static import.
 import { apply } from '@deepseek-ai/dsh-mcp-client/src/index.ts'
+import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { resolveReconnectPolicy, startConnection } from '@deepseek-ai/dsh-mcp-client/src/connection.ts'
 
 // ---- Helpers ----
@@ -221,5 +225,188 @@ describe('connection status sink', () => {
     await apply(ctx, stdioConfig())
     await vi.waitFor(() => { expect(ctx.tools.get('mcp__srv__remote')).toBeDefined() })
     expect(ctx.get('mcpStatusSink')).toBeUndefined()
+  })
+})
+
+/** One Streamable HTTP config: the only transport that consults the auth sink. */
+function httpConfig(reconnect?: Config['reconnect']): Config {
+  return {
+    transport: 'streamable-http',
+    serverName: 'srv',
+    url: 'https://example.com/mcp',
+    headers: {},
+    toolCallTimeoutMs: 60_000,
+    failOnStartupError: false,
+    ...reconnect === undefined ? {} : { reconnect },
+  }
+}
+
+describe('credential resolution', () => {
+  let ctx: Context
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    instances.length = 0
+    mockConnect.mockResolvedValue(undefined)
+    mockClose.mockImplementation(function (this: { onclose?: () => void }) {
+      this.onclose?.()
+      return Promise.resolve()
+    })
+    mockListTools.mockResolvedValue(listing('remote'))
+    ctx = await mountRegistry()
+  })
+
+  it('reports needs-auth when the resolver says the server is unauthorized', async () => {
+    const { sink, reports } = recordingSink()
+    ctx.provide('mcpStatusSink', sink)
+    ctx.provide('mcpAuthSink', {
+      resolve: async () => ({ ok: false, reason: 'unauthorized', error: 'server "srv" is not authorized yet' }),
+    })
+    await apply(ctx, httpConfig())
+    await vi.waitFor(() => { expect(reports.some(entry => entry.status === 'needs-auth')).toBe(true) })
+    const report = reports.at(-1)!
+    expect(report.status).toBe('needs-auth')
+    expect(report.detail?.error).toContain('not authorized yet')
+    // No transport is built, so nothing is registered and nothing reconnects:
+    // authorizing is the user's next action, not a retry schedule.
+    expect(instances).toHaveLength(0)
+    expect(ctx.tools.get('mcp__srv__remote')).toBeUndefined()
+  })
+
+  it('reports failed when the credential store itself is unusable', async () => {
+    const { sink, reports } = recordingSink()
+    ctx.provide('mcpStatusSink', sink)
+    ctx.provide('mcpAuthSink', {
+      resolve: async () => ({ ok: false, reason: 'unavailable', error: 'no credential store' }),
+    })
+    await apply(ctx, httpConfig())
+    await vi.waitFor(() => { expect(reports.some(entry => entry.status === 'failed')).toBe(true) })
+    expect(reports.at(-1)!.detail?.error).toContain('no credential store')
+  })
+
+  it('reports failed when the resolver throws, without breaking the loop', async () => {
+    const { sink, reports } = recordingSink()
+    ctx.provide('mcpStatusSink', sink)
+    ctx.provide('mcpAuthSink', {
+      resolve: () => { throw new Error('resolver exploded') },
+    })
+    await apply(ctx, httpConfig())
+    await vi.waitFor(() => { expect(reports.some(entry => entry.status === 'failed')).toBe(true) })
+    expect(reports.at(-1)!.detail?.error).toContain('resolver exploded')
+  })
+
+  it('connects with the resolved authorization header', async () => {
+    const { sink } = recordingSink()
+    ctx.provide('mcpStatusSink', sink)
+    const resolved: string[] = []
+    ctx.provide('mcpAuthSink', {
+      resolve: async (serverName) => {
+        resolved.push(serverName)
+        return { ok: true, authorization: 'Bearer at-1' }
+      },
+    })
+    mockListTools.mockResolvedValue(listing('remote'))
+    await apply(ctx, httpConfig())
+    await vi.waitFor(() => { expect(ctx.tools.get('mcp__srv__remote')).toBeDefined() })
+    expect(resolved).toEqual(['srv'])
+  })
+
+  it('renews once after a 401 and reconnects with the fresh token', async () => {
+    const { sink, reports } = recordingSink()
+    ctx.provide('mcpStatusSink', sink)
+    const forces: (boolean | undefined)[] = []
+    let issued = 0
+    ctx.provide('mcpAuthSink', {
+      resolve: async (_serverName, options) => {
+        forces.push(options?.force)
+        issued += 1
+        return { ok: true, authorization: `Bearer at-${String(issued)}` }
+      },
+    })
+    // The first connect rejects with 401; the retry after renewal succeeds.
+    mockConnect
+      .mockRejectedValueOnce(new StreamableHTTPError(401, 'Unauthorized'))
+      .mockResolvedValue(undefined)
+    await apply(ctx, httpConfig())
+    await vi.waitFor(() => { expect(ctx.tools.get('mcp__srv__remote')).toBeDefined() })
+    // The retry is its own generation, so the shape is: an unforced resolve
+    // for the first attempt, a forced one to renew, then the retry's own
+    // unforced resolve — and exactly one forced renewal in the whole attempt.
+    expect(forces.filter(force => force === true)).toHaveLength(1)
+    expect(forces.indexOf(true)).toBe(1)
+    expect(issued).toBeGreaterThanOrEqual(2)
+    expect(reports.some(entry => entry.status === 'connected')).toBe(true)
+  })
+
+  it('reports needs-auth when the renewal after a 401 is refused', async () => {
+    const { sink, reports } = recordingSink()
+    ctx.provide('mcpStatusSink', sink)
+    let call = 0
+    ctx.provide('mcpAuthSink', {
+      resolve: async (_serverName, options) => {
+        call += 1
+        if (options?.force === true) {
+          return { ok: false, reason: 'unauthorized', error: 'refresh token rejected' }
+        }
+        return { ok: true, authorization: 'Bearer stale' }
+      },
+    })
+    mockConnect.mockRejectedValue(new StreamableHTTPError(401, 'Unauthorized'))
+    await apply(ctx, httpConfig())
+    await vi.waitFor(() => { expect(reports.some(entry => entry.status === 'needs-auth')).toBe(true) })
+    expect(reports.at(-1)!.detail?.error).toContain('refresh token rejected')
+    expect(call).toBe(2)
+  })
+
+  it('spends at most one renewal retry per outage', async () => {
+    const { sink } = recordingSink()
+    ctx.provide('mcpStatusSink', sink)
+    let forced = 0
+    ctx.provide('mcpAuthSink', {
+      resolve: async (_serverName, options) => {
+        if (options?.force === true) forced += 1
+        return { ok: true, authorization: 'Bearer at' }
+      },
+    })
+    // Every attempt fails with 401, including the retry: the renewal must not
+    // become a loop inside one attempt.
+    mockConnect.mockRejectedValue(new StreamableHTTPError(401, 'Unauthorized'))
+    await apply(ctx, httpConfig({ initialDelayMs: 2, maxDelayMs: 4, maxAttempts: 3 }))
+    await vi.waitFor(() => { expect(forced).toBeGreaterThan(0) }, { timeout: 3000 })
+    // One forced renewal per attempt, never more, and no unbounded growth.
+    expect(forced).toBeLessThanOrEqual(3)
+  })
+
+  it('treats a non-401 HTTP failure as an ordinary connection fault', async () => {
+    const { sink, reports } = recordingSink()
+    ctx.provide('mcpStatusSink', sink)
+    let forced = 0
+    ctx.provide('mcpAuthSink', {
+      resolve: async (_serverName, options) => {
+        if (options?.force === true) forced += 1
+        return { ok: true, authorization: 'Bearer at' }
+      },
+    })
+    mockConnect.mockRejectedValue(new StreamableHTTPError(500, 'Server Error'))
+    await apply(ctx, httpConfig({ initialDelayMs: 2, maxDelayMs: 4, maxAttempts: 1 }))
+    await vi.waitFor(() => { expect(reports.some(entry => entry.status === 'failed')).toBe(true) })
+    // A 500 is the server's problem: the token is not renewed for it.
+    expect(forced).toBe(0)
+  })
+
+  it('does not consult the resolver for a stdio server', async () => {
+    const { sink } = recordingSink()
+    ctx.provide('mcpStatusSink', sink)
+    let asked = false
+    ctx.provide('mcpAuthSink', {
+      resolve: async () => {
+        asked = true
+        return { ok: true, authorization: 'Bearer at-1' }
+      },
+    })
+    mockListTools.mockResolvedValue(listing('remote'))
+    await apply(ctx, stdioConfig())
+    await vi.waitFor(() => { expect(ctx.tools.get('mcp__srv__remote')).toBeDefined() })
+    expect(asked).toBe(false)
   })
 })

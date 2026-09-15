@@ -20,6 +20,7 @@ import type Schema from '@deepseek-ai/schemastery'
 import { parse as parseYaml } from 'yaml'
 import type { FileSystem, FsDirEntry, FsTarget } from '@deepseek-ai/dsh-fs'
 import { canonicalizeWatchPath, resolveDshHome } from '@deepseek-ai/dsh-home-paths'
+import { scopeOf } from '@deepseek-ai/dsh-scope'
 import {
   BUNDLED_SKILL_RANK,
   isSkillName,
@@ -41,6 +42,9 @@ const USER_AGENTS_RANK = 500
 const DEFAULT_WATCH_STABILITY_THRESHOLD_MS = 200
 const DEFAULT_WATCH_POLL_INTERVAL_MS = 100
 const DEFAULT_WATCH_MAX_PROJECTS = 128
+
+/** Directory a management surface parks disabled entries in, out of this provider's reach. */
+const DISABLED_DIR = '.disabled'
 
 export const name = 'skill-filesystem'
 export const inject = ['skills']
@@ -97,6 +101,47 @@ interface SkillRoot {
   trustedHost?: boolean
 }
 
+/** One skill root this provider scans, as a management surface reads it. */
+export interface SkillRootInfo {
+  /** Absolute root directory, whether or not it exists yet. */
+  readonly path: string
+  /** Discovery source label candidates from this root carry. */
+  readonly source: SkillSource
+  /** Precedence rank; a lower rank wins a duplicate skill name within one layer. */
+  readonly rank: number
+  /** Project root this root belongs to, present only for project-scoped roots. */
+  readonly projectRoot?: string
+  /** Whether the root is part of the deployment's trusted bundled set and must not be written. */
+  readonly readOnly: boolean
+}
+
+/**
+ * Read-only view of the roots this provider scans. A management surface
+ * consumes it so its writes land in directories the discovery pass actually
+ * reads; deriving roots independently would let the two drift apart whenever
+ * this provider's configuration changes.
+ *
+ * Only the deployment-level instance publishes it: the roots a management
+ * surface edits are the deployment's, while a preset instance's roots belong to
+ * that preset (its own bundled `skills/` directory, for one) and cannot be
+ * edited from a surface that has no session to resolve them against.
+ */
+export interface SkillRootsView {
+  /**
+   * List the roots one cwd selects, in precedence order.
+   * @param cwd - workspace directory whose project roots participate; omit for global roots alone.
+   * @returns absolute root descriptors, including roots that do not exist yet.
+   */
+  list: (cwd?: string) => Promise<SkillRootInfo[]>
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Read-only skill-root view contributed by the deployment-level filesystem provider. */
+    skillRoots: SkillRootsView
+  }
+}
+
 interface SkillRootEntry {
   name: string
   type: 'directory' | 'file' | 'other'
@@ -140,6 +185,17 @@ export function apply(ctx: Context, config: Config = {}): void {
     if (mutationToolName(actor) === undefined) return
     provider.observeHostMutation(target.displayPath)
   })
+  // Management surfaces read roots through this view rather than re-deriving
+  // them from configuration, so a write always targets a scanned directory.
+  // A service has exactly one provider, so only the deployment-level row
+  // publishes it: a preset mounts its own instance into that preset's layer of
+  // the skill registry, and a second `provide` would fail the preset's mount
+  // outright.
+  if (scopeOf(ctx) === undefined) {
+    ctx.provide('skillRoots', {
+      list: (cwd?: string) => provider.describeRoots(cwd),
+    } satisfies SkillRootsView)
+  }
 }
 
 /** Provider that maps local project/user skill roots into `ctx.skills`. */
@@ -227,6 +283,22 @@ export class FileSystemSkillProvider implements SkillProvider {
    */
   observeHostMutation(path: string): void {
     this.watchManager.observeHostMutation(path)
+  }
+
+  /**
+   * Describe the roots this provider scans for one cwd, in precedence order.
+   * @param cwd - workspace directory whose project roots participate; omit for global roots alone.
+   * @returns absolute root descriptors, including roots that do not exist yet.
+   */
+  async describeRoots(cwd?: string): Promise<SkillRootInfo[]> {
+    const roots = await this.roots(cwd)
+    return roots.map(root => ({
+      path: root.path,
+      source: root.source,
+      rank: root.rank,
+      ...root.projectRoot === undefined ? {} : { projectRoot: root.projectRoot },
+      readOnly: root.trustedHost === true,
+    }))
   }
 
   /**
@@ -721,6 +793,11 @@ async function discoverRoot(root: SkillRoot, ctx: Context, provider: string): Pr
   const entries = await listSkillRootEntries(root, ctx)
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     if (root.skipSystem && entry.name === '.system') continue
+    // A management surface parks disabled skills in `.disabled`. Skipping that
+    // name here makes "a disabled skill is never discovered" a contract of this
+    // provider rather than a consequence of the directory happening to hold no
+    // SKILL.md of its own.
+    if (entry.name === DISABLED_DIR) continue
     const locator = entry.type === 'directory'
       ? { path: join(entry.path, 'SKILL.md'), directory: entry.path }
       : entry.type === 'file' && entry.name.endsWith('.md')

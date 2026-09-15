@@ -15,6 +15,15 @@
       "path": "../../../vendor/schemastery"
     },
     {
+      "path": "../../credentials/authorization"
+    },
+    {
+      "path": "../../credentials/credentials"
+    },
+    {
+      "path": "../../host/webserver"
+    },
+    {
       "path": "../../settings/settings"
     },
     {

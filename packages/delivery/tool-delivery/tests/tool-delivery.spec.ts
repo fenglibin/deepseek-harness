@@ -22,8 +22,27 @@ import { orderItemsByMarkdown, renderTasksMarkdown } from '@deepseek-ai/dsh-tool
 
 const testToolSignal = new AbortController().signal
 
+/**
+ * Whether a command runs `openspec validate` without naming what to validate.
+ *
+ * The real CLI exits non-zero on a bare `openspec validate`. The stub models
+ * that because an untargeted command is exactly how a recorded empty change id
+ * blocked every non-l2 acceptance; a stub that returned success for anything
+ * would hide that defect rather than catch its return.
+ * @param command - the shell command under test.
+ * @returns true when the command names no validation target.
+ */
+function validatesNothing(command: string): boolean {
+  const match = /^\s*openspec\s+validate\b(.*)$/.exec(command)
+  if (match === null) return false
+  return !(match[1] ?? '').split(/\s+/).some(token => token !== '' && !token.startsWith('-'))
+}
+
 /** In-memory shell whose `run` returns a fixed outcome, for post-hook tests. */
 class StubShell extends ShellExecutor {
+  /** Every command run through this shell, in order. */
+  readonly commands: string[] = []
+
   constructor(ctx: Context, private readonly outcome: Partial<ShellRunResult> = {}) {
     super(ctx)
   }
@@ -39,14 +58,18 @@ class StubShell extends ShellExecutor {
   }
 
   async run(spec: ShellExecSpec): Promise<ShellRunResult> {
+    this.commands.push(spec.command)
+    const outcome = validatesNothing(spec.command)
+      ? { exitCode: 1, stdout: { text: 'Nothing to validate.', truncated: false } }
+      : this.outcome
     return {
-      exitCode: this.outcome.exitCode ?? 0,
-      signal: this.outcome.signal ?? null,
-      timedOut: this.outcome.timedOut ?? false,
-      aborted: this.outcome.aborted ?? false,
+      exitCode: outcome.exitCode ?? 0,
+      signal: outcome.signal ?? null,
+      timedOut: outcome.timedOut ?? false,
+      aborted: outcome.aborted ?? false,
       timeoutMs: spec.timeoutMs,
-      stdout: this.outcome.stdout ?? { text: '', truncated: false },
-      stderr: this.outcome.stderr ?? { text: '', truncated: false },
+      stdout: outcome.stdout ?? { text: '', truncated: false },
+      stderr: outcome.stderr ?? { text: '', truncated: false },
     }
   }
 
@@ -720,6 +743,62 @@ describe('tool-delivery post-hooks', () => {
     expect(result.isError).toBe(true)
   })
 
+  it('accepts a non-l2 task whose checklist records an empty change id', async () => {
+    const { ctx, agent } = await harness()
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l1 post-hook', level: 'l1' }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
+    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
+    // A non-l2 task has no OpenSpec change, so this is the empty id the
+    // acceptance path used to interpolate into a target-less validate command.
+    task = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: '',
+      items: [{ content: 'the fix', phase: 'implemented', status: 'completed' }],
+    }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'verified' }, agent))
+
+    const accepted = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'accepted',
+      coverage_confirmation: 'the design is implemented',
+    }, agent))
+    expect(accepted).toMatchObject({ phase: 'accepted' })
+    // No validate command runs without a target: the empty id is a non-l2 task
+    // having no OpenSpec change, not a target to validate.
+    const commands = (ctx.get('shell') as StubShell).commands
+    expect(commands.some(validatesNothing)).toBe(false)
+  })
+
+  it('validates the change id of an l2 task at acceptance', async () => {
+    const { ctx, agent } = await harness()
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l2 post-hook', level: 'l2' }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
+    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
+    task = resultTask(await execute(ctx, 'record_spec', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing', kind: 'proposal', text: 'why',
+    }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'specified' }, agent))
+    // The validated id is the one the checklist recorded, so an l2 task must
+    // record its checklist to own a validation target.
+    task = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [{ content: 'the fix', phase: 'implemented', status: 'completed' }],
+    }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'verified' }, agent))
+
+    const accepted = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'accepted',
+      coverage_confirmation: 'the design and spec are implemented',
+    }, agent))
+    expect(accepted).toMatchObject({ phase: 'accepted' })
+    // An l2 task owns a change, so its acceptance still validates that change.
+    expect((ctx.get('shell') as StubShell).commands).toContain('openspec validate add-thing --strict --json')
+  })
+
   it('passes the session cwd to post-hooks', async () => {
     const ctx = new Context()
     const cwd = mkdtempSync(join(tmpdir(), 'dsh-delivery-ph-'))
@@ -747,8 +826,8 @@ describe('tool-delivery post-hooks', () => {
 })
 
 describe('tool-delivery auto-detect', () => {
-  // The character floor dropped from 1200 to 200, so a 400-character request
-  // is now an l2 task instead of an l1 one.
+  // Only a graded l2 creates a task at pre-step; l0 and l1 both reach the
+  // model, which decides whether the discipline applies.
   it('creates an l2 task at pre-step for a request above the character floor', async () => {
     const { ctx, agent } = await harness()
     await preStep(ctx, agent, [createUserMessage({
@@ -822,13 +901,16 @@ describe('tool-delivery auto-detect', () => {
     expect(ctx.delivery.get(agent)?.level).toBe('l2')
   })
 
-  it('creates an l1 task when a short request hits one medium signal', async () => {
+  it('leaves a medium-signal request to the model instead of creating an l1 task', async () => {
     const { ctx, agent } = await harness()
     await preStep(ctx, agent, [createUserMessage({
       content: [{ type: 'text', text: '新增一个小能力' }],
       source: { kind: 'user' },
     })])
-    expect(ctx.delivery.get(agent)?.level).toBe('l1')
+    expect(ctx.delivery.get(agent)).toBeUndefined()
+    const injected = agent.inbox.nextStep
+    expect(injected.some(message => message.source.kind === 'plugin'
+      && message.source.plugin === 'tool-delivery')).toBe(true)
   })
 
   it('injects the grading rubric once per turn when no signal matches', async () => {

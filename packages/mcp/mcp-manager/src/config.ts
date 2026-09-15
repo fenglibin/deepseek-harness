@@ -35,6 +35,26 @@ export interface McpStdioServer {
   allowedTools?: string[]
 }
 
+/**
+ * How one HTTP server authenticates. `none` sends no credential beyond the
+ * entry's own `headers`; `oauth` obtains a bearer token through the
+ * authorization-code flow and keeps it outside the settings document.
+ */
+export type McpHttpAuth =
+  | { /** Send no credential beyond `headers`. */ kind: 'none' }
+  | {
+    /** Obtain a bearer token through authorization code + PKCE. */
+    kind: 'oauth'
+    /** OAuth client identifier registered with the server. */
+    clientId: string
+    /** Authorization endpoint the browser is sent to. */
+    authorizationUrl: string
+    /** Token endpoint the code and refresh exchanges POST to. */
+    tokenUrl: string
+    /** Scopes requested from the server; omission requests none. */
+    scopes?: string[]
+  }
+
 /** One Streamable HTTP MCP server. */
 export interface McpHttpServer {
   /** Stable local namespace for this server's model-facing tools. */
@@ -47,6 +67,8 @@ export interface McpHttpServer {
   url: string
   /** Additional headers attached to MCP requests; shown and edited in the UI. */
   headers: Record<string, string>
+  /** Authentication mode; omission resolves to `{ kind: 'none' }`. */
+  auth: McpHttpAuth
   /** Raw MCP tool names admitted to registration; omission registers every tool the server lists. */
   allowedTools?: string[]
 }
@@ -77,6 +99,24 @@ const StdioServerSchema = z.object({
   allowedTools: z.array(String).default(undefined as unknown as string[]),
 })
 
+/** The `none` branch of {@link McpHttpAuth}. */
+const NoneAuthSchema: z<Extract<McpHttpAuth, { kind: 'none' }>> = z.object({
+  kind: z.const('none'),
+})
+
+/** The `oauth` branch of {@link McpHttpAuth}; `clientId` is configuration, never a secret. */
+const OAuthAuthSchema: z<Extract<McpHttpAuth, { kind: 'oauth' }>> = z.object({
+  kind: z.const('oauth'),
+  clientId: z.string().required(),
+  authorizationUrl: z.string().required(),
+  tokenUrl: z.string().required(),
+  // Preserve omission; `[]` would request no scope and admit no tool-by-analogy.
+  scopes: z.array(String).default(undefined as unknown as string[]),
+})
+
+/** Discriminated on `kind`; omission resolves to `none`. */
+const AuthSchema: z<McpHttpAuth> = z.union([NoneAuthSchema, OAuthAuthSchema]).default({ kind: 'none' })
+
 /** Schema of one Streamable HTTP server entry; header values never ride a wire read. */
 const HttpServerSchema = z.object({
   serverName: ServerNameSchema,
@@ -85,6 +125,9 @@ const HttpServerSchema = z.object({
   url: z.string().required(),
   // Not role('secret'): see the stdio env field — the list is edited wholesale.
   headers: z.dict(String).default({}),
+  // Omission is `none`, so an entry written before this field existed resolves
+  // to the behavior it always had.
+  auth: AuthSchema,
   // Preserve omission; Schemastery's `[]` default would admit no tool.
   allowedTools: z.array(String).default(undefined as unknown as string[]),
 })
@@ -107,5 +150,12 @@ export function validateServers(value: McpSettings): void {
       throw new Error(`mcp-manager: duplicate serverName "${server.serverName}" in the MCP server list`)
     }
     seen.add(server.serverName)
+    // The stdio schema has no `auth` field, so Schemastery would drop a
+    // stray one silently. A stdio server has no HTTP endpoint to authorize
+    // against, so naming the mistake beats accepting a credential the entry
+    // can never use.
+    if (server.transport === 'stdio' && 'auth' in server) {
+      throw new Error(`mcp-manager: serverName "${server.serverName}" is a stdio server and cannot carry an auth section`)
+    }
   }
 }
