@@ -208,6 +208,26 @@ export function collectRuntimeSourceExportUses(path: string, source: string): Ru
   const sourceFile = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true)
   const uses = new Map<string, RuntimeSourceExportUse>()
   const sourceLines = source.split(/\r?\n/u)
+  // `createLazyRequire(specifier, import.meta.url)` 的第一个字面量实参是一个运行时
+  // 依赖边，即使源码里没有静态值导入。先记下这个 helper 在本文件中的绑定名，
+  // 供下面的调用点识别使用。
+  const lazyRequireBindings = new Set<string>()
+  const lazyRequireNamespaces = new Set<string>()
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)
+      || !ts.isStringLiteralLike(statement.moduleSpecifier)
+      || statement.moduleSpecifier.text !== '@deepseek-ai/dsh-lazy-require') continue
+    const bindings = statement.importClause?.namedBindings
+    if (bindings !== undefined && ts.isNamespaceImport(bindings)) {
+      lazyRequireNamespaces.add(bindings.name.text)
+    } else if (bindings !== undefined) {
+      for (const element of bindings.elements) {
+        if ((element.propertyName ?? element.name).text === 'createLazyRequire') {
+          lazyRequireBindings.add(element.name.text)
+        }
+      }
+    }
+  }
   const record = (specifier: string, exportName: string, locationNode: ts.Node): void => {
     const key = `${specifier}\0${exportName}`
     if (uses.has(key)) return
@@ -264,10 +284,17 @@ export function collectRuntimeSourceExportUses(path: string, source: string): Ru
       && !node.isTypeOnly
       && ts.isExternalModuleReference(node.moduleReference)) {
       add(node.moduleReference.expression, NAMESPACE_RUNTIME_EXPORT, node.name)
-    } else if (ts.isCallExpression(node)
-      && (node.expression.kind === ts.SyntaxKind.ImportKeyword
-        || ts.isIdentifier(node.expression) && node.expression.text === 'require')) {
-      add(node.arguments[0], NAMESPACE_RUNTIME_EXPORT)
+    } else if (ts.isCallExpression(node)) {
+      // 惰性 specifier 与该 helper 的两种绑定形态（具名别名、命名空间）都算运行时依赖。
+      const lazyRequire = ts.isIdentifier(node.expression)
+        ? lazyRequireBindings.has(node.expression.text)
+        : ts.isPropertyAccessExpression(node.expression)
+          && ts.isIdentifier(node.expression.expression)
+          && lazyRequireNamespaces.has(node.expression.expression.text)
+          && node.expression.name.text === 'createLazyRequire'
+      if (node.expression.kind === ts.SyntaxKind.ImportKeyword
+        || ts.isIdentifier(node.expression) && node.expression.text === 'require'
+        || lazyRequire) add(node.arguments[0], NAMESPACE_RUNTIME_EXPORT)
     } else if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node) || ts.isJsxFragment(node)) {
       record('react/jsx-runtime', NAMESPACE_RUNTIME_EXPORT, node)
     }
