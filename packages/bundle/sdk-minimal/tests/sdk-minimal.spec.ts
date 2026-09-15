@@ -37,6 +37,7 @@ describe('dsh-sdk-minimal bundle', () => {
       ['terminal-pwsh', '@deepseek-ai/dsh-terminal-bash'],
       ['fs-local', '@deepseek-ai/dsh-fs-local'],
       ['agent-spine', '@deepseek-ai/dsh-agent-spine-demo'],
+      ['mcp-resources', '@deepseek-ai/dsh-mcp-resources'],
       ['persistent-bash', '@deepseek-ai/dsh-tool-bash-persistent'],
       ['persistent-pwsh', '@deepseek-ai/dsh-tool-pwsh-persistent'],
       ['str-replace-editor', '@deepseek-ai/dsh-tool-str-replace-editor'],
