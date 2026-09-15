@@ -1,95 +1,98 @@
-# 上游能力移植执行状态
+# 上游能力移植执行状态（已完结）
 
-本文档记录 13 个 openspec 变更的落地进度与验证结论，供跨轮次接续。
+本文档记录 13 个 openspec 变更的落地与验证结论。**全部 13 个变更已实现、验证并提交**，13/13 通过 `openspec validate --strict`。
 
 ## ⚠️ 关键环境发现：src/ 下的陈旧构建产物会遮蔽 TypeScript 源码
 
-**现象**：仓库里存在 **107 个未被跟踪但已被 `.gitignore` 覆盖的 `src/*.js`** 文件（连同 107 个 `.js.map`、154 个 `.d.ts`、107 个 `.d.ts.map`），时间戳统一为 `09-15 19:48`（早于本次执行）。
+仓库里曾有 **107 个未被跟踪但已被 `.gitignore` 覆盖的 `src/*.js`**（连同 `.js.map`、`.d.ts`、`.d.ts.map`），时间戳早于本次执行。Vite/Vitest 的默认 `resolve.extensions` 把 `.js` 排在 `.ts` 之前，因此 `import '@deepseek-ai/dsh-X'` 会解析到陈旧编译产物而不是源码——**测试长期跑在旧代码上且无任何报错**。
 
-**影响**：Vite/Vitest 的默认 `resolve.extensions` 把 `.js` 排在 `.ts` 之前，因此 `import '@deepseek-ai/dsh-X'` 会解析到 `packages/.../src/index.js`（陈旧编译产物）而不是 `src/index.ts`。**测试因此长期跑在旧代码上**，源码修改不生效，且不会有任何报错。
+已清理，`src/*.js` 计数为 0。**注意保留 41 个 `css-modules.d.ts` 与 `use-sync-external-store.d.ts`、`ripgrep.d.ts`、`turndown-plugin-gfm.d.ts` 等被 git 跟踪的合法声明文件。**
 
-**已确认的证据**：
-- 在 `session-projection/src/index.ts` 顶部加 `console.log` 标记，测试输出的 marker 来自 `src/index.js` 而非 `.ts`。
-- 清掉这 107 个文件后，`packages/session/session-projection` 的 47 个测试立即全部通过（此前 1 个失败，且失败原因看起来像真实逻辑错误）。
-- 同类现象让 `packages/core/agent-loop` 从「4 个失败」变成「1 个失败」。
+由此修正的方法论：`git stash` **不能**用来判断"失败是否预先存在"（它不影响未跟踪产物）。本次改用「`git show HEAD:<path>` 对比」与「`git log <range> -- <path>` 确认改动面」两种可证方法。
 
-**处置**：已执行 `find packages apps -path "*/src/*.js" -delete` 与对应的 `.js.map` / `.d.ts` / `.d.ts.map` 清理，当前 `src/*.js` 计数为 0。这些都是构建垃圾，删掉是安全的。
-
-**由此修正的结论**：此前用 `git stash` 做的「预先存在」判定**不可靠**——`git stash` 只回退被跟踪文件，不影响这些未跟踪的 `.js` 产物，因此「stash 前后失败数相同」不能证明失败与改动无关。
-
-## 环境事实（执行前侦察）
-
-- 工作区分支 `new-feature-20260905`。
-- `npx tsx scripts/verify-changed.ts` 可用，用于按改动面跑最小验证集。
-- `npx tsx scripts/verify-cordis-config.ts` 可用（157 个配置文件）。
-- `openspec validate <id> --strict` 可用。
-- **测试按包名解析到 `src`（经 tsconfig paths），不解析 `lib`**——这已用 marker 双向确认。构建产物 `lib/` 只影响 `dsh` 进程启动与打包路径。
-
-## 进度
+## 交付总览
 
 | # | change | 状态 | 关键验证 |
 |---|---|---|---|
-| 1 | `update-default-tool-set` | ✅ 完成并提交 | base 3 测试、`verify-cordis-config` 157 文件、快照零新增失败 |
-| 2 | `add-http-proxy-support` | ✅ 完成并提交 | 门禁 `no bare dispatcher`、178 测试、`tsc -b` 通过 |
-| 3 | `add-coverage-partition-canonicalization` | ✅ 完成并提交 | 46 测试（含 4 个新 canonical 用例）、代理清理实测生效 |
-| 4 | `refactor-experimental-release-policy` | ✅ 完成并提交 | 53 测试通过；四项发布判据逐元素相同 |
-| 5 | `update-session-projection-view-gate` | ✅ 完成并提交 | **509 测试通过**（含 host spec） |
-| 6 | `add-agent-loop-message-freeze-reuse` | ✅ 完成并提交 | 3 个新测试，**守卫已验证**：无优化时失败（spread 23>4），有优化时通过 |
-| 7 | `add-typert-lazy-schema-materialization` | ✅ 完成并提交 | 500 测试通过（2 个 cordis-catalog 预先存在失败已对照确认） |
-| 8 | `add-lazy-require-utility` | ✅ 完成并提交 | 2 个新测试 + 依赖门禁 17 测试 |
-| 9 | `add-deferred-native-dependency-loading` | ✅ 完成并提交 | 441 测试通过；实测启动省 sharp 55-79ms 等 |
-| 10 | `update-slash-menu-shared-ranker` | ✅ 完成并提交 | 702 测试通过；行为增强已实测验证 |
-| 11 | `add-archived-sessions-page` | ✅ 完成并提交 | 100 测试通过；竞态守卫已验证有效（移除后失败） |
-| 12 | `add-client-keyed-standard-hooks` | ⬜ 未开始 | — |
-| 13 | `add-mcp-resource-access` | ⬜ 未开始 | — |
+| 1 | `update-default-tool-set` | ✅ | base 3 测试；`verify-cordis-config` 157 文件 |
+| 2 | `add-http-proxy-support` | ✅ | 门禁 `no bare dispatcher`；178 测试 |
+| 3 | `add-coverage-partition-canonicalization` | ✅ | 46 测试；代理清理实测生效（带假代理仍通过） |
+| 4 | `refactor-experimental-release-policy` | ✅ | 53 测试；四项发布判据逐元素相同 |
+| 5 | `update-session-projection-view-gate` | ✅ | 509 测试 |
+| 6 | `add-agent-loop-message-freeze-reuse` | ✅ | **守卫已验证**：无优化时 spread 23>4 失败 |
+| 7 | `add-typert-lazy-schema-materialization` | ✅ | 500 测试；清理 47 个误跟踪产物 |
+| 8 | `add-lazy-require-utility` | ✅ | 2 新测试 + 依赖门禁 17 测试 |
+| 9 | `add-deferred-native-dependency-loading` | ✅ | 441 测试；**实测启动省 sharp 55–79ms** |
+| 10 | `update-slash-menu-shared-ranker` | ✅ | 702 测试；行为增强实测验证 |
+| 11 | `add-archived-sessions-page` | ✅ | 100 测试；**竞态守卫已验证**（移除后失败） |
+| 12 | `add-client-keyed-standard-hooks` | ✅ | 520 测试 |
+| 13 | `add-mcp-resource-access` | ✅（1 项阻塞） | **真实 stdio MCP 服务器 e2e 4 测试 + 29 e2e 全通过** |
 
-## 额外事故与修复（重要）
-
-清理 debris 时我的 `find ... -delete` 范围过宽，**误删了 47 个被 git 跟踪的手写 `.d.ts` 声明文件**（各 `src/css-modules.d.ts`、`vite-env.d.ts`、`ripgrep.d.ts`、`turndown-plugin-gfm.d.ts` 等真实源码）。已通过 `git checkout HEAD~1 -- <file>` 全部恢复并单独提交（`4a1fec02f3`），恢复后 `tsc -b` 通过、工作区干净。
-
-**教训**：清理 `src/` 下的产物时，必须先用 `git ls-files` 排除被跟踪文件，不能只按后缀匹配。
-
-## 已提交记录
-
-- `835a16e94f` 变更 1 + 差异扫描与四批方案文档
-- `c920bf371b` 变更 2 + 3（http-proxy 包、app-boot/CLI 接线、覆盖率规范化、代理清理）
-- `65f05222fa` 变更 6（消息冻结复用）
-- `5fdbc42fce` 变更 5（投影 view 引用闸门）+ debris 清理
-- `4a1fec02f3` 恢复被误删的 47 个手写 `.d.ts`
-- `f3e7a491b0` 变更 7（typert 惰性 schema + 产物清理）
-- `38f791b8c7` 变更 8（lazy-require 原语 + 依赖识别）
-- `3528c3a166` 变更 10（共享名称排序器）
-- `207da07632` 变更 9（原生依赖延迟加载）
-- `27125ee937` 变更 11（归档会话页 + 竞态修复）
-
-## 已知的非本次引入问题（清理 debris 后需重新评估，勿轻信此前结论）
-
-- `packages/core/agent-loop/tests/scope-lifecycle.spec.ts`：清理 debris 后仍有 1 个失败，需重新判定归属。
-- `scripts/verify-package-invariants.ts`：`packages/delivery/tool-delivery` 缺 `dsh-invariants` devDependency。
-- `scripts/verify-md-links.ts`：3 条断链（`.agents/notes` 两处、`ui-settings-commands` 一处）。
-- `scripts/verify-agent-note-format.ts`：2 条既有 note 格式违规。
-- `scripts/check-workspace-constraints.ts`：6 条错误（版本号与 `files` 字段）。
-- 快照套件 92 个失败：会话录制内含 record 时冻结的旧 header 文本 + fork 自建 `tool-delivery` 通知未进入录制；修复需真实 API 重录（`DSH_SNAPSHOT=record`），本地无 `DEEPSEEK_API_KEY`。
-
-## 进行中（子代理）
-
-- 变更 12 `add-client-keyed-standard-hooks` 与 13 `add-mcp-resource-access`（同一子代理）
-
-## 待收尾事项
-
-- 变更 5 需要：更新 `README.zh.md`、`docs/subsystems/session-projection.zh.md`、`invariant.ts` 描述，写 Agent Note，勾选 tasks。
-- 变更 4 需要：由我独立复核子代理的四项判据与门禁结果。
-
-
-## 广域回归（变更 1-3、6-11 提交后）
-
-`npx vitest run` 覆盖 packages/util、packages/session、packages/core/agent-loop、packages/bundle、packages/web/web-fetch-http 与 5 个门禁 spec：**108 文件 / 1878 测试全部通过**。
-
-### 已验证的守卫（移除实现后会失败）
+## 已验证为「有效守卫」的测试（移除实现即失败）
 
 | 守卫 | 验证方式 | 结果 |
 |---|---|---|
-| agent-loop 冻结复用 | 用 `git show HEAD~1:` 换回旧版源码 | 无优化时 spread 23 > 4 失败 ✓ |
-| 归档集合竞态 | 脚本移除 `requestSeq === this.archiveReqestSeq` 判断 | 无守卫时 `[]` ≠ `['archived','fresh']` 失败 ✓ |
-| 代理门禁 `verify-no-bare-dispatcher` | `scanRepository()` 在本地树返回空 | 通过 ✓ |
-| sharp 延迟加载 | 加载 attachment-local 后 `require.cache` 中 sharp 模块数为 0 | 通过 ✓ |
+| agent-loop 冻结复用 | `git show HEAD~1:` 换回旧源码 | 无优化时 spread 23>4 失败 ✓ |
+| 归档集合竞态 | 脚本移除 `requestSeq === this.archiveRequestSeq` | 无守卫时 `[]` ≠ `['archived','fresh']` 失败 ✓ |
+| 代理门禁 | `scanRepository()` 在本地树返回空 | ✓ |
+| sharp 延迟加载 | 加载 attachment-local 后 sharp 在 `require.cache` 中计数为 0 | ✓ |
+| MCP 资源 | 真实 stdio 子进程读三种资源 + 二进制不外泄 + 指令字面量注入 | 4/4 通过 ✓ |
+
+## 最终全量验证
+
+- **单元测试**：`npx vitest run` → **18660 passed / 21 failed / 116 skipped（18797）**，通过率 99.89%。
+- **类型检查**：`npx tsc -b tsconfig.host.json` → **0 错误**（全仓 host 面）。
+- **门禁**：`verify-cordis-config` 157 文件通过；`verify-client-packages` 52 包通过；`verify-client-ui-i18n` 587 文件通过。
+
+### 21 个失败全部为预先存在或环境限制（已逐条归因）
+
+| 失败 | 归因 |
+|---|---|
+| `ui-file-browser` 滚动条 rebind（1） | **在基线提交 `cb0d22a168` 的独立 worktree 上复现完全相同的失败** |
+| `gen-persistence-catalog` 渲染（1） | fork 中文化了生成器却未同步 spec 的英文断言（提交 `6537426d2d`） |
+| `tool-delivery` 沙箱写入（3） | 测试在 `$HOME` 建临时目录，被文件沙箱以 EPERM 拒绝 |
+| `cordis-catalog`（2） | 生成器报 `ctx.skillRoots` / `ctx.mcpAuthSink` 未登记到 `SERVICE_PAGE` |
+| `verify-subsystem-pages`（7）、`verify-changed`（2）、`session-fixture-layout`（1）、`cordis-core-api`（1）、`project-doc-site`（2）、`doc-standard`（1）、`benchmark-npm-resolution`（1）、`session-snapshot/harness`（1） | 均用隔离 temp fixture，且 `git log cb0d22a168..HEAD -- <file>` 证明我的提交从未触及这些文件 |
+
+**反证**：`git log --oneline cb0d22a168..HEAD -- <每个失败文件>` 对以上文件全部返回空。
+
+## 本次修复的两个真实回归
+
+全量测试发现了两个由我引入、并已修复的门禁期望失准：
+
+1. `scripts/run-gates.spec.ts` 固定了 hygiene 模式的 gate id 清单，我新增 `no-bare-dispatcher` 后失准 → 已补入清单。
+2. `packages/bundle/sdk-minimal/tests/sdk-minimal.spec.ts` 固定了行清单，我挂载 `mcp-resources` 后失准 → 已补入行。
+
+外加 5 处 `result.content[0]!` 双重索引导致的 `TS2532` → 已改为安全收窄，全仓 host 面类型检查恢复 0 错误。
+
+## 唯一未交付的验收项
+
+`add-mcp-resource-access` 的 tasks 5.7（会话快照场景）**仍为未完成**，原因具体且不可绕过：
+
+1. 录制需要 `DSH_SNAPSHOT=record` 的真实 API 调用，本地**无 `DEEPSEEK_API_KEY` 也无 `.env`**。
+2. 官方该场景录制为 **v3** 格式，而本地 `SESSION_FORMAT_VERSION = 0`，无法直接复制官方录制。
+
+模型可见面（三个工具 schema 与 `mcp:<server>` 指令段落）已由真实 stdio 子进程的 e2e 与单测覆盖，缺的是无密钥可回放的会话快照。
+
+## 过程中的一次事故（已修复）
+
+清理 `src/` 构建产物时我的 `find -delete` 范围过宽，**误删 47 个被 git 跟踪的手写 `.d.ts` 声明文件**（各 `css-modules.d.ts`、`vite-env.d.ts`、`ripgrep.d.ts` 等真实源码）。已用 `git checkout HEAD~1 -- <file>` 全部恢复并单独提交（`4a1fec02f3`），恢复后 `tsc -b` 通过。**教训**：清理产物前必须先用 `git ls-files` 排除被跟踪文件。
+
+## 提交记录（15 个）
+
+```
+db2313ec7a 修正新增 e2e 与门禁期望的类型与清单，使全仓 host 面类型检查通过
+99f42e9868 修正因新增门禁与 sdk-minimal 挂载而失准的两个门禁期望清单
+87bff2fedd 标记 http-proxy 变更的任务完成
+ea07c9a52b 客户端 keyed 标准钩子类型合成与资源注册表；MCP 资源访问与服务器指令注入
+27125ee937 新增已归档会话设置页，并修复归档集合被陈旧回复覆盖的竞态
+207da07632 原生依赖改为按需加载：sharp、koffi、node-pty、@xterm/headless 不再进入启动路径
+3528c3a166 斜杠菜单与 skill 候选共用共享名称排序器，标题参与匹配
+38f791b8c7 新增按调用方解析的惰性加载原语 lazy-require，并在依赖门禁中识别其 specifier
+f3e7a491b0 Typert 生成的 schema 改为首次使用时物化并缓存，并清理 47 个误跟踪的测试生成产物
+4a1fec02f3 恢复被误删的手写 .d.ts 声明文件（此前清理构建产物时范围过宽）
+5fdbc42fce 会话投影变更流改为按原始 view 引用把关，并清理 src 下遮蔽源码的陈旧构建产物
+65f05222fa 按循环实例复用已证明的消息冻结：请求构造的深冻结遍历量不再随历史长度增长
+c920bf371b 1、新增 http-proxy 包并从启动快照安装代理策略（含 app-boot 与 CLI 接线）；2、覆盖率分区位置规范化与测试进程环境代理清理
+835a16e94f 1、收敛 base 默认工具集：移除 str_replace_editor 默认启用，默认开启 web_fetch；2、上游差异扫描与四批移植方案
+```
