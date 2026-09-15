@@ -223,7 +223,8 @@ export type TypertCodec =
   | {
     readonly mode: 'strict'
     readonly typeSymbol: string
-    readonly schema: TypertSchema
+    /** 首次边界使用时物化并返回进程 realm 的 schema。 */
+    readonly create: () => TypertSchema
   }
   | {
     readonly mode: 'src-json'

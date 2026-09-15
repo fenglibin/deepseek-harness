@@ -32,8 +32,8 @@
 | 1 | `update-default-tool-set` | ✅ 完成并提交 | base 3 测试、`verify-cordis-config` 157 文件、快照零新增失败 |
 | 2 | `add-http-proxy-support` | ✅ 完成并提交 | 门禁 `no bare dispatcher`、178 测试、`tsc -b` 通过 |
 | 3 | `add-coverage-partition-canonicalization` | ✅ 完成并提交 | 46 测试（含 4 个新 canonical 用例）、代理清理实测生效 |
-| 4 | `refactor-experimental-release-policy` | ✅ 实现完成，待验证 | 子代理报告四项发布判据逐元素相同 |
-| 5 | `update-session-projection-view-gate` | 🔄 实现完成，待收尾 | **47 测试全通过**（清理 debris 后） |
+| 4 | `refactor-experimental-release-policy` | ✅ 完成并提交 | 53 测试通过；四项发布判据逐元素相同 |
+| 5 | `update-session-projection-view-gate` | ✅ 完成并提交 | **509 测试通过**（含 host spec） |
 | 6 | `add-agent-loop-message-freeze-reuse` | ✅ 完成并提交 | 3 个新测试，**守卫已验证**：无优化时失败（spread 23>4），有优化时通过 |
 | 7 | `add-typert-lazy-schema-materialization` | ⬜ 未开始 | — |
 | 8 | `add-lazy-require-utility` | ⬜ 未开始 | — |
@@ -43,11 +43,19 @@
 | 12 | `add-client-keyed-standard-hooks` | ⬜ 未开始 | — |
 | 13 | `add-mcp-resource-access` | ⬜ 未开始 | — |
 
+## 额外事故与修复（重要）
+
+清理 debris 时我的 `find ... -delete` 范围过宽，**误删了 47 个被 git 跟踪的手写 `.d.ts` 声明文件**（各 `src/css-modules.d.ts`、`vite-env.d.ts`、`ripgrep.d.ts`、`turndown-plugin-gfm.d.ts` 等真实源码）。已通过 `git checkout HEAD~1 -- <file>` 全部恢复并单独提交（`4a1fec02f3`），恢复后 `tsc -b` 通过、工作区干净。
+
+**教训**：清理 `src/` 下的产物时，必须先用 `git ls-files` 排除被跟踪文件，不能只按后缀匹配。
+
 ## 已提交记录
 
 - `835a16e94f` 变更 1 + 差异扫描与四批方案文档
 - `c920bf371b` 变更 2 + 3（http-proxy 包、app-boot/CLI 接线、覆盖率规范化、代理清理）
 - `65f05222fa` 变更 6（消息冻结复用）
+- `5fdbc42fce` 变更 5（投影 view 引用闸门）+ debris 清理
+- `4a1fec02f3` 恢复被误删的 47 个手写 `.d.ts`
 
 ## 已知的非本次引入问题（清理 debris 后需重新评估，勿轻信此前结论）
 
