@@ -83,6 +83,8 @@ export class ReactLoopAgent implements Agent {
   private requestHeaderLogged = false
   /** Surface generation of the preceding built request. */
   private requestSurfaceGeneration: number | undefined
+  /** 本循环已完整深冻结的消息对象身份；弱引用不会留住已被替换的历史。 */
+  private readonly frozenMessages = new WeakSet<Message>()
   private readonly runtimeContext: RuntimeContextProjection
 
   constructor(
@@ -440,7 +442,8 @@ export class ReactLoopAgent implements Agent {
 
   /**
    * Compose one frozen request and bind it to the adapter registration that
-   * resolved its exact-model defaults.
+   * resolved its exact-model defaults. Message identities retain their first
+   * successful deep freeze; each local header is frozen afresh. The signal stays live.
    */
   private async buildRequest(
     turn: number,
@@ -533,7 +536,15 @@ export class ReactLoopAgent implements Agent {
     }
     signal.throwIfAborted()
 
-    const request = markAgentLoopRequest(deepFreeze({
+    // canonicalHeader 是浅冻结；append 记录的是脱离的副本，不是这些本地值。
+    deepFreeze(header)
+    for (const message of boundaryMessages) {
+      if (this.frozenMessages.has(message)) continue
+      deepFreeze(message)
+      this.frozenMessages.add(message)
+    }
+    Object.freeze(boundaryMessages)
+    const request = markAgentLoopRequest(Object.freeze({
       ...header.config,
       messages: boundaryMessages,
       ...header.system !== undefined ? { system: header.system } : {},

@@ -80,6 +80,7 @@ const PACKAGE_LIBRARIES: Readonly<Record<string, string>> = {
   'packages/util/crypto': 'Zero-dependency identifier minting utility.',
   'packages/util/deque': 'Zero-dependency circular deque utility.',
   'packages/util/home-paths': 'Zero-dependency harness-home path resolver.',
+  'packages/util/http-proxy': '进程级出站代理策略库，解析启动环境并装为 undici 全局 dispatcher。',
   'packages/util/launch-environment': 'Zero-dependency environment resolver.',
   'packages/util/native-command': 'Host-side subprocess runner utility.',
   'packages/util/output-retention': 'Zero-dependency retention utility.',
