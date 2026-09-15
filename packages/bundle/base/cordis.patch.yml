@@ -529,6 +529,11 @@
         fetch: true
         searchTimeoutMs: 60000
 
+    # 按作用域的 MCP 资源访问与三个共享资源工具。挂载是可选的：没有它时
+    # mcp-client 照常桥接工具，只是不注册资源工具、不注入服务器指令段落。
+    - id: mcp-resources
+      name: '@deepseek-ai/dsh-mcp-resources'
+
     # ── rows every mode mounts, whose values each overlay may state ──────────────
 
     # The tool registry. Presentation mode is a deployment choice; omitting it here

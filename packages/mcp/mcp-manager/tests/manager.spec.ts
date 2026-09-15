@@ -29,6 +29,8 @@ const { mockConnect, mockClose, mockListTools, MockClient, instances } = vi.hois
     close = mockClose
     request = mockRequest
     setNotificationHandler = vi.fn()
+    /** SDK 1.29 的 Client 提供该方法；连接成功后生产代码会读取服务器指令。 */
+    getInstructions(): string | undefined { return undefined }
     constructor() { instances.push(this) }
   }
   const instances: MockClient[] = []

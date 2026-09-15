@@ -82,6 +82,11 @@
         toolBash: false
         toolJobs: false
 
+    # 按作用域的 MCP 资源访问与三个共享资源工具；agent-spine 已经在上面提供了
+    # 它注入的 `tools` 注册表。
+    - id: mcp-resources
+      name: '@deepseek-ai/dsh-mcp-resources'
+
     - id: persistent-bash
       name: '@deepseek-ai/dsh-tool-bash-persistent'
       disabled: !!js process.platform === 'win32'

@@ -6,7 +6,7 @@ kind: "package-reference"
 
 ## 概述
 
-`@deepseek-ai/dsh-api-workspace-controller` 拥有 Host 的 `ctx.workspaceController` 服务和生成的 Client `ctx.remote.workspace` namespace。它的 Remote 方法负责创建、重命名、移除和重排 Workspace，在 Workspace 内重排 Session，在 Workspace 导航中归档与取消归档 Session，以及跟随完整的 Workspace 投影。当 Client 必须修改或跟随 Workspace 导航时，请通过 API Gateway 使用它。本包同时拥有 `ctx.directoryPickerController` 与生成的 `ctx.remote.directoryPicker` namespace，因为它承载的选目录 seam 是抽象的，自身从不作为 Loader entry。
+`@deepseek-ai/dsh-api-workspace-controller` 拥有 Host 的 `ctx.workspaceController` 服务和生成的 Client `ctx.remote.workspace` namespace。它的 Remote 方法负责创建、重命名、移除和重排 Workspace，在 Workspace 内重排 Session，归档与取消归档 Session，以及跟随完整的 Workspace 投影。当 Client 必须修改或跟随 Workspace 导航时，请通过 API Gateway 使用它。本包同时拥有 `ctx.directoryPickerController` 与生成的 `ctx.remote.directoryPicker` namespace，因为它承载的选目录 seam 是抽象的，自身从不作为 Loader entry。
 
 ## 目录
 
@@ -25,6 +25,8 @@ Host 控制器会串行执行正确性取决于当前 registry 状态的变更�
 归档集合是显示成员资格，而非所有权。`archiveSession` 把一个已知 Session 加入 registry 全局集合——registry 找不到的 Session 会以 `session/not-found` 失败——而该 Session 保留它在 Workspace 行中的槽位，因此 `unarchiveSession` 会把它恢复到该槽位保留的位置。两个 verb 都返回完整的结果归档集合；Client 的 `workspace` 服务把两者暴露为 `Promise<void>`，由 `ClientWorkspaceModel` 把返回的集合装入自己的行。对位于归档集合之外的 id 取消归档会直接返回而不写入，因此被恢复两次的 Session——或从未归档过的 Session——都不是错误。
 
 Client 入口提供 `ClientWorkspaceModel` 和 `createWorkspaceStateStream()`。该模型拥有 Workspace 行、registry 顺序、已归档 Session id、一元变更回声，以及流与一元调用的竞态处理。较新的 Host 行按 `updatedAt` 获胜；已提交的流顺序优先于较旧的一元响应；已经移除的 Workspace id 不会被延迟数据复活。该包公开与框架无关的快照和订阅，把导航策略与 React hook 留给 UI owner。
+
+归档集合有四个写入者：`archiveSession` 与 `unarchiveSession` 的一元回复、`follow()` 的 `archived` 增量，以及 `replaceBaseline` 的完整基线。因此集合安装受一个单调递增的请求序号守卫：每个一元操作在发起远程调用前自增该序号并记住自己的值，只有当它仍是当前值时，回复中的集合才会被安装；`replaceBaseline` 与 `replaceArchived` 同样自增该序号，使任何更新的推送都作废在途的一元回复。于一元回复晚于更新的请求或更新的推送到达时，陈旧集合不会覆盖新集合。
 
 -----
 

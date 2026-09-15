@@ -2,9 +2,10 @@
  * Tests for the mcp-client plugin's `apply` lifecycle entry point.
  * Isolated file so vi.mock of the MCP SDK doesn't pollute other test suites.
  */
+import assert from 'node:assert/strict'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+import SystemPrompt, { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import type { Config } from '@deepseek-ai/dsh-mcp-client'
@@ -37,6 +38,8 @@ const { mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotification
     callTool = mockCallTool
     request = mockRequest
     setNotificationHandler = mockSetNotificationHandler
+    /** SDK 1.29 的 Client 提供该方法；连接成功后生产代码会读取服务器指令。 */
+    getInstructions(): string | undefined { return undefined }
   }
   return { mockConnect, mockClose, mockListTools, mockCallTool, mockSetNotificationHandler, MockClient }
 })
@@ -482,5 +485,78 @@ describe('apply (plugin lifecycle)', () => {
 
     expect(mockConnect).toHaveBeenCalled()
     expect(ctx.tools.get('mcp__web__remote')).toBeDefined()
+  })
+})
+
+describe('server instructions', () => {
+  let ctx: Context
+
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    mockConnect.mockResolvedValue(undefined)
+    mockClose.mockImplementation(function (this: { onclose?: () => void }) {
+      this.onclose?.()
+      return Promise.resolve()
+    })
+    mockListTools.mockResolvedValue({
+      tools: [{ name: 'remote', description: 'A remote tool', inputSchema: { type: 'object' } }],
+      nextCursor: undefined,
+    })
+    mockCallTool.mockResolvedValue({ content: [{ type: 'text', text: 'ok' }] })
+    ctx = await mountRegistry()
+  })
+
+  it.each([undefined, '', ' \n\t'])(
+    '服务器没有指令或指令全为空白时不注入带来源标注的文本 (%j)',
+    async (instructions) => {
+      const spy = vi.spyOn(MockClient.prototype, 'getInstructions').mockReturnValue(instructions)
+      try {
+        await apply(ctx, {
+          ...stdioConfig, failOnStartupError: true, reconnect: { enabled: false }, maxInstructionBytes: 1,
+        })
+        expect(ctx.tools.get('mcp__srv__remote')).toBeDefined()
+        expect(renderPrompt(await ctx.systemPrompt.assemble())).not.toContain('### MCP server:')
+      } finally {
+        spy.mockRestore()
+        await ctx.fiber.dispose()
+      }
+    },
+  )
+
+  it('在发布工具之前按完整的带来源标注 UTF-8 文本计量字节数', async () => {
+    const text = '服务器指南'
+    const spy = vi.spyOn(MockClient.prototype, 'getInstructions').mockReturnValue(text)
+    const exactBytes = Buffer.byteLength(`### MCP server: srv\n\n${text}`)
+    try {
+      const failure: unknown = await apply(ctx, {
+        ...stdioConfig, failOnStartupError: true, reconnect: { enabled: false },
+        maxInstructionBytes: exactBytes - 1,
+      }).catch((error: unknown) => error)
+      assert(failure instanceof Error)
+      assert(failure.cause instanceof Error)
+      expect(failure.cause.message).toContain('server instructions exceed maxInstructionBytes')
+      // 连接失败即不注册任何工具，也不注入截断后的指令。
+      expect(ctx.tools.schemas()).toEqual([])
+    } finally {
+      spy.mockRestore()
+      await ctx.fiber.dispose()
+    }
+
+    // 同样的文本刚好落在上限内时连接成功，指令进入提示词且花括号保持字面量。
+    const valid = await mountRegistry()
+    const validSpy = vi.spyOn(MockClient.prototype, 'getInstructions')
+      .mockReturnValue(`Keep {{server.template}} literal.`)
+    try {
+      await apply(valid, {
+        ...stdioConfig, failOnStartupError: true, reconnect: { enabled: false },
+        maxInstructionBytes: 32_768,
+      })
+      const prompt = renderPrompt(await valid.systemPrompt.assemble())
+      expect(prompt).toContain('### MCP server: srv')
+      expect(prompt).toContain('Keep {{server.template}} literal.')
+    } finally {
+      validSpy.mockRestore()
+      await valid.fiber.dispose()
+    }
   })
 })
