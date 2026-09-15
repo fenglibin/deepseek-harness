@@ -17,8 +17,9 @@ import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { scopeOf } from '@deepseek-ai/dsh-scope'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
-import { RECONNECT_DEFAULTS, resolveReconnectPolicy, startConnection } from './connection.ts'
+import { DEFAULT_MAX_INSTRUCTION_BYTES, RECONNECT_DEFAULTS, resolveReconnectPolicy, startConnection } from './connection.ts'
 import type { ReconnectConfig } from './connection.ts'
+import { registerServerContext } from './server-context.ts'
 import { resolveAllowedTools } from './tools.ts'
 // Side-effect type import: declaration-merges `ctx.tools` onto Context.
 import type {} from '@deepseek-ai/dsh-tools'
@@ -73,6 +74,11 @@ export interface StdioConfig {
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
   failOnStartupError: boolean
   /**
+   * 带来源标注的服务器指令的字节上限（缺省 32768）。超限使该次连接失败而非截断：
+   * 截断后的指令可能语义不完整。
+   */
+  maxInstructionBytes?: number
+  /**
    * Raw MCP tool names admitted to registration; omission registers every tool
    * the server lists. Entries are the server's own wire names — never the
    * `mcp__<serverName>__` public names — and an empty list is refused.
@@ -100,6 +106,11 @@ export interface StreamableHttpConfig {
   toolCallTimeoutMs: number
   /** Fail plugin activation when the initial connection or tool synchronization fails. */
   failOnStartupError: boolean
+  /**
+   * 带来源标注的服务器指令的字节上限（缺省 32768）。超限使该次连接失败而非截断：
+   * 截断后的指令可能语义不完整。
+   */
+  maxInstructionBytes?: number
   /**
    * Raw MCP tool names admitted to registration; omission registers every tool
    * the server lists. Entries are the server's own wire names — never the
@@ -136,6 +147,7 @@ export const Config = z.union([
     cwd: z.string().default(''),
     toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
     failOnStartupError: z.boolean().default(false),
+    maxInstructionBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INSTRUCTION_BYTES),
     // Preserve omission; Schemastery's `[]` default would admit no tool.
     allowedTools: z.array(String).default(undefined as unknown as string[]),
     reconnect: Reconnect,
@@ -147,6 +159,7 @@ export const Config = z.union([
     headers: z.dict(String).default({}),
     toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
     failOnStartupError: z.boolean().default(false),
+    maxInstructionBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INSTRUCTION_BYTES),
     // Preserve omission; Schemastery's `[]` default would admit no tool.
     allowedTools: z.array(String).default(undefined as unknown as string[]),
     reconnect: Reconnect,
@@ -197,6 +210,10 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   // Status reporting is opt-in: a management surface provides one sink for
   // every instance it mounts; without one the supervisor is unchanged.
   const connection = startConnection(ctx, config, reconnect, ctx.get('mcpStatusSink'), allowedTools)
+
+  // 资源访问与指令段落都经可选服务注入，因此不挂 mcp-resources 或不挂
+  // system-prompt 的组合仍照常工作（只是没有资源工具，或没有指令段落）。
+  registerServerContext(ctx, config.serverName, connection)
 
   ctx.effect(() => {
     return () => connection.dispose()

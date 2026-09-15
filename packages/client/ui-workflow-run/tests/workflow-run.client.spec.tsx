@@ -15,6 +15,7 @@ import type {
   SessionListState, SessionLiveEventEntry,
 } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session/types'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { apply as applyLocale, inject as localeInject } from '@deepseek-ai/dsh-client-locale/client'
 import {
   chatSnapshot as emptyChatSnapshot, conversationSnapshot, makeTranslate, sessionSnapshot,
@@ -33,6 +34,9 @@ import { apply as applyInvariant } from '../src/invariant.ts'
 import type {} from '../src/client/index.ts'
 
 afterEach(cleanup)
+
+// 每个 fixture 都带上 resources 插件合并进 GlobalStandardProps 的资源钩子。
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
 
 const PARENT_ID = 'parent' as SessionId
 const CHILD_ID = 'child-1' as SessionId
@@ -310,6 +314,7 @@ function panelProps(data: WorkflowRunChatData, sessions = listState(), openSessi
     node: node(data),
     sessionId: PARENT_ID,
     useSessions: selector => selector(sessions),
+    useResource,
     useSessionPendingInteraction: selector => selector(panelAttention),
     useSession: selector => selector(panelSession),
     useProjection: () => undefined,

@@ -1,8 +1,9 @@
 /**
  * Connection supervisor: owns the MCP client/transport generations for one
  * plugin instance, keeps the harness tool registry in sync with the live
- * generation, and — when the connection drops — restarts the configured
- * server with bounded exponential backoff.
+ * generation, exposes that generation's resource operations plus the
+ * last connected server's instructions, and — when the connection drops —
+ * restarts the configured server with bounded exponential backoff.
  *
  * One outage shares one attempt budget (`maxAttempts` consecutive failed
  * attempts, delays doubling from `initialDelayMs` up to `maxDelayMs`). A
@@ -20,9 +21,11 @@ import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamable
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js'
 import type { Context } from '@deepseek-ai/cordis'
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
+import { assertNever, type JsonValue } from '@deepseek-ai/dsh-util-values'
 import { createTransport } from './transport.ts'
 import { syncTools } from './tools.ts'
 import type { ToolBridgeOptions, ToolDisposers } from './tools.ts'
+import type { ServerContext } from './server-context.ts'
 import type { Config } from './index.ts'
 
 /** Automatic reconnect policy for one MCP server connection. */
@@ -49,6 +52,12 @@ export const RECONNECT_DEFAULTS: Required<ReconnectConfig> = Object.freeze({
 // Keep one additional second for the process-close event that proves the old
 // generation is gone; timing out fails closed instead of overlapping children.
 const GENERATION_CLOSE_TIMEOUT_MS = 5_000
+
+/**
+ * 带来源标注的服务器指令字节上限的缺省值。指令是外部文本，超限使其连接失败
+ * 而非截断：截断后的指令可能语义不完整，静默截断比失败更危险。
+ */
+export const DEFAULT_MAX_INSTRUCTION_BYTES = 32_768
 
 /** Fully resolved reconnect policy captured at plugin load. */
 export type ResolvedReconnectPolicy = Readonly<Required<ReconnectConfig>>
@@ -225,7 +234,7 @@ export interface ConnectionOutcome {
 }
 
 /** Handle for one plugin instance's supervised connection. */
-export interface ConnectionHandle {
+export interface ConnectionHandle extends ServerContext {
   /**
    * Settles when the first connection attempt completes (success or failure).
    * The supervisor enters its reconnect loop regardless; the caller decides
@@ -273,6 +282,10 @@ export function startConnection(
     : opts
 
   let disposed = false
+  /** 指令字节上限；超限使该次连接失败而不是截断。 */
+  const maxInstructionBytes = config.maxInstructionBytes ?? DEFAULT_MAX_INSTRUCTION_BYTES
+  /** 带来源标注的服务器指令，只在连接代际存活期间非空。 */
+  let serverInstructions = ''
   /** Current generation: the connecting or connected client; undefined during backoff waits and after final failure. */
   let client: Client | undefined
   /** Close signal paired with {@link client}; captured by dispose before current ownership is cleared. */
@@ -365,6 +378,7 @@ export function startConnection(
       syncChain = syncChain.then(() => {
         for (const dispose of disposers.values()) dispose()
         disposers = new Map()
+        serverInstructions = ''
       })
       const message = `giving up after ${policy.maxAttempts} consecutive failed reconnect attempts — tools unregistered; reload the plugin or restart the Host to reconnect`
       ctx.logger.error(`${label}: ${message}`)
@@ -449,12 +463,18 @@ export function startConnection(
         }
       },
     )
+    let instructions: string
     try {
       await generation.connect(createTransport(config, auth?.authorization))
       if (hasClosed()) {
         attemptSettled = true
         generationDown(generation)
         return
+      }
+      const serverText = generation.getInstructions()?.trimEnd() ?? ''
+      instructions = serverText ? `### MCP server: ${config.serverName}\n\n${serverText}` : ''
+      if (Buffer.byteLength(instructions) > maxInstructionBytes) {
+        throw new Error(`${label}: server instructions exceed maxInstructionBytes (${maxInstructionBytes})`)
       }
       await enqueueSync(generation, startup ? startupOpts : opts)
     } catch (error) {
@@ -515,6 +535,7 @@ export function startConnection(
       return
     }
     if (!isCurrent(generation)) return
+    serverInstructions = instructions
     connectedAt = Date.now()
     // A live connection closes the outage, so the next one earns its own
     // single post-401 renewal retry.
@@ -543,8 +564,32 @@ export function startConnection(
 
   return {
     ready,
+    instructions: () => serverInstructions,
+    resources: {
+      async request(request, exec): Promise<JsonValue> {
+        const generation = client
+        if (!generation || connectedAt === undefined) throw new Error(`${label}: server is disconnected`)
+        const options = { signal: exec.signal, timeout: config.toolCallTimeoutMs }
+        switch (request.method) {
+          case 'resources/list':
+            return await generation.listResources(
+              request.cursor === undefined ? undefined : { cursor: request.cursor }, options,
+            ) as JsonValue
+          case 'resources/templates/list':
+            return await generation.listResourceTemplates(
+              request.cursor === undefined ? undefined : { cursor: request.cursor }, options,
+            ) as JsonValue
+          case 'resources/read':
+            return await generation.readResource({ uri: request.uri }, options) as JsonValue
+          /* v8 ignore next 2 -- resource requests are the closed, typed tool operation union */
+          default:
+            return assertNever(request)
+        }
+      },
+    },
     async dispose(): Promise<void> {
       disposed = true
+      serverInstructions = ''
       if (reconnectTimer !== undefined) {
         clearTimeout(reconnectTimer)
         reconnectTimer = undefined

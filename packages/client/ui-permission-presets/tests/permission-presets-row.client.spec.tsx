@@ -9,6 +9,10 @@ import { PermissionRow, type PermissionRowProps } from '../src/client/Permission
 import { zh } from '../src/client/locales.ts'
 import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import { PermissionPresetSettingsController } from '../src/client/settings-store.ts'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
+
+// 每个 fixture 都带上 resources 插件合并进 GlobalStandardProps 的资源钩子。
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
 
 const schema = new SettingsSchemaService(new Context())
 
@@ -57,6 +61,7 @@ const runtime = {
   useSessions: (() => { throw new Error('unused') }) as never,
   useSessionPendingInteraction,
   useWorkspaces: (() => { throw new Error('unused') }) as never,
+  useResource,
 }
 
 function mount(controller: PermissionPresetSettingsController) {

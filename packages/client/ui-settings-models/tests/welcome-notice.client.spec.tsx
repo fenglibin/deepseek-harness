@@ -18,6 +18,10 @@ import {
   WELCOME_NOTICE_ACK_FIELD, WELCOME_NOTICE_SETTINGS_NAMESPACE,
   WELCOME_NOTICE_VERSION,
 } from '../src/onboarding-copy.ts'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
+
+// 每个 fixture 都带上 resources 插件合并进 GlobalStandardProps 的资源钩子。
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
 
 const WELCOME_NOTICE_COPY = {
   zh: { title: zh.welcomeTitle, body: zh.welcomeBody, continueLabel: zh.welcomeContinue },
@@ -89,6 +93,7 @@ function mount(
     useSessions: unusedHook,
     useSessionPendingInteraction,
     useWorkspaces: unusedHook,
+    useResource,
     controller,
     useWelcome: bindSnapshotSelector(controller.store),
     t: key => zh[key],

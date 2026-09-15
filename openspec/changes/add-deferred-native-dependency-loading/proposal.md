@@ -19,13 +19,14 @@
 - `encoding.ts` 保持 `import type { Sharp } from 'sharp'` 不变（它只做类型标注）
 - 新增 `tests/lazy-sharp-failure.spec.ts`，mock `../src/sharp.ts` 让 `requireSharp` 抛出，断言三个入口都原样传播该错误
 - 对 `koffi`、`node-pty`、`@xterm/headless` 做同类改造（详见 design.md 的适用范围判定）
+- 一并移植官方对 `terminal-bash` 启动失败清理路径的重构：`createSession()` 抛错时先 `terminal.terminate()` 回收那条尚未被任何会话拥有的 PTY（见 design.md 的 D6）
 - `sharp` 保持在 `dependencies`，不移入 `optionalDependencies`：它是必需依赖，只是加载时机被推迟
 
 ## 不做什么
 
 - 不改 `packages/api/terminal-controller`：本地没有该包（官方为新增包）
 - 不改 `benchmarks/package.json`：本地没有 `benchmarks/` 目录
-- 不改 `packages/experimental/webworker-runtime/tests/compile/transform-corpus-check.ts` 中 `koffi` 的 `BASELINE_EXEMPT` 条目（详见 design.md 的 D6 与「被拒绝的方案」）
+- `packages/experimental/webworker-runtime/tests/compile/transform-corpus-check.ts` 中 `koffi` 的 `BASELINE_EXEMPT` 条目按其必要性实测复核：改造后构建产物重建，完整 279 文件清扫报 `STALE EXEMPTION`（该条目只在文件仍无法导入时才合法），据此删除该条目及其顺序说明注释（详见 design.md 的 D6 与「被拒绝的方案」）
 - 不改 `packages/subprocess/subprocess-local/src/linux-execve.ts`：本地没有该文件（本地该包只有 6 个 src 文件，无 `linux-execve.ts`）
 - 不动本地既有的启动期堆水位机制：`packages/api/session-controller/src/heap-watch.ts` 与三个 `heapWatch*` 配置项、`run.sh` 中关于 `--heapsnapshot-near-heap-limit` 的注释都保持原样
 - 不改 `tsconfig.host.json` 的 leaf 结构、不改任何包依赖形状（除新增 `@deepseek-ai/dsh-lazy-require`）
@@ -37,6 +38,6 @@
 - `packages/subprocess/win32-process`：新增 `src/koffi.ts`；改 `src/ffi.ts`、`src/process.ts`、`package.json`、`tsconfig.json` 与 4 个测试
 - `packages/subprocess/subprocess-local`：改 `src/index.ts`、`src/windows-inspector.ts`、`package.json`、`tsconfig.json` 与 `tests/local.spec.ts`
 - `packages/sandbox/sandbox-windows-acl`：改 `src/ffi.ts`、`package.json`、`tsconfig.json` 与 `tests/index-failure-paths.spec.ts`
-- `packages/terminal/terminal-bash`：改 `src/session.ts`、`package.json`、`tsconfig.json`
+- `packages/terminal/terminal-bash`：改 `src/session.ts`（`@xterm/headless` 惰性加载）、`src/index.ts`（启动失败清理）、`package.json`、`tsconfig.json` 与 `tests/index.spec.ts`
 
 原生依赖的加载时机属于启动路径契约变更（l2）。

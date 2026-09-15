@@ -28,6 +28,27 @@ function spec(command: string, overrides: Partial<SubprocessSpawnSpec> = {}): Su
   }
 }
 
+/**
+ * 让隔离运行时里的 node-pty 解析到给定的 spawn 桩。
+ * node-pty 现在经 `@deepseek-ai/dsh-lazy-require` 返回的 loader 加载，所以 mock 点
+ * 从 `node-pty` 移到了该 helper 上；其余惰性 specifier 一律拒绝，避免测试默默拿到
+ * 未声明桩的真实依赖。
+ * @param spawn - node-pty 的 spawn 桩。
+ */
+function mockNodePtyForIsolatedRuntime(spawn: unknown): void {
+  vi.doMock('@deepseek-ai/dsh-lazy-require', () => ({
+    createLazyRequire: (specifier: string) => () => {
+      if (specifier === 'node-pty') return { spawn }
+      throw new Error(`unexpected lazy dependency ${specifier}`)
+    },
+  }))
+}
+
+/** 撤销 {@link mockNodePtyForIsolatedRuntime} 的 mock。 */
+function unmockLazyRequireForIsolatedRuntime(): void {
+  vi.doUnmock('@deepseek-ai/dsh-lazy-require')
+}
+
 describe('LocalSubprocessRuntime', () => {
   it('places the host-exit finalizer before listeners that predate the service', async () => {
     const baseline = new Set(process.listeners('exit'))
@@ -318,7 +339,7 @@ describe('LocalSubprocessRuntime', () => {
       kill: () => {},
     }
     vi.resetModules()
-    vi.doMock('node-pty', () => ({ spawn: () => terminal }))
+    mockNodePtyForIsolatedRuntime(() => terminal)
     vi.doMock('../src/process-inspector.ts', async importOriginal => ({
       ...await importOriginal<typeof import('../src/process-inspector.ts')>(),
       createProcessInspector: () => inspector,
@@ -338,7 +359,7 @@ describe('LocalSubprocessRuntime', () => {
       expect((service as unknown as { terminals: Set<SubprocessTerminalHandle> }).terminals.size).toBe(0)
       await fiber.dispose()
     } finally {
-      vi.doUnmock('node-pty')
+      unmockLazyRequireForIsolatedRuntime()
       vi.doUnmock('../src/process-inspector.ts')
       vi.resetModules()
     }
@@ -357,7 +378,7 @@ describe('LocalSubprocessRuntime', () => {
       kill: () => {},
     }
     vi.resetModules()
-    vi.doMock('node-pty', () => ({ spawn: () => terminal }))
+    mockNodePtyForIsolatedRuntime(() => terminal)
     try {
       const { default: IsolatedLocalSubprocessRuntime } = await import('../src/index.ts')
       const ctx = new Context()
@@ -387,7 +408,7 @@ describe('LocalSubprocessRuntime', () => {
       await fiber.dispose()
       expect(disposalErrors).toHaveLength(1)
     } finally {
-      vi.doUnmock('node-pty')
+      unmockLazyRequireForIsolatedRuntime()
       vi.resetModules()
     }
   })

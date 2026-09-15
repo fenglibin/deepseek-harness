@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { Context } from '@deepseek-ai/cordis'
 import {
   bindSnapshotSelector, conversationSnapshot, makeTranslate, sessionSnapshot, workspaceSnapshot,
@@ -23,6 +24,9 @@ import { ReadRow, readToolview } from '../src/client/tool/toolviews/read-row.tsx
 import { renderToolDetails, toolChatSnapshot, useEmptyTrajectory } from './tool-details-render.client.tsx'
 
 afterEach(cleanup)
+
+// 每个 fixture 都带上 resources 插件合并进 GlobalStandardProps 的资源钩子。
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
 
 const SID = 's1' as SessionId
 
@@ -304,6 +308,7 @@ describe('DetailsPanel Output section (read)', () => {
         useSession={bindSnapshotSelector(session)}
         useSessions={bindSnapshotSelector(sessions)}
         useSessionPendingInteraction={bindSnapshotSelector(attention)}
+        useResource={useResource}
         useWorkspaces={bindSnapshotSelector(workspaces)}
         useConversation={bindSnapshotSelector(conversation)}
         useChat={bindSnapshotSelector({ getSnapshot: () => snapshot, subscribe: () => () => {} })}

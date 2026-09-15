@@ -25,6 +25,15 @@
       "path": "../../core/scope"
     },
     {
+      "path": "../../core/system-prompt"
+    },
+    {
+      "path": "../mcp-resources"
+    },
+    {
+      "path": "../../util/values"
+    },
+    {
       "path": "../../subprocess/subprocess"
     },
     {

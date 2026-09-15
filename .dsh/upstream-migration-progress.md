@@ -35,10 +35,10 @@
 | 4 | `refactor-experimental-release-policy` | ✅ 完成并提交 | 53 测试通过；四项发布判据逐元素相同 |
 | 5 | `update-session-projection-view-gate` | ✅ 完成并提交 | **509 测试通过**（含 host spec） |
 | 6 | `add-agent-loop-message-freeze-reuse` | ✅ 完成并提交 | 3 个新测试，**守卫已验证**：无优化时失败（spread 23>4），有优化时通过 |
-| 7 | `add-typert-lazy-schema-materialization` | ⬜ 未开始 | — |
-| 8 | `add-lazy-require-utility` | ⬜ 未开始 | — |
+| 7 | `add-typert-lazy-schema-materialization` | ✅ 完成并提交 | 500 测试通过（2 个 cordis-catalog 预先存在失败已对照确认） |
+| 8 | `add-lazy-require-utility` | ✅ 完成并提交 | 2 个新测试 + 依赖门禁 17 测试 |
 | 9 | `add-deferred-native-dependency-loading` | ⬜ 未开始 | — |
-| 10 | `update-slash-menu-shared-ranker` | ⬜ 未开始 | — |
+| 10 | `update-slash-menu-shared-ranker` | ✅ 完成并提交 | 702 测试通过；行为增强已实测验证 |
 | 11 | `add-archived-sessions-page` | ⬜ 未开始 | — |
 | 12 | `add-client-keyed-standard-hooks` | ⬜ 未开始 | — |
 | 13 | `add-mcp-resource-access` | ⬜ 未开始 | — |
@@ -56,6 +56,9 @@
 - `65f05222fa` 变更 6（消息冻结复用）
 - `5fdbc42fce` 变更 5（投影 view 引用闸门）+ debris 清理
 - `4a1fec02f3` 恢复被误删的 47 个手写 `.d.ts`
+- `f3e7a491b0` 变更 7（typert 惰性 schema + 产物清理）
+- `38f791b8c7` 变更 8（lazy-require 原语 + 依赖识别）
+- `3528c3a166` 变更 10（共享名称排序器）
 
 ## 已知的非本次引入问题（清理 debris 后需重新评估，勿轻信此前结论）
 
@@ -65,6 +68,12 @@
 - `scripts/verify-agent-note-format.ts`：2 条既有 note 格式违规。
 - `scripts/check-workspace-constraints.ts`：6 条错误（版本号与 `files` 字段）。
 - 快照套件 92 个失败：会话录制内含 record 时冻结的旧 header 文本 + fork 自建 `tool-delivery` 通知未进入录制；修复需真实 API 重录（`DSH_SNAPSHOT=record`），本地无 `DEEPSEEK_API_KEY`。
+
+## 进行中（子代理）
+
+- 变更 9 `add-deferred-native-dependency-loading`
+- 变更 12 `add-client-keyed-standard-hooks` 与 13 `add-mcp-resource-access`
+- 变更 11 `add-archived-sessions-page`（竞态守卫已由我完成，页面包交给子代理）
 
 ## 待收尾事项
 

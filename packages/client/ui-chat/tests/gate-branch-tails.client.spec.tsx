@@ -9,7 +9,7 @@ import type {
 } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { SessionProviderComponent } from '@deepseek-ai/dsh-client-ui-slots'
+import type { GlobalStandardProps, SessionProviderComponent } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionPendingInteractionSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
 import { EMPTY_CONVERSATION_SNAPSHOT } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {
@@ -22,6 +22,9 @@ import { StatsLine } from '../src/client/chat/StatsLine.tsx'
 import { DetailsPanel } from '../src/client/details/DetailsPanel.tsx'
 import { zh } from '../src/client/locale.ts'
 import { chatSnapshotFixture } from './chat-snapshot-fixture.client.ts'
+
+// 每个 fixture 都带上 resources 插件合并进 GlobalStandardProps 的资源钩子。
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
 
 const t: AssistantMarkdownProps['t'] = makeTranslate(zh, commonZh)
 const renderMessageImages: AssistantMarkdownProps['renderMessageImages'] = () => null
@@ -149,6 +152,7 @@ describe('render branch tails', () => {
           createSnapshotStore<SessionPendingInteractionSnapshot>(new Map()),
         )}
         useWorkspaces={bindSnapshotSelector(workspaces)}
+        useResource={useResource}
         useProjection={(() => undefined)}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{
@@ -210,6 +214,7 @@ describe('render branch tails', () => {
           createSnapshotStore<SessionPendingInteractionSnapshot>(new Map()),
         )}
         useWorkspaces={bindSnapshotSelector(workspaces)}
+        useResource={useResource}
         useProjection={(() => undefined)}
         useInput={(() => { throw new Error('unused') })}
         inputActions={{

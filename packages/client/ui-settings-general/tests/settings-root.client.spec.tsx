@@ -6,6 +6,10 @@ import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import type { SettingsRootComponentProps } from '../src/client/shell-contract.ts'
 import { SettingsRoot } from '../src/client/SettingsRoot.tsx'
 import { zh } from '../src/client/locales.ts'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
+
+// 每个 fixture 都带上 resources 插件合并进 GlobalStandardProps 的资源钩子。
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
 
 afterEach(() => {
   cleanup()
@@ -73,6 +77,7 @@ function mount({
     useSessions,
     useSessionPendingInteraction,
     useWorkspaces: unusedHook,
+    useResource,
     wide,
     reconnect,
     t: makeTranslate(zh),
@@ -251,19 +256,20 @@ describe('SettingsPanel navigation', () => {
         { id: 'models', order: 10, label: '模型' },
         { id: 'agent-presets', order: 20, label: 'Agent 预设' },
         { id: 'plugins', order: 30, label: '插件' },
-        { id: 'contributed', order: 40, label: 'Contributed' },
+        { id: 'archived-sessions', order: 40, label: '已归档会话' },
+        { id: 'contributed', order: 50, label: 'Contributed' },
       ],
     })
     openPanel()
     // Glyphs carry no id of their own, so the drawn paths are what tells them apart.
-    const glyphs = ['通用设置', '模型', 'Agent 预设', '插件', 'Contributed']
+    const glyphs = ['通用设置', '模型', 'Agent 预设', '插件', '已归档会话', 'Contributed']
       .map(name => screen.getByRole('button', { name }).querySelector('svg')?.innerHTML)
 
     expect(glyphs.every(glyph => glyph !== undefined && glyph !== '')).toBe(true)
-    // The three ids the shell names get their own glyph; every other section —
+    // The four ids the shell names get their own glyph; every other section —
     // including one this package never heard of — shares the gear.
-    expect(new Set(glyphs.slice(0, 4)).size).toBe(4)
-    expect(glyphs[4]).toBe(glyphs[0])
+    expect(new Set(glyphs.slice(0, 5)).size).toBe(5)
+    expect(glyphs[5]).toBe(glyphs[0])
   })
 
   it('switches the rendered section on nav click', () => {

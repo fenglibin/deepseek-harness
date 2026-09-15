@@ -19,7 +19,7 @@ const SECTION_ORDER_NAMES = [
   'TOOL_PWSH', 'TOOL_READ', 'TOOL_WRITE', 'TOOL_EDIT', 'TOOL_GLOB',
   'TOOL_GREP', 'TOOL_JOBS', 'TOOL_PTY', 'TOOL_WEB_SEARCH', 'TOOL_WEB_FETCH',
   'TOOL_LSP', 'TOOL_SESSION_QUERY', 'TOOL_GOAL', 'TOOL_DELIVERY', 'TOOL_CORDIS', 'TOOL_WORKFLOW',
-  'TOOL_RALPH', 'TOOL_SUBAGENT', 'TOOL_REPORT', 'TOOLS_SDK',
+  'TOOL_RALPH', 'TOOL_SUBAGENT', 'TOOL_REPORT', 'MCP_SERVERS', 'TOOLS_SDK',
   'DELIVERABLE_FILE_REFERENCES', 'STRUCTURED_OUTPUT',
 ] as const satisfies readonly PromptSectionOrderName[]
 const CONTEXT_ORDER_NAMES = [
@@ -467,6 +467,53 @@ describe('SystemPrompt', () => {
 
     dispose()
     expect((await ctx.systemPrompt.assemble()).tools).toHaveLength(0)
+  })
+
+  describe('section interpolation opt-out', () => {
+    it('keeps {{name}} literal and does not throw for a section registered with interpolate: false', async () => {
+      const ctx = new Context()
+      await ctx.plugin(SystemPrompt)
+      ctx.systemPrompt.section({
+        name: 'mcp:server',
+        order: ctx.systemPrompt.getSectionOrder('MCP_SERVERS'),
+        text: 'Use {{planner}} notation — no variable is registered for it.',
+        interpolate: false,
+      })
+
+      const assembled = await ctx.systemPrompt.assemble()
+      const section = assembled.sections.find(entry => entry.name === 'mcp:server')
+      expect(section).toMatchObject({ interpolate: false })
+      expect(renderPrompt(assembled)).toContain('Use {{planner}} notation — no variable is registered for it.')
+    })
+
+    it('leaves a section without the field interpolating exactly as before', async () => {
+      const ctx = new Context()
+      await ctx.plugin(SystemPrompt)
+      ctx.systemPrompt.section({ name: 'plain', order: 0, text: 'in {{cwd}}' })
+      ctx.systemPrompt.variable('cwd', () => '/work')
+
+      const assembled = await ctx.systemPrompt.assemble()
+      const section = assembled.sections.find(entry => entry.name === 'plain')
+      expect(section).not.toHaveProperty('interpolate')
+      expect(renderPrompt(assembled)).toBe(`${IDENTITY}\n\nin /work`)
+    })
+
+    it('still reports an unknown variable for a section that keeps interpolation', async () => {
+      const ctx = new Context()
+      await ctx.plugin(SystemPrompt)
+      ctx.systemPrompt.section({ name: 'plain', order: 0, text: 'in {{nope}}' })
+      await expect(async () => renderPrompt(await ctx.systemPrompt.assemble()))
+        .rejects.toThrow('unknown prompt variable "{{nope}}" in section "plain"')
+    })
+
+    it('places MCP_SERVERS after the tool sections and before TOOLS_SDK', async () => {
+      const ctx = new Context()
+      await ctx.plugin(SystemPrompt)
+      const order = ctx.systemPrompt.getSectionOrder('MCP_SERVERS')
+      expect(Number.isInteger(order)).toBe(true)
+      expect(order).toBeGreaterThan(ctx.systemPrompt.getSectionOrder('TOOL_REPORT'))
+      expect(order).toBeLessThan(ctx.systemPrompt.getSectionOrder('TOOLS_SDK'))
+    })
   })
 
   describe('prompt variables', () => {

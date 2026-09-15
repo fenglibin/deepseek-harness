@@ -60,23 +60,23 @@
 
 值得注意的是两者方向一致：本地明确拒绝近限快照，理由是"把一次留下 FATAL ERROR 与水位的崩溃，变成既不留错误也不留水位的无界停顿"。延迟加载减少的是启动期的原生初始化开销，同样属于"不制造停顿"这一类。
 
-### D6 只移植与延迟加载直接相关的改动
+### D6 同时移植 `terminal-bash` 的启动失败清理
 
-官方该提交还顺带改了 `packages/terminal/terminal-bash/src/index.ts` 的启动失败清理路径：把 `createSession()` 包进 `try`，失败时先 `terminal.terminate()` 再抛出，并抽出 `rejectAfterStartupCleanup()` 保证未发布资源到达静止后才拒绝。本地该文件是旧版（`spawn` 里直接 `createSession` 然后 `try` startup）。
+官方该提交还改了 `packages/terminal/terminal-bash/src/index.ts` 的启动失败清理路径：把 `createSession()` 包进 `try`，失败时先 `terminal.terminate()` 再抛出，并抽出 `rejectAfterStartupCleanup()` 保证未发布资源到达静止后才拒绝。本变更一并移植。
 
-这项改动与延迟加载无关，它是"启动失败时未发布的 PTY 也要回收"的独立健壮性修复，本地若要引入应作为独立变更评估，理由是它改变的是失败路径的资源所有权，而不是加载时机。本变更不夹带它。
+它与延迟加载分属两个关注点（一个改加载时机，一个改失败路径的资源所有权），但改动落在同一个文件与同一条启动路径上，拆分会让 `src/index.ts` 在两处被先后改写。这条修复补的是一条真实泄漏路径：只做延迟加载时，`createSession()` 抛出后那条已经创建的 PTY 没有任何所有者会回收它，直到进程退出。
+
+`rejectAfterStartupCleanup()` 同时统一了两条失败路径的清理结算方式——`createSession` 失败走 `terminal.terminate()`，`startupSession` 失败走 `session.close()`——并保留原有的 `TerminalBackendCleanupError` 聚合语义。
 
 同理，官方新增的 `tests/lazy-sharp-failure.spec.ts` 中 `normalizeImage` 用例传入了 `depth: 'ushort'` 的 PNG 事实，用于触发编码路径。本地 `normalizeImage` 的签名与 `DetectedImage` 字段与官方一致，用例可照搬。
 
 ## 被拒绝的方案
 
-**把 `packages/experimental/webworker-runtime/tests/compile/transform-corpus-check.ts` 的 `koffi` 条目一并删除**：官方删除它，是因为改造后 `win32-process` 不再在模块加载期注册 koffi 类型名，第二次加载不再冲突。本地该文件确实有同一行 `['packages/subprocess/win32-process/lib/index.js', 'koffi type-name collision on a second load']`，但**能否删除取决于改造后该冲突是否真的消失**——而该语料检查扫的是构建产物 `lib/`，必须在本变更的源码改造完成、产物重建后实测确认。因此本变更把它列为待验证项：先按 D4 完成改造，再实测该条目是否仍必要，必要则保留并更新注释，不必要才删除。凭官方删了就跟着删，会把一条真实存在的豁免改成静默失效。
+**凭官方删了就跟着删 `koffi` 语料豁免条目**：官方删除它，是因为改造后 `win32-process` 不再在模块加载期注册 koffi 类型名，第二次加载不再冲突。本地该文件确实有同一行 `['packages/subprocess/win32-process/lib/index.js', 'koffi type-name collision on a second load']`，但**能否删除取决于改造后该冲突是否真的消失**——该语料检查扫的是构建产物 `lib/`，因此判定必须发生在源码改造完成、产物重建之后。本变更按此执行实测：`npm run build:lib:host` 重建产物后，完整 279 文件清扫报 `STALE EXEMPTION packages/subprocess/win32-process/lib/index.js`（该检查在两个方向上把关——一个变成可导入的条目必须离开列表），据此删除该条目与它的顺序说明注释；删除后清扫为 276 ok / 3 exempt / 0 findings。凭官方删了就跟着删而不实测，会把一条仍然必要的豁免改成静默失效。
 
 **把 `sharp` 移到 `optionalDependencies`**：与 D3 冲突。
 
 **把 `requireSharp()` 放进既有 `try`**：与 D1 冲突，会把环境故障误报为数据故障。
-
-**顺带移植 `terminal-bash` 的启动清理重构**：与 D6 冲突，属于另一个变更。
 
 **覆盖或替换本地 `heap-watch` 与 `run.sh` 的堆策略**：与 D5 冲突。官方没有对应机制，无从"移植"。
 

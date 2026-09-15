@@ -6,6 +6,8 @@ Status: implemented
 
 启动路径上被静态导入的原生依赖会在进程启动时付出初始化成本，即使当次运行从未使用该功能。`packages/attachment/attachment-local` 的静态 `import sharp` 就是这类：只要挂载该插件就加载原生模块，而许多会话从不处理图片。
 
+本记录拥有工具本身与它的成本论证；把这些依赖逐项改为惰性加载所涉及的失败位置契约与适用范围判定，由[原生依赖改为按需加载](2026-09-15-deferred-native-dependency-loading.zh.md)拥有。
+
 把这些依赖改成动态 `import()` 需要调用方自己写异步 factory，并在每个使用点处理 Promise——而真实的加载点是同步的。手工写成 `let cached` 加 `createRequire` 的模板会在每个消费方重复一遍，且容易写错解析基准。
 
 ## Decision

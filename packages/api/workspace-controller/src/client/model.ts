@@ -63,6 +63,8 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
   private orderFrameGeneration = 0
   /** Last complete order accepted from a baseline, increment, or current unary echo. */
   private committedOrder: WorkspaceId[] = []
+  /** 最新的归档集合请求；更新的请求或推送回来的集合会作废它。 */
+  private archiveRequestSeq = 0
   /** Host Workspace ids are never reused, so delayed data cannot resurrect a removed row. */
   private readonly removedIds = new Set<WorkspaceId>()
   private readonly listeners = new Set<() => void>()
@@ -159,27 +161,35 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
 
   /**
    * Archive one Session and install the returned complete archive set.
+   * 被更新的归档请求或推送回来的集合作废的回复不安装任何东西。
    * @param sessionId - Session to archive.
    * @returns generated Remote result.
    */
   async archiveSession(
     sessionId: WorkspaceArchiveSessionRequest['sessionId'],
   ): Promise<RemoteResult<WorkspaceArchiveValue>> {
+    const requestSeq = ++this.archiveRequestSeq
     const result = await this.remote.archiveSession({ sessionId })
-    if (result.ok) this.installArchived(result.value.archivedSessionIds)
+    if (result.ok && requestSeq === this.archiveRequestSeq) {
+      this.installArchived(result.value.archivedSessionIds)
+    }
     return result
   }
 
   /**
    * Unarchive one Session and install the returned complete archive set.
+   * 被更新的归档请求或推送回来的集合作废的回复不安装任何东西。
    * @param sessionId - Session to return to the grouping surfaces.
    * @returns generated Remote result.
    */
   async unarchiveSession(
     sessionId: WorkspaceArchiveSessionRequest['sessionId'],
   ): Promise<RemoteResult<WorkspaceArchiveValue>> {
+    const requestSeq = ++this.archiveRequestSeq
     const result = await this.remote.unarchiveSession({ sessionId })
-    if (result.ok) this.installArchived(result.value.archivedSessionIds)
+    if (result.ok && requestSeq === this.archiveRequestSeq) {
+      this.installArchived(result.value.archivedSessionIds)
+    }
     return result
   }
 
@@ -189,6 +199,7 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
    */
   replaceBaseline(baseline: WorkspaceBaseline): void {
     this.orderFrameGeneration++
+    this.archiveRequestSeq++
     this.installViews(baseline.items)
     this.installArchived(baseline.archivedSessionIds)
     this.state = 'idle'
@@ -218,6 +229,7 @@ export class ClientWorkspaceModel implements WorkspaceFollowSink {
    * @param archivedSessionIds - complete Host-confirmed archive set.
    */
   replaceArchived(archivedSessionIds: WorkspaceArchiveValue['archivedSessionIds']): void {
+    this.archiveRequestSeq++
     this.installArchived(archivedSessionIds)
   }
 

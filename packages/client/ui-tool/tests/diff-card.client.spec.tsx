@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   bindSnapshotSelector, conversationSnapshot, sessionSnapshot, workspaceSnapshot,
 } from '@deepseek-ai/dsh-client-test-runtime'
@@ -25,6 +26,9 @@ import { zh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.t
 import { zh as chatZh } from '@deepseek-ai/dsh-client-ui-chat/src/client/locale.ts'
 
 afterEach(cleanup)
+
+// 每个 fixture 都带上 resources 插件合并进 GlobalStandardProps 的资源钩子。
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
 
 type FileMutationRowProps = Parameters<typeof FileMutationRow>[0]
 
@@ -496,6 +500,7 @@ describe('DetailsPanel diff Output section', () => {
         useSession={bindSnapshotSelector(session)}
         useSessions={bindSnapshotSelector(sessions)}
         useSessionPendingInteraction={bindSnapshotSelector(attention)}
+        useResource={useResource}
         useWorkspaces={bindSnapshotSelector(workspaces)}
         useConversation={bindSnapshotSelector(conversation)}
         useChat={bindSnapshotSelector({ getSnapshot: () => snapshot, subscribe: () => () => {} })}

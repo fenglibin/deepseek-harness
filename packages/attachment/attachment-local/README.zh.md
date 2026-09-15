@@ -94,6 +94,7 @@ kind: "package-reference"
 | [`src/normalization.ts`](src/normalization.ts) + [`src/encoding.ts`](src/encoding.ts) | 提供方无关的规范化与有界格式／质量候选 |
 | [`src/request-image.ts`](src/request-image.ts) | 路由专用请求变换、缓存身份与 singleflight |
 | [`src/image.ts`](src/image.ts) | 完整光栅解码与元数据校验 |
+| [`src/sharp.ts`](src/sharp.ts) | 按调用方解析的 `sharp` 惰性加载，使挂载本插件不加载原生绑定 |
 | [`src/invariant.ts`](src/invariant.ts) | 不变式伴生插件（无运行时不变式；不可变写入与校验读取在后端边界直接强制） |
 
 </details>

@@ -327,6 +327,53 @@ describe('ClientWorkspaceModel', () => {
     expect(model.getSnapshot().archivedSessionIds).toEqual([])
   })
 
+  it('installs an archive set only from the latest request or push', async () => {
+    const remote = new FakeWorkspaceRemote()
+    const model = modelFor(remote)
+    baseline(model, [workspace('one')], [sid('archived')])
+
+    // 陈旧回复：先发出的取消归档被后发出的归档请求超越，它到达时不得安装自己的集合。
+    const staleGate = deferred<RemoteResult<WorkspaceArchiveValue>>()
+    const freshGate = deferred<RemoteResult<WorkspaceArchiveValue>>()
+    remote.onUnarchiveSession = () => staleGate.promise
+    remote.onArchiveSession = () => freshGate.promise
+    const stale = model.unarchiveSession(sid('archived'))
+    const fresh = model.archiveSession(sid('fresh'))
+    freshGate.resolve(remoteOk({ archivedSessionIds: [sid('archived'), sid('fresh')] }))
+    await expect(fresh).resolves.toMatchObject({ ok: true })
+    expect(model.getSnapshot().archivedSessionIds).toEqual(['archived', 'fresh'])
+    staleGate.resolve(remoteOk({ archivedSessionIds: [] }))
+    await expect(stale).resolves.toMatchObject({ ok: true })
+    expect(model.getSnapshot().archivedSessionIds).toEqual(['archived', 'fresh'])
+
+    // 推送增量：增量先于在途一元回复到达，回复到达时集合保持为推送的值。
+    const pushedGate = deferred<RemoteResult<WorkspaceArchiveValue>>()
+    remote.onArchiveSession = () => pushedGate.promise
+    const inflight = model.archiveSession(sid('later'))
+    model.replaceArchived([sid('pushed')])
+    expect(model.getSnapshot().archivedSessionIds).toEqual(['pushed'])
+    pushedGate.resolve(remoteOk({
+      archivedSessionIds: [sid('archived'), sid('fresh'), sid('later')],
+    }))
+    await expect(inflight).resolves.toMatchObject({ ok: true })
+    expect(model.getSnapshot().archivedSessionIds).toEqual(['pushed'])
+
+    // 基线替换与推送增量同权：重建的一元回复不得覆盖完整基线。
+    const baselineGate = deferred<RemoteResult<WorkspaceArchiveValue>>()
+    remote.onArchiveSession = () => baselineGate.promise
+    const abandoned = model.archiveSession(sid('late'))
+    baseline(model, [workspace('one')], [sid('baseline')])
+    expect(model.getSnapshot().archivedSessionIds).toEqual(['baseline'])
+    baselineGate.resolve(remoteOk({ archivedSessionIds: [sid('late')] }))
+    await expect(abandoned).resolves.toMatchObject({ ok: true })
+    expect(model.getSnapshot().archivedSessionIds).toEqual(['baseline'])
+
+    // 没有更新的请求或推送时，回复中的集合正常安装。
+    remote.onUnarchiveSession = () => Promise.resolve(remoteOk({ archivedSessionIds: [] }))
+    await expect(model.unarchiveSession(sid('baseline'))).resolves.toMatchObject({ ok: true })
+    expect(model.getSnapshot().archivedSessionIds).toEqual([])
+  })
+
   it('keeps the newest row and places Workspaces missing from partial orders last', async () => {
     const model = modelFor()
     baseline(model, [

@@ -29,6 +29,19 @@ kind: "package-library"
 
 每个已注册组件都会收到由四个 share 组合而成的 props：运行时 share（父级 renderSlot 调用点的 `owner`，加上会话标准工具包与全局席位）、child render share（静态缩窄到已声明 children key 的 `renderSlot`）、store share（已声明 handle 的 selector 钩子与移除 draft 的 actions），以及业务 share（从 `inject` factory 返回值推断）。组件引用 `ComposedProps`；它们绝不在本地重新输入任何 share。
 
+### inject 的两个分区
+
+inject face 有两个保留分区，都在组件 props 上合成 `use<Name>` 钩子，且原分区本身不会到达组件：
+
+- `hooks`——固定名源（`HooksSources`），每个成员合成为 `use<Name>(selector, equal?)`，快照类型从源推断（`PropsHooks`）。
+- `keyedHooks`——开放 key 族（`KeyedHooksSources`），每个成员合成为 `use<Name>(key)`（`PropsKeyedHooks`）：既可直接以 key 调用并返回该 key 的当前值或 `undefined`，也可传入选择器与可选相等函数、返回选择结果（`KeyedSnapshotSelectorHook`）。按 key 订阅使一个 key 的变化不会触发只读其他 key 的组件。
+
+`InjectFace` 因此是三分支的：两个分区都在、只有 `hooks`、只有 `keyedHooks`，其余原样透传。未声明 `keyedHooks` 的面合成结果与本分区引入前完全一致。绑定属于渲染层（见 [ui-renderer](../ui-renderer/README.zh.md)）。
+
+### 资源协议合并点
+
+`ResourceProtocolMap` 在本包声明为空，是「URL scheme → 该协议的值类型」的零依赖合并点：协议属主（例如工作区文件）在此合并自己的成员，消费方以 `useResource<P>(address)` 按 `P` 收窄值的类型，而无需依赖资源实现包。资源服务本身与 `useResource` 标准钩子由 [resources](../resources/README.zh.md) 提供。
+
 ### Store 席位
 
 register 调用可以用 `store: defineStore(...)` 声明 store 席位：`init` 推断状态 schema，`actions` 是完整的 draft-transform 写入集合。组件经 selector 钩子读取、经烘焙回调写入；`defineStore` 的引擎实现位于 runtime 包，并满足这里导出的 `DefineStore` 约定。

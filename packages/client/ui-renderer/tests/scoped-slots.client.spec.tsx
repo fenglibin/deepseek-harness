@@ -1009,6 +1009,66 @@ describe('inject: execution point, parameter derivation, cache granularity', () 
     expect(seen.at(-1)!['read']).toBe('hot')
   })
 
+  it('binds an inject keyedHooks compartment into use<Name>(key) selector hooks', () => {
+    const h = makeHost()
+    h.declare('k.single', SINGLE_ROOT)
+    const first = observable('one-a')
+    const second = observable('two-a')
+    const byKey = new Map<string, ReturnType<typeof observable<string>>>([['one', first], ['two', second]])
+    const seen: Record<string, unknown>[] = []
+    h.add('k.single', {
+      component: (props: {
+        useFeed?: {
+          (key: string): string | undefined
+          <S>(key: string, selector: (value: string | undefined) => S): S
+        }
+        keyedHooks?: unknown
+        plain?: string
+      }) => {
+        seen.push({
+          keyedHooks: props.keyedHooks,
+          plain: props.plain,
+          // 直接调用返回当前值；选择器形式返回投影值。
+          raw: props.useFeed!('one'),
+          projected: props.useFeed!('two', value => value?.toUpperCase()),
+          absent: props.useFeed!('missing'),
+        })
+        return null
+      },
+      inject: () => ({ plain: 'kept', keyedHooks: { feed: (key: string) => byKey.get(key) } }),
+    })
+    mountRoot(h, { 'k.single': SINGLE_ROOT }, renderSlot => renderSlot('k.single', {}))
+    // 原始分区由绑定层消费；普通成员原样透传。
+    expect(seen.at(-1)).toEqual({
+      keyedHooks: undefined, plain: 'kept', raw: 'one-a', projected: 'TWO-A', absent: undefined,
+    })
+    // 只有被读取的那个 key 变化时才重新渲染。
+    act(() => { second.set('two-b') })
+    expect(seen.at(-1)!['projected']).toBe('TWO-B')
+    expect(seen.at(-1)!['raw']).toBe('one-a')
+    const renders = seen.length
+    act(() => { first.set('one-b') })
+    expect(seen.length).toBe(renders + 1)
+    expect(seen.at(-1)!['raw']).toBe('one-b')
+  })
+
+  it('passes a face with neither compartment through unchanged', () => {
+    const h = makeHost()
+    h.declare('k.single', SINGLE_ROOT)
+    const seen: Record<string, unknown>[] = []
+    h.add('k.single', {
+      component: (props: Record<string, unknown>) => { seen.push(props); return null },
+      inject: () => ({ plain: 'kept' }),
+    })
+    mountRoot(h, { 'k.single': SINGLE_ROOT }, renderSlot => renderSlot('k.single', {}))
+    const props = seen.at(-1)!
+    expect(props['plain']).toBe('kept')
+    // 未声明两个分区时既不留下原分区，也不合成任何由它们派生的 use<Name> 钩子。
+    expect('hooks' in props).toBe(false)
+    expect('keyedHooks' in props).toBe(false)
+    expect('useFeed' in props).toBe(false)
+  })
+
   it('session inject receives sessionId and caches per (entry x session): switch-back reuses', () => {
     const h = makeHost()
     h.declare('k.session', SINGLE_SESSION)

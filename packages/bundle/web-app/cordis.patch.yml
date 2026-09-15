@@ -217,6 +217,10 @@
     - id: ui-settings-plugin-inventory
       name: '@deepseek-ai/dsh-client-ui-settings-plugin-inventory'
 
+    # 已归档会话设置页：归档集合的恢复入口，每行一个取消归档操作。
+    - id: ui-settings-unarchive-sessions
+      name: '@deepseek-ai/dsh-client-ui-settings-unarchive-sessions'
+
     - id: ui-settings-skills
       name: '@deepseek-ai/dsh-client-ui-settings-skills'
 

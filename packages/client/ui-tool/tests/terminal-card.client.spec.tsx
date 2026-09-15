@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   bindSnapshotSelector, conversationSnapshot, sessionSnapshot, workspaceSnapshot,
 } from '@deepseek-ai/dsh-client-test-runtime'
@@ -32,6 +33,9 @@ const enT: GenericToolCardProps['t'] = makeTranslate(zh, commonEn)
 const chatT = makeTranslate(chatZh, commonZh)
 
 afterEach(cleanup)
+
+// 每个 fixture 都带上 resources 插件合并进 GlobalStandardProps 的资源钩子。
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
 
 /**
  * Match an output line with its interior whitespace intact: the column
@@ -589,6 +593,7 @@ describe('DetailsPanel Output section', () => {
         useSession={bindSnapshotSelector(session)}
         useSessions={bindSnapshotSelector(sessions)}
         useSessionPendingInteraction={bindSnapshotSelector(attention)}
+        useResource={useResource}
         useWorkspaces={bindSnapshotSelector(workspaces)}
         useConversation={bindSnapshotSelector(conversation)}
         useChat={bindSnapshotSelector({ getSnapshot: () => snapshot, subscribe: () => () => {} })}
@@ -777,6 +782,7 @@ describe('DetailsPanel Output section', () => {
             subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
           }))}
         useSessionPendingInteraction={bindSnapshotSelector(attention)}
+        useResource={useResource}
         useWorkspaces={bindSnapshotSelector(workspaces)}
         useConversation={bindSnapshotSelector(conversation)}
         useChat={bindSnapshotSelector({ getSnapshot: () => snap, subscribe: () => () => {} })}

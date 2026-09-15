@@ -16,6 +16,10 @@ function derivedDocumentStore(remote: object) {
   return new SettingsDocumentStore(ctx, new SettingsDescribeMirror(ctx))
 }
 import { zh } from '../src/client/locales.ts'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
+
+// 每个 fixture 都带上 resources 插件合并进 GlobalStandardProps 的资源钩子。
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
 
 afterEach(cleanup)
 
@@ -28,7 +32,7 @@ const unusedHook = (() => { throw new Error('unused by settings-general componen
 type AttentionSnapshot = Parameters<Parameters<TriggerContentProps['useSessionPendingInteraction']>[0]>[0]
 const noAttention: AttentionSnapshot = new Map()
 const useSessionPendingInteraction: TriggerContentProps['useSessionPendingInteraction'] = selector => selector(noAttention)
-const kit = { useSessions: unusedHook, useSessionPendingInteraction, useWorkspaces: unusedHook }
+const kit = { useSessions: unusedHook, useSessionPendingInteraction, useWorkspaces: unusedHook, useResource }
 
 describe('chrome content', () => {
   it('TriggerContent renders the icon with the label in the wide column', () => {

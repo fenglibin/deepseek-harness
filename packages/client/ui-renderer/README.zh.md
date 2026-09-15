@@ -51,6 +51,10 @@ kind: "package-reference"
 
 `createSlotRenderer` 把 slot 注册表连接到 React：条目列表成为响应式 source，每个 outlet 经已安装的渲染器渲染。每个条目渲染在各自的 error boundary 内，因此单次崩溃被就地隔离：boundary 打印 slot key 并上报给注册表，outlet 重新投影到该 cell 的下一个存活条目——退休只对崩溃发生时正在渲染的 Session 生效。崩溃占位在 official 构建中是纯粹的 `[data-slot-error]` 标记元素，本地构建会渲染出带 slot key 的可见占位，让开发期能直接看到树上的空洞。业务插件通过带类型的 slot `hooks` 传递裸 observable source；渲染器经 uSES 适配器在 outlet 处完成绑定。
 
+### inject 分区的绑定
+
+一个 entry 自有的 inject face 在 outlet 处归一化：`hooks` 分区绑定为 `use<Name>(selector, equal?)`，`keyedHooks` 分区绑定为 `use<Name>(key)`（按 key 订阅，可行的话再传选择器与相等函数）。两类源都由同一套按源缓存的钩子工厂产生，因此同一源在多次绑定间复用同一个钩子实例，不新增订阅。绑定在 entry 级的既有 cache 轴上完成，未声明 `keyedHooks` 的 entry 结果不变。
+
 ### 身份
 
 React、React DOM、Cordis、ui-slots 与 ui-primitives 通过 Web 外壳的静态模块表保持同一浏览器身份；本包则以动态客户端 bundle 到达。

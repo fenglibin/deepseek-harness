@@ -2,6 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   bindSnapshotSelector, conversationSnapshot, sessionSnapshot, workspaceSnapshot,
 } from '@deepseek-ai/dsh-client-test-runtime'
@@ -25,6 +26,9 @@ import { renderToolDetails, toolChatSnapshot, useEmptyTrajectory } from './tool-
 type SearchRowProps = Parameters<typeof SearchRow>[0]
 
 afterEach(cleanup)
+
+// 每个 fixture 都带上 resources 插件合并进 GlobalStandardProps 的资源钩子。
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
 
 const t: GenericToolCardProps['t'] = makeTranslate(zh, commonZh)
 const chatT = makeTranslate(chatZh, commonZh)
@@ -388,6 +392,7 @@ describe('DetailsPanel Output section (search)', () => {
         useSession={bindSnapshotSelector(session)}
         useSessions={bindSnapshotSelector(sessions)}
         useSessionPendingInteraction={bindSnapshotSelector(attention)}
+        useResource={useResource}
         useWorkspaces={bindSnapshotSelector(workspaces)}
         useConversation={bindSnapshotSelector(conversation)}
         useChat={bindSnapshotSelector({ getSnapshot: () => snapshot, subscribe: () => () => {} })}

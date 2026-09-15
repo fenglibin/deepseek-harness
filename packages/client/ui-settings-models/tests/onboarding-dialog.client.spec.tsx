@@ -13,6 +13,10 @@ import { ModelsSettingsStore } from '../src/client/store.ts'
 import { createModelsOperations } from '../src/client/operations.ts'
 import { zh } from '../src/client/locales.ts'
 import { settingsSchema } from './settings-schema.client.ts'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
+
+// 每个 fixture 都带上 resources 插件合并进 GlobalStandardProps 的资源钩子。
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
 
 afterEach(() => {
   cleanup()
@@ -144,6 +148,7 @@ function harness(options: {
     useSessions: unusedHook,
     useSessionPendingInteraction,
     useWorkspaces: unusedHook,
+    useResource,
     controller,
     useModels: bindSnapshotSelector(controller.store),
     operations,

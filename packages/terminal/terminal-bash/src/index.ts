@@ -170,6 +170,22 @@ async function startupSession(
   }
 }
 
+/**
+ * 先让启动失败时尚未发布的资源到达静止，再拒绝。
+ * 清理自身失败时把两个错误一并抛出，使调用方既能看到根因，也知道回收未完成。
+ * @param error - 启动失败的原错误。
+ * @param cleanup - 回收未发布资源的操作。
+ * @returns never；清理成功后抛出原错误。
+ */
+async function rejectAfterStartupCleanup(error: unknown, cleanup: () => Promise<void>): Promise<never> {
+  try {
+    await cleanup()
+  } catch (cleanupError: unknown) {
+    throw new TerminalBackendCleanupError(error, cleanupError)
+  }
+  throw error
+}
+
 /** Local shell backend registered under the configured type. */
 export class BashTerminalBackend implements TerminalBackend {
   readonly type: string
@@ -203,17 +219,19 @@ export class BashTerminalBackend implements TerminalBackend {
       graceMs: this.config.disposeGraceMs,
       signal: spec.signal,
     })
-    const session = this.createSession(terminal, this.config)
+    // 会话构造失败时 PTY 已经存在但没有会话拥有它，必须在这里回收，
+    // 否则那条未发布的 PTY 会一直泄漏到进程退出。
+    let session: LocalPtySession
+    try {
+      session = this.createSession(terminal, this.config)
+    } catch (error) {
+      return rejectAfterStartupCleanup(error, () => terminal.terminate())
+    }
     try {
       await startupSession(session, this.config.shellDialect, this.config.timeoutMs, spec.signal)
       return session
     } catch (error) {
-      try {
-        await session.close('PTY startup failed')
-      } catch (closeError: unknown) {
-        throw new TerminalBackendCleanupError(error, closeError)
-      }
-      throw error
+      return rejectAfterStartupCleanup(error, () => session.close('PTY startup failed'))
     }
   }
 }

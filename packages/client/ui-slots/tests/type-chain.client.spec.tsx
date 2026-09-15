@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ReactNode } from 'react'
 import type {
-  BoundActions, DefineStore, PropsRenderSlots, PropsRuntime, PropsStore, SlotComponent, SlotHookFactory,
+  BoundActions, DefineStore, InjectFace, PropsRenderSlots, PropsRuntime, PropsStore, SlotComponent, SlotHookFactory,
 } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotCore } from '@deepseek-ai/dsh-client-ui-slots'
 
@@ -84,6 +84,21 @@ const CONTEXT_INJECT: ContextInjected = {
     },
   },
 }
+
+/**
+ * entry 级 inject 面样本：`hooks` 与 `keyedHooks` 两个分区都合成为 `use<Name>` 席位，
+ * keyed 的那个保留 key 参数与选择器重载。SlotMap 级的 SlotInjectOf 仍只支持 `hooks`，
+ * 因此本样本直接作用于 {@link InjectFace}（entry 级注入面的组件侧视图）。
+ */
+type DocSource = { getSnapshot: () => { text: string }; subscribe: (fn: () => void) => () => void }
+type BadgeSource = { getSnapshot: () => number; subscribe: (fn: () => void) => () => void }
+type KeyedFace = InjectFace<{
+  plain: string
+  hooks: { badge: BadgeSource }
+  keyedHooks: { doc: (key: string) => DocSource | undefined }
+}>
+type HooksOnlyFace = InjectFace<{ plain: string; hooks: { badge: BadgeSource } }>
+type PassthroughFace = InjectFace<{ plain: string }>
 
 // Component fixtures (never rendered; the register call sites are the test).
 declare function Frame(props: FrameProps): ReactNode
@@ -186,6 +201,34 @@ describe('terminal-design type chain', () => {
         hookContext: 'turn:1',
       })
       void tail
+
+      // ── entry-level inject face synthesis ──────────────────────────
+      // Both compartments present: each yields its own use<Name> seat, and
+      // neither reserved key survives on the component face.
+      const keyedFace: KeyedFace = null as never
+      const badgeValue: number = keyedFace.useBadge(value => value)
+      const direct: { text: string } | undefined = keyedFace.useDoc('doc:1')
+      const selected: string = keyedFace.useDoc('doc:1', value => value?.text ?? '')
+      const plain: string = keyedFace.plain
+      // @ts-expect-error the keyed seat keeps its key argument
+      keyedFace.useDoc()
+      // @ts-expect-error the selector receives the snapshot, not an already-projected value
+      keyedFace.useDoc('doc:1', (value: string) => value)
+      // @ts-expect-error reserved compartments never reach the component
+      void keyedFace.keyedHooks
+
+      // hooks only: the pre-existing branch is untouched.
+      const hooksOnly: HooksOnlyFace = null as never
+      const hooksBadge: number = hooksOnly.useBadge(value => value)
+      // @ts-expect-error no keyed compartment declared → no keyed seat
+      void hooksOnly.useDoc
+
+      // neither compartment: the face passes through verbatim.
+      const passthrough: PassthroughFace = null as never
+      const passthroughPlain: string = passthrough.plain
+      // @ts-expect-error no compartments declared → no synthesized seats
+      void passthrough.useBadge
+      void [badgeValue, direct, selected, plain, hooksBadge, passthroughPlain]
 
       // ── negatives ──────────────────────────────────────────────────
       // children spec must match the SlotMap entry.

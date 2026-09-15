@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import {
   PendingQuestion, planReviewOf, type QuestionComposerProps, type QuestionWait,
 } from '../src/client/contract/slots.ts'
@@ -12,6 +13,9 @@ import { zh as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 
 afterEach(cleanup)
+
+// 每个 fixture 都带上 resources 插件合并进 GlobalStandardProps 的资源钩子。
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
 
 const SID = 's1' as SessionId
 
@@ -104,6 +108,7 @@ const kit: Omit<QuestionComposerProps, 'matched'> = {
   pendingInteraction: undefined,
   useSession: selector => selector(sessionState),
   useSessions: selector => selector(sessionList),
+  useResource,
   useSessionPendingInteraction: selector => selector(attentionState),
   useWorkspaces: selector => selector(workspaceState),
   useConversation: selector => selector(conversationState),

@@ -61,9 +61,14 @@ export interface PromptSection {
   /**
    * Static text or a provider evaluated at each assembly with that assembly's
    * {@link AssembleContext}. The text may reference `{{variable}}`s — they are
-   * interpolated later, by {@link renderPrompt}.
+   * interpolated later, by {@link renderPrompt}, unless {@link PromptSection.interpolate} is `false`.
    */
   readonly text: string | ((context: AssembleContext) => string)
+  /**
+   * 是否参与 `{{variable}}` 插值。缺省按 `true` 处理；设为 `false` 时文本作为字面量
+   * 直接进入组装结果，其中的花括号保持原样（外部文本可能含花括号，按变量解析会抛错）。
+   */
+  readonly interpolate?: boolean
   /**
    * Treat this contribution as the complete system prompt. Assembly still
    * runs the cooperative waterfall so tools, contexts, and variables can be
@@ -89,6 +94,11 @@ export interface AssembledSection {
   name: string
   /** The resolved (but not yet interpolated) section text. */
   text: string
+  /**
+   * 提供方注册时的插值开关，从 {@link PromptSection} 透传而来；缺省按 `true` 处理。
+   * 为 `false` 时 {@link renderPrompt} 直接取原文。
+   */
+  interpolate?: boolean
 }
 
 /** One resolved dynamic context contribution. */
@@ -148,6 +158,7 @@ const SECTION_ORDERS = {
   TOOL_RALPH: 2700,
   TOOL_SUBAGENT: 2800,
   TOOL_REPORT: 2900,
+  MCP_SERVERS: 3100,
   TOOLS_SDK: 5000,
   DELIVERABLE_FILE_REFERENCES: 9000,
   STRUCTURED_OUTPUT: 9900,
@@ -258,13 +269,14 @@ export interface Config {
  * Interpolate strict `{{variable}}` references, drop empty sections, and join
  * the rest with blank lines. Malformed, unknown, or undefined references throw;
  * a lone `{{` without any later `}}` is literal prose, and substituted values
- * are not scanned again.
+ * are not scanned again. Sections with `interpolate: false` retain literal
+ * text.
  * @param assembly - the assembly whose sections and variables to render.
  * @returns the rendered prompt, or `''` when all sections are empty.
  */
 export function renderPrompt(assembly: PromptAssembly): string {
   return assembly.sections
-    .map(section => interpolate(section, assembly.variables, 'section'))
+    .map(section => section.interpolate === false ? section.text : interpolate(section, assembly.variables, 'section'))
     .filter(text => text.length > 0)
     .join('\n\n')
 }
@@ -583,6 +595,7 @@ export class SystemPrompt extends Service {
         const assembled = {
           name: section.name,
           text: typeof section.text === 'function' ? section.text(context) : section.text,
+          ...section.interpolate !== undefined ? { interpolate: section.interpolate } : {},
         }
         if (section.complete === true) completeSection = { ...assembled }
         return assembled
