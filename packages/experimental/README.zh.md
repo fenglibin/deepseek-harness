@@ -9,6 +9,10 @@ kind: "package-group"
 
 实验组包含不属于任何正式发布的原型能力：它们运行在真实 harness 上，但约定可能变更，也不提供支持承诺。本组包含 Agent Teams、跨 realm Inspector，以及预览部署使用的浏览器 worker 运行时与镜像打包器。用这些包来尝试未发布的能力；它们没有稳定性承诺，已发布产品不得依赖它们。
 
+本组的每个包都是私有的：它们全部列在 [`scripts/experimental-package-policy.ts`](../../scripts/experimental-package-policy.ts) 的私有清单里，因此既不进入 dsh 发布家族，也不进入 npm baseline。把一个目录从该清单摘除，就把它交给默认公开策略——此时它会成为发布成员，并必须满足发布成员的清单要求（去掉 `private`、声明 `publishConfig.access: "public"`）。
+
+命名与发布是两个正交契约：`@deepseek-ai/dsh-experimental-` 前缀由[工作区约束](../../scripts/check-workspace-constraints.ts)独立强制，与包是否发布无关。保留前缀而在清单中保持私有，是本组的常态。
+
 ## 目录
 
 - [包](#packages)
@@ -37,6 +41,7 @@ kind: "package-group"
 ## 相关文档
 
 - [实验包决策](../../.agents/notes/implemented/architecture/2026-08-18-experimental-agent-teams-packages.zh.md)——位置、发布排除与依赖隔离。
+- [实验包发布策略](../../.agents/notes/implemented/simplification/2026-09-15-experimental-package-release-policy.zh.md)——单一真相源，以及本地为何保持全部私有。
 - [Agent Teams 子系统](../../docs/subsystems/agent-team.zh.md)——持久 Team 类型与 `ctx.agentTeams` 服务 API。
 - [实验子树规则](AGENTS.md)——实验状态放宽了什么、不放宽什么。
 

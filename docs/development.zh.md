@@ -117,6 +117,12 @@ vendor manifest 守卫检查 `vendor/*/src` 下的改动是否连同对应的 `v
 
 keyless [CI 工作流](../.github/workflows/ci.yml) 将独立门禁分组到若干宽粒度 lane，并在受支持的 Node 版本上运行一组较小的兼容性检查。产物消费方在各自 lane 内等待一次 build。单独的真实 API 工作流按其配置的 worker 上限运行 `pnpm run test:e2e`。当前门禁和 job 清单以 [scripts/run-gates.ts](../scripts/run-gates.ts) 和工作流文件为准。
 
+### 实验包发布策略
+
+实验包是否对外发布由 [`scripts/experimental-package-policy.ts`](../scripts/experimental-package-policy.ts) 单点决定：它导出私有实验包目录清单 `PRIVATE_EXPERIMENTAL_PACKAGE_DIRECTORIES` 与判定函数 `isPublicExperimentalPackageDirectory`。发布成员发现（[`scripts/release/families.ts`](../scripts/release/families.ts)）、npm baseline（[`scripts/publish-npm-baseline.ts`](../scripts/publish-npm-baseline.ts)）、依赖校验（[`scripts/verify-package-dependencies.ts`](../scripts/verify-package-dependencies.ts)）与工作区约束（[`scripts/check-workspace-constraints.ts`](../scripts/check-workspace-constraints.ts)）都从该函数读取，不再各自内联目录判断。
+
+本地清单列出 `packages/experimental/` 下的全部 8 个包，即它们当前都不发布；从清单摘除一个目录就让它进入发布成员集合，无需改动任何调用方。命名约定与发布策略是两个正交契约：`@deepseek-ai/dsh-experimental-` 前缀由工作区约束独立强制，与包是否发布无关（[决策](../.agents/notes/implemented/simplification/2026-09-15-experimental-package-release-policy.zh.md)）。
+
 ### 日常命令
 
 根目录的[贡献者说明](../AGENTS.md#命令)概述常用命令，[`package.json`](../package.json) 与 [scripts/run-gates.ts](../scripts/run-gates.ts) 则负责当前脚本和门禁清单。请选择覆盖变更表面的最小检查集。文档变更使用 `pnpm run doc-sync`；包公开行为变更还需更新所属 README 或 JSDoc，而基于构建产物的检查需要先运行 `pnpm run build`。

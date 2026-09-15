@@ -15,6 +15,7 @@ import {
   officialClientBuildEnvironment,
   readClientBuildRecord,
 } from '../client-build-environment.ts'
+import { isPrivateExperimentalPackageDirectory } from '../experimental-package-policy.ts'
 import { validateTarballPayload } from '../publication-payload.ts'
 
 /**
@@ -320,8 +321,24 @@ export abstract class ReleaseFamily {
 /** Release packages and apps: one shared version across the whole family. */
 class DshFamily extends ReleaseFamily {
   readonly id = 'dsh'
-  readonly patterns = ['packages/!(experimental)/*/package.json', 'apps/*/package.json'] as const
+  readonly patterns = [
+    'packages/*/*/package.json',
+    'apps/*/package.json',
+  ] as const
   readonly tagPrefix = 'dsh-v'
+
+  /**
+   * Drop the private experimental packages the release policy excludes.
+   *
+   * The family glob covers every `packages/<group>/<pkg>` manifest, so the
+   * directory policy — not a negative glob — is what keeps a private
+   * experimental package out of the published set.
+   * @param root - repository root.
+   * @returns The dsh family's publishable members.
+   */
+  override members(root: string): ReleaseMember[] {
+    return super.members(root).filter(member => !isPrivateExperimentalPackageDirectory(member.directory))
+  }
 
   /** Require current artifacts from a complete official client build. */
   override verifyBuildArtifacts(root: string): void {

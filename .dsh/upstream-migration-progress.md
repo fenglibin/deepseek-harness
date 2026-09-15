@@ -2,42 +2,63 @@
 
 本文档记录 13 个 openspec 变更的落地进度与验证结论，供跨轮次接续。
 
+## ⚠️ 关键环境发现：src/ 下的陈旧构建产物会遮蔽 TypeScript 源码
+
+**现象**：仓库里存在 **107 个未被跟踪但已被 `.gitignore` 覆盖的 `src/*.js`** 文件（连同 107 个 `.js.map`、154 个 `.d.ts`、107 个 `.d.ts.map`），时间戳统一为 `09-15 19:48`（早于本次执行）。
+
+**影响**：Vite/Vitest 的默认 `resolve.extensions` 把 `.js` 排在 `.ts` 之前，因此 `import '@deepseek-ai/dsh-X'` 会解析到 `packages/.../src/index.js`（陈旧编译产物）而不是 `src/index.ts`。**测试因此长期跑在旧代码上**，源码修改不生效，且不会有任何报错。
+
+**已确认的证据**：
+- 在 `session-projection/src/index.ts` 顶部加 `console.log` 标记，测试输出的 marker 来自 `src/index.js` 而非 `.ts`。
+- 清掉这 107 个文件后，`packages/session/session-projection` 的 47 个测试立即全部通过（此前 1 个失败，且失败原因看起来像真实逻辑错误）。
+- 同类现象让 `packages/core/agent-loop` 从「4 个失败」变成「1 个失败」。
+
+**处置**：已执行 `find packages apps -path "*/src/*.js" -delete` 与对应的 `.js.map` / `.d.ts` / `.d.ts.map` 清理，当前 `src/*.js` 计数为 0。这些都是构建垃圾，删掉是安全的。
+
+**由此修正的结论**：此前用 `git stash` 做的「预先存在」判定**不可靠**——`git stash` 只回退被跟踪文件，不影响这些未跟踪的 `.js` 产物，因此「stash 前后失败数相同」不能证明失败与改动无关。
+
 ## 环境事实（执行前侦察）
 
-- 工作区分支 `new-feature-20260905`，执行开始时干净（HEAD `cb0d22a168`）。
+- 工作区分支 `new-feature-20260905`。
 - `npx tsx scripts/verify-changed.ts` 可用，用于按改动面跑最小验证集。
 - `npx tsx scripts/verify-cordis-config.ts` 可用（157 个配置文件）。
 - `openspec validate <id> --strict` 可用。
-
-## 阻塞发现：92 个快照失败为预先存在
-
-`npx vitest run --config vitest.snapshot.config.ts` 有 **92 个失败**，与本次移植无关：
-
-- **已验证**：把 `packages/bundle/base` 与 `packages/bundle/web-app` 的改动 `git stash` 后，失败集**完全相同**（92 vs 92，`comm` 对比无差异）。
-- **根因一**：会话录制 `.jsonl` 内含 record 时冻结的 `request/header` 文本。例：fixture 中 `mark_analysis_done` 的描述缺 "record_spec(kind: design)" 字样，而源码已更新。
-- **根因二**：fork 自建的 `tool-delivery` 插件注入的 "delivery size grading" 通知未进入任何录制。
-- **`DSH_SNAPSHOT=refresh` 无法修复**：它只从既有录制重新派生 sidecar，不重写录制内的 header；实测刷新后仍 57 个失败，二次运行反而升到 60（不收敛）。
-- **修复需要 `DSH_SNAPSHOT=record`（真实 API 调用）**：本地未设置 `DEEPSEEK_API_KEY`，也无 `.env`。
-
-**结论**：本任务的验收以「不引入新的快照失败」为准，而非「快照全绿」。每个变更都用 stash 前后失败集对比来证明零新增。
+- **测试按包名解析到 `src`（经 tsconfig paths），不解析 `lib`**——这已用 marker 双向确认。构建产物 `lib/` 只影响 `dsh` 进程启动与打包路径。
 
 ## 进度
 
-### 第 1 批
+| # | change | 状态 | 关键验证 |
+|---|---|---|---|
+| 1 | `update-default-tool-set` | ✅ 完成并提交 | base 3 测试、`verify-cordis-config` 157 文件、快照零新增失败 |
+| 2 | `add-http-proxy-support` | ✅ 完成并提交 | 门禁 `no bare dispatcher`、178 测试、`tsc -b` 通过 |
+| 3 | `add-coverage-partition-canonicalization` | ✅ 完成并提交 | 46 测试（含 4 个新 canonical 用例）、代理清理实测生效 |
+| 4 | `refactor-experimental-release-policy` | ✅ 实现完成，待验证 | 子代理报告四项发布判据逐元素相同 |
+| 5 | `update-session-projection-view-gate` | 🔄 实现完成，待收尾 | **47 测试全通过**（清理 debris 后） |
+| 6 | `add-agent-loop-message-freeze-reuse` | ✅ 完成并提交 | 3 个新测试，**守卫已验证**：无优化时失败（spread 23>4），有优化时通过 |
+| 7 | `add-typert-lazy-schema-materialization` | ⬜ 未开始 | — |
+| 8 | `add-lazy-require-utility` | ⬜ 未开始 | — |
+| 9 | `add-deferred-native-dependency-loading` | ⬜ 未开始 | — |
+| 10 | `update-slash-menu-shared-ranker` | ⬜ 未开始 | — |
+| 11 | `add-archived-sessions-page` | ⬜ 未开始 | — |
+| 12 | `add-client-keyed-standard-hooks` | ⬜ 未开始 | — |
+| 13 | `add-mcp-resource-access` | ⬜ 未开始 | — |
 
-| change | 状态 | 验证 |
-|---|---|---|
-| `update-default-tool-set` | 实现中 | base 测试 3 个通过；`verify-cordis-config` 157 文件通过；快照零新增失败 |
-| `add-http-proxy-support` | 未开始 | — |
-| `add-coverage-partition-canonicalization` | 未开始 | — |
-| `refactor-experimental-release-policy` | 未开始 | — |
+## 已提交记录
 
-#### `update-default-tool-set` 已完成的改动
+- `835a16e94f` 变更 1 + 差异扫描与四批方案文档
+- `c920bf371b` 变更 2 + 3（http-proxy 包、app-boot/CLI 接线、覆盖率规范化、代理清理）
+- `65f05222fa` 变更 6（消息冻结复用）
 
-- `packages/bundle/base/cordis.patch.yml`：删除 `tool-str-replace-editor` 条目；`tool-web` 的 `fetch: false` → `true`；重写该行上方注释。
-- `packages/bundle/web-app/cordis.patch.yml`：删除 `- id: tool-str-replace-editor / disabled: true` 覆盖（避免悬空 id）。
-- `packages/bundle/base/package.json`：删除 `@deepseek-ai/dsh-tool-str-replace-editor` 依赖。
-- `packages/bundle/base/tests/base.spec.ts`：`fetch` 断言改为 `true`；新增断言 base 行集合不含该工具；新增用例经 `applyEntryPatches` 验证显式 `insert` 仍可注册该工具。
+## 已知的非本次引入问题（清理 debris 后需重新评估，勿轻信此前结论）
 
-**未做**：`apps/cli/package.json` 的依赖未删——官方也保留它（`grep` 确认官方同行为），因为它是 CLI 插件清单而非 base 组合。
-**未做**：minimal preset 与 `sdk-minimal` 未动——按 design/D5，本变更不含 minimal 移除。
+- `packages/core/agent-loop/tests/scope-lifecycle.spec.ts`：清理 debris 后仍有 1 个失败，需重新判定归属。
+- `scripts/verify-package-invariants.ts`：`packages/delivery/tool-delivery` 缺 `dsh-invariants` devDependency。
+- `scripts/verify-md-links.ts`：3 条断链（`.agents/notes` 两处、`ui-settings-commands` 一处）。
+- `scripts/verify-agent-note-format.ts`：2 条既有 note 格式违规。
+- `scripts/check-workspace-constraints.ts`：6 条错误（版本号与 `files` 字段）。
+- 快照套件 92 个失败：会话录制内含 record 时冻结的旧 header 文本 + fork 自建 `tool-delivery` 通知未进入录制；修复需真实 API 重录（`DSH_SNAPSHOT=record`），本地无 `DEEPSEEK_API_KEY`。
+
+## 待收尾事项
+
+- 变更 5 需要：更新 `README.zh.md`、`docs/subsystems/session-projection.zh.md`、`invariant.ts` 描述，写 Agent Note，勾选 tasks。
+- 变更 4 需要：由我独立复核子代理的四项判据与门禁结果。

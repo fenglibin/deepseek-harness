@@ -1,10 +1,11 @@
 /** Release family discovery, publish order, tag naming, and the bump judgements. */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { globSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { officialClientBuildEnvironment, writeClientBuildRecord } from '../client-build-environment.ts'
+import { isPrivateExperimentalPackageDirectory } from '../experimental-package-policy.ts'
 import { releaseFamily, type ReleaseMember } from './families.ts'
 import { compareVersions, nextVendorVersion, planShared, reachesPayload } from './bump.ts'
 
@@ -43,10 +44,30 @@ afterEach(() => {
 
 describe('release families', () => {
   it('excludes private experimental packages from the dsh release', () => {
-    const members = releaseFamily('dsh').members(resolve(import.meta.dirname, '../..'))
+    const root = resolve(import.meta.dirname, '../..')
+    const members = releaseFamily('dsh').members(root)
 
-    expect(members.some(member => member.directory.startsWith('packages/experimental/'))).toBe(false)
+    // 成员排除由发布策略决定，而不是成员发现使用的 glob。
+    expect(members.filter(member =>
+      isPrivateExperimentalPackageDirectory(member.directory))).toEqual([])
     expect(members.map(member => member.name)).not.toContain('@deepseek-ai/dsh-experimental-agent-team')
+  })
+
+  it('discovers exactly the manifests no private experimental directory covers', () => {
+    const root = resolve(import.meta.dirname, '../..')
+    const patterns = ['packages/*/*/package.json', 'apps/*/package.json']
+    const expected = globSync(patterns, { cwd: root })
+      .map(path => path.replaceAll('\\', '/'))
+      .filter(path => !isPrivateExperimentalPackageDirectory(dirname(path)))
+      .sort()
+      .map(path => ({
+        directory: path.slice(0, path.length - '/package.json'.length),
+        name: (JSON.parse(readFileSync(resolve(root, path), 'utf8')) as { name: string }).name,
+      }))
+
+    expect(releaseFamily('dsh').members(root).map(m => ({ directory: m.directory, name: m.name })))
+      .toEqual(expected)
+    expect(expected.some(entry => entry.directory.startsWith('packages/experimental/'))).toBe(false)
   })
 
   it('bumps private dsh packages without adding release tags', () => {

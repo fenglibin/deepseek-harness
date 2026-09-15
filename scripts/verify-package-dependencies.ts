@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, globSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, extname, join, normalize, relative, resolve, sep } from 'node:path'
 import ts from 'typescript'
+import { isPrivateExperimentalPackageDirectory } from './experimental-package-policy.ts'
 import { writeModuleGraph } from './gen-module-graph.ts'
 import {
   hasClientDeclaration,
@@ -18,7 +19,6 @@ import {
 const GATE = 'verify-package-dependencies'
 const CORDIS = '@deepseek-ai/cordis'
 const WORKSPACE_RANGE = 'workspace:^'
-const RELEASE_MANIFEST_GLOB = 'packages/!(experimental)/*/package.json'
 const WORKSPACE_MANIFEST_GLOBS = [
   'apps/*/package.json',
   'packages/*/*/package.json',
@@ -115,8 +115,9 @@ export function readWorkspacePackageManifests(root: string): {
     }
   }
   const all = globSync(WORKSPACE_MANIFEST_GLOBS, { cwd: root }).map(normalizePath).sort().map(read)
-  const releasePaths = new Set(globSync(RELEASE_MANIFEST_GLOB, { cwd: root }).map(normalizePath))
-  return { all, release: all.filter(pkg => releasePaths.has(pkg.manifestPath)) }
+  const release = all.filter(pkg =>
+    pkg.manifestPath.startsWith('packages/') && !isPrivateExperimentalPackageDirectory(pkg.dir))
+  return { all, release }
 }
 
 function duplicates(values: readonly string[]): string[] {

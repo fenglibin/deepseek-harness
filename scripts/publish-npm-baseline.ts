@@ -18,13 +18,14 @@ import { basename, dirname, isAbsolute, join, normalize, relative, resolve, sep 
 import { createInterface } from 'node:readline/promises'
 import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
+import { isPrivateExperimentalPackageDirectory } from './experimental-package-policy.ts'
 import { validateTarballPayload } from './publication-payload.ts'
 
 const DEFAULT_REGISTRY = 'https://registry.npm.harnessment.com'
 const DEFAULT_OUTPUT_DIRECTORY = '.artifacts/npm-baseline'
 const PACKAGE_PATTERNS = [
   'vendor/*/package.json',
-  'packages/!(experimental)/*/package.json',
+  'packages/*/*/package.json',
   'apps/*/package.json',
 ] as const
 const DEPENDENCY_SECTIONS = [
@@ -234,6 +235,15 @@ class DetachedWorktree {
   }
 }
 
+/**
+ * 一个清单路径是否进入 baseline，按实验包发布策略判定。
+ * @param manifestPath - `globSync` 返回的仓库相对清单路径（Windows 上为反斜杠分隔）。
+ * @returns 被排除的私有实验包为 `false`，其余一律为 `true`。
+ */
+function publishesUnderBaselinePolicy(manifestPath: string): boolean {
+  return !isPrivateExperimentalPackageDirectory(dirname(manifestPath.replaceAll('\\', '/')))
+}
+
 /** Discovers and stages every package published in one repository baseline. */
 class WorkspacePackageSet {
   private constructor(
@@ -242,7 +252,9 @@ class WorkspacePackageSet {
   ) {}
 
   static discover(root: string): WorkspacePackageSet {
-    const manifestPaths = globSync(PACKAGE_PATTERNS, { cwd: root }).sort()
+    const manifestPaths = globSync(PACKAGE_PATTERNS, { cwd: root })
+      .filter(path => publishesUnderBaselinePolicy(path))
+      .sort()
     if (manifestPaths.length === 0) {
       throw new Error('no package manifests found under vendor/, packages/, or apps/')
     }
