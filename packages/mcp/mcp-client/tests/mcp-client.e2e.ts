@@ -649,7 +649,8 @@ describe('resources fixture server — real MCP resources and instructions', () 
       arguments: { server: 'catalog', uri: 'memo://text' },
     })
     expect(result.isError).toBe(false)
-    const text = result.content[0]!.type === 'text' ? result.content[0].text : ''
+    const first = result.content[0]
+    const text = first?.type === 'text' ? first.text : ''
     expect(text).toContain('MCP server: catalog')
     expect(text).toContain('MCP resource text with {{braces}} intact.')
   })
@@ -661,7 +662,8 @@ describe('resources fixture server — real MCP resources and instructions', () 
       arguments: { server: 'catalog', uri: 'memo://binary' },
     })
     expect(result.isError).toBe(false)
-    const text = result.content[0]!.type === 'text' ? result.content[0].text : ''
+    const first = result.content[0]
+    const text = first?.type === 'text' ? first.text : ''
     expect(text).toContain(`[binary resource: ${BINARY_BASE64.length} base64 characters; available to programmatic callers]`)
     expect(text).not.toContain(BINARY_BASE64)
   })
@@ -672,15 +674,15 @@ describe('resources fixture server — real MCP resources and instructions', () 
       callId: nextCallId(), name: 'list_mcp_resources', arguments: { server: 'catalog' },
     })
     expect(listed.isError).toBe(false)
-    expect(listed.content[0]!.type === 'text' ? listed.content[0].text : '').toContain('memo://text')
+    expect(listed.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('memo://text') })
 
     const templates = await ctx.tools.execute({
       signal: testToolSignal,
       callId: nextCallId(), name: 'list_mcp_resource_templates', arguments: { server: 'catalog' },
     })
     expect(templates.isError).toBe(false)
-    expect(templates.content[0]!.type === 'text' ? templates.content[0].text : '')
-      .toContain('memo://greeting/{name}')
+    expect(templates.content[0])
+      .toMatchObject({ type: 'text', text: expect.stringContaining('memo://greeting/{name}') })
 
     // 展开后的模板 URI 可直接读取。
     const greeting = await ctx.tools.execute({
@@ -689,7 +691,7 @@ describe('resources fixture server — real MCP resources and instructions', () 
       arguments: { server: 'catalog', uri: 'memo://greeting/Ada' },
     })
     expect(greeting.isError).toBe(false)
-    expect(greeting.content[0]!.type === 'text' ? greeting.content[0].text : '').toContain('Hello, Ada.')
+    expect(greeting.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('Hello, Ada.') })
   })
 
   it('不可用的服务器名在发起网络操作之前失败', async () => {

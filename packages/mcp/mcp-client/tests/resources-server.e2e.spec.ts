@@ -35,17 +35,19 @@ async function setup(): Promise<Context> {
   await ctx.plugin(SubprocessRuntime)
   await ctx.plugin(McpResources)
   // mcp-client 是函数插件（具名导出 name/inject/Config/apply），config 作为 apply 的第二个参数。
-  await ctx.plugin({
-    name: 'mcp-client',
-    inject: ['tools'],
-    apply: (inner: Context) => applyMcpClient(inner, {
-      transport: 'stdio',
-      serverName: 'catalog',
-      command: process.execPath,
-      args: ['--import', 'tsx/esm', FIXTURE],
-      failOnStartupError: true,
-      reconnect: { enabled: false },
-    }),
+  // `Config` 是解析后的完整形状，因此 schema 有默认值的字段在这里也要显式写全。
+  await applyMcpClient(ctx, {
+    transport: 'stdio',
+    serverName: 'catalog',
+    command: process.execPath,
+    args: ['--import', 'tsx/esm', FIXTURE],
+    env: {},
+    cwd: fileURLToPath(new URL('..', import.meta.url)),
+    toolCallTimeoutMs: 15_000,
+    failOnStartupError: true,
+    maxInstructionBytes: 32_768,
+    allowedTools: undefined as unknown as string[],
+    reconnect: { enabled: false },
   })
   return ctx
 }
