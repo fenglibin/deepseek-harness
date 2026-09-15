@@ -1,6 +1,5 @@
 /** Typed Win32 process operations over the shared binding table. */
 
-import koffi from 'koffi'
 import * as abi from './abi.ts'
 import {
   allocProcessInfo,
@@ -16,6 +15,7 @@ import {
   throwWin32,
 } from './ffi.ts'
 import type { NativePtr, Win32ProcessBindings } from './ffi.ts'
+import { requireKoffi } from './koffi.ts'
 
 /**
  * Quote one argument according to CommandLineToArgvW parsing.
@@ -93,7 +93,7 @@ interface PipePair {
 }
 
 function freeNative(pointer: NativePtr | undefined): void {
-  if (pointer !== undefined) koffi.free(pointer)
+  if (pointer !== undefined) requireKoffi().free(pointer)
 }
 
 function closeBestEffort(api: Win32ProcessBindings, handle: NativePtr | null | undefined): void {
@@ -118,7 +118,7 @@ function createPipe(api: Win32ProcessBindings, owned: Set<NativePtr>): PipePair 
     return { read, write }
   } finally {
     freeNative(writeSlot)
-    koffi.free(readSlot)
+    requireKoffi().free(readSlot)
   }
 }
 

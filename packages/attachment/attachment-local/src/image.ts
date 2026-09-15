@@ -1,8 +1,9 @@
 /** Raster inspection: full decode at admission, header-only probe on verified reads. */
 
-import sharp, { type Sharp } from 'sharp'
+import type { Sharp } from 'sharp'
 import { AttachmentError } from '@deepseek-ai/dsh-attachment'
 import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
+import { requireSharp } from './sharp.ts'
 
 /** Decoded metadata from a supported image. */
 export interface DetectedImage {
@@ -89,6 +90,8 @@ async function imageMetadata(image: Sharp): Promise<DetectedImage> {
  * @returns verified format and dimensions.
  */
 export async function probeImage(data: Uint8Array): Promise<DetectedImage> {
+  // 加载发生在 try 之外：原生绑定缺失是环境故障，不能被下面的 catch 改写成"图片数据无效"。
+  const sharp = requireSharp()
   try {
     return await imageMetadata(sharp(data, { failOn: 'error', limitInputPixels: false }))
   } catch (error) {
@@ -112,6 +115,8 @@ export interface DecodedImageLimits {
  * @returns verified format and dimensions.
  */
 export async function detectImage(data: Uint8Array, limits?: DecodedImageLimits): Promise<DetectedImage> {
+  // 与 probeImage 同理：加载失败必须在重包装为 INVALID_IMAGE 之前传播出去。
+  const sharp = requireSharp()
   try {
     const image = sharp(data, { failOn: 'error', limitInputPixels: false })
     const detected = await imageMetadata(image)

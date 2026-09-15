@@ -11,6 +11,9 @@
     },
     {
       "path": "../../runtime-diagnostics/invariants"
+    },
+    {
+      "path": "../../util/lazy-require"
     }
   ]
 }

@@ -12,8 +12,9 @@ import { constants } from 'node:fs'
 import { access, stat } from 'node:fs/promises'
 import { delimiter, extname, isAbsolute, resolve } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
-import * as nodePty from 'node-pty'
+import type * as NodePty from 'node-pty'
 import type { IPtyForkOptions } from 'node-pty'
+import { createLazyRequire } from '@deepseek-ai/dsh-lazy-require'
 import { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type {
   SubprocessHandle,
@@ -26,6 +27,9 @@ import type { LocalSubprocessHandle, SpawnInternals } from './spawn.ts'
 import { createProcessInspector } from './process-inspector.ts'
 import type { ProcessInspector } from './process-inspector.ts'
 import { LocalTerminalHandle } from './terminal.ts'
+
+/** 在首次 PTY 终端操作时加载 node-pty；进程只用普通子进程时不必付原生初始化代价。 */
+const requireNodePty = createLazyRequire<typeof NodePty>('node-pty', import.meta.url)
 
 /**
  * Local subprocess service: detached process trees, Node-shaped stdio
@@ -172,7 +176,7 @@ export class LocalSubprocessRuntime extends SubprocessRuntime {
       env: childEnv(spec.env),
     }
     const inspector = this.terminalInspector ?? createProcessInspector()
-    const terminal = nodePty.spawn(file, [...spec.argv.slice(1)], options)
+    const terminal = requireNodePty().spawn(file, [...spec.argv.slice(1)], options)
     const handle = new LocalTerminalHandle(terminal, inspector, spec.graceMs)
     this.terminals.add(handle)
     const release = async (): Promise<void> => {

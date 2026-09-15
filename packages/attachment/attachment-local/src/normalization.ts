@@ -1,11 +1,12 @@
 /** Deterministic provider-independent image normalization. */
 
-import sharp, { type Sharp } from 'sharp'
+import type { Sharp } from 'sharp'
 import { AttachmentError, requestImageDimensions } from '@deepseek-ai/dsh-attachment'
 import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import { encodeFirstWithinLimit, encodingLadder, isExhaustedEncoding } from './encoding.ts'
 import { detectImage, encodedAlphaIsCompatible } from './image.ts'
 import type { DetectedImage } from './image.ts'
+import { requireSharp } from './sharp.ts'
 
 /** Deployment-resolved policy for the persisted normalized attachment. */
 export interface NormalizationPolicy {
@@ -69,8 +70,20 @@ async function verifyNormalizedImage(
   return image
 }
 
-/** Build one fixed-size, oriented, metadata-free sRGB pipeline from submitted bytes. */
-function preparedPipeline(data: Uint8Array, width: number, height: number): Sharp {
+/**
+ * Build one fixed-size, oriented, metadata-free sRGB pipeline from submitted bytes.
+ * @param sharp - 由 {@link requireSharp} 取到的 Sharp 入口；作为参数传入，使 loader 的调用点留在调用方的 `try` 之外。
+ * @param data - 已受理的源字节。
+ * @param width - 目标宽度。
+ * @param height - 目标高度。
+ * @returns 可继续派生的 sRGB 管线。
+ */
+function preparedPipeline(
+  sharp: ReturnType<typeof requireSharp>,
+  data: Uint8Array,
+  width: number,
+  height: number,
+): Sharp {
   return sharp(data, { failOn: 'error', limitInputPixels: false })
     .rotate()
     .toColourspace('srgb')
@@ -108,10 +121,13 @@ export async function normalizeImage(
   if (canPassThroughNormalization(detected, data.byteLength, policy)) {
     return { data, mediaType: detected.mediaType, width: detected.width, height: detected.height }
   }
+  // 直通路径不需要原生栅格能力，加载发生在早返回之后；调用点同样留在 try 之外，
+  // 使缺失的原生绑定不被改写成"编码失败"。
+  const sharp = requireSharp()
   try {
     const { width, height } = initialDimensions(detected, policy)
     const encoded = await encodeFirstWithinLimit(
-      encodingLadder(preparedPipeline(data, width, height), detected.hasAlpha),
+      encodingLadder(preparedPipeline(sharp, data, width, height), detected.hasAlpha),
       policy.maxBytes,
     )
     const chosen = isExhaustedEncoding(encoded) ? encoded.smallest : encoded

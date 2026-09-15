@@ -17,7 +17,7 @@ import type { ReactNode } from 'react'
 import type {
   BoundActions, HandleOf, PropsStore, SnapshotSelectorHook, StoreDecl,
 } from '@deepseek-ai/dsh-client-store'
-import type { HostObservable } from './renderer.ts'
+import type { HostObservable, KeyedStandardSource } from './renderer.ts'
 
 export * from './store.ts'
 export * from './renderer.ts'
@@ -34,6 +34,13 @@ export interface SlotMap {}
  * component props.
  */
 export interface LocaleNamespaceMap {}
+
+/**
+ * 资源协议（URL scheme）→ 其提供方流出的值类型。此处声明为空，是零依赖合并点：
+ * 每个协议属主合并自己的成员（`file`，后续 `chat`），`useResource<P>(address)`
+ * 按 `P` 收窄其值的类型。资源服务本身位于 `dsh-client-resources`。
+ */
+export interface ResourceProtocolMap {}
 
 /**
  * Translate a dictionary key with optional `{name}` template params.
@@ -393,6 +400,29 @@ export type SlotComponent<P> = (props: P) => ReactNode
  */
 export type HooksSources = Record<string, HostObservable<unknown>>
 
+/** 注册方的 keyed 钩子分区：稳定的 key → observable 解析器。 */
+export type KeyedHooksSources = Record<string, KeyedStandardSource>
+
+/** 面向开放 keyed observable 源族的按 key 选择器钩子。 */
+export type KeyedSnapshotSelectorHook<Snapshot> = {
+  /**
+   * @param key - 源 key。
+   * @returns 当前值，或源不可用时的 `undefined`。
+   */
+  (key: string): Snapshot | undefined
+  /**
+   * @param key - 源 key。
+   * @param selector - 对当前 keyed 值的投影。
+   * @param equal - 可选的选择结果相等函数。
+   * @returns 选择后的值。
+   */
+  <Selected>(
+    key: string,
+    selector: (value: Snapshot | undefined) => Selected,
+    equal?: (left: Selected, right: Selected) => boolean,
+  ): Selected
+}
+
 /** Framework-owned props visible while a slot-level contextual Hook is bound. */
 export type StandardPropsOf<K extends keyof SlotMap & string> =
   (ScopeOf<K> extends 'session' ? SessionStandardProps
@@ -439,13 +469,26 @@ export type PropsHooks<HS extends HooksSources> = {
   SnapshotSelectorHook<HS[N] extends HostObservable<infer T> ? T : never>
 }
 
+/** 由 entry 的 inject keyedHooks 分区合成的按 key 选择器钩子份额。 */
+export type PropsKeyedHooks<HS extends KeyedHooksSources> = {
+  [N in keyof HS & string as `use${Capitalize<N>}`]: KeyedSnapshotSelectorHook<
+    HS[N] extends (key: string) => HostObservable<infer T> | undefined ? T : never
+  >
+}
+
 /**
- * The component-side view of an inject face: the reserved `hooks`
- * compartment (when declared) arrives as bound `use<Name>` selector hooks;
- * every other member passes through verbatim.
+ * The component-side view of an inject face: the reserved `hooks` and
+ * `keyedHooks` compartments (when declared) arrive as bound `use<Name>`
+ * selector hooks; every other member passes through verbatim.
  */
 export type InjectFace<I extends object> =
-  I extends { hooks: infer HS extends HooksSources } ? Omit<I, 'hooks'> & PropsHooks<HS> : I
+  I extends { hooks: infer HS extends HooksSources }
+    ? I extends { keyedHooks: infer KS extends KeyedHooksSources }
+      ? Omit<I, 'hooks' | 'keyedHooks'> & PropsHooks<HS> & PropsKeyedHooks<KS>
+      : Omit<I, 'hooks'> & PropsHooks<HS>
+    : I extends { keyedHooks: infer KS extends KeyedHooksSources }
+      ? Omit<I, 'keyedHooks'> & PropsKeyedHooks<KS>
+      : I
 
 /**
  * The composed component props intersection: runtime share (SlotMap) +

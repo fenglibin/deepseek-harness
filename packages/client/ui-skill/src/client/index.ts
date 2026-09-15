@@ -35,6 +35,7 @@ import type { SkillEntry } from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { InputTriggerServiceContract, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the SlotRegistry service merge (ctx.slots).
@@ -142,8 +143,8 @@ export function apply(ctx: ClientContext): void {
       const skills = await fetchCatalog(session.sessionId)
       // Superseded keystroke: the shared fetch stays warm, this caller yields.
       if (signal.aborted) return []
-      return skills
-        .filter(skill => skill.name.startsWith(query))
+      // 与同一菜单的命令组使用同一套排序：不区分大小写的有序子序列，前缀命中优先。
+      return rankByName(skills, query)
         .map(skill => ({
           name: skill.name,
           // The user-only marker rides the description (the menu's only

@@ -105,6 +105,7 @@
     { "path": "./packages/client/ui-settings-skills" },
     { "path": "./packages/client/locale" },
     { "path": "./packages/client/ui-renderer" },
+    { "path": "./packages/client/resources" },
     { "path": "./packages/client/ui-session" },
     { "path": "./packages/client/web" },
     { "path": "./packages/context/file-reference" },

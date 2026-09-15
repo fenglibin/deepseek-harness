@@ -195,6 +195,10 @@
     - id: ui-session
       name: '@deepseek-ai/dsh-client-ui-session'
 
+    # 统一资源模型：useResource 钩子背后的按协议提供方。
+    - id: resources
+      name: '@deepseek-ai/dsh-client-resources'
+
     - id: ui-sidebar
       name: '@deepseek-ai/dsh-client-ui-sidebar'
 

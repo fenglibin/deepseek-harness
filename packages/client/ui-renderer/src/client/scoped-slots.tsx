@@ -6,7 +6,7 @@ import { Component, useMemo, useState, useSyncExternalStore, type FC, type React
 import {
   ABDICATION_SCOPE_ROOT, SlotOwnershipError, StaleAuthorizationError, abdicationScopeOf,
   standardHookPropName,
-  type ChainRenderOpts, type HostObservable, type LocaleFace, type RenderOpts,
+  type ChainRenderOpts, type HostObservable, type KeyedStandardSource, type LocaleFace, type RenderOpts,
   type ScopedStandardSourceBinding, type SessionAreaProps, type SessionProviderComponent, type SlotRenderer,
   type SlotRendererHost, type SlotScope, type SlotScopeAdapter, type StandardSourceBinding,
   type StoredEntry, type Translate,
@@ -114,17 +114,26 @@ function runInject(entry: StoredEntry, binding: StandardSourceBinding | undefine
 }
 
 /**
- * Normalize one entry-owned inject face on its existing cache axis. Its hooks
- * compartment remains the original Observable-only contract.
+ * 在既有 cache 轴上归一化一个 entry 自有的 inject face。`hooks` 分区保持
+ * Observable-only 的原契约，`keyedHooks` 分区在此同时绑定为按 key 的选择器钩子。
  */
 function bindInjectHooks(face: InjectedProps): InjectedProps {
   const sources = face['hooks']
-  if (sources === undefined) return face
-  const { hooks: _hooks, ...rest } = face
+  const keyedSources = face['keyedHooks']
+  if (sources === undefined && keyedSources === undefined) return face
+  const { hooks: _hooks, keyedHooks: _keyedHooks, ...rest } = face
   const bound: InjectedProps = rest
-  for (const [name, source] of Object.entries(sources as Record<string, HostObservable<unknown>>)) {
+  for (const [name, source] of Object.entries(
+    (sources ?? {}) as Record<string, HostObservable<unknown>>,
+  )) {
     const hookName = standardHookPropName(name)
     bound[hookName] = observableHook(source)
+  }
+  for (const [name, source] of Object.entries(
+    (keyedSources ?? {}) as Record<string, KeyedStandardSource>,
+  )) {
+    const hookName = standardHookPropName(name)
+    bound[hookName] = keyedObservableHook(source)
   }
   return bound
 }
