@@ -93,7 +93,7 @@ type ProjectionChangeListener = (
 ) => void
 ```
 
-`snapshot(session)` 完全同步：载体在切出页面切片的同一 tick 内读取它，因此 `asOfSeq` 使两次读取使用同一个序号。它只返回客户端视图，并在返回前通过各单元的 `viewSchema` 校验。`stateOf(session, key)` 可在不计算无关视图的情况下读取一份实时 host 状态；调用方不得修改这一借用引用。对于每个已提交事件，变更流会为每个状态*引用*已变化的客户端可见单元触发一次；状态未变时，`apply` 必须返回同一引用。
+`snapshot(session)` 完全同步：载体在切出页面切片的同一 tick 内读取它，因此 `asOfSeq` 使两次读取使用同一个序号。它只返回客户端视图，并在返回前通过各单元的 `viewSchema` 校验。`stateOf(session, key)` 可在不计算无关视图的情况下读取一份实时 host 状态；调用方不得修改这一借用引用。对于每个已提交事件，变更流会为每个*原始 view 引用*已变化的客户端可见单元触发一次。两层 `Object.is` 闸门依次生效：状态引用不变时跳过 view 计算，原始 view 引用不变时抑制发布。
 
 ## 注册表：`ctx.sessionProjections`
 

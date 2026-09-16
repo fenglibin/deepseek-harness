@@ -124,13 +124,49 @@ describe('循环持有的请求冻结证明', () => {
     // 首轮没有可复用的证明，需要遍历已恢复/新增的全部消息。
     const [first, ...later] = traversed as [number, ...number[]]
     expect(first).toBeGreaterThan(0)
-    // 后续每轮只遍历本轮新增的消息，因此遍历量落在一个窄带内而与历史长度
-    // 无关（实测 77、76、76、76）。若证明未被复用，每轮都会重新走完整段
-    // 历史，遍历量随 messageCounts 每轮 +2 条消息持续增长、带宽发散。
-    const spread = Math.max(...later) - Math.min(...later)
-    expect(spread).toBeLessThanOrEqual(4)
-    // 且量级与历史长度脱钩：末轮有 9 条消息，线性重冻结会遍历到数百个节点。
-    expect(Math.max(...later)).toBeLessThan(messageCounts.at(-1)! * 20)
+    // 后续每轮只遍历本轮新增的两条消息，因此遍历量不得逐轮增长（实测优化后为
+    // 76、77、76、76，仅 ±1 抖动）；若证明未被复用，每轮重走整段历史，遍历量
+    // 会随历史线性攀升（实测无优化时为 76、81、88、96、104）。
+    // 断言「无增长趋势」而不是「各轮极差小」：极差在序列含上升趋势时仍可能
+    // 偶然落进窄带，而逐对比较直接锁定「不随历史增长」这一契约本身。
+    for (let index = 1; index < later.length; index++) {
+      expect(later[index]!).toBeLessThanOrEqual(later[index - 1]! + 2)
+    }
+    // 且量级与历史长度脱钩：末轮有 9 条消息，线性重冻结会遍历到上百个节点。
+    expect(Math.max(...later)).toBeLessThan(first + Math.max(...messageCounts) * 4)
+  })
+
+  it('首次遍历失败的消息身份在下一次请求中被重新尝试冻结', async () => {
+    const adapter = new MockAdapter([textResponse('done')])
+    const ctx = await harness(adapter)
+    const agent = ctx.agentLoop.create(SessionId('freeze-failure'), { provider: 'mock', model: 'mock' })
+    // 先落一条历史消息，让它成为后续请求里被复用的身份。
+    const message = agent.session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'history' }], source: { kind: 'user' },
+    }), { surfaceOp: 'append' }).data
+
+    const real = values.deepFreeze
+    let traversals = 0
+    vi.spyOn(values, 'deepFreeze').mockImplementation(((value: never) => {
+      // 只让**第一次**遍历这条消息时抛错，模拟一次失败的冻结。
+      if (value === message && ++traversals === 1) throw new Error('freeze traversal failed')
+      return real(value)
+    }) as never)
+
+    const errors: unknown[] = []
+    ctx.on('agent/error', (payload: { error: unknown }) => { errors.push(payload.error) })
+
+    await send(agent, 'failed turn')
+    // 失败的那一轮不得派发任何请求，错误原样冒泡。
+    expect(errors).toEqual([new Error('freeze traversal failed')])
+    expect(adapter.requests).toHaveLength(0)
+
+    // 第二次请求必须重新尝试冻结同一身份——失败的遍历不能进证明集合。
+    await send(agent, 'retry turn')
+    expect(adapter.requests).toHaveLength(1)
+    expect(traversals).toBe(2)
+    expect(adapter.requests[0]!.messages[0]).toBe(message)
+    expectFrozen(adapter.requests[0])
   })
 
   it('派发的请求仍被完整冻结，且取消信号保持可变', async () => {
