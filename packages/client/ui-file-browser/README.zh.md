@@ -1,5 +1,5 @@
 ---
-description: "Web GUI 的工作区文件浏览器：在工作区行菜单里贡献「工作区文件」条目，并打开一个左树右内容区的文件管理器，文本可带语法高亮编辑保存、图片只查看。"
+description: "Web GUI 的文件浏览器：在工作区行菜单里贡献「文件浏览器」条目，并打开一个左树右内容区的文件管理器，文本可带语法高亮编辑保存、图片只查看。"
 kind: "package-reference"
 ---
 
@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## 概述
 
-本包把两个贡献挂进 Web GUI：一个工作区行「...」菜单里的**工作区文件**条目，以及一个挂在 `shell.overlay` 上的文件管理器弹层。弹层左侧是工作区目录的懒加载树（含文件名搜索、新建、重命名、删除），右侧是选中文件的内容区。文本文件进编辑器，带按扩展名解析的 shiki 语法着色，可编辑并保存；图片用 `<img>` 查看；二进制与超过大小上限的文件给出明确提示而不进编辑器。所有磁盘操作都经由 Host 的 `fileBrowser` Remote（[`dsh-api-file-browser`](../../api/file-browser/README.zh.md)）。
+本包把两个贡献挂进 Web GUI：一个工作区行「...」菜单里的**文件浏览器**条目，以及一个挂在 `shell.overlay` 上的文件管理器弹层。弹层左侧是工作区目录的懒加载树（含文件名搜索、新建、重命名、删除），右侧是选中文件的内容区。文本文件进编辑器，带按扩展名解析的 shiki 语法着色，可编辑并保存；图片用 `<img>` 查看；二进制与超过大小上限的文件给出明确提示而不进编辑器。所有磁盘操作都经由 Host 的 `fileBrowser` Remote（[`dsh-api-file-browser`](../../api/file-browser/README.zh.md)）。
 
 ## 目录
 
@@ -21,7 +21,7 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-把本插件与 `dsh-api-file-browser`、`ui-workspace` 一起挂载即可。它出现在组合里之后，每个真实工作区行的菜单就多出**工作区文件**一项；Ungrouped 分桶没有菜单，因此也没有该条目。
+把本插件与 `dsh-api-file-browser`、`ui-workspace` 一起挂载即可。它出现在组合里之后，每个真实工作区行的菜单就多出**文件浏览器**一项；Ungrouped 分桶没有菜单，因此也没有该条目。
 
 ### 弹层的两列
 

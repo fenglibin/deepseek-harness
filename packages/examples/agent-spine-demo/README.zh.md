@@ -52,7 +52,7 @@ kind: "package-reference"
 - name: '@deepseek-ai/dsh-bash-local'     # executor for ctx.shell
 ```
 
-`workspaceContext` 是唯一必填字段：给它一个字节预算，工作区文件就会加载进 agent 上下文；设 `false` 则得到隔离提示词。`agents` 默认为空，因此请传入你想运行的 agent——或者当你的入口按需创建 agent 时省略它（ACP 应用就是这样）。当 agent 回答第一个提示词且会话被保存时，说明配置成功。
+`workspaceContext` 是唯一必填字段：给它一个字节预算，文件浏览器就会加载进 agent 上下文；设 `false` 则得到隔离提示词。`agents` 默认为空，因此请传入你想运行的 agent——或者当你的入口按需创建 agent 时省略它（ACP 应用就是这样）。当 agent 回答第一个提示词且会话被保存时，说明配置成功。
 
 | 字段 | 默认值 | 配置内容 |
 |---|---|---|
@@ -65,7 +65,7 @@ kind: "package-reference"
 | `tools` | `{ mode: 'native' }` | 工具如何到达模型：native schema、PTC mode 或两者 |
 | `dshHome` | `$DSH_HOME` 或 `~/.dsh` | bash 环境与本地 skill 目录使用的 harness 主目录 |
 | `sessionTitle` | 示例限制 | 后备标题限制：5 个词、40 个后备字节、80 个可接受字节 |
-| `workspaceContext` | 必填 | 加载工作区文件进上下文的字节预算，或 `false` |
+| `workspaceContext` | 必填 | 加载文件浏览器进上下文的字节预算，或 `false` |
 | `skills` | 启用 | 是否加载本地 skill 并提供 skill 工具 |
 | `toolBash` | 挂载 | bash 工具；当其他插件拥有 `bash` 时设 `false` |
 | `jobs` | 拥有者默认值 | 每个 owner 可同时运行的后台任务数 |

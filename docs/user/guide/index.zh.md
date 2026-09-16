@@ -18,7 +18,7 @@
 
 > Summarize this repository and identify its main packages.
 
-Agent（智能体）可以读取和编辑工作区文件、运行命令、委派工作并维护计划。如果根据当前权限策略，某项操作需要审批，Web UI 会先询问你。
+Agent（智能体）可以读取和编辑文件浏览器、运行命令、委派工作并维护计划。如果根据当前权限策略，某项操作需要审批，Web UI 会先询问你。
 
 ## 继续使用
 

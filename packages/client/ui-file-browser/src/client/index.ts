@@ -2,7 +2,7 @@
  * Workspace file browser, browser half. Two registrations share one piece of
  * state:
  *
- * - a `ctx.workspaceRowMenu` entry named "工作区文件", which pushes the
+ * - a `ctx.workspaceRowMenu` entry named "文件浏览器", which pushes the
  *   Workspace it was invoked for onto the open-request source;
  * - a `shell.overlay` entry, which subscribes to that source and renders the
  *   dialog for whichever Workspace is currently requested.

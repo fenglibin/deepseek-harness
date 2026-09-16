@@ -273,7 +273,7 @@
     - id: ui-workspace
       name: '@deepseek-ai/dsh-client-ui-workspace'
 
-    # Workspace file browser: a "工作区文件" entry on each Workspace row menu
+    # Workspace file browser: a "文件浏览器" entry on each Workspace row menu
     # opening a tree-and-editor dialog over the workspace directory. Remove to
     # take the entry and its dialog out of the composition.
     - id: ui-file-browser

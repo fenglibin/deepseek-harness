@@ -152,7 +152,7 @@ typert 加载器与注册表校验 schema 与严格编解码时 SHALL 校验其�
 
 ### Requirement: 测试生成产物不被跟踪
 
-`packages/typert/generator/tests/` 下的 `.generated-*` 临时产物 SHALL NOT 被 git 跟踪，但在分叉点就已被跟踪且与官方一致的 2 个历史遗留 SHALL 保持跟踪。清理 MUST 使用 `git rm --cached`，MUST NOT 删除工作区文件。
+`packages/typert/generator/tests/` 下的 `.generated-*` 临时产物 SHALL NOT 被 git 跟踪，但在分叉点就已被跟踪且与官方一致的 2 个历史遗留 SHALL 保持跟踪。清理 MUST 使用 `git rm --cached`，MUST NOT 删除文件浏览器。
 
 #### Scenario: 清理后 gitignore 规则生效
 
@@ -166,7 +166,7 @@ typert 加载器与注册表校验 schema 与严格编解码时 SHALL 校验其�
 - **THEN** `.generated-model-O7FJNT/host.mjs` 与 `.generated-model-qwn8sk/host.mjs` SHALL 仍在索引中
 - **AND** 其内容 SHALL 与分叉点一致
 
-#### Scenario: 清理保留工作区文件
+#### Scenario: 清理保留文件浏览器
 
 - **WHEN** 执行清理
 - **THEN** 磁盘上的生成产物 SHALL 保持存在

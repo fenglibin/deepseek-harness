@@ -95,7 +95,7 @@ export function apply(ctx) {
 
 <a id="known-limitations-and-deferred-work"></a>
 
-- **本批次落地后暂无协议属主与消费者**：本地缺少工作区文件（`api/workspace-files`）与右侧栏文档预览（`ui-sidebar-documentpreview`、`ui-sidebar-right`）等消费方，因此当前组合中没有任何协议被注册。本包是这些批次的前置基础设施，keyed 钩子的类型合成（`keyedHooks` → `useResource`）已有独立价值与端到端测试；消费者在后续侧栏批次接入。
+- **本批次落地后暂无协议属主与消费者**：本地缺少文件浏览器（`api/workspace-files`）与右侧栏文档预览（`ui-sidebar-documentpreview`、`ui-sidebar-right`）等消费方，因此当前组合中没有任何协议被注册。本包是这些批次的前置基础设施，keyed 钩子的类型合成（`keyedHooks` → `useResource`）已有独立价值与端到端测试；消费者在后续侧栏批次接入。
 - **记录在页面存续期内保留**——地址的记录在最后一个持有者离开后仍留在注册表中，只丢弃其状态。内存随读取过的不同地址数增长，而非随读取次数增长。
 - **中止合规由提供方负责**——注册表会丢弃已释放的流仍产出的帧，但忽略 `signal` 的提供方会一直工作到它的下一帧。
 

@@ -40,7 +40,7 @@ inject face 有两个保留分区，都在组件 props 上合成 `use<Name>` 钩
 
 ### 资源协议合并点
 
-`ResourceProtocolMap` 在本包声明为空，是「URL scheme → 该协议的值类型」的零依赖合并点：协议属主（例如工作区文件）在此合并自己的成员，消费方以 `useResource<P>(address)` 按 `P` 收窄值的类型，而无需依赖资源实现包。资源服务本身与 `useResource` 标准钩子由 [resources](../resources/README.zh.md) 提供。
+`ResourceProtocolMap` 在本包声明为空，是「URL scheme → 该协议的值类型」的零依赖合并点：协议属主（例如文件浏览器）在此合并自己的成员，消费方以 `useResource<P>(address)` 按 `P` 收窄值的类型，而无需依赖资源实现包。资源服务本身与 `useResource` 标准钩子由 [resources](../resources/README.zh.md) 提供。
 
 ### Store 席位
 

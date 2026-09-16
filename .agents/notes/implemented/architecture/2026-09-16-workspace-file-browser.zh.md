@@ -1,4 +1,4 @@
-# Agent Note: 工作区文件浏览器与工作区行菜单扩展点
+# Agent Note: 文件浏览器与工作区行菜单扩展点
 
 Status: implemented
 
@@ -74,7 +74,7 @@ interface WorkspaceRowMenuContribution {
 
 **用一个 `sidebar.workspaces.rowMenu` slot 承载菜单项。** 否决：slot 的货币是 ReactNode 组合，而这里需要的是数据加回调的增量列表；且该 slot 的 owner 会是 ui-workspace 自己，贡献方拿不到 owner 渲染时机之外的东西。
 
-**在 ui-workspace 内联「工作区文件」并探测可选服务。** 改动更小，但第二个插件想加菜单项时还要再改一次 ui-workspace，且卸载路径把菜单项与探测分支耦合在一起。
+**在 ui-workspace 内联「文件浏览器」并探测可选服务。** 改动更小，但第二个插件想加菜单项时还要再改一次 ui-workspace，且卸载路径把菜单项与探测分支耦合在一起。
 
 **引入 CodeMirror 或 Monaco。** 否决：以零新依赖换取与现有高亮单例、主题 token 完全一致，代价是编辑体验为纯文本编辑加彩色底纹，没有自动缩进与括号匹配——这是明确接受的取舍。
 

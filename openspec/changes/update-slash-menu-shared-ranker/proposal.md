@@ -13,7 +13,7 @@
 - 新增 `packages/client/ui-primitives/src/rank-by-name.ts`，导出 `rankByName`
 - 删除 `ui-commands` 的内联实现，改调 `rankByName`
 - 把 `ui-skill` 的前缀过滤改为 `rankByName`
-- 补充 `ui-skill` 缺少的子 agent 会话守卫
+- 确认 `ui-skill` 既有的子 agent 会话守卫覆盖候选源与预热路径
 
 ## 不做什么
 

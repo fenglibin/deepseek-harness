@@ -1,4 +1,4 @@
-# 为 Web GUI 增加工作区文件浏览器
+# 为 Web GUI 增加文件浏览器
 
 ## 为什么
 
@@ -7,7 +7,7 @@
 ## 改什么
 
 1. 新增 Host 包 `packages/api/file-browser`（`@deepseek-ai/dsh-api-file-browser`），提供 Remote namespace `fileBrowser`：工作区受限的目录列举、文本读取、文本写入、新建、重命名、删除、文件名搜索；另注册精确 Fetch 路由 `/api/file.asset` 供图片字节直连。
-2. 新增 Client 插件包 `packages/client/ui-file-browser`（`@deepseek-ai/dsh-client-ui-file-browser`）：向工作区行菜单贡献「工作区文件」条目，并向 `shell.overlay` 注册文件管理器弹层（左树 + 右内容区）。
+2. 新增 Client 插件包 `packages/client/ui-file-browser`（`@deepseek-ai/dsh-client-ui-file-browser`）：向工作区行菜单贡献「文件浏览器」条目，并向 `shell.overlay` 注册文件管理器弹层（左树 + 右内容区）。
 3. `packages/client/ui-workspace` 新增可插拔的 `ctx.workspaceRowMenu` 注册表服务；工作区行「...」菜单按它渲染贡献项，破坏性操作始终留在菜单末尾。
 4. 内容编辑器复用 `ui-primitives` 现有的 shiki 单例做语法渲染（覆盖 TypeScript/JavaScript、Python、Ruby、Go、Rust、Java、C、C++、C#、Kotlin、Swift、PHP、shell、Lua、SQL，以及 JSON、YAML、TOML、INI、XML/HTML、CSS/SCSS/LESS、Markdown/MDX）；编辑态是 textarea 叠加在高亮层之上。
 5. 非文本内容按类型降级：图片在右侧用 `<img>` 查看，其余二进制与超过上限的文件给出明确提示而不进编辑器。

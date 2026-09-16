@@ -39,7 +39,7 @@ Session 行内的 Rename 操作打开一个以该行显示标题预填的对话�
 
 ### 工作区行菜单的扩展点
 
-工作区行「...」菜单的条目集合由 `ctx.workspaceRowMenu` 提供：任何插件都能注册贡献项，注册返回的 disposer 随注册方 fiber 生命周期生效，卸载后该条目即从菜单消失。内置的重命名在最前、破坏性的删除在最后，贡献项按 `order`（同值按注册顺序）排在两者之间。贡献项只携带 JSON 兼容数据与它自己的选择回调——标签由贡献方用自己的 locale 命名空间绑好再传入；图标不经由此处传递，因为 ReactNode 不能跨 UI 领域。Ungrouped 分桶没有菜单，因此也没有任何贡献项。**工作区文件**条目就是这样一个贡献（[`dsh-client-ui-file-browser`](../ui-file-browser/README.zh.md)）。
+工作区行「...」菜单的条目集合由 `ctx.workspaceRowMenu` 提供：任何插件都能注册贡献项，注册返回的 disposer 随注册方 fiber 生命周期生效，卸载后该条目即从菜单消失。内置的重命名在最前、破坏性的删除在最后，贡献项按 `order`（同值按注册顺序）排在两者之间。贡献项只携带 JSON 兼容数据与它自己的选择回调——标签由贡献方用自己的 locale 命名空间绑好再传入；图标不经由此处传递，因为 ReactNode 不能跨 UI 领域。Ungrouped 分桶没有菜单，因此也没有任何贡献项。**文件浏览器**条目就是这样一个贡献（[`dsh-client-ui-file-browser`](../ui-file-browser/README.zh.md)）。
 
 ### 待处理交互
 

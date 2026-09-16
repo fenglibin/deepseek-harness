@@ -34,7 +34,7 @@
 
 ### D6 补子 agent 会话守卫
 
-官方 `ui-skill` 的候选源在取目录前有 `if (sessions.subagentAddress(session.sessionId) !== undefined) return []`，使子 agent 会话不暴露 skill 候选。本地缺该守卫。它与排序器无关，但同属该候选源的契约，一并补齐。
+官方 `ui-skill` 的候选源在取目录前有 `if (sessions.subagentAddress(session.sessionId) !== undefined) return []`，使子 agent 会话不暴露 skill 候选。**本地基线已有等价守卫**（`packages/client/ui-skill/src/client/index.ts` 的 `fetchCatalog` 首行），本变更确认它覆盖候选源与预热两条路径，无需新增。
 
 ## 被拒绝的方案
 

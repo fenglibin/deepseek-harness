@@ -7,8 +7,8 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
-  'menu.open': '工作区文件',
-  'dialog.title': '工作区文件',
+  'menu.open': '文件浏览器',
+  'dialog.title': '文件浏览器',
   'dialog.close': '关闭',
 
   'tree.aria': '文件树',

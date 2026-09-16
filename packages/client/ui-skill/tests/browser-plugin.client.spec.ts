@@ -5,7 +5,7 @@
  * the source behavior contract driven directly on the captured source with
  * real ClientSessionContext projections — sessionId addressing, the
  * session-keyed catalog cache (single-flight per key, scope-birth warm
- * prewarm, connection/reset clear), startsWith filtering, RPC-failure
+ * prewarm, connection/reset clear), shared name ranking, RPC-failure
  * rejection, pick → plain-text outcome (the plain-text-reference decision:
  * .agents/notes/implemented/architecture/2026-07-25-web-input-machine-and-slash-pipeline.zh.md),
  * the synchronous
@@ -158,7 +158,7 @@ describe('apply', () => {
 })
 
 describe('candidates: sessionId addressing', () => {
-  it('lists via {sessionId} and filters by startsWith(query)', async () => {
+  it('lists via {sessionId} and ranks by the shared menu ranker', async () => {
     const { list, payloads } = countingList()
     const { source } = await bench(list)
     const items = await source.candidates(proj('s1'), req('co'))
@@ -168,6 +168,22 @@ describe('candidates: sessionId addressing', () => {
       { name: 'commit-helper', description: 'commit flow' },
       { name: 'code-review', description: 'review flow' },
     ])
+  })
+
+  it('matches an ordered subsequence, not only a prefix', async () => {
+    const { source } = await bench(countingList().list)
+    // `crv` 不是任何名称的前缀，但 `code-review` 含 c-r-v 有序子序列；
+    // 旧的 `startsWith` 实现会在这里返回空。
+    expect((await source.candidates(proj('s1'), req('crv'))).map(item => item.name))
+      .toEqual(['code-review'])
+    // 前缀命中优先于更强的非前缀对齐，与命令组同一套排序。
+    expect((await source.candidates(proj('s1'), req('de'))).map(item => item.name))
+      .toEqual(['deploy', 'code-review'])
+  })
+
+  it('keeps an unrelated query empty', async () => {
+    const { source } = await bench(countingList().list)
+    expect(await source.candidates(proj('s1'), req('zzzz'))).toEqual([])
   })
 
   it('rejects on a failed result (the slash shell owns the menu-side fold)', async () => {

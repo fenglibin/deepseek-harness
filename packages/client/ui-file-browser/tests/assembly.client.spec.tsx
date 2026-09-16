@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * The assembled chain a product user actually walks: ui-workspace's row menu →
- * the contributed "工作区文件" entry → the file-browser dialog over
+ * the contributed "文件浏览器" entry → the file-browser dialog over
  * `ctx.remote.fileBrowser`.
  *
  * Both plugins run their real `apply` here — the contribution rides the real
@@ -126,7 +126,7 @@ describe('workspace file browser through the assembled browser', () => {
     const view = runtime.renderRoot()
     const row = (await view.findByText('alpha')).closest('[role="treeitem"]') as HTMLElement
     fireEvent.click(within(row).getByLabelText('工作区“alpha”的操作'))
-    expect(await view.findByRole('menuitem', { name: '工作区文件', hidden: true })).toBeTruthy()
+    expect(await view.findByRole('menuitem', { name: '文件浏览器', hidden: true })).toBeTruthy()
     // The built-in verbs keep their places around the contribution.
     expect(view.getByRole('menuitem', { name: '重命名', hidden: true })).toBeTruthy()
     expect(view.getByRole('menuitem', { name: '删除工作区', hidden: true })).toBeTruthy()
@@ -138,10 +138,10 @@ describe('workspace file browser through the assembled browser', () => {
     const view = runtime.renderRoot()
     const row = (await view.findByText('alpha')).closest('[role="treeitem"]') as HTMLElement
     fireEvent.click(within(row).getByLabelText('工作区“alpha”的操作'))
-    fireEvent.click(await view.findByRole('menuitem', { name: '工作区文件', hidden: true }))
+    fireEvent.click(await view.findByRole('menuitem', { name: '文件浏览器', hidden: true }))
 
     // The dialog lands and lists the requested Workspace's root.
-    await view.findByRole('dialog', { name: /工作区文件/ })
+    await view.findByRole('dialog', { name: /文件浏览器/ })
     await waitFor(() => { expect(fileBrowser.calls).toContain('list:') })
     expect(await view.findByText('README.md')).toBeTruthy()
     await runtime.dispose()
@@ -152,7 +152,7 @@ describe('workspace file browser through the assembled browser', () => {
     const view = runtime.renderRoot()
     const row = (await view.findByText('alpha')).closest('[role="treeitem"]') as HTMLElement
     fireEvent.click(within(row).getByLabelText('工作区“alpha”的操作'))
-    await view.findByRole('menuitem', { name: '工作区文件', hidden: true })
+    await view.findByRole('menuitem', { name: '文件浏览器', hidden: true })
     // Close the menu so the surviving-verbs assertion below reopens it cleanly.
     fireEvent.keyDown(document, { key: 'Escape' })
 
@@ -161,7 +161,7 @@ describe('workspace file browser through the assembled browser', () => {
 
     fireEvent.click(within(row).getByLabelText('工作区“alpha”的操作'))
     // The contributed row is gone; the built-in verbs survive it.
-    expect(view.queryByRole('menuitem', { name: '工作区文件', hidden: true })).toBeNull()
+    expect(view.queryByRole('menuitem', { name: '文件浏览器', hidden: true })).toBeNull()
     expect(view.getByRole('menuitem', { name: '重命名', hidden: true })).toBeTruthy()
     await runtime.dispose()
   })

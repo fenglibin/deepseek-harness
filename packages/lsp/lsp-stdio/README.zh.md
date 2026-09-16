@@ -108,7 +108,7 @@ kind: "package-reference"
 
 ### 协议行为
 
-初始化会声明 UTF-16 位置、工作区文件夹与配置、markdown／plaintext hover，以及定义与实现使用的 link 支持，且不进行动态注册；服务器返回的能力具有最终决定权。服务器省略 `positionEncoding` 时默认为 `utf-16`；其他任何值都会使查询失败。客户端通过静态配置回答 `workspace/configuration`，接受生命周期记账请求，并拒绝 `workspace/applyEdit`——它绝不应用编辑或运行命令。导航直接映射 `Location`，并从 `LocationLink` 的 `targetUri` + `targetSelectionRange` 映射；hover 规范化接受 `MarkupContent` 与 `MarkedString` 形状，保留字符串值，把带 language tag 的值渲染为围栏代码，并用一个空行连接数组。缺失结果、格式错误的范围或位置，以及格式错误的 hover 编码，都会以结构化 `LSP_MALFORMED_RESPONSE` 错误失败。
+初始化会声明 UTF-16 位置、文件浏览器与配置、markdown／plaintext hover，以及定义与实现使用的 link 支持，且不进行动态注册；服务器返回的能力具有最终决定权。服务器省略 `positionEncoding` 时默认为 `utf-16`；其他任何值都会使查询失败。客户端通过静态配置回答 `workspace/configuration`，接受生命周期记账请求，并拒绝 `workspace/applyEdit`——它绝不应用编辑或运行命令。导航直接映射 `Location`，并从 `LocationLink` 的 `targetUri` + `targetSelectionRange` 映射；hover 规范化接受 `MarkupContent` 与 `MarkedString` 形状，保留字符串值，把带 language tag 的值渲染为围栏代码，并用一个空行连接数组。缺失结果、格式错误的范围或位置，以及格式错误的 hover 编码，都会以结构化 `LSP_MALFORMED_RESPONSE` 错误失败。
 
 </details>
 

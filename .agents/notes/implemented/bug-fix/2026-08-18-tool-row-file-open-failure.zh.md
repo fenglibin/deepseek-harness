@@ -19,7 +19,7 @@ Host 消息按抛出内容展示。聊天视图的 `openFile` adapter 会在 Rem
 ## 考虑过的替代方案
 
 - **按行内联错误。** Host 调用由会话拥有，多个入口共用一个打开器；行内横幅会在每个点击目标旁重复同一拒绝。
-- **没有重试的 toast。** 产品要求同时给出原因和重试入口。工作区文件夹采纳对话框已经把这两者配对。
+- **没有重试的 toast。** 产品要求同时给出原因和重试入口。文件浏览器采纳对话框已经把这两者配对。
 - **写入 chat store 并跨 remount 保留。** 打开失败是瞬时视图状态。chat store 会在视图 remount 后存活，于是残留对话框会在无法有效重试原手势的页签切换之后回来。
 
 ## 后果
@@ -28,4 +28,4 @@ Host 消息按抛出内容展示。聊天视图的 `openFile` adapter 会在 Rem
 
 ## 测试
 
-包测试覆盖 inject 拒绝、对话框文案（Error、非 Error、空文本、工作区文件夹）、同一路径重试、取消，以及关闭之后才落到的结果。`apps/web/tests/seeded-history.e2e.ts` 在冷恢复的 read 行上把 `session/openWorkspacePath` stub 为失败，用 `file-open-failure.expected.md` 钉住组装后的对话框，并断言英文原因以及对同一 payload 的第二次调用。
+包测试覆盖 inject 拒绝、对话框文案（Error、非 Error、空文本、文件浏览器）、同一路径重试、取消，以及关闭之后才落到的结果。`apps/web/tests/seeded-history.e2e.ts` 在冷恢复的 read 行上把 `session/openWorkspacePath` stub 为失败，用 `file-open-failure.expected.md` 钉住组装后的对话框，并断言英文原因以及对同一 payload 的第二次调用。

@@ -5,8 +5,8 @@
 ## 1. 前置清理
 
 - [x] 1.1 用 `git ls-files packages/typert/generator/tests/ | grep '\.generated-'` 列出被跟踪的临时产物清单（当前 49 个文件），并确认其中 2 个在分叉点 `0a53fb55be` 时就已存在且与官方逐字一致 (covers: typert/两个历史遗留保持跟踪, design/D9)
-- [x] 1.2 对 **47 个**需清理的目录执行 `git rm --cached -r`（排除 `.generated-model-O7FJNT/host.mjs` 与 `.generated-model-qwn8sk/host.mjs`），保留工作区文件；确认 `.gitignore:63` 规则此后对新产物生效 (covers: typert/清理后 gitignore 规则生效, typert/清理保留工作区文件, design/D9)
-- [x] 1.3 跑一次 `packages/typert/generator` 测试，确认清理未影响测试通过（产物仍在磁盘上） (covers: typert/清理保留工作区文件, design/D9)
+- [x] 1.2 对 **47 个**需清理的目录执行 `git rm --cached -r`（排除 `.generated-model-O7FJNT/host.mjs` 与 `.generated-model-qwn8sk/host.mjs`），保留文件浏览器；确认 `.gitignore:63` 规则此后对新产物生效 (covers: typert/清理后 gitignore 规则生效, typert/清理保留文件浏览器, design/D9)
+- [x] 1.3 跑一次 `packages/typert/generator` 测试，确认清理未影响测试通过（产物仍在磁盘上） (covers: typert/清理保留文件浏览器, design/D9)
 - [x] 1.4 记录副作用：`consumer.ts` 等产物移出索引后 oxlint 检查面缩小；`tsconfig` 的 `include` 只有 `src`，不影响 `tsc` (covers: design/D9)
 
 ## 2. 生成器
