@@ -905,6 +905,24 @@ importers:
         specifier: workspace:^
         version: link:../../workspace/workspace
 
+  packages/api/session-file-revisions:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@deepseek-ai/dsh-session-file-revisions':
+        specifier: workspace:^
+        version: link:../../fs/session-file-revisions
+      '@deepseek-ai/dsh-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
+
   packages/api/settings-controller:
     dependencies:
       '@deepseek-ai/schemastery':
