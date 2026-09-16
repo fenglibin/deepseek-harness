@@ -16,8 +16,6 @@ import { ImageChip } from './ImageChip.tsx'
 
 /** Locale-owned chip labels cached at insert time (the decorator has no locale seat). */
 export interface ImageChipLabels {
-  /** Remove-button accessible name. */
-  readonly removeLabel: string
   /** Fallback alt for a nameless image. */
   readonly pendingAlt: string
   /** Preview dialog accessible name. */
@@ -49,8 +47,6 @@ export class ImageChipNode extends DecoratorNode<JSX.Element> {
   __height: number | undefined
   /** Insert-time cached locale labels (see ImageChipLabels). */
   __labels: ImageChipLabels
-  /** Drop callback owned by the shell; absent for a deserialized node (never mounted). */
-  __onRemove: ((id: DraftAttachmentId) => void) | undefined
 
   /** Lexical node registry type tag. */
   static override getType(): string {
@@ -60,7 +56,7 @@ export class ImageChipNode extends DecoratorNode<JSX.Element> {
   /**
    * Clone with identity (Lexical writable-copy contract).
    * @param node - node to clone.
-   * @returns a copy carrying the same NodeKey, labels, and callback.
+   * @returns a copy carrying the same NodeKey and labels.
    */
   static override clone(node: ImageChipNode): ImageChipNode {
     return new ImageChipNode(
@@ -72,7 +68,6 @@ export class ImageChipNode extends DecoratorNode<JSX.Element> {
         ...(node.__height === undefined ? {} : { height: node.__height }),
       },
       node.__labels,
-      node.__onRemove,
       node.__key,
     )
   }
@@ -92,15 +87,13 @@ export class ImageChipNode extends DecoratorNode<JSX.Element> {
         ...(json.width === undefined ? {} : { width: json.width }),
         ...(json.height === undefined ? {} : { height: json.height }),
       },
-      { removeLabel: '', pendingAlt: '', lightboxDialog: '', lightboxClose: '' },
-      undefined,
+      { pendingAlt: '', lightboxDialog: '', lightboxClose: '' },
     )
   }
 
   /**
    * @param insert - the attachment display cache (browser-owned bytes excluded).
    * @param labels - insert-time cached locale labels.
-   * @param onRemove - shell-owned drop callback; absent for a deserialized node.
    * @param key - Lexical clone-path key; absent for fresh nodes.
    */
   constructor(
@@ -110,7 +103,6 @@ export class ImageChipNode extends DecoratorNode<JSX.Element> {
       height?: number
     },
     labels: ImageChipLabels,
-    onRemove: ((id: DraftAttachmentId) => void) | undefined,
     key?: NodeKey,
   ) {
     super(key)
@@ -120,7 +112,6 @@ export class ImageChipNode extends DecoratorNode<JSX.Element> {
     this.__width = insert.width
     this.__height = insert.height
     this.__labels = labels
-    this.__onRemove = onRemove
   }
 
   /** Serialize to the JSON node form (locale labels and the callback stay out). */
@@ -181,16 +172,13 @@ export class ImageChipNode extends DecoratorNode<JSX.Element> {
   override decorate(): JSX.Element {
     return (
       <ImageChip
-        attachmentId={this.__attachmentId}
         previewUrl={this.__previewUrl}
         name={this.__name}
         {...(this.__width === undefined ? {} : { width: this.__width })}
         {...(this.__height === undefined ? {} : { height: this.__height })}
-        removeLabel={this.__labels.removeLabel}
         pendingAlt={this.__labels.pendingAlt}
         lightboxDialog={this.__labels.lightboxDialog}
         lightboxClose={this.__labels.lightboxClose}
-        onRemove={this.__onRemove}
       />
     )
   }
@@ -200,7 +188,6 @@ export class ImageChipNode extends DecoratorNode<JSX.Element> {
  * Mint one image chip node from an attachment insert.
  * @param insert - the attachment display cache.
  * @param labels - insert-time cached locale labels.
- * @param onRemove - shell-owned drop callback.
  * @returns the fresh node.
  */
 export function $createImageChipNode(
@@ -210,9 +197,8 @@ export function $createImageChipNode(
     height?: number
   },
   labels: ImageChipLabels,
-  onRemove: ((id: DraftAttachmentId) => void) | undefined,
 ): ImageChipNode {
-  return new ImageChipNode(insert, labels, onRemove)
+  return new ImageChipNode(insert, labels)
 }
 
 /**

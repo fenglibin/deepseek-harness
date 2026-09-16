@@ -97,7 +97,6 @@ function bench(over?: {
     defaultSink: sink,
     commandImages: { serialize, release, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` },
     imageLabels: {
-      remove: (name: string) => `remove ${name}`,
       pending: () => 'pending image',
       lightboxDialog: () => 'image preview',
       lightboxClose: () => 'close preview',

@@ -134,7 +134,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
     inputTriggers: () => controller,
     defaultSink: sink,
     commandImages: { serialize, release, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` },
-    imageLabels: { remove: () => '', pending: () => '', lightboxDialog: () => '', lightboxClose: () => '' },
+    imageLabels: { pending: () => '', lightboxDialog: () => '', lightboxClose: () => '' },
     releaseImage: () => {},
   })
   // The hub's listener wiring, verbatim.

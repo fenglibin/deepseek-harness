@@ -27,7 +27,6 @@ export const zh = {
   'image.pending': '待发送图片',
   'image.openOriginal': '查看原图',
   'image.openOriginalLabel': '{label}，点击查看原图',
-  'image.remove': '移除图片 {name}',
   'image.original': '原图',
   'image.label': '图片',
   'image.loadFailed': '图片加载失败，点击重试',

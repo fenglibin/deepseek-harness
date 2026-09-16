@@ -104,7 +104,6 @@ export class InputHub implements SessionInputResolver {
         }),
       },
       imageLabels: {
-        remove: name => this.t('image.remove', { name }),
         pending: () => this.t('image.pending'),
         lightboxDialog: () => this.t('image.preview'),
         lightboxClose: () => this.t('image.closePreview'),

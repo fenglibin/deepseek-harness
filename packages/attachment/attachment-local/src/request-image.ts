@@ -23,7 +23,24 @@ import { detectImage, encodedAlphaIsCompatible, probeImage } from './image.ts'
 import { requireSharp } from './sharp.ts'
 
 /** Transform version included in every cache and upload-index identity. */
-export const REQUEST_IMAGE_TRANSFORM_VERSION = 'request-image-v5'
+export const REQUEST_IMAGE_TRANSFORM_VERSION = 'request-image-v6'
+
+/**
+ * Longest edge a byte-driven downscale stops at. A source that will not fit
+ * the byte budget at this size keeps its smallest encoding instead: below the
+ * floor, more shrinking would trade the model's ability to read the image for
+ * bytes it cannot reliably win back.
+ */
+export const MIN_REQUEST_IMAGE_LONG_EDGE = 512
+
+/** Most byte-driven downscales applied after the pixel budget. */
+const MAX_DOWNSCALE_STEPS = 4
+
+/** Floor on one downscale factor, so a step always buys real bytes. */
+const MIN_DOWNSCALE_FACTOR = 0.5
+
+/** Ceiling on one downscale factor, so an over-optimistic ratio still moves. */
+const MAX_DOWNSCALE_FACTOR = 0.95
 
 interface EncodedRequestImage {
   data: Uint8Array
@@ -107,11 +124,89 @@ async function createRequestImage(
       height: attachment.ref.height,
     }
   }
-  const encodedVersion = await encodeFirstWithinLimit(
+  return encodeWithinBudget(attachment, dimensions, policy.maxBytes, hasAlpha)
+}
+
+/**
+ * One quality-ladder pass at one raster size.
+ * @param attachment - normalized source bytes and reference.
+ * @param dimensions - raster size to encode at.
+ * @param maxBytes - encoded-byte budget.
+ * @param hasAlpha - decoded source alpha fact selecting the codec.
+ * @returns the first fitting encoding, or the smallest one when none fits.
+ */
+async function encodeAtSize(
+  attachment: StoredImageAttachment,
+  dimensions: { readonly width: number; readonly height: number },
+  maxBytes: number,
+  hasAlpha: boolean,
+): Promise<EncodedRequestImage> {
+  const encoded = await encodeFirstWithinLimit(
     encodingLadder(pipeline(attachment, dimensions.width, dimensions.height), hasAlpha),
-    policy.maxBytes,
+    maxBytes,
   )
-  return isExhaustedEncoding(encodedVersion) ? encodedVersion.smallest : encodedVersion
+  return isExhaustedEncoding(encoded) ? encoded.smallest : encoded
+}
+
+/**
+ * Encode one source under the byte budget, shrinking the raster when the
+ * quality ladder alone cannot fit it. The ladder alone is no guarantee: its
+ * lowest rung can still exceed the budget, and the previous contract kept that
+ * oversized output. Each step rescales by the overflow the smallest rung
+ * reported, so a source that needs fewer pixels reaches them in a step or two.
+ * @param attachment - normalized source bytes and reference.
+ * @param dimensions - raster size the pixel budget allows.
+ * @param maxBytes - encoded-byte budget the result must fit.
+ * @param hasAlpha - decoded source alpha fact selecting the codec.
+ * @returns the fitting encoding, or the smallest one produced.
+ */
+async function encodeWithinBudget(
+  attachment: StoredImageAttachment,
+  dimensions: { readonly width: number; readonly height: number },
+  maxBytes: number,
+  hasAlpha: boolean,
+): Promise<EncodedRequestImage> {
+  let size = dimensions
+  let smallest = await encodeAtSize(attachment, size, maxBytes, hasAlpha)
+  for (let step = 0; step < MAX_DOWNSCALE_STEPS; step += 1) {
+    if (smallest.data.byteLength <= maxBytes) return smallest
+    const next = downscaledSize(size, smallest.data.byteLength, maxBytes)
+    if (next === undefined) return smallest
+    size = next
+    const candidate = await encodeAtSize(attachment, size, maxBytes, hasAlpha)
+    if (candidate.data.byteLength < smallest.data.byteLength) smallest = candidate
+  }
+  return smallest
+}
+
+/**
+ * The raster size for one byte-driven downscale, or undefined when a further
+ * step buys nothing: the current size already sits at the long-edge floor, or
+ * rounding would produce the same raster again. A step that would undershoot
+ * the floor is lifted back onto it, so the last attempt keeps the floor's
+ * legibility instead of a smaller raster that cannot fit either.
+ * @param current - size whose smallest encoding missed the budget.
+ * @param bytes - encoded bytes that smallest encoding cost.
+ * @param maxBytes - encoded-byte budget to aim at.
+ * @returns the next smaller size, or undefined when no step remains.
+ */
+function downscaledSize(
+  current: { readonly width: number; readonly height: number },
+  bytes: number,
+  maxBytes: number,
+): { width: number; height: number } | undefined {
+  if (Math.max(current.width, current.height) <= MIN_REQUEST_IMAGE_LONG_EDGE) return undefined
+  const ratio = Math.sqrt(maxBytes / bytes)
+  const factor = Math.min(MAX_DOWNSCALE_FACTOR, Math.max(MIN_DOWNSCALE_FACTOR, ratio))
+  let width = Math.max(1, Math.floor(current.width * factor))
+  let height = Math.max(1, Math.floor(current.height * factor))
+  if (Math.max(width, height) < MIN_REQUEST_IMAGE_LONG_EDGE) {
+    const lift = MIN_REQUEST_IMAGE_LONG_EDGE / Math.max(width, height)
+    width = Math.max(1, Math.floor(width * lift))
+    height = Math.max(1, Math.floor(height * lift))
+  }
+  if (width === current.width && height === current.height) return undefined
+  return { width, height }
 }
 
 function cachePath(root: string, hash: string): string {

@@ -5,9 +5,8 @@
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
   max-width: 160px;
-  padding: 1px 4px 1px 1px;
+  padding: 1px;
   border-radius: 6px;
   vertical-align: bottom;
   line-height: 22px;
@@ -52,25 +51,6 @@
   max-height: 240px;
   object-fit: contain;
   border-radius: 6px;
-}
-
-.remove {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: none;
-  border-radius: 4px;
-  background: none;
-  color: var(--dsw-alias-label-secondary);
-  cursor: pointer;
-}
-
-.remove:hover {
-  background: var(--dsw-alias-interactive-bg-active);
-  color: var(--dsw-alias-state-error-primary);
 }
 
 /* Original preview: same fixed mask recipe as the message-image lightbox. */

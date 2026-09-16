@@ -26,7 +26,6 @@ const INSERT: DraftImageInsert = {
 }
 
 const LABELS = {
-  removeLabel: 'Remove image shot.png',
   pendingAlt: 'Pending images',
   lightboxDialog: 'Original image preview',
   lightboxClose: 'Close original image preview',
@@ -44,7 +43,7 @@ describe('ImageChipNode', () => {
   it('carries the display cache and answers an empty text projection', () => {
     const editor = makeEditor()
     editor.update(() => {
-      const chip = $createImageChipNode(INSERT, LABELS, () => {})
+      const chip = $createImageChipNode(INSERT, LABELS)
       expect(chip.getAttachmentId()).toBe('draft-1')
       expect(chip.getTextContent()).toBe('')
       expect(chip.isInline()).toBe(true)
@@ -57,7 +56,7 @@ describe('ImageChipNode', () => {
   it('round-trips JSON with and without intrinsic dimensions', () => {
     const editor = makeEditor()
     editor.update(() => {
-      const sized = $createImageChipNode(INSERT, LABELS, () => {}).exportJSON()
+      const sized = $createImageChipNode(INSERT, LABELS).exportJSON()
       expect(sized.attachmentId).toBe('draft-1')
       expect(sized.previewUrl).toBe('blob:preview-draft-1')
       expect(sized.name).toBe('shot.png')
@@ -70,7 +69,6 @@ describe('ImageChipNode', () => {
       const bare = $createImageChipNode(
         { attachmentId: 'draft-2' as DraftAttachmentId, previewUrl: 'blob:preview-draft-2' },
         LABELS,
-        () => {},
       ).exportJSON()
       expect('width' in bare).toBe(false)
       expect('height' in bare).toBe(false)
@@ -83,7 +81,7 @@ describe('ImageChipNode', () => {
     const editor = makeEditor()
     editor.update(() => {
       const json: SerializedImageChipNode = {
-        ...$createImageChipNode(INSERT, LABELS, () => {}).exportJSON(),
+        ...$createImageChipNode(INSERT, LABELS).exportJSON(),
         name: '',
       }
       const chip = ImageChipNode.importJSON(json)
@@ -92,11 +90,11 @@ describe('ImageChipNode', () => {
     }, { discrete: true })
   })
 
-  it('clones with the same NodeKey, labels, and remove callback', () => {
+  it('clones with the same NodeKey and labels', () => {
     const editor = makeEditor()
     let key = '' as NodeKey
     editor.update(() => {
-      const chip = $createImageChipNode(INSERT, LABELS, (id) => { void id })
+      const chip = $createImageChipNode(INSERT, LABELS)
       key = chip.getKey()
       const copy = ImageChipNode.clone(chip)
       expect(copy.getKey()).toBe(key)
@@ -109,7 +107,7 @@ describe('ImageChipNode', () => {
   it('mounts a non-editable inline host carrying the composer anchor', () => {
     const editor = makeEditor()
     editor.update(() => {
-      const chip = $createImageChipNode(INSERT, LABELS, () => {})
+      const chip = $createImageChipNode(INSERT, LABELS)
       const el = chip.createDOM({ namespace: 'image-node-spec', theme: {} })
       expect(el.getAttribute('data-composer-image-chip')).toBe('')
       expect(el.getAttribute('contenteditable')).toBe('false')
@@ -117,22 +115,20 @@ describe('ImageChipNode', () => {
     }, { discrete: true })
   })
 
-  it('decorates to an ImageChip element forwarding the cache, labels, and callback', () => {
+  it('decorates to an ImageChip element forwarding the cache and labels', () => {
     const editor = makeEditor()
     editor.update(() => {
-      const onRemove = (id: DraftAttachmentId): void => { void id }
-      const chip = $createImageChipNode(INSERT, LABELS, onRemove)
+      const chip = $createImageChipNode(INSERT, LABELS)
       const element = chip.decorate()
       expect(element.type).toBe(ImageChip)
       const props = element.props as ImageChipProps
-      expect(props.attachmentId).toBe('draft-1')
       expect(props.previewUrl).toBe('blob:preview-draft-1')
       expect(props.name).toBe('shot.png')
       expect(props.width).toBe(640)
       expect(props.height).toBe(480)
-      expect(props.removeLabel).toBe(LABELS.removeLabel)
       expect(props.pendingAlt).toBe(LABELS.pendingAlt)
-      expect(props.onRemove).toBe(onRemove)
+      expect(props.lightboxDialog).toBe(LABELS.lightboxDialog)
+      expect(props.lightboxClose).toBe(LABELS.lightboxClose)
     }, { discrete: true })
   })
 })

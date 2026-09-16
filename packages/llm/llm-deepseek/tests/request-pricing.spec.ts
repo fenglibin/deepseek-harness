@@ -88,8 +88,8 @@ describe('DeepSeek request-image pricing', () => {
   })
 
   it('caps each occurrence at the per-image byte target before the byte budget', () => {
-    // Each 5 MiB source counts as the 1 MiB request target, so a 2 MiB budget
-    // with a one-byte quantum removes exactly the oldest occurrence.
+    // Each 5 MiB source counts as the 100 KiB request target, so a 250 KiB
+    // budget with a one-byte quantum removes exactly the oldest occurrence.
     const oversized = 5 * 1024 * 1024
     const images = [
       ref('first', 800, 800, oversized),
@@ -97,7 +97,7 @@ describe('DeepSeek request-image pricing', () => {
       ref('third', 800, 800, oversized),
     ]
     const prices = deepSeekImageRequestPricing(
-      connection({ maxRequestFilesBytes: 2 * 1024 * 1024, imageOffloadByteQuantum: 1 }),
+      connection({ maxRequestFilesBytes: 250 * 1024, imageOffloadByteQuantum: 1 }),
       'vision',
     ).priceImages(images)
     expect(prices.map(price => price.visualTokens)).toEqual([0, 349, 349])

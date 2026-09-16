@@ -5,7 +5,7 @@
 // user message and an assistant message, and pins the product surfaces: the
 // history ImageGallery loading real fixture bytes through the authorized
 // sessions.attachment route, the single-click ImageLightbox, and the composer
-// intake chain (paste → ordered inline chips → image-only send enablement → remove).
+// intake chain (paste → ordered inline chips → image-only send enablement).
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { expect, it } from 'vitest'
 import { installAssembledBootEnv, mountAssembledApp } from './assembled-boot.ts'
@@ -78,7 +78,7 @@ it('renders the history image pair through the authorized attachment route and o
   })
 })
 
-it('accepts pasted images into the composer as inline chips in order and removes them', async () => {
+it('accepts pasted images into the composer as inline chips in order', async () => {
   mountAssembledApp()
 
   const tree = await screen.findByRole('tree', { name: 'Sessions' }, { timeout: 10_000 })
@@ -131,12 +131,12 @@ it('accepts pasted images into the composer as inline chips in order and removes
       .toEqual(['pasted.png', 'second.png'])
   })
 
-  const remove = [...textarea.querySelectorAll('button[aria-label^="Remove image"]')]
-  if (remove.length !== 2) throw new Error('remove buttons missing')
-  for (const button of remove) fireEvent.click(button)
-  await waitFor(() => {
-    expect(textarea.querySelector('img')).toBeNull()
-  })
+  // No remove control ships on a chip: dropping one is the Backspace gesture,
+  // whose effect is the browser's own editing behavior (jsdom implements none),
+  // so it is pinned at package level instead of through synthetic DOM events.
+  expect(textarea.querySelectorAll('button[aria-label^="Remove image"]')).toHaveLength(0)
+  expect([...textarea.querySelectorAll('img')].map(img => img.getAttribute('alt')))
+    .toEqual(['pasted.png', 'second.png'])
 
   // An unsupported file announces a transient toast (the inline strip is
   // gone) and the banner dismisses itself after its hold-and-fade lifetime.

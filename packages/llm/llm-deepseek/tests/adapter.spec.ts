@@ -145,11 +145,11 @@ describe('request image policy', () => {
   it.each([
     [
       { id: 'default' },
-      { maxPixels: 640_000, maxBytes: 1024 * 1024 },
+      { maxPixels: 640_000, maxBytes: 100 * 1024 },
     ],
     [
       { id: 'low', imagePixelBudget: 'low' as const },
-      { maxPixels: 512 * 512, maxBytes: 1024 * 1024 },
+      { maxPixels: 512 * 512, maxBytes: 100 * 1024 },
     ],
     [
       { id: 'custom', imagePixelBudget: 320_000, imageMaxBytes: 512_000 },
@@ -407,7 +407,7 @@ describe('DeepSeekAdapter against a mock server', () => {
       bytes: 3,
     }])
     expect(signalSeen[0]).toBeInstanceOf(AbortSignal)
-    expect(policies).toEqual([{ maxPixels: 640_000, maxBytes: 1024 * 1024 }])
+    expect(policies).toEqual([{ maxPixels: 640_000, maxBytes: 100 * 1024 }])
   })
 
   it('falls back to one all-base64 request when Files API resolution fails', async () => {
@@ -621,7 +621,7 @@ describe('DeepSeekAdapter against a mock server', () => {
 
     expect(attachmentMocks.readImageRequest).toHaveBeenCalledWith(
       recent,
-      { maxPixels: 640_000, maxBytes: 1024 * 1024 },
+      { maxPixels: 640_000, maxBytes: 100 * 1024 },
       expect.any(AbortSignal),
     )
     const body = server.requests[0] as { messages: unknown[] }
@@ -678,7 +678,7 @@ describe('DeepSeekAdapter against a mock server', () => {
     expect(attachmentMocks.readImageRequest).toHaveBeenNthCalledWith(
       2,
       imageRef,
-      { maxPixels: 320_000, maxBytes: 1024 * 1024 },
+      { maxPixels: 320_000, maxBytes: 100 * 1024 },
       expect.any(AbortSignal),
     )
   })

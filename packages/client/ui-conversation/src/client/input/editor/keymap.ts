@@ -20,6 +20,7 @@ import {
 } from 'lexical'
 import { mergeRegister } from '@lexical/utils'
 import type { ArbitrateKey, ArbitrateOutcome } from '../../contract/input.ts'
+import { clipboardImageFiles } from './paste-images.ts'
 
 /** The bar-supplied behavior behind each intercepted gesture. */
 export interface ComposerKeymapHandlers {
@@ -133,10 +134,9 @@ export function registerComposerKeymap(editor: LexicalEditor, handlers: Composer
       // deliver clipboardData on plain events.
       const clipboardData = (event as ClipboardEvent).clipboardData ?? null
       if (clipboardData === null) return false
-      const files = Array.from(clipboardData.items)
-        .filter(item => item.kind === 'file')
-        .map(item => item.getAsFile())
-        .filter((file): file is File => file !== null)
+      // A copy that carries no file item still carries its images as an HTML
+      // fragment, so both forms reach the same intake path.
+      const files = clipboardImageFiles(clipboardData)
       if (files.length > 0) handlers.intakeFiles(files)
       const text = clipboardData.getData('text/plain')
       if (text === '') {

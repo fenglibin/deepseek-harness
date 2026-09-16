@@ -1,15 +1,18 @@
-/* Inline message image: a small thumbnail that sits inside a user message's
-   text line, plus a transient hover preview floated above it. */
+/* Inline message image: a thumbnail that sits inside a user message's text
+   line, plus a transient hover preview floated above it. The frame matches the
+   composer chip: a 22px capsule (border-box) around a 20px image, so a sent
+   image shows at the same size it had while it sat in the draft. */
 
 .frame {
   display: inline-block;
-  width: 40px;
-  height: 40px;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
   margin: 0 2px;
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--dsw-alias-border-l2-darkmode-thin);
-  border-radius: 8px;
+  border-radius: 4px;
   background: var(--dsw-alias-interactive-bg-hover);
   cursor: zoom-in;
   vertical-align: middle;

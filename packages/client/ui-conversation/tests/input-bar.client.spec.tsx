@@ -10,7 +10,7 @@
 
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
-import { $getRoot, $isTextNode } from 'lexical'
+import { $getRoot, $getSelection, $isRangeSelection, $isTextNode } from 'lexical'
 import {
   bindSnapshotSelector, conversationSnapshot as conversationFixture, makeTranslate, RemoteError,
   sessionSnapshot as sessionFixture,
@@ -124,7 +124,6 @@ function bench(over?: BenchOptions) {
     defaultSink: sink,
     commandImages: { serialize: () => Promise.resolve([]), release: () => {}, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` },
     imageLabels: {
-      remove: (name: string) => `删除图片 ${name}`,
       pending: () => '待处理图片',
       lightboxDialog: () => '查看图片',
       lightboxClose: () => '关闭预览',
@@ -257,6 +256,16 @@ describe('inline image intake and send', () => {
     })
   }
 
+  /** Paste a copy that offers no file item at all, only an HTML fragment. */
+  function pasteHtml(target: HTMLElement, html: string): void {
+    fireEvent.paste(target, {
+      clipboardData: {
+        items: [],
+        getData: (type: string) => (type === 'text/html' ? html : ''),
+      },
+    })
+  }
+
   it('collects clipboard files while preserving text from a mixed paste', async () => {
     const addImages = vi.fn(() => null)
     const { textarea, shell } = bench({ addImages })
@@ -273,6 +282,28 @@ describe('inline image intake and send', () => {
     expect(addImages).toHaveBeenCalledWith([image])
     // The paste lands inside the PASTE_COMMAND update; its commit is a microtask away.
     await vi.waitFor(() => { expect(shell.snapshot.draft).toBe('同时粘贴的文字') })
+  })
+
+  // A right-click "copy image" hands some browsers over as markup with no
+  // file item; the composer must take the image out of that fragment too.
+  it('takes an image from an HTML fragment when the clipboard offers no file item', () => {
+    const addImages = vi.fn((_files: readonly File[]): string | null => null)
+    const { textarea } = bench({ addImages })
+    pasteHtml(textarea, '<img src="data:image/png;base64,iVBORw0KGgo=">')
+    const files = addImages.mock.calls[0]?.[0] ?? []
+    expect(files).toHaveLength(1)
+    expect(files[0]?.type).toBe('image/png')
+  })
+
+  // The card owns the gesture outside the editable, so a paste that no editor
+  // listener took still lands in the composer.
+  it('takes a pasted image that lands on the card outside the editable', () => {
+    const addImages = vi.fn(() => null)
+    const { view } = bench({ addImages })
+    const card = view.container.querySelector<HTMLElement>('[data-composer-card]')
+    if (card === null) throw new Error('composer card missing')
+    pasteHtml(card, '<img src="data:image/png;base64,iVBORw0KGgo=">')
+    expect(addImages).toHaveBeenCalledTimes(1)
   })
 
   it('pre-checks projected limits at intake: whole-batch refusal with product copy, none added', () => {
@@ -463,6 +494,27 @@ describe('inline image intake and send', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  // The chip carries no remove button: the backward-delete gesture is the only
+  // removal path, and it must take the whole chip (never part of it).
+  it('drops a whole chip with the backward-delete gesture', () => {
+    const attachment: ComposerAttachment = {
+      kind: 'image',
+      id: 'draft-backspace' as DraftAttachmentId,
+      previewUrl: 'blob:preview-backspace',
+      file: new File([Uint8Array.of(1)], 'shot.png', { type: 'image/png' }),
+    }
+    const b = bench({ attachments: [attachment] })
+    expect(b.shell.snapshot.parts).toEqual([{ type: 'image', attachmentId: attachment.id }])
+    act(() => {
+      b.shell.editor.update(() => {
+        $getRoot().selectEnd()
+        const selection = $getSelection()
+        if ($isRangeSelection(selection)) selection.deleteCharacter(true)
+      }, { discrete: true })
+    })
+    expect(b.shell.snapshot.parts).toEqual([])
   })
 })
 

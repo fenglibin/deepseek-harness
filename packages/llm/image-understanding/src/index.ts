@@ -105,7 +105,7 @@ export interface Config {
   maxDescriptionChars?: number
   /** Total-pixel budget for one deterministic request image in an understanding call. */
   requestImagePixelBudget?: number
-  /** Encoded-byte target for one request image; the smallest quality-ladder output is used when no quality fits. */
+  /** Encoded-byte target for one request image; a source no ladder quality fits is downscaled until it does. */
   requestImageMaxBytes?: number
   /** Number of attachment descriptions retained per route. */
   maxCacheEntries?: number
@@ -153,7 +153,7 @@ export class LlmImageUnderstanding extends ImageUnderstanding {
     timeoutMs: z.number().step(1).min(1).max(MAX_TIMER_DELAY_MS).default(30_000),
     maxDescriptionChars: z.number().step(1).min(1).default(4000),
     requestImagePixelBudget: z.number().step(1).min(1).default(1024 * 1024),
-    requestImageMaxBytes: z.number().step(1).min(1).default(1024 * 1024),
+    requestImageMaxBytes: z.number().step(1).min(1).default(100 * 1024),
     maxCacheEntries: z.number().step(1).min(1).default(64),
   })
 
@@ -174,7 +174,7 @@ export class LlmImageUnderstanding extends ImageUnderstanding {
       timeoutMs: config.timeoutMs ?? 30_000,
       maxDescriptionChars: config.maxDescriptionChars ?? 4000,
       requestImagePixelBudget: config.requestImagePixelBudget ?? 1024 * 1024,
-      requestImageMaxBytes: config.requestImageMaxBytes ?? 1024 * 1024,
+      requestImageMaxBytes: config.requestImageMaxBytes ?? 100 * 1024,
       maxCacheEntries: config.maxCacheEntries ?? 64,
     }
     assertPaired(resolvedConfig)

@@ -202,7 +202,7 @@ describe('LlmImageUnderstanding.describe', () => {
     expect(adapter.requests[0]?.sessionId).toBe(sessionId)
   })
 
-  it('defaults the request-image policy to one megapixel and one MiB', async () => {
+  it('defaults the request-image policy to one megapixel and 100 KiB', async () => {
     const ctx = await llmContext()
     const adapter = new ScriptedAdapter(TEXT, [visionModel()])
     ctx.llm.registerAdapter(['vision'], adapter)
@@ -212,7 +212,7 @@ describe('LlmImageUnderstanding.describe', () => {
 
     expect(adapter.requests[0]?.requestImagePolicy).toEqual({
       maxPixels: 1024 * 1024,
-      maxBytes: 1024 * 1024,
+      maxBytes: 100 * 1024,
     })
   })
 

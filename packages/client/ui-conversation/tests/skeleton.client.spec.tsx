@@ -48,7 +48,7 @@ function fakeWiring() {
     actx: {} as Context,
     defaultSink: sink,
     commandImages: { serialize: () => Promise.resolve([]), release: () => {}, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` },
-    imageLabels: { remove: () => '', pending: () => '', lightboxDialog: () => '', lightboxClose: () => '' },
+    imageLabels: { pending: () => '', lightboxDialog: () => '', lightboxClose: () => '' },
     releaseImage: () => {},
   })
   return { wiring: shell, sink, shell }

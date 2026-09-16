@@ -14,7 +14,9 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { CSSProperties, DragEvent, KeyboardEvent, MouseEvent, ReactNode } from 'react'
+import type {
+  ClipboardEvent, CSSProperties, DragEvent, KeyboardEvent, MouseEvent, ReactNode,
+} from 'react'
 import clsx from 'clsx'
 import {
   IconPlusOutline16, IconWarningOutline16, Toast, Tooltip,
@@ -32,6 +34,7 @@ import type { ComposerBarProps } from '../contract/slots.ts'
 import { ComposerContentEditable } from '../input/editor/ComposerContentEditable.tsx'
 import { DecoratorPortals } from '../input/editor/DecoratorPortals.tsx'
 import { registerComposerKeymap } from '../input/editor/keymap.ts'
+import { clipboardImageFiles } from '../input/editor/paste-images.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { ContextMeter } from './ContextMeter.tsx'
 import { PermissionSelect } from './PermissionSelect.tsx'
@@ -255,6 +258,18 @@ export function InputBar({
     event.preventDefault()
     intakeImages(files)
   }
+  // Paste mirrors the drop: the capsule owns the gesture on every part of the
+  // card the editor does not, so a paste no editor listener took — focus
+  // outside the editable, or a browser that handed the copy over as markup —
+  // still lands in the composer instead of nowhere. An editor paste arrives
+  // with its default prevented, so the same copy is never taken twice.
+  const onCardPaste = (event: ClipboardEvent<HTMLDivElement>): void => {
+    if (event.defaultPrevented) return
+    const files = clipboardImageFiles(event.clipboardData)
+    if (files.length === 0) return
+    event.preventDefault()
+    intakeImages(files)
+  }
 
   // The keymap handlers read live bar state through this ref so the editor
   // registration survives re-renders without re-arming per keystroke.
@@ -402,6 +417,7 @@ export function InputBar({
         onPointerDown={workspaceTrigger ? (e) => { e.stopPropagation() } : undefined}
         onDragOver={onCardDragOver}
         onDrop={onCardDrop}
+        onPaste={onCardPaste}
       >
         {overlay !== undefined && <div className={css.overlayAnchor}>{overlay}</div>}
         {accessory !== undefined && <div className={css.accessory}>{accessory}</div>}

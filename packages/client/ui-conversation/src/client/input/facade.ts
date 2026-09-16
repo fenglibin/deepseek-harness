@@ -80,8 +80,6 @@ export interface SessionInputDeps {
   }
   /** Insert-time locale labels for inline image chips (the decorator has no locale seat). */
   imageLabels: {
-    /** Remove-button accessible name for one image. */
-    remove(name: string): string
     /** Fallback alt for a nameless image. */
     pending(): string
     /** Preview dialog accessible name. */
@@ -343,8 +341,7 @@ export class SessionInputShell implements SessionInput {
     if (inserts.length === 0) return true
     for (const insert of inserts) this.imageCache.set(insert.attachmentId, insert)
     this.applyEdit(() => {
-      const nodes = inserts.map(insert =>
-        $createImageChipNode(insert, this.imageLabelsOf(insert), (id) => { this.removeImage(id) }))
+      const nodes = inserts.map(insert => $createImageChipNode(insert, this.imageLabels()))
       const selection = $getSelection()
       if ($isRangeSelection(selection)) {
         selection.insertNodes(nodes)
@@ -382,9 +379,8 @@ export class SessionInputShell implements SessionInput {
   }
 
   /** Insert-time locale labels for one image chip. */
-  private imageLabelsOf(insert: DraftImageInsert): ImageChipLabels {
+  private imageLabels(): ImageChipLabels {
     return {
-      removeLabel: this.deps.imageLabels.remove(insert.name ?? ''),
       pendingAlt: this.deps.imageLabels.pending(),
       lightboxDialog: this.deps.imageLabels.lightboxDialog(),
       lightboxClose: this.deps.imageLabels.lightboxClose(),
@@ -997,7 +993,7 @@ export class SessionInputShell implements SessionInput {
               // The cache belongs to the restored document: a chip whose entry
               // stayed pruned would send as nothing on the next submit.
               this.imageCache.set(insert.attachmentId, insert)
-              paragraph.append($createImageChipNode(insert, this.imageLabelsOf(insert), (id) => { this.removeImage(id) }))
+              paragraph.append($createImageChipNode(insert, this.imageLabels()))
             }
             cursor = item.offset
           }
@@ -1020,8 +1016,7 @@ export class SessionInputShell implements SessionInput {
     if (restored.length === 0) return
     for (const insert of restored) this.imageCache.set(insert.attachmentId, insert)
     this.applyEdit(() => {
-      const nodes = restored.map(insert =>
-        $createImageChipNode(insert, this.imageLabelsOf(insert), (id) => { this.removeImage(id) }))
+      const nodes = restored.map(insert => $createImageChipNode(insert, this.imageLabels()))
       const root = $getRoot()
       if (root.getChildrenSize() === 0) root.append($createParagraphNode())
       root.getFirstChild()?.selectStart()

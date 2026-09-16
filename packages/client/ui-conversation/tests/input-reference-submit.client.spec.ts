@@ -18,7 +18,6 @@ const commandImages = {
   unsupportedNotice: (token: string) => `${token.trim()} images-unsupported`,
 }
 const imageLabels = {
-  remove: (name: string) => `remove ${name}`,
   pending: () => 'pending image',
   lightboxDialog: () => 'image preview',
   lightboxClose: () => 'close preview',

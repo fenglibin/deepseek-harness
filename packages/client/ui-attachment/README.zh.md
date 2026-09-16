@@ -23,11 +23,11 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
-与 [`ui-conversation`](../ui-conversation/README.zh.md) 一起挂载本插件；它等待 conversation 包的槽位声明，并把自身表面注册进这些槽位。用户随即看到 Chat 与 Trajectory 中按数量定尺寸的消息图片，以及支持 Escape／遮罩／关闭按钮的灯箱。
+与 [`ui-conversation`](../ui-conversation/README.zh.md) 一起挂载本插件；它等待 conversation 包的槽位声明，并把自身表面注册进这些槽位。用户随即看到 Chat 与 Trajectory 中与输入框芯片同尺寸的内联消息图片，以及支持 Escape／遮罩／关闭按钮的灯箱。
 
 ### 消息图片与灯箱
 
-一条消息仅有的一张图按长边 240px 渲染（宽高比钳制在 [0.25, 4]，从不放大）；多图中的一张渲染为固定 64px 方块。加载完成的图片单击打开文档级灯箱；加载失败则显示重试控件。灯箱按 Escape、按下遮罩或点关闭按钮关闭，并把焦点还给打开者。
+每张图渲染在 22px 胶囊里的 20px 缩略图——与同一张图还在草稿里时的芯片尺寸一致，因此发送前后不会跳变；从不放大。加载完成的图片单击打开文档级灯箱；加载失败则显示重试控件。灯箱按 Escape、按下遮罩或点关闭按钮关闭，并把焦点还给打开者。
 
 -----
 
@@ -41,8 +41,9 @@ kind: "package-reference"
 
 | 文件 | 职责 |
 |---|---|
-| [`src/client/MessageImages.tsx`](src/client/MessageImages.tsx) | 每消息画廊＋灯箱的组装 |
-| [`src/MessageImage.tsx`](src/MessageImage.tsx) | 单图尺寸、加载／重试、点击打开；本地提交回显预览直接显示其 object URL |
+| [`src/client/MessageImages.tsx`](src/client/MessageImages.tsx) | 每消息内联缩略图＋灯箱的组装 |
+| [`src/InlineMessageImage.tsx`](src/InlineMessageImage.tsx) | 与文本同行的内联缩略图：悬浮预览与点击打开；本地提交回显预览直接显示其 object URL |
+| [`src/MessageImage.tsx`](src/MessageImage.tsx) | 单图尺寸、加载／重试、点击打开 |
 | [`src/ImageLightbox.tsx`](src/ImageLightbox.tsx) | 铺在共享遮罩上的文档级模态预览 |
 
 </details>

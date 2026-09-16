@@ -6,6 +6,7 @@ import sharp from 'sharp'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CompressionLimiter } from '../src/compression-limiter.ts'
 import LocalAttachmentStore from '../src/index.ts'
+import { MIN_REQUEST_IMAGE_LONG_EDGE } from '../src/request-image.ts'
 
 const homes: string[] = []
 
@@ -78,6 +79,36 @@ describe('local request-image cache', () => {
     expect(request.mediaType).toBe('image/jpeg')
     expect(request.bytes).toBeGreaterThan(1)
     expect(request).toMatchObject({ width: 1, height: 1 })
+  })
+
+  it('meets the byte budget by shrinking a source no ladder quality fits', async () => {
+    const attachments = await store()
+    // Noise defeats the quality ladder: at full size even its lowest rung
+    // costs several times the budget, so the budget has to be met in pixels.
+    const attachment = await attachments.saveImage({
+      data: await complexOpaqueAlphaImage(1024, 1024), mediaType: 'image/png',
+    })
+    const maxBytes = 100 * 1024
+
+    const request = await attachments.readImageRequest(attachment, { maxPixels: 2048 * 2048, maxBytes })
+
+    expect(request.bytes).toBeLessThanOrEqual(maxBytes)
+    expect(request.width).toBeLessThan(1024)
+    expect(request.width).toBeGreaterThanOrEqual(MIN_REQUEST_IMAGE_LONG_EDGE)
+  })
+
+  it('stops shrinking at the long-edge floor when no raster can meet the budget', async () => {
+    const attachments = await store()
+    const attachment = await attachments.saveImage({
+      data: await complexOpaqueAlphaImage(2048, 2048), mediaType: 'image/png',
+    })
+
+    // A budget even the floor cannot meet: the floor's encoding wins rather
+    // than a smaller raster that would cost the model its legibility anyway.
+    const request = await attachments.readImageRequest(attachment, { maxPixels: 2048 * 2048, maxBytes: 512 })
+
+    expect(Math.max(request.width, request.height)).toBe(MIN_REQUEST_IMAGE_LONG_EDGE)
+    expect(request.bytes).toBeGreaterThan(512)
   })
 
   it('regenerates invalid, oversized, incompatible, or mismatched cached variants', async () => {

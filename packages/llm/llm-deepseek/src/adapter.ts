@@ -61,7 +61,7 @@ export interface DeepSeekCatalogModel {
   inputModalities?: ModelModality[]
   /** Total-pixel budget for one deterministic request preview, or the 512-by-512 `low` preset. */
   imagePixelBudget?: number | 'low'
-  /** Encoded-byte target for one deterministic request preview; the smallest quality-ladder output is used when no quality fits. */
+  /** Encoded-byte target for one deterministic request preview; a source no ladder quality fits is downscaled until it does. */
   imageMaxBytes?: number
 }
 

@@ -1,15 +1,16 @@
 /**
  * Visual body of one inline image chip: the DecoratorNode's React face. A
- * thumbnail opens a document-level original preview; the remove button asks
- * the owning shell to drop the node. All user-facing strings arrive as
- * insert-time cached labels — the decorator sits outside the slot locale
- * seat, so the node carries them like ReferenceChipNode carries its label.
+ * thumbnail opens a document-level original preview. The chip carries no
+ * remove control: dropping it is the keyboard gesture on the chip itself
+ * (Backspace/Delete), so the face stays a bare thumbnail. All user-facing
+ * strings arrive as insert-time cached labels — the decorator sits outside
+ * the slot locale seat, so the node carries them like ReferenceChipNode
+ * carries its label.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { IconCloseOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { DraftAttachmentId } from '../../contract/input.ts'
 import css from './ImageChip.module.css'
 
 /** Vertical clearance the hover preview needs plus its drop gap. */
@@ -34,8 +35,6 @@ function hoverPreviewStyle(anchor: HTMLElement | null): CSSProperties {
 
 /** Display inputs of one image chip (the node's cached owner projections). */
 export interface ImageChipProps {
-  /** Browser-owned draft attachment id (remove routing key). */
-  readonly attachmentId: DraftAttachmentId
   /** Object URL the thumbnail renders. */
   readonly previewUrl: string
   /** Original file name; empty renders the pending alt. */
@@ -44,26 +43,22 @@ export interface ImageChipProps {
   readonly width?: number
   /** Intrinsic pixel height, when the intake probe has resolved it. */
   readonly height?: number
-  /** Localized remove-button accessible name. */
-  readonly removeLabel: string
   /** Localized fallback alt for a nameless image. */
   readonly pendingAlt: string
   /** Localized preview dialog accessible name. */
   readonly lightboxDialog: string
   /** Localized preview close-button accessible name. */
   readonly lightboxClose: string
-  /** Drop this chip; undefined only for a deserialized node (never mounted here). */
-  readonly onRemove: ((id: DraftAttachmentId) => void) | undefined
 }
 
 /**
  * Render one inline image chip and its original preview.
- * @param props - attachment display cache, localized labels, and the remove callback.
+ * @param props - attachment display cache and localized labels.
  * @returns the chip capsule plus a body-portal lightbox while previewing.
  */
 export function ImageChip({
-  attachmentId, previewUrl, name, width, height,
-  removeLabel, pendingAlt, lightboxDialog, lightboxClose, onRemove,
+  previewUrl, name, width, height,
+  pendingAlt, lightboxDialog, lightboxClose,
 }: ImageChipProps) {
   const [open, setOpen] = useState(false)
   const [hovering, setHovering] = useState(false)
@@ -106,14 +101,6 @@ export function ImageChip({
             alt={alt}
             {...(width === undefined || height === undefined ? {} : { width, height })}
           />
-        </button>
-        <button
-          type="button"
-          className={css.remove}
-          aria-label={removeLabel}
-          onClick={() => { onRemove?.(attachmentId) }}
-        >
-          <IconCloseOutline16 size={12} />
         </button>
       </span>
       {hovering && createPortal(
