@@ -740,6 +740,8 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   ImageDescriberRoute: 'vision route contract is owned by packages/llm/image-understanding/README.md',
   ImageDescriptionResult:
     'generated description result is owned by packages/llm/image-understanding/README.md',
+  McpResourceProvider:
+    'resource-provider contract (`register(server, provider)` and its `request` discriminant union) is owned by packages/mcp/mcp-resources/README.zh.md',
 }
 
 /** Repository data policy consumed by the Cordis catalog projector. */
