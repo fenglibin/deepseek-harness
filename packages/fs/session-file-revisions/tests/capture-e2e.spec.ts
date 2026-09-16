@@ -159,6 +159,7 @@ describe('capture through the real tool pipeline', () => {
     const current = await readFile(join(root, 'a.txt'), 'utf8')
     const result = revertContent(revision?.baseline ?? null, revision?.endState ?? '', current)
     expect(result.applied).toBe('all')
+    if (result.applied !== 'all') return
     // The session's line is restored and the outside edit survives.
     expect(result.content).toBe('original\nOUTSIDE\n')
     await ctx.fiber.dispose()
