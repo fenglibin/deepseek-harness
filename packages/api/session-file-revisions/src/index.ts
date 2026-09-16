@@ -72,7 +72,7 @@ export class SessionRevisionController extends TypertRemoteService {
    */
   @Remote('list')
   list(request: RevisionsListRequest): Promise<{ entries: readonly RevisionEntry[] }> {
-    return this.guard(async () => ({
+    return Promise.resolve({
       entries: this.revisions(request.sessionId).map((revision): RevisionEntry => {
         const oversized = this.isOversized(revision)
         const counts = lineCounts(revision.baseline, revision.endState)
@@ -83,7 +83,7 @@ export class SessionRevisionController extends TypertRemoteService {
           oversized,
         }
       }),
-    }))
+    })
   }
 
   /**
@@ -93,17 +93,15 @@ export class SessionRevisionController extends TypertRemoteService {
    */
   @Remote('diff')
   diff(request: RevisionsDiffRequest): Promise<RevisionDiff> {
-    return this.guard(async () => {
-      const revision = this.revisionOf(request.sessionId, request.path)
-      return this.isOversized(revision)
-        ? { path: revision.path, baseline: null, endState: '', oversized: true }
-        : {
-          path: revision.path,
-          baseline: revision.baseline,
-          endState: revision.endState,
-          oversized: false,
-        }
-    })
+    const revision = this.revisionOf(request.sessionId, request.path)
+    return Promise.resolve(this.isOversized(revision)
+      ? { path: revision.path, baseline: null, endState: '', oversized: true }
+      : {
+        path: revision.path,
+        baseline: revision.baseline,
+        endState: revision.endState,
+        oversized: false,
+      })
   }
 
   /**
@@ -254,25 +252,6 @@ export class SessionRevisionController extends TypertRemoteService {
       )
     }
     return cwd
-  }
-
-  /**
-   * Run one operation that may name a path outside the workspace, translating
-   * the containment refusal onto the wire.
-   * @param operation - the operation to run.
-   * @returns the operation's value.
-   */
-  private async guard<T>(operation: () => Promise<T>): Promise<T> {
-    try {
-      return await operation()
-    } catch (error: unknown) {
-      if (error instanceof EscapeError) throw new RemoteError(
-        'session-revisions/outside-workspace',
-        error.message,
-        { path: error.path },
-      )
-      throw error
-    }
   }
 }
 

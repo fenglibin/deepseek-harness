@@ -63,6 +63,11 @@
       // plus a /client fold and a /types face that only a hand-written entry maps.
       "@deepseek-ai/dsh-file-changes/types": ["./packages/fs/file-changes/src/types.ts"],
       "@deepseek-ai/dsh-file-changes/client": ["./packages/fs/file-changes/src/client.ts"],
+      // session-file-revisions keeps its domain name, so the generated bare
+      // alias (keyed on the directory) does not cover it.
+      "@deepseek-ai/dsh-session-file-revisions": ["./packages/fs/session-file-revisions/src/index.ts"],
+      "@deepseek-ai/dsh-session-file-revisions/invariant": ["./packages/fs/session-file-revisions/src/invariant.ts"],
+      "@deepseek-ai/dsh-session-file-revisions/types": ["./packages/fs/session-file-revisions/src/types.ts"],
       "@deepseek-ai/dsh-api-workspace-controller": ["./packages/api/workspace-controller/src/index.ts"],
       "@deepseek-ai/dsh-api-workspace-controller/client": ["./packages/api/workspace-controller/src/client/index.ts"],
       "@deepseek-ai/dsh-api-workspace-controller/invariant": ["./packages/api/workspace-controller/src/invariant.ts"],
@@ -73,6 +78,9 @@
       "@deepseek-ai/dsh-api-file-browser": ["./packages/api/file-browser/src/index.ts"],
       "@deepseek-ai/dsh-api-file-browser/invariant": ["./packages/api/file-browser/src/invariant.ts"],
       "@deepseek-ai/dsh-api-file-browser/types": ["./packages/api/file-browser/src/types.ts"],
+      "@deepseek-ai/dsh-api-session-file-revisions": ["./packages/api/session-file-revisions/src/index.ts"],
+      "@deepseek-ai/dsh-api-session-file-revisions/invariant": ["./packages/api/session-file-revisions/src/invariant.ts"],
+      "@deepseek-ai/dsh-api-session-file-revisions/types": ["./packages/api/session-file-revisions/src/types.ts"],
       "@deepseek-ai/dsh-typert-protocol": ["./packages/typert/protocol/src/index.ts"],
       "@deepseek-ai/dsh-typert-protocol/types": ["./packages/typert/protocol/src/types.ts"],
       "@deepseek-ai/dsh-typert-loader": ["./packages/typert/loader/src/index.ts"],
