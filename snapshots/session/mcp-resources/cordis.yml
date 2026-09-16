@@ -1,0 +1,18 @@
+# Live-recording patch for the MCP resource scenario. The base bundle already
+# mounts `dsh-mcp-resources`; this patch adds the deterministic stdio server
+# whose resources the three shared tools read, and pins a literal-instruction
+# server so the injected prompt section stays reviewable.
+#
+# The fixture server ships beside this scenario in `workspace/`, which the
+# harness makes the run cwd, so a plain relative path resolves in every checkout.
+- insert:
+    - id: mcp-resource-catalog
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        transport: stdio
+        serverName: catalog
+        command: !!js process.execPath
+        args: ['./resources-server.mjs']
+        failOnStartupError: true
+        reconnect:
+          enabled: false

@@ -44,7 +44,7 @@
 - [x] 5.5 在 `packages/mcp/mcp-client/tests/` 补充用例：未挂载资源包时客户端仍工作、白名单只过滤服务器自报工具、超限指令使连接失败 (covers: mcp-resources/未挂载资源包时客户端仍工作, mcp-resources/资源工具不受工具白名单影响, mcp-resources/指令超过上限时连接失败, design/D6, design/D7)
 - [x] 5.6 新增确定性 resources fixture 服务器（含文本资源、二进制资源、URI 模板与字面量 instructions），供上述用例复用 (covers: mcp-resources/调用时才读取, mcp-resources/连接成功后注入指令)
 - [x] 5.6b 新增真实 stdio MCP 服务器的端到端用例（`packages/mcp/mcp-client/tests/resources-server.e2e.spec.ts`）：经 `dsh-mcp-client` 连上 `fixtures/resources-server.ts` 子进程，断言三个工具读到资源、二进制以说明文字呈现且 base64 不外泄、URI 模板展开可读、缺服务器参数失败、instructions 以字面量段落进入系统提示词 (covers: mcp-resources/调用时才读取, mcp-resources/二进制载荷以说明文字呈现, mcp-resources/结果标明来源服务器, mcp-resources/连接成功后注入指令, mcp-resources/MCP 资源按作用域可访问)
-- [ ] 5.7（阻塞：需真实 API 录制）新增会话快照场景：一个挂载 resources 能力的组合，固定模型可见的工具 schema 与系统提示词段落。本地无 `DEEPSEEK_API_KEY`，官方该场景为 v3 录制而本地 `SESSION_FORMAT_VERSION` 为 0，故未能产出 (covers: mcp-resources/三个共享资源工具随提供方存活, mcp-resources/服务器指令作为独立段落注入)
+- [x] 5.7 新增会话快照场景 `snapshots/session/mcp-resources/`：一个挂载 resources 能力的组合，固定模型可见的工具 schema 与系统提示词段落 (covers: mcp-resources/三个共享资源工具随提供方存活, mcp-resources/服务器指令作为独立段落注入)
 
 ## 6. 文档
 
