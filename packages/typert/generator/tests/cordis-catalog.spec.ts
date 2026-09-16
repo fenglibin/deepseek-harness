@@ -61,7 +61,7 @@ describe('Typert-backed Cordis catalog', () => {
     const { projector, model } = projection()
     const expected = (path: string): string => readFileSync(join(workspaceRoot, path), 'utf8')
 
-    expect(renderInheritedPage(CORDIS_CATALOG_POLICY)).toBe(expected('docs/cordis-api/inherited.md'))
+    expect(renderInheritedPage(CORDIS_CATALOG_POLICY)).toBe(expected('docs/cordis-api/inherited.zh.md'))
     for (const page of [...new Set([...Object.values(SERVICE_PAGE), ...Object.values(EVENT_SCOPE_PAGE)])].sort()) {
       const region = renderPageRegion(
         page,

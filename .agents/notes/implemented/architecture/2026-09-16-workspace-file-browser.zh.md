@@ -87,11 +87,36 @@ interface WorkspaceRowMenuContribution {
 - 版本令牌由 `mtimeMs` 与 `size` 组成，因此同一毫秒内写入同样长度的内容不会被识别为一次变化。
 - 不做文件监视：磁盘上的外部改动只通过保存冲突与手动重新加载进入视图。
 - 两个新包默认进入 web-app 组合；移除该行即同时移除菜单入口、弹层与 Host 侧命名空间贡献。
+- 编辑器关闭软换行（`wrap="off"`）：高亮层按源码行渲染，软换行会让文字落在高亮层从不绘制的位置。长行因此需要横向滚动。
+- 弹层尺寸是布局状态而非持久偏好，刷新即回到样式表初值：一个记下的宽度在另一块屏幕上会落错位置。
+
+## 三处修正
+
+首版交付后修掉了三个缺陷，都会改变可观察行为，因此记在这里而不是只留在提交里。
+
+### 固定宽度采样把普通 UTF-8 文本报成二进制
+
+二进制判定原先对开头 8192 字节做严格解码。采样是固定的**前缀**，切分点可以落在某个多字节字符中间，严格解码就把这段不完整序列报成畸形——仓库根目录的 `AGENTS.md` 正是如此（它的第 8192 字节切在一个 CJK 字符里），于是被显示为「这不是文本文件」。
+
+修法是按采样是否截断区分两种尾部不完整序列：采样只是前缀时用流式解码容忍它（切分产物）；采样就是整个文件时严格解码（真的截断内容）。两种情况都有测试钉住，因为只放宽不收紧会放过真正畸形的文件。
+
+### `ctx.connection` 未声明为注入，字节路由可能整条缺席
+
+首版用 `Reflect.get(ctx, 'connection')` 读载体，并在缺失时**静默跳过**路由注册。若该服务在构造时尚未就绪，Remote 七个方法照常工作而每张图片都 404——一个只在图片上显形的静默降级。改为声明 `connection` 为注入，由 Loader 保证时序；载体缺席现在是加载期错误。测试从「缺席时注册零条路由」改为「缺席时响亮失败」。
+
+### 工具栏挤占两行、`textarea` 软换行、新建落在根目录
+
+- 搜索框与隐藏项开关原各占一行，把树往下挤了两行。改为单行工具栏（标题、搜索、开关、新建文件、新建文件夹、关闭），搜索框是其中唯一可伸缩的控件；开关文案缩短，标题只渲染一次——树原本自带一个重复标题。
+- `textarea` 缺 `wrap="off"`，于是它软换行：长行永不溢出、横向滚动条不出现，而且文字落在高亮层从不绘制的位置。这是「内容区没有滚动条」的原因。
+- 新建原先把目标算作「选中文件的父目录」，选中一个目录时该值退化成根目录。改为单独跟踪选中的目录：点目录既展开它、又把它设为新建目的地。
+
+弹层的可调尺寸（右下角抓手与两列分隔条）在同一轮加入，两者直接改写 CSS 自定义属性而不进 React state：拖动每帧触发 pointermove，把尺寸写进 state 会让整棵树与编辑器跟着重渲染。
 
 ## 验证
 
-- `packages/api/file-browser/tests/workspace-io.host.spec.ts`（49 条）：包含（含符号链接逃逸与允许的内部链接）、四条内容分支、版本守卫的接受与拒绝、新建/重命名/删除、名称校验、搜索上限与只匹配名称、图片字节的越界拒绝。
-- `packages/api/file-browser/tests/controller.host.spec.ts`（16 条）：每个结构化拒绝到线上错误码的映射、可配置边界、字节路由的注册形状与四类拒绝。
-- `packages/client/ui-file-browser/tests/file-browser.client.spec.tsx`（38 条）：懒加载树、隐藏项开关、截断、四种内容呈现、编辑保存与 Ctrl+S、冲突的重新加载与强制覆盖、新建/重命名/删除确认与取消、搜索定位、关闭时不发起调用。
+- `packages/api/file-browser/tests/workspace-io.host.spec.ts`（53 条）：包含（含符号链接逃逸与允许的内部链接）、四条内容分支、**采样边界落在多字节字符中间仍判为文本**（含两种切法）与「整个文件的尾部截断仍判为二进制」、版本守卫的接受与拒绝、新建/重命名/删除、名称校验、搜索上限与只匹配名称、图片字节的越界拒绝。
+- `packages/api/file-browser/tests/controller.host.spec.ts`（16 条）：每个结构化拒绝到线上错误码的映射、可配置边界、字节路由的注册形状与四类拒绝、载体缺席时响亮失败。
+- `packages/client/ui-file-browser/tests/file-browser.client.spec.tsx`：懒加载树、隐藏项开关、截断、四种内容呈现、编辑保存与 Ctrl+S、冲突的重新加载与强制覆盖、新建/重命名/删除确认与取消、搜索定位、关闭时不发起调用，以及**新建落在选中目录（选中目录／选中文件的父目录／根目录三种情形）**、工具栏单行与标题唯一、分隔条与抓手存在、`wrap="off"` 与尺寸初值不被内联覆盖。
 - `packages/client/ui-file-browser/tests/assembly.client.spec.tsx`（3 条，REAL composition）：真实 `apply` 经真实 `ctx.workspaceRowMenu` 贡献菜单项、点击后弹层列出所请求工作区的根目录、销毁插件 fiber 后菜单项与弹层一并消失而内置动词仍在。
-- `packages/client/ui-workspace/tests/`（163 条）无回归；两个 tsconfig 编译面干净；改动包 lint 0 警告 0 错误；`verify-cordis-config`、`verify-client-packages`、`verify-package-dependencies`、`verify-client-ui-i18n`、client bundle 纯净性与 CSS 门禁、`gen-client-catalog` 与 `gen-tsconfig-paths` 均通过。
+- 端到端：真实启动 `dsh web`，经 `workspace/create` 注册本仓库后逐个调用 Remote——`list` 返回 45 个根条目且 `node_modules`/`.git` 被隐藏，`read` 对 `AGENTS.md` 返回 `kind: "text"`（修复前为 `binary`），图片返回 Host 合成的 URL 且字节路由应答 200 + `image/png` + 有效 PNG，越界路径得到 `file-browser/outside-workspace`、字节路由得到 403，陈旧版本写入得到 `file-browser/stale`，`create` 落在传入的 `directory` 内。
+- `packages/client/ui-workspace/tests/`（163 条）无回归；两个 tsconfig 编译面干净；改动包 lint 0 警告 0 错误；`verify-cordis-config`、`verify-client-packages`、`verify-client-ui-i18n`、client bundle 纯净性与 CSS 门禁均通过。

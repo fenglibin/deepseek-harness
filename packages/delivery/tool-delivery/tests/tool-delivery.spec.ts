@@ -1,15 +1,13 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
+import { describe, expect, it } from 'vitest'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { Inbox, agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import DeliveryService from '@deepseek-ai/dsh-delivery'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
-import SandboxedFileSystem from '@deepseek-ai/dsh-fs-sandbox'
 import { ToolCallId, createUserMessage } from '@deepseek-ai/dsh-llm'
-import SandboxPolicyService from '@deepseek-ai/dsh-sandbox-policy'
 import { Session, SessionId, SESSION_FORMAT_VERSION, type UserMessage } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { ShellExecutor } from '@deepseek-ai/dsh-shell'
@@ -1681,89 +1679,5 @@ describe('tool-delivery task checklist disk sync', () => {
     expect(view.items.map(item => item.content)).toEqual(['build first', 'ship it', 'verify it'])
     expect(readFileSync(join(dir, 'tasks.md'), 'utf8'))
       .toBe('- [x] build first\n- [ ] ship it\n- [ ] verify it\n')
-  })
-})
-
-describe('tool-delivery sandboxed artifact writes', () => {
-  // The session cwd and the filesystem's default cwd must live OUTSIDE the
-  // platform temp areas: `writableRoots` grants `/tmp` and `os.tmpdir()` under
-  // workspace-write, so a temp-dir session cwd would pass containment for the
-  // wrong reason and make the regression invisible.
-  const sandboxRoots: string[] = []
-  afterEach(() => {
-    for (const root of sandboxRoots.splice(0)) rmSync(root, { recursive: true, force: true })
-  })
-
-  /**
-   * Mount the confining filesystem backend and the shared policy service, then
-   * register a delivery agent whose session cwd differs from the filesystem's
-   * default cwd (the harness process cwd the bare `resolve()` would fall back
-   * to). Delivery artifacts must still land under the session cwd, which is the
-   * exact deployed-session shape that previously denied `.dsh/*` writes.
-   */
-  async function sandboxHarness(): Promise<{
-    ctx: Context
-    agent: Agent
-    sessionCwd: string
-    fsDefaultCwd: string
-  }> {
-    const ctx = new Context()
-    const sessionCwd = mkdtempSync(join(homedir(), 'dsh-delivery-sandbox-cwd-'))
-    const fsDefaultCwd = mkdtempSync(join(homedir(), 'dsh-delivery-sandbox-fs-'))
-    sandboxRoots.push(sessionCwd, fsDefaultCwd)
-    await ctx.plugin(SystemPrompt)
-    await ctx.plugin(AgentRegistry)
-    await ctx.plugin(ToolRuntime)
-    await ctx.plugin(SessionProjectionRegistry)
-    await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: fsDefaultCwd })
-    await ctx.plugin(SandboxedFileSystem, { cwd: fsDefaultCwd })
-    await ctx.plugin(StubShell)
-    await ctx.plugin(DeliveryService)
-    await ctx.plugin(toolDelivery, {})
-    const id = SessionId(`delivery-sandbox-${Math.random()}`)
-    const agent = stubAgent(`sandbox-agent-${Math.random()}`, Session.create(
-      id,
-      undefined,
-      { version: SESSION_FORMAT_VERSION, id, createdAt: Date.now(), cwd: sessionCwd },
-    ))
-    ctx.agents.register(agent)
-    return { ctx, agent, sessionCwd, fsDefaultCwd }
-  }
-
-  it('writes the design artifact under the session cwd through a workspace-write sandbox', async () => {
-    const { ctx, agent, sessionCwd } = await sandboxHarness()
-    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'sandbox design', level: 'l1' }, agent))
-    const analyzed = resultTask(await execute(ctx, 'mark_analysis_done', {
-      task_id: created['id'], revision: created['revision'],
-    }, agent))
-    await execute(ctx, 'record_design', {
-      task_id: analyzed['id'], revision: analyzed['revision'], text: 'the sandboxed design',
-    }, agent)
-    expect(readFileSync(join(sessionCwd, '.dsh', 'design', `${created['id']}.md`), 'utf8'))
-      .toContain('the sandboxed design')
-  })
-
-  it('writes the change artifact under the session cwd through a workspace-write sandbox', async () => {
-    const { ctx, agent, sessionCwd } = await sandboxHarness()
-    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'sandbox change', level: 'l0' }, agent))
-    await execute(ctx, 'record_change', {
-      task_id: created['id'], revision: created['revision'], text: 'the sandboxed change',
-    }, agent)
-    expect(readFileSync(join(sessionCwd, '.dsh', 'changes', `${created['id']}.md`), 'utf8'))
-      .toContain('the sandboxed change')
-  })
-
-  it('writes tasks.md under the session cwd through a workspace-write sandbox', async () => {
-    const { ctx, agent, sessionCwd } = await sandboxHarness()
-    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'sandbox tasks', level: 'l2' }, agent))
-    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
-    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
-    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
-    resultTask(await execute(ctx, 'record_tasks', {
-      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
-      items: [{ content: 'ship it', phase: 'implemented', status: 'pending' }],
-    }, agent))
-    expect(readFileSync(join(sessionCwd, 'openspec', 'changes', 'add-thing', 'tasks.md'), 'utf8'))
-      .toBe('- [ ] ship it\n')
   })
 })

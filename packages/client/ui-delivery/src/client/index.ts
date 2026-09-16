@@ -21,7 +21,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 // Type-only: pulls the Session Remote's Context merge (ctx.remote.session).
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+// Type-only: pulls the optional `fileViewer` Context merge (ctx.get).
+import type {} from '@deepseek-ai/dsh-client-ui-file-browser/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { DeliveryFloatCard } from './DeliveryFloatCard.tsx'
 import type { DeliveryFloatCardInjected } from './DeliveryFloatCard.tsx'
 import { DeliveryTaskPanel } from './DeliveryTaskPanel.tsx'
@@ -73,8 +76,15 @@ export function apply(ctx: ClientContext): void {
     id: 'delivery',
     locale: NS,
     store: cardStore,
-    inject: (): DeliveryFloatCardInjected => ({
+    inject: (sessionId: SessionId): DeliveryFloatCardInjected => ({
       openFile: async (path) => {
+        // The viewer resolves the session's Workspace and reports its own
+        // misses; composing it out leaves the desktop opener as the only way.
+        const viewer = ctx.get('fileViewer')
+        if (viewer !== undefined) {
+          viewer.open({ sessionId, path })
+          return
+        }
         const result = await ctx.remote.session.openWorkspacePath({ path })
         if (!result.ok) throw new Error(result.error.message)
       },

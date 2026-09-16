@@ -67,14 +67,28 @@ function remoteStub(overrides: Partial<FileBrowserRemote> = {}): FileBrowserRemo
   return Object.assign(face, { calls })
 }
 
-/** Render the dialog for one Workspace. */
+/** Render the dialog browsing one Workspace. */
 function mount(remote: FileBrowserRemote, open = true) {
   return render(
     <FileBrowserModal
       open={open}
-      workspace={{ workspaceId: WID, title: 'Project' }}
+      request={{ kind: 'workspace', workspaceId: WID, title: 'Project' }}
       onClose={() => {}}
       remote={remote}
+      t={t}
+    />,
+  )
+}
+
+/** Render the dialog viewing one file read-only, as a session file link does. */
+function mountFile(remote: FileBrowserRemote, path = 'src/main.ts', openNative?: (path: string) => Promise<string | undefined>) {
+  return render(
+    <FileBrowserModal
+      open
+      request={{ kind: 'file', workspaceId: WID, path, title: 'Project', readOnly: true }}
+      onClose={() => {}}
+      remote={remote}
+      openNative={openNative}
       t={t}
     />,
   )
@@ -147,7 +161,7 @@ describe('tree', () => {
     })
     mount(remote)
     await screen.findByText('此目录为空')
-    fireEvent.click(screen.getByLabelText('显示隐藏项'))
+    fireEvent.click(screen.getByLabelText('隐藏项'))
     expect(await screen.findByText('.git')).toBeTruthy()
   })
 })
@@ -347,7 +361,7 @@ describe('file operations', () => {
     await waitFor(() => { expect(remote.calls).toContain('create:new.txt') })
   })
 
-  it('creates a directory through the second header action', async () => {
+  it('creates a directory through the second toolbar action', async () => {
     const kinds: string[] = []
     const remote = remoteStub({
       create: (request) => {
@@ -362,6 +376,72 @@ describe('file operations', () => {
     fireEvent.click(screen.getByRole('button', { name: '创建' }))
     await waitFor(() => { expect(remote.calls).toContain('create:nested') })
     expect(kinds).toEqual(['directory'])
+  })
+
+  it('creates inside the selected directory rather than the root', async () => {
+    const directories: (string | undefined)[] = []
+    const remote = remoteStub({
+      list: request => Promise.resolve({
+        ok: true as const,
+        value: request.path === 'src'
+          ? listing('src', [])
+          : listing('', [{ name: 'src', kind: 'directory' as const }]),
+      }),
+      create: (request) => {
+        directories.push(request.directory)
+        return Promise.resolve({ ok: true as const, value: { path: request.name } })
+      },
+    })
+    mount(remote)
+    // Selecting the directory both expands it and makes it the destination.
+    fireEvent.click(await screen.findByText('src'))
+    await screen.findByText('此目录为空')
+    fireEvent.click(screen.getByRole('button', { name: '新建文件' }))
+    fireEvent.change(await screen.findByLabelText('名称'), { target: { value: 'main.ts' } })
+    fireEvent.click(screen.getByRole('button', { name: '创建' }))
+    await waitFor(() => { expect(directories).toEqual(['src']) })
+  })
+
+  it('creates inside the selected file\u2019s parent directory', async () => {
+    const directories: (string | undefined)[] = []
+    const remote = remoteStub({
+      list: request => Promise.resolve({
+        ok: true as const,
+        value: request.path === 'src'
+          ? listing('src', [{ name: 'main.ts', kind: 'file' as const }])
+          : listing('', [{ name: 'src', kind: 'directory' as const }]),
+      }),
+      create: (request) => {
+        directories.push(request.directory)
+        return Promise.resolve({ ok: true as const, value: { path: request.name } })
+      },
+    })
+    mount(remote)
+    fireEvent.click(await screen.findByText('src'))
+    fireEvent.click(await screen.findByText('main.ts'))
+    // The editor's label is the full workspace-relative path.
+    await screen.findByLabelText('src/main.ts')
+    fireEvent.click(screen.getByRole('button', { name: '新建文件' }))
+    fireEvent.change(await screen.findByLabelText('名称'), { target: { value: 'other.ts' } })
+    fireEvent.click(screen.getByRole('button', { name: '创建' }))
+    await waitFor(() => { expect(directories).toEqual(['src']) })
+  })
+
+  it('creates in the root when nothing is selected', async () => {
+    const directories: (string | undefined)[] = []
+    const remote = remoteStub({
+      create: (request) => {
+        directories.push(request.directory)
+        return Promise.resolve({ ok: true as const, value: { path: request.name } })
+      },
+    })
+    mount(remote)
+    await screen.findByText('此目录为空')
+    fireEvent.click(screen.getByRole('button', { name: '新建文件' }))
+    fireEvent.change(await screen.findByLabelText('名称'), { target: { value: 'root.txt' } })
+    fireEvent.click(screen.getByRole('button', { name: '创建' }))
+    // The root is the empty relative path, which is omitted from the request.
+    await waitFor(() => { expect(directories).toEqual([undefined]) })
   })
 
   it('refuses to submit a blank create name', async () => {
@@ -502,6 +582,168 @@ describe('lifecycle', () => {
   it('does not call the Remote while closed', () => {
     const remote = remoteStub()
     mount(remote, false)
+    expect(remote.calls).toEqual([])
+  })
+})
+
+describe('chrome layout', () => {
+  it('keeps the search box, the hidden toggle, and both create verbs on the toolbar row', async () => {
+    mount(remoteStub())
+    await screen.findByText('此目录为空')
+    const toolbar = screen.getByRole('dialog').querySelector('[class*="toolbar"]')
+    expect(toolbar).not.toBeNull()
+    // Every control lives inside the single toolbar element, which is what keeps
+    // the tree from being pushed down by stacked rows.
+    const inToolbar = (node: HTMLElement | null): boolean =>
+      node !== null && toolbar?.contains(node) === true
+    expect(inToolbar(screen.getByLabelText('搜索文件'))).toBe(true)
+    expect(inToolbar(screen.getByLabelText('隐藏项'))).toBe(true)
+    expect(inToolbar(screen.getByLabelText('新建文件'))).toBe(true)
+    expect(inToolbar(screen.getByLabelText('新建文件夹'))).toBe(true)
+  })
+
+  it('renders the dialog title exactly once', async () => {
+    mount(remoteStub())
+    await screen.findByText('此目录为空')
+    // A second header inside the tree would duplicate the title and add a row.
+    expect(screen.getAllByText('文件浏览器 — Project')).toHaveLength(1)
+  })
+
+  it('offers the split divider and the corner grip', async () => {
+    mount(remoteStub())
+    await screen.findByText('此目录为空')
+    expect(screen.getByRole('separator')).toBeTruthy()
+    expect(screen.getByRole('dialog').querySelector('[class*="sizeGrip"]')).not.toBeNull()
+  })
+
+  it('turns off soft wrapping so long lines scroll instead of being hidden', async () => {
+    const remote = remoteStub({
+      list: () => Promise.resolve({ ok: true as const, value: listing('', [{ name: 'a.ts', kind: 'file' }]) }),
+      read: () => Promise.resolve({
+        ok: true as const,
+        value: { kind: 'text' as const, text: 'const a = 1', version: 'v1', size: 11 },
+      }),
+    })
+    mount(remote)
+    fireEvent.click(await screen.findByText('a.ts'))
+    const box = await screen.findByLabelText('a.ts')
+    // Wrapping would put the transparent textarea's glyphs on rows the
+    // highlight layer never draws, and would leave long lines with no
+    // horizontal scrollbar.
+    expect(box.getAttribute('wrap')).toBe('off')
+  })
+
+  it('writes the frame size as CSS variables the grips can move', async () => {
+    mount(remoteStub())
+    await screen.findByText('此目录为空')
+    const dialog = screen.getByRole('dialog')
+    // The frame starts from the stylesheet's own sizing, not an inline one, so a
+    // drag writes the first inline value rather than replacing a hand-set one.
+    expect(dialog.style.getPropertyValue('--dsl-fb-width')).toBe('')
+    expect(dialog.style.getPropertyValue('--dsl-fb-height')).toBe('')
+  })
+})
+
+describe('read-only file view', () => {
+  it('opens the requested path directly and reads it without listing the tree', async () => {
+    const remote = remoteStub({
+      read: () => Promise.resolve({
+        ok: true as const,
+        value: { kind: 'text' as const, text: 'const answer = 42', version: 'v1', size: 17 },
+      }),
+    })
+    mountFile(remote, 'src/main.ts')
+    expect(await screen.findByText('src/main.ts')).toBeTruthy()
+    expect(remote.calls).toContain('read:src/main.ts')
+    // The tree is what a read-only view omits; listing it would be work whose
+    // result the operator cannot act on.
+    expect(remote.calls.some(call => call.startsWith('list:'))).toBe(false)
+  })
+
+  it('offers the highlight layer but no save or reload action', async () => {
+    mountFile(remoteStub())
+    await screen.findByText('src/main.ts')
+    expect(screen.getByText('只读')).toBeTruthy()
+    expect(screen.queryByText('保存')).toBeNull()
+    expect(screen.queryByText('重新加载')).toBeNull()
+  })
+
+  it('shows no tree, search box, or create verbs', async () => {
+    mountFile(remoteStub())
+    await screen.findByText('src/main.ts')
+    expect(screen.queryByLabelText('搜索文件')).toBeNull()
+    expect(screen.queryByLabelText('新建文件')).toBeNull()
+    expect(screen.queryByLabelText('新建文件夹')).toBeNull()
+    expect(screen.queryByLabelText('显示隐藏项')).toBeNull()
+  })
+
+  it('offers the desktop opener only when the deployment supplies one', async () => {
+    const withNative = remoteStub()
+    mountFile(withNative, 'src/main.ts', () => Promise.resolve(undefined))
+    expect(await screen.findByText('用本地编辑器打开')).toBeTruthy()
+    cleanup()
+
+    const withoutNative = remoteStub()
+    mountFile(withoutNative, 'src/main.ts')
+    await screen.findByText('src/main.ts')
+    expect(screen.queryByText('用本地编辑器打开')).toBeNull()
+  })
+
+  it('calls the desktop opener with the viewed path', async () => {
+    const opened: string[] = []
+    mountFile(remoteStub(), 'src/main.ts', (path) => {
+      opened.push(path)
+      return Promise.resolve(undefined)
+    })
+    fireEvent.click(await screen.findByText('用本地编辑器打开'))
+    expect(opened).toEqual(['src/main.ts'])
+  })
+
+  it('reports a refused desktop open without discarding the loaded file', async () => {
+    mountFile(remoteStub(), 'src/main.ts', () => Promise.resolve('xdg-open is not available'))
+    fireEvent.click(await screen.findByText('用本地编辑器打开'))
+    expect(await screen.findByText(/无法用本地编辑器打开.*xdg-open is not available/)).toBeTruthy()
+    // The viewer keeps showing the file it already loaded.
+    expect(screen.getByDisplayValue('hello')).toBeTruthy()
+  })
+
+  it('keeps the desktop opener available for a file it cannot render as text', async () => {
+    const remote = remoteStub({
+      read: () => Promise.resolve({
+        ok: true as const,
+        value: { kind: 'too-large' as const, size: 5_000_000, limit: 2 * 1024 * 1024 },
+      }),
+    })
+    mountFile(remote, 'huge.log', () => Promise.resolve(undefined))
+    expect(await screen.findByText('用本地编辑器打开')).toBeTruthy()
+  })
+
+  it('states that no Workspace backs the session instead of showing a pane', async () => {
+    render(
+      <FileBrowserModal
+        open
+        request={{ kind: 'unavailable', path: 'src/main.ts', reason: 'no-workspace' }}
+        onClose={() => {}}
+        remote={remoteStub()}
+        t={t}
+      />,
+    )
+    expect(await screen.findByText('该会话不属于任何工作区，无法在此查看文件。')).toBeTruthy()
+    expect(screen.getByText('src/main.ts')).toBeTruthy()
+  })
+
+  it('reads nothing when the request could not be resolved', async () => {
+    const remote = remoteStub()
+    render(
+      <FileBrowserModal
+        open
+        request={{ kind: 'unavailable', path: 'src/main.ts', reason: 'no-workspace' }}
+        onClose={() => {}}
+        remote={remote}
+        t={t}
+      />,
+    )
+    await screen.findByText('该会话不属于任何工作区，无法在此查看文件。')
     expect(remote.calls).toEqual([])
   })
 })

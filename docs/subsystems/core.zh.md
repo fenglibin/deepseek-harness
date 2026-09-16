@@ -566,6 +566,31 @@ async remove(id: string): Promise<void>
 @Remote('deletePreset') async remoteExportDelete(id: string): Promise<void>
 
 /**
+ * Enable or disable one plugin row of one preset's composition.
+ *
+ * A shipped preset is edited in place, at the composition file discovery
+ * resolved: the deployment ships the decision to run a row, not a veto over
+ * whether this user runs it. Only the row's own `disabled` line moves, so the
+ * comments a shipped composition records its design in survive.
+ *
+ * The write reaches the composition FILE first, then reconciles every
+ * standing mount of this preset with the new enablement. Without that step a
+ * session that already composed the preset keeps the generation it started
+ * on and the inventory keeps answering from the stale mount, so a reader
+ * would see the old state until restart. The row is addressed by the id its
+ * file declares, so a row a listing shows without an id cannot be changed at
+ * all.
+ * @param agentPreset - the preset whose composition to change.
+ * @param entryId - the id the target row declares.
+ * @param disabled - whether the row should be stopped.
+ * @returns once the composition file carries the change and live mounts match.
+ * @throws {RemoteError} `gateway/bad-request` for an empty id,
+ * `agent-preset/not-found` when no root supplies the preset, or
+ * `agent-preset/invalid` when the write is refused.
+ */
+@Remote('setRowDisabled') async setRowDisabled(agentPreset: string, entryId: string, disabled: boolean): Promise<void>
+
+/**
  * One agent's instance of a service its preset mounted.
  *
  * A preset publishes services behind `isolate` realms, which are invisible

@@ -283,6 +283,65 @@ type FsErrorCode =
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.zh.md](../cordis-api/inherited.zh.md).
 
+<a id="ctxfilebrowsercontroller--filebrowsercontroller"></a>
+
+### `ctx.fileBrowserController` — `FileBrowserController`
+
+Host service backing the generated `ctx.remote.fileBrowser` namespace.
+
+```ts cordis-catalog
+/**
+ * List one directory level of a workspace.
+ * @param request - workspace, directory, and hidden-files choice.
+ * @returns the level's direct children.
+ */
+@Remote('list') list(request: FileBrowserListRequest): Promise<FileBrowserListing>
+
+/**
+ * Read one file as content the browser can present.
+ * @param request - workspace and workspace-relative file path.
+ * @returns the arm describing this file (text, image, binary, or over the bound).
+ */
+@Remote('read') read(request: FileBrowserReadRequest): Promise<FileBrowserContent>
+
+/**
+ * Write one file, atomically and optionally guarded by the version read.
+ * @param request - workspace, path, content, and the version the caller read.
+ * @returns the version the write produced.
+ */
+@Remote('write') write(request: FileBrowserWriteRequest): Promise<FileBrowserWriteValue>
+
+/**
+ * Create one file or directory inside a workspace directory.
+ * @param request - workspace, parent directory, name, and entry kind.
+ * @returns the created entry's workspace-relative path.
+ */
+@Remote('create') create(request: FileBrowserCreateRequest): Promise<FileBrowserCreateValue>
+
+/**
+ * Rename one entry within its own directory.
+ * @param request - workspace, current path, and the replacement base name.
+ * @returns the entry's path after the move.
+ */
+@Remote('rename') rename(request: FileBrowserRenameRequest): Promise<FileBrowserRenameValue>
+
+/**
+ * Delete one file or directory.
+ * @param request - workspace and workspace-relative entry path.
+ * @returns nothing on success; a refusal rejects.
+ */
+@Remote('delete') delete(request: FileBrowserDeleteRequest): Promise<void>
+
+/**
+ * Search entry names under a workspace root.
+ * @param request - workspace and case-insensitive name fragment.
+ * @returns the matches with a truncation flag.
+ */
+@Remote('search') search(request: FileBrowserSearchRequest): Promise<FileBrowserSearchResult>
+```
+
+Source: [`packages/api/file-browser/src/index.ts`](../../packages/api/file-browser/src/index.ts)
+
 <a id="ctxfs--filesystem-abstract-seam"></a>
 
 ### `ctx.fs` — `FileSystem` (abstract seam)

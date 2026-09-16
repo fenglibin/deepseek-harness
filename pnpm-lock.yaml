@@ -2186,6 +2186,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-conversation':
         specifier: workspace:^
         version: link:../ui-conversation
+      '@deepseek-ai/dsh-client-ui-file-browser':
+        specifier: workspace:^
+        version: link:../ui-file-browser
       '@deepseek-ai/dsh-client-ui-layout':
         specifier: workspace:^
         version: link:../ui-layout
@@ -2473,6 +2476,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-conversation':
         specifier: workspace:^
         version: link:../ui-conversation
+      '@deepseek-ai/dsh-client-ui-file-browser':
+        specifier: workspace:^
+        version: link:../ui-file-browser
       '@deepseek-ai/dsh-client-ui-primitives':
         specifier: workspace:^
         version: link:../ui-primitives
@@ -2527,6 +2533,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-conversation':
         specifier: workspace:^
         version: link:../ui-conversation
+      '@deepseek-ai/dsh-client-ui-file-browser':
+        specifier: workspace:^
+        version: link:../ui-file-browser
       '@deepseek-ai/dsh-client-ui-primitives':
         specifier: workspace:^
         version: link:../ui-primitives
@@ -2679,6 +2688,9 @@ importers:
       '@deepseek-ai/dsh-invariants':
         specifier: workspace:^
         version: link:../../runtime-diagnostics/invariants
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:^
+        version: link:../../core/session
       '@testing-library/react':
         specifier: ^16.1.0
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -3355,6 +3367,9 @@ importers:
       '@deepseek-ai/dsh-client-locale':
         specifier: workspace:^
         version: link:../locale
+      '@deepseek-ai/dsh-client-store':
+        specifier: workspace:^
+        version: link:../store
       '@deepseek-ai/dsh-client-test-runtime':
         specifier: workspace:^
         version: link:../../test-support/client-runtime
@@ -3367,6 +3382,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-deliverables':
         specifier: workspace:^
         version: link:../ui-deliverables
+      '@deepseek-ai/dsh-client-ui-file-browser':
+        specifier: workspace:^
+        version: link:../ui-file-browser
       '@deepseek-ai/dsh-client-ui-primitives':
         specifier: workspace:^
         version: link:../ui-primitives

@@ -458,11 +458,11 @@ describe('docsPages locale routes', () => {
     }
   })
 
-  it('keeps Cordis inherited on the English fallback', () => {
+  it('publishes Cordis inherited from its Chinese source under the canonical route', () => {
     const pages = docsPages.filter(page => page.route.endsWith('reference/cordis-api/inherited.md'))
     expect(pages).toHaveLength(1)
-    expect(pages.every(page => page.source === 'docs/cordis-api/inherited.md')).toBe(true)
-    expect(pages.every(page => page.contentLocale === 'en-US')).toBe(true)
+    expect(pages.every(page => page.source === 'docs/cordis-api/inherited.zh.md')).toBe(true)
+    expect(pages.every(page => page.contentLocale === 'zh-CN')).toBe(true)
   })
 
   it('includes persistence event headings in the locale outline', () => {

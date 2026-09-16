@@ -7,7 +7,7 @@
  * targets while retaining every other byte. The
  * projection enforces event modes, JSDoc parameter/return completeness, and
  * signature type-link coverage; the inherited (vendor) tier renders to
- * `docs/cordis-api/inherited.md`. `--check` verifies every generated artifact.
+ * `docs/cordis-api/inherited.zh.md`. `--check` verifies every generated artifact.
  *
  * Generated regions embed `file:line` source pointers, so inserting lines ABOVE a
  * recorded symbol makes the committed output stale even though nothing about the
@@ -116,6 +116,9 @@ export const SERVICE_PAGE: Record<string, string> = {
   workspaceRegistry: 'workspace.md',
   workspaceController: 'workspace.md',
   directoryPickerController: 'workspace.md',
+  fileBrowserController: 'filesystem.md',
+  mcpResources: 'mcp.md',
+  skillRoots: 'skills.md',
 }
 
 /**
@@ -168,6 +171,9 @@ export const SERVICE_WALK_EXEMPTIONS: Record<string, string> = {
   workspaces: 'client-side interface-typed browser service — packages/api/workspace-controller/README.md owns the API',
   mcpStatusSink: 'per-server connection sink every mounted mcp-client instance reports to — packages/mcp/mcp-client/README.md owns the API',
   mcpManager: 'optional manager handle configuration surfaces read through the mcp Remote namespace — docs/subsystems/mcp.md owns the API and docs/subsystems/mcp.md#events carries mcp/status',
+  mcpAuthSink: 'optional bearer-credential resolver the MCP management surface provides — packages/mcp/mcp-client/README.md owns the API',
+  resources: 'client-side resource model provided by the browser half — packages/client/resources/README.md owns the API',
+  workspaceRowMenu: 'client-side Workspace row-menu registry — packages/client/ui-workspace/README.md owns the API',
 }
 
 /**
@@ -386,6 +392,19 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   FsVersion: 'filesystem.md',
   FsWriteIntent: 'filesystem.md',
   FsWriteOutcome: 'filesystem.md',
+  FileBrowserListRequest: 'filesystem.md',
+  FileBrowserListing: 'filesystem.md',
+  FileBrowserContent: 'filesystem.md',
+  FileBrowserReadRequest: 'filesystem.md',
+  FileBrowserWriteRequest: 'filesystem.md',
+  FileBrowserWriteValue: 'filesystem.md',
+  FileBrowserCreateRequest: 'filesystem.md',
+  FileBrowserCreateValue: 'filesystem.md',
+  FileBrowserRenameRequest: 'filesystem.md',
+  FileBrowserRenameValue: 'filesystem.md',
+  FileBrowserDeleteRequest: 'filesystem.md',
+  FileBrowserSearchRequest: 'filesystem.md',
+  FileBrowserSearchResult: 'filesystem.md',
   CreateGoalRequest: 'goal.md',
   EditGoalRequest: 'goal.md',
   GoalBlockReason: 'goal.md',

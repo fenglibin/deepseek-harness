@@ -8,7 +8,7 @@
  * ordering, canonical paths — is actually the shape the business rules need.
  */
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { Context } from '@deepseek-ai/cordis'
 import { ToolCallId, createToolResultMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -16,9 +16,10 @@ import { Session, SessionStore, SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import * as FileChangesPlugin from '@deepseek-ai/dsh-file-changes'
 import type { ChangedFilesProjection } from '@deepseek-ai/dsh-file-changes/client'
-import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import { bindSnapshotSelector, makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import { SessionChangesDock } from '../src/client/SessionChangesDock.tsx'
+import { createAcceptedChangesStore } from '../src/client/accept-store.ts'
 import { zh } from '../src/client/locales.ts'
 // Type-only: registers the `session-changes` LocaleNamespaceMap merge so the
 // dock's PropsLocale resolves `t` in this program.
@@ -27,6 +28,8 @@ import '@deepseek-ai/dsh-client-ui-session-changes/client'
 type SessionHandle = Session
 const t: Parameters<typeof SessionChangesDock>[0]['t'] = makeTranslate(zh, commonZh)
 
+// The accept store persists; the suite owns the storage it writes.
+beforeEach(() => { localStorage.clear() })
 afterEach(cleanup)
 
 /** One successful mutation of `path`, recorded the way the agent loop records it. */
@@ -79,10 +82,13 @@ async function composed(id: string) {
 function dockProps(
   read: () => ChangedFilesProjection | undefined,
   openFile: () => Promise<void>,
+  seat = createAcceptedChangesStore().create('e2e'),
 ): Parameters<typeof SessionChangesDock>[0] {
   return {
     useConversation: () => ({ views: { get: () => undefined } }) as never,
     useProjection: () => read(),
+    useStore: bindSnapshotSelector(seat),
+    actions: seat.actions,
     cwd: '/proj',
     openFile,
     t,
@@ -97,6 +103,7 @@ describe('end-to-end business: a real log drives the dock', () => {
   it('keeps a change pending until accepted, then restores it when the file changes again', async () => {
     const { session, read } = await composed('e2e-business')
     const openFile = vi.fn<() => Promise<void>>(() => Promise.resolve())
+    const seat = createAcceptedChangesStore().create('e2e-business')
 
     // Turn 1: the agent creates src/a.txt and src/b.txt.
     turn(session, 1, () => {
@@ -107,7 +114,7 @@ describe('end-to-end business: a real log drives the dock', () => {
     // Guard: the projection really returned two files, so the dock's count is
     // evidence about the unit rather than about an empty list.
     expect(read()?.files).toHaveLength(2)
-    const view = render(<SessionChangesDock {...dockProps(read, openFile)} />)
+    const view = render(<SessionChangesDock {...dockProps(read, openFile, seat)} />)
     expect(screen.getByText(t('summary', { count: 2 }))).toBeDefined()
     fireEvent.click(screen.getByRole('button', { name: new RegExp(t('title')) }))
     // The path is canonicalized against the Session Workspace root.
@@ -122,12 +129,12 @@ describe('end-to-end business: a real log drives the dock', () => {
     // Turn 2 adds an untouched file: the accept survives the new turn and the
     // accepted file stays hidden.
     turn(session, 2, () => { mutate(session, 2, 'w-c', 'src/c.txt') })
-    view.rerender(<SessionChangesDock {...dockProps(read, openFile)} />)
+    view.rerender(<SessionChangesDock {...dockProps(read, openFile, seat)} />)
     expect(screen.getByText(t('summary', { count: 2 }))).toBeDefined()
 
     // Turn 3 edits a.txt again: the accepted file comes back to the list.
     turn(session, 3, () => { mutate(session, 3, 'e-a', 'src/a.txt', 'edit') })
-    view.rerender(<SessionChangesDock {...dockProps(read, openFile)} />)
+    view.rerender(<SessionChangesDock {...dockProps(read, openFile, seat)} />)
     expect(screen.getByText(t('summary', { count: 3 }))).toBeDefined()
     expect(screen.getByTitle('/proj/src/a.txt')).toBeDefined()
   })
@@ -135,22 +142,32 @@ describe('end-to-end business: a real log drives the dock', () => {
   it('accept-all hides every pending file and only a later change brings one back', async () => {
     const { session, read } = await composed('e2e-accept-all')
     const openFile = vi.fn<() => Promise<void>>(() => Promise.resolve())
+    const seat = createAcceptedChangesStore().create('e2e-accept-all')
 
     turn(session, 1, () => {
       mutate(session, 1, 'w-a', 'src/a.txt')
       mutate(session, 1, 'w-b', 'src/b.txt')
     })
 
-    const view = render(<SessionChangesDock {...dockProps(read, openFile)} />)
+    const view = render(<SessionChangesDock {...dockProps(read, openFile, seat)} />)
     fireEvent.click(screen.getByRole('button', { name: t('acceptAll') }))
-    expect(screen.queryByTestId('session-changes')).toBeNull()
+    expect(screen.getByText(t('summary', { count: 0 }))).toBeDefined()
+
+    // Both accepted files stay reachable in the all view; that entry is the
+    // whole point of keeping the strip after every file is accepted.
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(t('title')) }))
+    fireEvent.click(screen.getByRole('tab', { name: t('view.all') }))
+    expect(screen.getByText(t('summaryAll', { count: 2 }))).toBeDefined()
+    expect(screen.getByTitle('/proj/src/a.txt')).toBeDefined()
+    expect(screen.getByTitle('/proj/src/b.txt')).toBeDefined()
+    fireEvent.click(screen.getByRole('tab', { name: t('view.pending') }))
 
     // A later edit of b.txt restores only b.txt.
     turn(session, 2, () => { mutate(session, 2, 'e-b', 'src/b.txt', 'edit') })
-    view.rerender(<SessionChangesDock {...dockProps(read, openFile)} />)
+    view.rerender(<SessionChangesDock {...dockProps(read, openFile, seat)} />)
     expect(screen.getByText(t('summary', { count: 1 }))).toBeDefined()
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(t('title')) }))
     expect(screen.getByTitle('/proj/src/b.txt')).toBeDefined()
+    expect(screen.queryByTitle('/proj/src/a.txt')).toBeNull()
   })
 
   it('lists the whole Session regardless of how much history the client loaded', async () => {

@@ -1,17 +1,20 @@
 /**
  * The workspace file tree: one lazily loaded level at a time, with the row
- * verbs (rename, delete) and the directory-relative create actions.
+ * verbs (rename, delete).
  *
  * A directory's children are fetched the first time it expands and cached in
  * this component's state; collapsing does not discard them, so reopening a
  * directory is instant. Every mutation reports back to the owner, which owns
  * the Remote call and refreshes the affected level — the tree never writes.
+ *
+ * The create verbs live on the dialog's toolbar rather than here: they act on
+ * the tree's current selection, which the dialog already owns.
  */
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import clsx from 'clsx'
 import {
   IconCodeOutline16, IconFolderClose16, IconFolderOpen16, IconEllipsisOutline16,
-  IconLoadingOutline16, IconPlusOutline16, IconProjectAddOutline16, IconTriangleRightFill14, Menu,
+  IconLoadingOutline16, IconTriangleRightFill14, Menu,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FileBrowserEntry } from '@deepseek-ai/dsh-api-file-browser/types'
@@ -32,12 +35,12 @@ export interface FileTreeActions {
   load: (path: string) => void
   /** Select a file for the content pane. */
   select: (path: string) => void
+  /** Make a directory the create destination (`''` is the root). */
+  selectDirectory: (path: string) => void
   /** Start the rename flow for one entry. */
   rename: (entry: FileBrowserEntry) => void
   /** Start the delete flow for one entry. */
   remove: (entry: FileBrowserEntry) => void
-  /** Start the create flow inside one directory. */
-  create: (directory: string, kind: 'file' | 'directory') => void
 }
 
 /** Props of {@link FileTree}. */
@@ -50,6 +53,12 @@ export interface FileTreeProps {
   onToggle: (path: string) => void
   /** The selected file's workspace-relative path. */
   selected?: string | undefined
+  /**
+   * The selected directory's workspace-relative path (`''` for the root). A
+   * create lands inside it, so it is tracked apart from `selected`: clicking a
+   * directory both expands it and makes it the create destination.
+   */
+  selectedDirectory?: string | undefined
   /** Row and create verbs. */
   actions: FileTreeActions
   /** Localized chrome. */
@@ -64,8 +73,7 @@ const INDENT_PER_DEPTH = 14
  * @param props - see {@link FileTreeProps}.
  * @returns the tree element.
  */
-export function FileTree({ levels, expanded, onToggle, selected, actions, t }: FileTreeProps) {
-  const root = levels.get('')
+export function FileTree({ levels, expanded, onToggle, selected, selectedDirectory, actions, t }: FileTreeProps) {
   const [menuPath, setMenuPath] = useState<string | undefined>(undefined)
 
   /**
@@ -118,7 +126,7 @@ export function FileTree({ levels, expanded, onToggle, selected, actions, t }: F
   const renderEntry = (entry: FileBrowserEntry, depth: number): React.ReactNode => {
     const isDirectory = entry.kind === 'directory'
     const isOpen = isDirectory && expanded.has(entry.path)
-    const isSelected = entry.path === selected
+    const isSelected = isDirectory ? entry.path === selectedDirectory : entry.path === selected
     const menuItems: MenuEntry[] = [
       { id: 'rename', label: t('file.rename') },
       { id: 'delete', label: t('file.delete'), danger: true },
@@ -132,8 +140,12 @@ export function FileTree({ levels, expanded, onToggle, selected, actions, t }: F
           aria-expanded={isDirectory ? isOpen : undefined}
           style={{ paddingLeft: `${String(depth * INDENT_PER_DEPTH + 4)}px` }}
           onClick={() => {
-            if (isDirectory) onToggle(entry.path)
-            else actions.select(entry.path)
+            // A directory click both selects it (the create destination) and
+            // toggles it; a file click opens it in the content pane.
+            if (isDirectory) {
+              actions.selectDirectory(entry.path)
+              onToggle(entry.path)
+            } else actions.select(entry.path)
           }}
         >
           <span className={css.chevron}>
@@ -178,40 +190,8 @@ export function FileTree({ levels, expanded, onToggle, selected, actions, t }: F
     )
   }
 
-  const rootReady = root !== undefined && !root.loading && root.error === undefined
-  const createTarget = useMemo(() => {
-    // Creating lands in the selected directory: the selected file's parent, or
-    // the root when nothing is selected.
-    if (selected === undefined) return ''
-    const cut = selected.lastIndexOf('/')
-    return cut < 0 ? '' : selected.slice(0, cut)
-  }, [selected])
-
   return (
     <div className={css.tree}>
-      <div className={css.header}>
-        <span className={css.headerLabel}>{t('dialog.title')}</span>
-        <span className={css.headerActions}>
-          <button
-            type="button"
-            className={css.iconButton}
-            aria-label={t('file.newFile')}
-            disabled={!rootReady}
-            onClick={() => { actions.create(createTarget, 'file') }}
-          >
-            <IconPlusOutline16 />
-          </button>
-          <button
-            type="button"
-            className={css.iconButton}
-            aria-label={t('file.newFolder')}
-            disabled={!rootReady}
-            onClick={() => { actions.create(createTarget, 'directory') }}
-          >
-            <IconProjectAddOutline16 />
-          </button>
-        </span>
-      </div>
       <div className={css.body} role="tree" aria-label={t('tree.aria')}>
         {renderLevel('', 0)}
       </div>

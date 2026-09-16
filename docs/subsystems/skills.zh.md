@@ -277,6 +277,16 @@ Host service backing `ctx.remote.skills` without activating a cold Agent.
 
 Source: [`packages/api/session-controller/src/skill-catalog.ts`](../../packages/api/session-controller/src/skill-catalog.ts)
 
+<a id="ctxskillroots--skillrootsview"></a>
+
+### `ctx.skillRoots` — `SkillRootsView`
+
+Read-only view of the roots this provider scans. A management surface consumes it so its writes land in directories the discovery pass actually reads; deriving roots independently would let the two drift apart whenever this provider's configuration changes.
+
+Only the deployment-level instance publishes it: the roots a management surface edits are the deployment's, while a preset instance's roots belong to that preset (its own bundled `skills/` directory, for one) and cannot be edited from a surface that has no session to resolve them against.
+
+Source: [`packages/skill/skill-filesystem/src/index.ts`](../../packages/skill/skill-filesystem/src/index.ts)
+
 <a id="ctxskills--skillregistry"></a>
 
 ### `ctx.skills` — `SkillRegistry`

@@ -7,7 +7,7 @@
  * collapse/expand + accept + open behavior, the projection-first source with
  * its window fallback, and the registration's injected opener.
  */
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { Context } from '@deepseek-ai/cordis'
 import type {
@@ -15,13 +15,14 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { DeliverablesTurnData } from '@deepseek-ai/dsh-client-ui-deliverables/client'
 import type { ChangedFilesProjection } from '@deepseek-ai/dsh-file-changes/client'
-import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
+import { makeTranslate, bindSnapshotSelector } from '@deepseek-ai/dsh-client-test-runtime'
 import { zh as commonZh } from '@deepseek-ai/dsh-client-locale/src/locales/zh.ts'
 import {
-  canonicalMutationPath, displayPath, pendingChanges, SessionChangesDock, SessionChangesPanel,
-  sessionChanges,
-  type AcceptedChanges, type SessionChange, type SessionChangesInjected,
+  canonicalMutationPath, displayPath, isPendingChange, pendingChanges, SessionChangesDock,
+  SessionChangesPanel, sessionChanges,
+  type SessionChange, type SessionChangesInjected,
 } from '../src/client/SessionChangesDock.tsx'
+import { createAcceptedChangesStore, type AcceptedChanges } from '../src/client/accept-store.ts'
 import { zh } from '../src/client/locales.ts'
 import { apply } from '../src/client/index.ts'
 import { apply as applyInvariant } from '../src/invariant.ts'
@@ -243,6 +244,13 @@ describe('pendingChanges', () => {
   it('keeps a file hidden while no newer mutation lands', () => {
     expect(pendingChanges([a], { '/proj/a.txt': 10 })).toEqual([])
   })
+
+  it('reports one row as pending by the same comparison the list uses', () => {
+    expect(isPendingChange(a, {})).toBe(true)
+    expect(isPendingChange(a, { '/proj/a.txt': 10 })).toBe(false)
+    // The accept covered seq 10, but this row now carries seq 30.
+    expect(isPendingChange(projected('/proj/a.txt', 10, 30), { '/proj/a.txt': 10 })).toBe(true)
+  })
 })
 
 describe('SessionChangesPanel', () => {
@@ -367,7 +375,7 @@ describe('SessionChangesPanel', () => {
     expect(onAccept).toHaveBeenCalledWith(changes[0])
   })
 
-  it('drops accepted files from the visible list using the adapter-owned set', () => {
+  it('drops accepted files from the visible list using the accept record', () => {
     const accepted = { '/proj/src/a.ts': 1 }
     const onAccept = vi.fn()
     renderPanel({ accepted, onAccept })
@@ -378,9 +386,108 @@ describe('SessionChangesPanel', () => {
     expect(screen.getByText('b.ts')).toBeDefined()
   })
 
-  it('renders nothing when every change is accepted at its current seq', () => {
+  it('keeps the strip reachable once every change is accepted', () => {
+    // The all-view entry must not vanish with the pending rows: a reader who
+    // accepted everything still needs a way back to the files.
     const accepted = { '/proj/src/a.ts': 1, '/proj/lib/b.ts': 2 }
     renderPanel({ accepted })
+    expect(screen.getByTestId('session-changes')).toBeDefined()
+    expect(screen.getByText(t('summary', { count: 0 }))).toBeDefined()
+    // Nothing is pending, so the bulk action has no subject left.
+    expect(screen.queryByRole('button', { name: t('acceptAll') })).toBeNull()
+  })
+
+  it('lists every change, accepted ones included, in the all view', () => {
+    renderPanel({ accepted: { '/proj/src/a.ts': 1 } })
+    fireEvent.click(screen.getByRole('button', { name: headerName }))
+    fireEvent.click(screen.getByRole('tab', { name: t('view.all') }))
+
+    expect(screen.getByText(t('summaryAll', { count: 2 }))).toBeDefined()
+    expect(screen.getByText('a.ts')).toBeDefined()
+    expect(screen.getByText('b.ts')).toBeDefined()
+    // The accepted row keeps its place but offers no second accept.
+    expect(screen.getByText(t('accepted'))).toBeDefined()
+    expect(screen.getAllByRole('button', { name: t('accept') })).toHaveLength(1)
+  })
+
+  it('lists an accepted path in BOTH views once it changes again', () => {
+    // The overlap the two readings exist to show: the reader accepted a.ts at
+    // seq 1, then the agent changed it again at seq 9. It is pending once more
+    // AND still carries its accept record, so each view lists it exactly once.
+    const reMutated = [
+      { path: '/proj/src/a.ts', operation: 'write', firstSeq: 1, lastSeq: 9 },
+      { path: '/proj/lib/b.ts', operation: 'edit', firstSeq: 2, lastSeq: 2 },
+    ] as const
+    render(
+      <SessionChangesPanel
+        changes={reMutated}
+        accepted={{ '/proj/src/a.ts': 1 }}
+        onAccept={vi.fn()}
+        onAcceptAll={vi.fn()}
+        openFile={() => Promise.resolve()}
+        cwd="/proj"
+        t={t}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: headerName }))
+    expect(screen.getByText(t('summary', { count: 2 }))).toBeDefined()
+    expect(screen.getByText('a.ts')).toBeDefined()
+
+    fireEvent.click(screen.getByRole('tab', { name: t('view.all') }))
+    expect(screen.getByText(t('summaryAll', { count: 2 }))).toBeDefined()
+    // One row for the path, so the two views cannot disagree on its count.
+    expect(screen.getAllByText('a.ts')).toHaveLength(1)
+  })
+
+  it('drops the path from the pending view on a second accept while the all view keeps one row', () => {
+    const reMutated = [
+      { path: '/proj/src/a.ts', operation: 'write', firstSeq: 1, lastSeq: 9 },
+    ] as const
+    const { rerender } = render(
+      <SessionChangesPanel
+        changes={reMutated}
+        accepted={{ '/proj/src/a.ts': 1 }}
+        onAccept={vi.fn()}
+        onAcceptAll={vi.fn()}
+        openFile={() => Promise.resolve()}
+        cwd="/proj"
+        t={t}
+      />,
+    )
+    expect(screen.getByText(t('summary', { count: 1 }))).toBeDefined()
+
+    // Second accept at the seq now on screen: pending empties, all keeps one.
+    rerender(
+      <SessionChangesPanel
+        changes={reMutated}
+        accepted={{ '/proj/src/a.ts': 9 }}
+        onAccept={vi.fn()}
+        onAcceptAll={vi.fn()}
+        openFile={() => Promise.resolve()}
+        cwd="/proj"
+        t={t}
+      />,
+    )
+    expect(screen.getByText(t('summary', { count: 0 }))).toBeDefined()
+
+    fireEvent.click(screen.getByRole('button', { name: headerName }))
+    fireEvent.click(screen.getByRole('tab', { name: t('view.all') }))
+    expect(screen.getAllByText('a.ts')).toHaveLength(1)
+    expect(screen.getByText(t('accepted'))).toBeDefined()
+  })
+
+  it('renders nothing when the Session never changed a file', () => {
+    render(
+      <SessionChangesPanel
+        changes={[]}
+        accepted={{}}
+        onAccept={vi.fn()}
+        onAcceptAll={vi.fn()}
+        openFile={() => Promise.resolve()}
+        cwd="/proj"
+        t={t}
+      />,
+    )
     expect(screen.queryByTestId('session-changes')).toBeNull()
   })
 
@@ -402,7 +509,7 @@ describe('SessionChangesPanel', () => {
     expect(screen.getByText(t('summary', { count: 1 }))).toBeDefined()
   })
 
-  it('routes the bulk-accept button through the adapter-owned handler with pending changes', () => {
+  it('routes the bulk-accept button through the panel handler with pending changes', () => {
     const onAcceptAll = vi.fn()
     renderPanel({ onAcceptAll })
     fireEvent.click(screen.getByRole('button', { name: t('acceptAll') }))
@@ -412,15 +519,35 @@ describe('SessionChangesPanel', () => {
 })
 
 describe('SessionChangesDock', () => {
+  // The accept store persists, so a leftover value from an earlier test would
+  // seed the next one's instance — the suite owns the storage it writes.
+  beforeEach(() => { localStorage.clear() })
   afterEach(cleanup)
 
+  /**
+   * One live accept-store instance bound to the hook/actions props shape the
+   * slot machinery supplies. Tests drive the real store rather than a stub, so
+   * the persistence key and the action set are exercised as shipped, and the
+   * hook comes from the framework's own snapshot binding so a write re-renders.
+   */
+  function acceptSeat(sessionId = 's1', handle = createAcceptedChangesStore()) {
+    const instance = handle.create(sessionId)
+    return { useStore: bindSnapshotSelector(instance), actions: instance.actions, instance, handle }
+  }
+
   /** Dock props reading the given projection; omit it to exercise the fallback. */
-  function dockProps(snapshot: ConversationSnapshot, projected?: ChangedFilesProjection) {
+  function dockProps(
+    snapshot: ConversationSnapshot,
+    projected?: ChangedFilesProjection,
+    seat = acceptSeat(),
+  ) {
     const useConversation = <T,>(selector: (s: ConversationSnapshot) => T) => selector(snapshot)
     const useProjection = () => projected
     return {
       useConversation,
       useProjection,
+      useStore: seat.useStore,
+      actions: seat.actions,
       cwd: '/proj',
       openFile: () => Promise.resolve(),
       t,
@@ -435,7 +562,8 @@ describe('SessionChangesDock', () => {
         { path: 'b.txt', operation: 'write', seq: 11 },
       ]),
     ])
-    const { rerender } = render(<SessionChangesDock {...dockProps(before)} />)
+    const seat = acceptSeat()
+    const { rerender } = render(<SessionChangesDock {...dockProps(before, undefined, seat)} />)
     expect(screen.getByText(t('summary', { count: 2 }))).toBeDefined()
 
     // Reader accepts a.txt (the bug scenario: a new request arrives before
@@ -461,7 +589,7 @@ describe('SessionChangesDock', () => {
         { path: 'c.txt', operation: 'write', seq: 21 },
       ]),
     ])
-    rerender(<SessionChangesDock {...dockProps(after)} />)
+    rerender(<SessionChangesDock {...dockProps(after, undefined, seat)} />)
     expect(screen.getByText(t('summary', { count: 2 }))).toBeDefined()
     expect(screen.queryByText('a.txt')).toBeNull()
     expect(screen.getByText('b.txt')).toBeDefined()
@@ -470,16 +598,17 @@ describe('SessionChangesDock', () => {
 
   it('returns an accepted file to the list once it is mutated again', () => {
     const before = conversationOf([turnLocation(1, [{ path: 'a.txt', operation: 'write', seq: 10 }])])
-    const { rerender } = render(<SessionChangesDock {...dockProps(before)} />)
+    const seat = acceptSeat()
+    const { rerender } = render(<SessionChangesDock {...dockProps(before, undefined, seat)} />)
     fireEvent.click(screen.getByRole('button', { name: t('acceptAll') }))
-    expect(screen.queryByTestId('session-changes')).toBeNull()
+    expect(screen.getByText(t('summary', { count: 0 }))).toBeDefined()
 
     // The agent edits a.txt again: the accept covered seq 10, the new change is 20.
     const after = conversationOf([
       turnLocation(1, [{ path: 'a.txt', operation: 'write', seq: 10 }]),
       turnLocation(2, [{ path: 'a.txt', operation: 'edit', seq: 20 }]),
     ])
-    rerender(<SessionChangesDock {...dockProps(after)} />)
+    rerender(<SessionChangesDock {...dockProps(after, undefined, seat)} />)
     expect(screen.getByTestId('session-changes')).toBeDefined()
     expect(screen.getByText(t('summary', { count: 1 }))).toBeDefined()
   })
@@ -536,30 +665,59 @@ describe('SessionChangesDock', () => {
     expect(openFile).not.toHaveBeenCalled()
   })
 
-  it('shows every change again after the dock remounts', () => {
-    // The accept set is component-local: a fresh mount (a page reload) has no
-    // memory of prior accepts, so every change is pending again.
+  it('keeps every accept when the dock remounts', () => {
+    // The accept record lives in the session-scoped store, so a fresh mount of
+    // the same Session reuses it. A component-local set would resurrect every
+    // accepted file here — the reported defect.
     const snapshot = conversationOf([turnLocation(1, [{ path: 'a.txt', operation: 'write', seq: 10 }])])
-    const first = render(<SessionChangesDock {...dockProps(snapshot)} />)
+    const seat = acceptSeat()
+    const first = render(<SessionChangesDock {...dockProps(snapshot, undefined, seat)} />)
     fireEvent.click(screen.getByRole('button', { name: t('acceptAll') }))
-    expect(screen.queryByTestId('session-changes')).toBeNull()
+    expect(screen.getByText(t('summary', { count: 0 }))).toBeDefined()
 
     first.unmount()
-    render(<SessionChangesDock {...dockProps(snapshot)} />)
+    render(<SessionChangesDock {...dockProps(snapshot, undefined, seat)} />)
     expect(screen.getByTestId('session-changes')).toBeDefined()
+    expect(screen.getByText(t('summary', { count: 0 }))).toBeDefined()
+  })
+
+  it('keeps the accept record across a page reload', () => {
+    // A reload discards the instance but keeps the persisted value, so a store
+    // created fresh from the same handle and Session still knows the accept.
+    const snapshot = conversationOf([turnLocation(1, [{ path: 'a.txt', operation: 'write', seq: 10 }])])
+    const handle = createAcceptedChangesStore()
+    const first = render(<SessionChangesDock {...dockProps(snapshot, undefined, acceptSeat('s1', handle))} />)
+    fireEvent.click(screen.getByRole('button', { name: t('acceptAll') }))
+    first.unmount()
+
+    render(<SessionChangesDock {...dockProps(snapshot, undefined, acceptSeat('s1', handle))} />)
+    expect(screen.getByText(t('summary', { count: 0 }))).toBeDefined()
+  })
+
+  it('keeps Sessions independent', () => {
+    const snapshot = conversationOf([turnLocation(1, [{ path: 'a.txt', operation: 'write', seq: 10 }])])
+    const handle = createAcceptedChangesStore()
+    const first = render(<SessionChangesDock {...dockProps(snapshot, undefined, acceptSeat('session-a', handle))} />)
+    fireEvent.click(screen.getByRole('button', { name: t('acceptAll') }))
+    expect(screen.getByText(t('summary', { count: 0 }))).toBeDefined()
+    first.unmount()
+
+    // A different Session gets its own instance: accepting there cannot leak.
+    render(<SessionChangesDock {...dockProps(snapshot, undefined, acceptSeat('session-b', handle))} />)
     expect(screen.getByText(t('summary', { count: 1 }))).toBeDefined()
   })
 
-  it('routes the bulk accept through the adapter-owned set', () => {
+  it('routes the bulk accept through the store actions', () => {
     const snapshot = conversationOf([
       turnLocation(1, [
         { path: 'a.txt', operation: 'write', seq: 10 },
         { path: 'b.txt', operation: 'write', seq: 11 },
       ]),
     ])
-    render(<SessionChangesDock {...dockProps(snapshot)} cwd={undefined} />)
+    const seat = acceptSeat()
+    render(<SessionChangesDock {...dockProps(snapshot, undefined, seat)} />)
     fireEvent.click(screen.getByRole('button', { name: t('acceptAll') }))
-    expect(screen.queryByTestId('session-changes')).toBeNull()
+    expect(seat.instance.getSnapshot()).toEqual({ '/proj/a.txt': 10, '/proj/b.txt': 11 })
   })
 })
 
@@ -580,6 +738,8 @@ describe('dock registration', () => {
       slots: { inject: slotsInject, register },
       sessions: { list: { getSnapshot: () => ({ byId: { 's1': { cwd: '/proj' } } }) } },
       remote: { session: { openWorkspacePath } },
+      // No viewer composed: the desktop opener is the only way to open a file.
+      get: () => undefined,
     } as never)
 
     expect(localeRegister).toHaveBeenCalledWith('session-changes', { zh })
@@ -598,6 +758,28 @@ describe('dock registration', () => {
 
     openWorkspacePath.mockResolvedValueOnce({ ok: false, error: { message: 'xdg-open is not available' } })
     await expect(injected.openFile('/proj/src/a.ts')).rejects.toThrow('xdg-open is not available')
+  })
+
+  it('opens the listed path in the viewer instead of the desktop when one is composed', () => {
+    const register = vi.fn()
+    const open = vi.fn(() => ({ kind: 'opened' as const }))
+    const openWorkspacePath = vi.fn()
+    apply({
+      effect: (body: () => void) => { body() },
+      locale: { register: vi.fn() },
+      slots: { inject: (_name: string, callback: () => () => void) => callback(), register },
+      sessions: { list: { getSnapshot: () => ({ byId: { 's1': { cwd: '/proj' } } }) } },
+      remote: { session: { openWorkspacePath } },
+      get: (name: string) => (name === 'fileViewer' ? { open } : undefined),
+    } as never)
+
+    const options = register.mock.calls[0]![0] as { inject: (sessionId: string) => SessionChangesInjected }
+    void options.inject('s1').openFile('src/a.ts')
+
+    // The viewer resolves the session's Workspace itself, so the row hands it
+    // the session identity and the path as listed — never a resolved path.
+    expect(open).toHaveBeenCalledWith({ sessionId: 's1', path: 'src/a.ts' })
+    expect(openWorkspacePath).not.toHaveBeenCalled()
   })
 })
 

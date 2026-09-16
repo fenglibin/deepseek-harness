@@ -116,6 +116,46 @@
   overflow-y: auto;
 }
 
+/* Two readings of one list, so the tabs read as a segmented control rather
+   than as two separate actions. */
+.views {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.viewTab {
+  padding: 2px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.viewTab:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.viewTab[data-active='true'] {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  font-weight: 500;
+}
+
+/* The accepted marker stands where the accept control would be, so a row's
+   remaining actions stay in one column across both views. */
+.accepted {
+  flex: none;
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-caption);
+}
+
 .item {
   display: flex;
   align-items: center;

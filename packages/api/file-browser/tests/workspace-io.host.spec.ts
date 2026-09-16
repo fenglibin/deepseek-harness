@@ -22,6 +22,7 @@ import {
   readFileContent,
   readImageBytes,
   renameEntry,
+  SNIFF_BYTES,
   searchNames,
   writeFileContent,
   type WorkspaceIoLimits,
@@ -194,6 +195,39 @@ describe('reading content', () => {
     const root = workspace()
     writeFileSync(join(root, 'blob.bin'), Buffer.from([0x41, 0x00, 0x42]))
     expect(await readFileContent(root, 'blob.bin', limits, assetUrl)).toEqual({ kind: 'binary', size: 3 })
+  })
+
+  it('reads a text file whose sample boundary falls inside a multi-byte character', async () => {
+    const root = workspace()
+    // The regression this pins: the content sample is a fixed-width prefix, so
+    // a strict decode reported malformed input whenever the cut landed inside a
+    // character — an ordinary UTF-8 Markdown file was shown as binary. Three
+    // bytes of CJK straddle byte 8192 here by construction.
+    const filler = 'a'.repeat(SNIFF_BYTES - 2)
+    writeFileSync(join(root, 'cjk.md'), `${filler}中文内容\n`)
+    const content = await readFileContent(root, 'cjk.md', limits, assetUrl)
+    expect(content.kind).toBe('text')
+    if (content.kind !== 'text') throw new Error('expected text')
+    expect(content.text).toBe(`${filler}中文内容\n`)
+  })
+
+  it('reads a text file whose sample boundary splits the first byte of a character', async () => {
+    const root = workspace()
+    // The cut can also land immediately after a lead byte, leaving 1 or 2
+    // continuation bytes outside the sample.
+    const filler = 'a'.repeat(SNIFF_BYTES - 1)
+    writeFileSync(join(root, 'cjk2.md'), `${filler}中\n`)
+    expect((await readFileContent(root, 'cjk2.md', limits, assetUrl)).kind).toBe('text')
+  })
+
+  it('still classifies a truncated multi-byte sequence as binary', async () => {
+    const root = workspace()
+    // An incomplete sequence at end-of-file is malformed, not a boundary cut:
+    // streaming decode tolerates the latter, never the former.
+    writeFileSync(join(root, 'truncated.bin'), Buffer.concat([
+      Buffer.from('ok '), Buffer.from([0xe4, 0xb8]),
+    ]))
+    expect((await readFileContent(root, 'truncated.bin', limits, assetUrl)).kind).toBe('binary')
   })
 
   it('classifies an invalid UTF-8 file as binary', async () => {

@@ -16,7 +16,7 @@ kind: "package-reference"
 - [进一步探索](#further-exploration)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发备忘](#dev-note)
+- [开发备注](#dev-note)
 
 -----
 
@@ -115,10 +115,10 @@ kind: "package-reference"
 - **页签只覆盖三个作用域**——`custom` 与 `bundled` 根里的技能在这页看不到。
 
 <a id="dev-note"></a>
-### 开发备忘
+### 开发备注
 
 <details>
 <summary>维护者的工作上下文——点击展开</summary>
 
-本开发备忘是维护者的工作上下文，明确不具权威性——已交付的行为与限制以上文和代码为准。编辑弹窗在一个组件里同时持有文件树与文档两种状态机，文件数继续增长时值得拆成两个独立的加载单元。
+本开发备注是维护者的工作上下文，明确不具权威性——已交付的行为与限制以上文和代码为准。编辑弹窗在一个组件里同时持有文件树与文档两种状态机，文件数继续增长时值得拆成两个独立的加载单元。
 </details>

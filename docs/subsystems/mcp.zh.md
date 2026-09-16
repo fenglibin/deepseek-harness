@@ -30,6 +30,24 @@ manager 提供 `mcpStatusSink`——每个挂载的 mcp-client 实例向它上�
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.zh.md](../cordis-api/inherited.zh.md).
 
+<a id="ctxmcpresources--mcpresourceruntime"></a>
+
+### `ctx.mcpResources` — `McpResourceRuntime`
+
+按作用域的资源访问，加上由已配置 MCP 服务器共享的三个工具。
+
+```ts cordis-catalog
+/**
+ * 注册一个服务器，并在该作用域存在提供方期间暴露资源工具。
+ * @param server - 已配置的服务器名，在本作用域内唯一。
+ * @param provider - 由连接拥有的资源操作。
+ * @returns 这次确切注册的 effect disposer。
+ */
+register(server: string, provider: McpResourceProvider): () => void
+```
+
+Source: [`packages/mcp/mcp-resources/src/index.ts`](../../packages/mcp/mcp-resources/src/index.ts)
+
 <a id="mcp-events"></a>
 
 ### `mcp/*` events

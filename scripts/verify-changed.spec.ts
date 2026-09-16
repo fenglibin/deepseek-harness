@@ -3,6 +3,7 @@
  * expansion, manifest parsing, and the skip/run decision.
  */
 
+import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -246,27 +247,74 @@ describe('spawnVitest', () => {
 })
 
 describe('main', () => {
+  /**
+   * Build a throwaway git workspace whose committed tree already contains the
+   * given files. `main` reads its scope from git, so an edge of this suite that
+   * asserted against the real checkout only passed when that checkout happened
+   * to carry changes — the fixture makes the scope the test's own.
+   */
+  function makeGitWorkspace(files: Readonly<Record<string, string>>): string {
+    const root = makeWorkspace(files)
+    const git = (...args: string[]): void => {
+      execFileSync('git', args, { cwd: root, stdio: 'ignore' })
+    }
+    git('init', '--quiet', '--initial-branch=main')
+    git('config', 'user.email', 'fixture@example.invalid')
+    git('config', 'user.name', 'verify-changed fixture')
+    git('add', '-A')
+    git('commit', '--quiet', '-m', 'fixture')
+    return root
+  }
+
+  /** Write one edited file, creating its parent directory. */
+  function edit(root: string, filePath: string): void {
+    const absolute = join(root, filePath)
+    mkdirSync(dirname(absolute), { recursive: true })
+    writeFileSync(absolute, '// edited\n')
+  }
+
+  const ONE = JSON.stringify({ name: `${WORKSPACE_DEPENDENCY_PREFIX}one` })
+  const TWO = JSON.stringify({
+    name: `${WORKSPACE_DEPENDENCY_PREFIX}two`,
+    dependencies: { [`${WORKSPACE_DEPENDENCY_PREFIX}one`]: 'workspace:*' },
+  })
+
   it('lists the affected directories and succeeds', { timeout: 30_000 }, () => {
+    const root = makeGitWorkspace({
+      'packages/alpha/one/package.json': ONE,
+      'packages/beta/two/package.json': TWO,
+    })
+    edit(root, 'packages/alpha/one/src/index.ts')
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     try {
-      expect(main(['--list'], repositoryRoot)).toBe(0)
+      expect(main(['--list'], root)).toBe(0)
     } finally {
       log.mockRestore()
     }
   })
 
   it('runs the affected directories through the injected runner', { timeout: 30_000 }, () => {
+    const root = makeGitWorkspace({
+      'packages/alpha/one/package.json': ONE,
+      'packages/beta/two/package.json': TWO,
+    })
+    edit(root, 'packages/alpha/one/src/index.ts')
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     const run = vi.fn<TestRunner>(() => 0)
     try {
-      expect(main([], repositoryRoot, run)).toBe(0)
-      expect(run).toHaveBeenCalled()
+      expect(main([], root, run)).toBe(0)
     } finally {
       log.mockRestore()
     }
+    expect(run).toHaveBeenCalledWith(['packages/alpha/one', 'packages/beta/two'], root)
   })
 
   it('narrows the scope to changed packages under --direct-only', { timeout: 30_000 }, () => {
+    const root = makeGitWorkspace({
+      'packages/alpha/one/package.json': ONE,
+      'packages/beta/two/package.json': TWO,
+    })
+    edit(root, 'packages/alpha/one/src/index.ts')
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
     const collected: string[][] = []
     const run: TestRunner = (directories) => {
@@ -274,14 +322,28 @@ describe('main', () => {
       return 0
     }
     try {
-      expect(main([], repositoryRoot, run)).toBe(0)
-      expect(main(['--direct-only'], repositoryRoot, run)).toBe(0)
+      expect(main([], root, run)).toBe(0)
+      expect(main(['--direct-only'], root, run)).toBe(0)
     } finally {
       log.mockRestore()
     }
-    const withDependents = collected[0]!
-    const directOnly = collected[1]!
-    expect(directOnly.every(directory => withDependents.includes(directory))).toBe(true)
-    expect(directOnly.length).toBeLessThanOrEqual(withDependents.length)
+    expect(collected[0]).toEqual(['packages/alpha/one', 'packages/beta/two'])
+    expect(collected[1]).toEqual(['packages/alpha/one'])
+  })
+
+  it('skips the runner when nothing inside a package changed', { timeout: 30_000 }, () => {
+    const root = makeGitWorkspace({
+      'packages/alpha/one/package.json': ONE,
+      'docs/guide.md': '# Guide\n',
+    })
+    edit(root, 'docs/guide.md')
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const run = vi.fn<TestRunner>(() => 0)
+    try {
+      expect(main([], root, run)).toBe(0)
+    } finally {
+      log.mockRestore()
+    }
+    expect(run).not.toHaveBeenCalled()
   })
 })

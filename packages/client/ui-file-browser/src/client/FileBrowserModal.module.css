@@ -1,15 +1,36 @@
-/* The dialog is a fixed two-column frame: a tree column of fixed width and a
-   content pane that takes the rest. Both columns scroll independently. */
+/*
+ * The dialog is one toolbar row plus a two-column body. Sizes are driven by CSS
+ * custom properties so the drag handles only move numbers: `--dsl-fb-width` /
+ * `--dsl-fb-height` for the frame, `--dsl-fb-side` for the tree column.
+ */
+/*
+ * The mask centers its child and pads it generously, which leaves the dialog
+ * sitting low with dead space underneath. `align-self` re-anchors this frame
+ * toward the top of that box, so the same viewport height buys more body and
+ * the tree starts closer to the top edge.
+ */
 .dialog {
-  width: min(1180px, 94vw);
-  height: min(760px, 88vh);
+  --dsl-fb-width: min(1180px, 94vw);
+  --dsl-fb-height: min(820px, 92vh);
+  --dsl-fb-side: 300px;
+
+  align-self: flex-start;
+  width: var(--dsl-fb-width);
+  height: var(--dsl-fb-height);
+  max-width: none;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .dialogContent {
   display: flex;
   flex-direction: column;
+  gap: 0;
   min-height: 0;
   height: 100%;
+  padding: 0;
 }
 
 .dialogBody {
@@ -18,36 +39,120 @@
   padding: 0;
 }
 
+/* One row: title, search, hidden toggle, create verbs, close. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 12px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+.toolbarTitle {
+  flex: none;
+  max-width: 30%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* The search field is the only flexible child: everything else keeps its
+   intrinsic width so the row never wraps. */
+.search {
+  flex: 1 1 auto;
+  min-width: 120px;
+  max-width: 340px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.toggle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* Every control that trails the flexible middle sits in this one group, so the
+   close button keeps the far-right seat whether or not the browsing verbs are
+   present. `margin-left: auto` lives here rather than on a mode-specific child:
+   a group that only exists in one mode cannot right-align the other's close. */
+.toolbarEnd {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.toolbarActions {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.iconButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .layout {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  height: 100%;
+  grid-template-columns: var(--dsl-fb-side) 5px minmax(0, 1fr);
+  flex: 1;
   min-height: 0;
+  height: 100%;
 }
 
 .side {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-right: 1px solid var(--dsw-alias-border-l2);
+  min-width: 0;
 }
 
-.search {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px;
+/* Drag the divider to rebalance tree against content. */
+.resizeHandle {
+  cursor: col-resize;
+  background: var(--dsw-alias-border-l2);
 }
 
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px 8px;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--dsw-alias-label-secondary);
-  cursor: pointer;
+.resizeHandle:hover {
+  background: var(--dsw-alias-brand-primary);
 }
 
 .treeHost {
@@ -80,7 +185,7 @@
   justify-content: center;
   height: 100%;
   overflow: auto;
-  padding: 16px;
+  padding: 12px;
   background: var(--dsw-alias-bg-layer-1);
 }
 
@@ -126,4 +231,22 @@
   font-size: 12px;
   cursor: pointer;
   text-decoration: underline;
+}
+
+/* Corner grip: dragging it resizes the frame, the way a desktop window does. */
+.sizeGrip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  background: linear-gradient(
+    135deg,
+    transparent 0 50%,
+    var(--dsw-alias-border-l2) 50% 60%,
+    transparent 60% 70%,
+    var(--dsw-alias-border-l2) 70% 80%,
+    transparent 80%
+  );
 }

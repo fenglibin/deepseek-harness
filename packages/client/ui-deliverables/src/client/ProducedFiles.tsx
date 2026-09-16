@@ -45,6 +45,11 @@ export interface ProducedFilesInjected {
   isLoopback: boolean
   /** Load the opener capability when this row first reaches the page. */
   ensureWorkspacePathOpen(): void
+  /**
+   * Open one directory through the Host desktop opener. The show-in-folder
+   * action needs it; the file chips use the owner's `openFile` instead.
+   */
+  openNative: (path: string) => void
   hooks: {
     /** Current generation's Session workspace opener capability. */
     workspacePathOpen: HostObservable<boolean | undefined>
@@ -66,7 +71,7 @@ function moreLabel(t: ProducedFilesProps['t'], count: number): string {
  * @returns The produced-files row.
  */
 export function ProducedFiles({
-  matched: paths, openFile, isLoopback, ensureWorkspacePathOpen, useWorkspacePathOpen, t,
+  matched: paths, openFile, isLoopback, ensureWorkspacePathOpen, openNative, useWorkspacePathOpen, t,
 }: ProducedFilesProps) {
   useEffect(() => { ensureWorkspacePathOpen() }, [ensureWorkspacePathOpen])
   const hostCanOpenPath = useWorkspacePathOpen(available => available === true)
@@ -129,7 +134,7 @@ export function ProducedFiles({
         {hidden > 0 && <span className={css.more}>{moreLabel(t, hidden)}</span>}
       </div>
       {hidden > 0 && canOpenPath && (
-        <button type="button" className={css.showFolder} onClick={() => { openFile('.') }}>
+        <button type="button" className={css.showFolder} onClick={() => { openNative('.') }}>
           {t('produced.showInFolder')}
         </button>
       )}

@@ -38,8 +38,13 @@ export const DEFAULT_SEARCH_LIMIT = 500
 /** Inclusive byte ceiling of a file the editor will open. */
 export const DEFAULT_MAX_FILE_BYTES = 2 * 1024 * 1024
 
-/** Bytes sampled to decide whether a file is text. */
-const SNIFF_BYTES = 8192
+/**
+ * Bytes sampled to decide whether a file is text. Published because the sample
+ * size is what decides the classification's boundary behavior: a caller that
+ * cares where a file stops being readable text needs the same number the
+ * classifier uses, not a copy of it.
+ */
+export const SNIFF_BYTES = 8192
 
 /**
  * Directory names hidden unless the operator asks for them. These are the
@@ -450,7 +455,8 @@ export function imageMediaTypeOf(relativePath: string): FileBrowserImageMediaTyp
  * @param info - the file's metadata.
  * @returns the opaque token a guarded write compares against.
  */
-export function versionOf(info: { mtimeMs: number; size: number }): string {  return `${String(info.mtimeMs)}:${String(info.size)}`
+export function versionOf(info: { mtimeMs: number; size: number }): string {
+  return `${String(info.mtimeMs)}:${String(info.size)}`
 }
 
 /** Reject anything that is not a single non-blank path segment. */
@@ -483,15 +489,28 @@ async function readBytesOrThrow(absolute: string, relativePath: string): Promise
 }
 
 /**
- * Whether a byte sample decodes as UTF-8 text. A NUL byte is the classic binary
- * marker and a fatal decode catches the rest, which is what keeps a stray
- * non-text file out of the editor instead of rendering replacement characters.
+ * Whether a byte sample decodes as UTF-8 text.
+ *
+ * A NUL byte is the classic binary marker. The decode then has to distinguish
+ * two ways a trailing multi-byte sequence can be incomplete:
+ *
+ * - The sample is a PREFIX of a larger file, so the cut itself may have split a
+ *   character. Streaming mode holds that partial sequence back instead of
+ *   reporting it, which is what keeps an ordinary UTF-8 file from being called
+ *   binary just because byte 8192 landed mid-character.
+ * - The sample IS the whole file, so an incomplete sequence at the end is
+ *   genuinely truncated content, not a boundary artifact. A strict decode
+ *   reports it, which is what keeps malformed data out of the editor.
+ *
+ * @param bytes - the whole file (only the leading sample is examined).
+ * @returns true when the sample is decodable text.
  */
 function isUtf8Text(bytes: Buffer): boolean {
+  const truncated = bytes.byteLength > SNIFF_BYTES
   const sample = bytes.subarray(0, SNIFF_BYTES)
   if (sample.includes(0)) return false
   try {
-    new TextDecoder('utf-8', { fatal: true }).decode(sample)
+    new TextDecoder('utf-8', { fatal: true }).decode(sample, truncated ? { stream: true } : undefined)
     return true
   } catch {
     return false

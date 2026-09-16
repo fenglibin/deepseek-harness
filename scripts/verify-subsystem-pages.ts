@@ -48,14 +48,21 @@ function groupOf(path: string): string {
   return group
 }
 
-/** Return canonical subsystem-page targets linked by one group README. */
+/**
+ * Return canonical subsystem-page targets linked by one group README. The
+ * subsystem index is not an owning page: linking it says only that the reader
+ * can reach the list, so it is excluded the same way a Chinese counterpart was
+ * before the English tree was removed.
+ */
 function subsystemLinks(source: string): string[] {
   const links = new Set<string>()
   visitMarkdown(parseMarkdown(source), (node) => {
     if (node.type !== 'link') return
     const match = /^\.\.\/\.\.\/docs\/subsystems\/([^/#?]+\.md)(?:#[^?#]*)?$/.exec(node.url)
     const page = match?.[1]
-    if (page !== undefined && page.endsWith('.zh.md')) links.add(`docs/subsystems/${page}`)
+    if (page !== undefined && page.endsWith('.zh.md') && page !== 'README.zh.md') {
+      links.add(`docs/subsystems/${page}`)
+    }
   })
   return [...links].sort()
 }

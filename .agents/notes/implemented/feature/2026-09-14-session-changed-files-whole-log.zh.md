@@ -31,11 +31,11 @@ Status: implemented
 
 这是自检中修掉的两处真实缺陷的共同根因：原实现取「先到者」，历史页 prepend 后顺序可能早于时间顺序，会让 `lastSeq` 倒退——而 `lastSeq` 正是接受语义的比较基准，倒退就会隐藏读者并未接受的变更。宿主侧另有一处只比较 `operation` 与 `lastSeq` 的提前返回，会静默丢弃 `firstSeq` 的修正；该分支是死代码（`recordMutation` 只在新的成功结果结算时到达，此时 pending 必变）且带 bug，已删除。
 
-**接受按 (路径, lastSeq) 比较。** wire 值给出每个路径的 `firstSeq`/`lastSeq`；接受集记 `Record<path, lastSeq>`，待处理集合为「`lastSeq` 大于已接受 seq」。这一条规则同时实现两条期望：接受某文件后它消失；该文件出现任何一次更新的成功变更就重新出现；「全部接受」是同一规则对当前全部待处理路径的批量应用。按用户确认，触发条件是「该文件出现任何一次更新的成功写入/编辑调用」，不做内容比对——因此 `write` 写回相同内容也算一次新变更。
+**接受集按 (路径, lastSeq) 比较，记录由会话级持久 store 持有。** 接受集记 `Record<path, lastSeq>`，待处理集合为「`lastSeq` 大于已接受 seq」。这一条规则同时实现两条期望：接受某文件后它消失；该文件出现任何一次更新的成功变更就重新出现；「全部接受」是同一规则对当前全部待处理路径的批量应用。按用户确认，触发条件是「该文件出现任何一次更新的成功写入/编辑调用」，不做内容比对——因此 `write` 写回相同内容也算一次新变更。
+
+记录本身不放在组件本地：组件本地状态会在作用域重绑定时按构造清空，导致接受过的文件整批复活，[接受记录 store Agent Note](2026-09-17-session-changes-accept-store-and-views.zh.md) 记录了该修复及其引入的会话级视图。
 
 **状态按路径收敛，不随事件增长。** 单元状态是 `{ cwd, files, pending }`：`files` 每个被改过的不同路径一条（实测样本 84），`pending` 只保留尚未拿到结果的变更调用（结果落地即移除，`turn/end` 丢弃该轮残留）。这是硬要求而非微优化——该状态会写入投影缓存，按事件增长的累加器会把整份会话日志塞进每个检查点文档，而单个轮次可以横跨整个会话。`cwd` 在 `init(header)` 时捕获一次，因此 `apply` 始终保持纯函数。
-
-**接受状态保持组件本地。** 按用户确认，随页面刷新丢失。接受集仍由 dock adapter 持有而非面板（面板在无待处理时返回 null，集合放在面板上会在下次挂载时丢失）。
 
 **标题改为「修改的文件」。** 按用户确认，「本次」在列表变成真正的会话级之后会被读成「这一次请求」。
 
@@ -45,11 +45,11 @@ Status: implemented
 
 **按内容比对决定「是否真的改了」。** 否决：需要宿主侧读取并比较文件内容，成本与歧义都更高；用户确认按调用计数即可。
 
-**接受状态持久化到宿主 settings。** 否决：用户明确选择保持现状范围（刷新即重置），持久化会引入一个新的宿主持久化面与设置 namespace。
+**接受状态持久化到宿主 settings。** 否决：用户当时明确选择保持现状范围（刷新即重置）。该范围此后由 [接受记录 store Agent Note](2026-09-17-session-changes-accept-store-and-views.zh.md) 扩大为会话级 store 持久化，采用的机制仍是 store 的 `persist`，而非新的宿主持久化面。
 
 ## Consequences
 
-改动过文件的会话现在显示「修改的文件」卡片，列出的是**整个会话**的变更文件，与客户端分页了多少历史无关。折叠键是规范化后的绝对路径，因此同一文件的绝对/相对两种拼写收敛为一条；`operation` 仍取最早一次。接受某文件把它从列表隐藏，该文件此后被 agent 再次改动时重新出现；全部接受同理。接受不动磁盘，且随页面刷新重置。
+改动过文件的会话现在显示「修改的文件」卡片，列出的是**整个会话**的变更文件，与客户端分页了多少历史无关。折叠键是规范化后的绝对路径，因此同一文件的绝对/相对两种拼写收敛为一条；`operation` 仍取最早一次。接受某文件把它从「当前变更」隐藏，该文件此后被 agent 再次改动时重新出现；全部接受同理。接受不动磁盘。接受记录由会话级 store 持久化，跨重挂载与刷新保持。
 
 代价：
 - 多了一个宿主包与一个投影单元（每次会话事件都要过一遍 `apply`，但它对无关事件返回同一状态引用，因此不产生下游工作）。
@@ -62,7 +62,7 @@ Status: implemented
 - **真实日志校验**：用一份未修改的 54 轮真实会话日志（1115 个 `tool/call`、1119 个 `tool/result`）驱动折叠，与对原始日志的独立重算逐条比对——84 个路径与 operation 完全一致，零缺失零多余。该日志中 21 个文件被改动多次，正是「接受后重现」必须生效的场景。
 - `packages/client/ui-session-changes/tests/e2e-business.client.spec.tsx`（3 条）：真实 Session 日志 → 真实 `changedFiles` 投影单元 → 真实 dock 组件，走完完整故事（接受 → 新回合加文件，已接受者保持隐藏 → 再改已接受者则重现；全部接受后仅被重新变更者回来；接受不调用宿主打开器即不动磁盘；重新挂载后列表重建）。此前的 dock 测试都喂的是手写的投影值，从未验证过单元自身产出的值能驱动业务规则。
 - `packages/fs/file-changes/tests/loader-composition.spec.ts`（2 条）：REAL 组合下经真实 Loader 启动 session + projection registry + 本包，一个完整轮次的成功 `write` 经注册表读到该文件；函数插件无 default export。
-- `packages/client/ui-session-changes/tests/session-changes-dock.client.spec.tsx`（43 条）：新增 `pendingChanges` 四条（无接受全待处理、接受后隐藏、更新变更重现、无新变更保持隐藏）、面板层「`lastSeq` 更新后重现」、adapter 层「全部接受后再次变更重现」、「优先用投影而非已加载窗口」、「投影缺席时回退」、「接受不调用宿主打开器」（接受不动磁盘）、「重新挂载后全部变更重新待处理」（刷新后重建），以及 node half 与 invariant companion 的包壳覆盖；原有的折叠、规范化、点击打开、失败呈现、注册注入全部保留并通过。
+- `packages/client/ui-session-changes/tests/session-changes-dock.client.spec.tsx`（43 条）：新增 `pendingChanges` 四条（无接受全待处理、接受后隐藏、更新变更重现、无新变更保持隐藏）、面板层「`lastSeq` 更新后重现」、adapter 层「全部接受后再次变更重现」、「优先用投影而非已加载窗口」、「投影缺席时回退」、「接受不调用宿主打开器」（接受不动磁盘）、以及 node half 与 invariant companion 的包壳覆盖；原有的折叠、规范化、点击打开、失败呈现、注册注入全部保留并通过。
 - `packages/client/ui-deliverables`（31 条）在删除本地重复解析后全部通过，界面行为不变。
 - 三个包合计 114 条测试通过。`packages/fs/file-changes` 与 `packages/client/ui-session-changes` 的 `src/**` 在 `vitest --coverage` 下达到 100% 语句/分支/函数/行，无豁免。
 - `tsc -b tsconfig.client.json` 与 `tsc -b tsconfig.host.json` 均干净（host 面抓到了一个测试里的 `turn/end` reason 字面量类型错误，已修）；`run-oxlint` 对三个包 0 警告 0 错误。
@@ -73,4 +73,4 @@ Status: implemented
 
 - **只认第一方变更工具。** 模型通过 `bash` 或脚本改动的文件不会被列出。扩展该集合是改 `mutation.ts` 一处，但每个新工具都需要论证其参数形状。
 - **不解析符号链接。** 规范化只统一拼写，不解析文件系统身份。
-- **接受状态不跨刷新。** 用户明确选择保持现状范围；若要持久化，需要一个新的宿主持久化面。
+- **接受状态不跨刷新。** 该范围由[接受记录 store Agent Note](2026-09-17-session-changes-accept-store-and-views.zh.md) 扩大为会话级 store 持久化；其边界（seq 回退、工作区移动后标记失效）记于该笔记。

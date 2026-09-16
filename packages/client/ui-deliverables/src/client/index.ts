@@ -9,6 +9,8 @@
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+// Type-only: pulls the optional `fileViewer` Context merge (ctx.get).
+import type {} from '@deepseek-ai/dsh-client-ui-file-browser/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ChatFileMentions } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -77,6 +79,12 @@ export function apply(ctx: ClientContext): void {
       inject: () => ({
         isLoopback: ctx.remote.$host.isLoopback,
         ensureWorkspacePathOpen,
+        // The "show in folder" action targets a directory, which the read-only
+        // text viewer cannot present; it keeps the desktop opener. File chips
+        // go through the owner's `openFile`, which reaches the viewer.
+        openNative: (path: string) => {
+          void ctx.remote.session.openWorkspacePath({ path })
+        },
         hooks: { workspacePathOpen },
       }),
     }, ProducedFiles),

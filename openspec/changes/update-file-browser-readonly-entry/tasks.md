@@ -1,0 +1,16 @@
+# 实现清单
+
+- [x] ui-file-browser：打开意图扩为判别联合（workspace 臂 + file 臂含 path/readOnly） (covers: file-browser/只读是入口的属性, design/D2)
+- [x] ui-file-browser：apply 中 provide('fileViewer')，open({sessionId,path}) 按 sessionIds 反查工作区 (covers: file-browser/会话到工作区的解析, design/D3, design/D7)
+- [x] ui-file-browser：文件臂直接打开该 path 并置只读，保留高亮与复制 (covers: file-browser/会话文件链接在 Web 端只读查看, file-browser/只读是入口的属性, design/D4)
+- [x] ui-file-browser：新增「用本地编辑器打开」次要入口（loopback + 能力双重门控） (covers: file-browser/本地编辑器入口作为次要动作, design/D5)
+- [x] ui-file-browser：反查失败与读取失败文案进 locale 字典 (covers: file-browser/会话到工作区的解析)
+- [x] ui-chat：openFile 改经 ctx.get('fileViewer') 打开 (covers: file-browser/会话文件链接在 Web 端只读查看)
+- [x] ui-session-changes：openFile 改走门面 (covers: file-browser/会话文件链接在 Web 端只读查看)
+- [x] ui-delivery：openFile 改走门面 (covers: file-browser/会话文件链接在 Web 端只读查看)
+- [x] ui-deliverables：产物行与 chatFileMentions 改走门面，目录路径保留 native (covers: file-browser/本地编辑器入口作为次要动作)
+- [x] ui-file-browser 单测：判别联合、只读态、反查失败、native 门控、降级分支 (covers: file-browser/只读是入口的属性, file-browser/本地编辑器入口作为次要动作, file-browser/超出上限与不可文本查看的内容明确降级)
+- [x] 调用点单测：点击链接经门面打开，门面缺席时不崩溃 (covers: file-browser/会话文件链接在 Web 端只读查看)
+- [x] 组合测试：经 Loader 真实组合断言只读查看器可打开 (covers: file-browser/会话文件链接在 Web 端只读查看, file-browser/云端部署下查看文件)
+- [x] 验证：受影响范围单测、client tsconfig 面、lint、verify 门禁 (covers: design/D1)
+- [x] 收尾：README、子系统页面、Agent Note 一并写齐并跑文档门禁 (covers: design/D1, design/D7)

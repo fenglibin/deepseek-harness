@@ -401,13 +401,15 @@ describe('produced-file Turn data', () => {
 
 describe('ProducedFiles row', () => {
   const t = makeTranslate(zh)
+  const openNative = vi.fn<(path: string) => void>()
   const capability = (
     canOpenPath: boolean | undefined,
     isLoopback = true,
-  ): Pick<ProducedFilesProps, 'isLoopback' | 'ensureWorkspacePathOpen' | 'useWorkspacePathOpen'> => {
+  ): Pick<ProducedFilesProps, 'isLoopback' | 'ensureWorkspacePathOpen' | 'openNative' | 'useWorkspacePathOpen'> => {
     return {
       isLoopback,
       ensureWorkspacePathOpen: () => {},
+      openNative,
       useWorkspacePathOpen: selector => selector(canOpenPath),
     }
   }
@@ -471,9 +473,12 @@ describe('ProducedFiles row', () => {
     fireEvent.click(chip)
     expect(openFile).toHaveBeenCalledWith('deep/a.html')
 
+    // Show-in-folder targets a directory, which the read-only text viewer
+    // cannot present, so it goes to the desktop opener instead of `openFile`.
     const showFolder = view.getByRole('button', { name: '在文件夹中显示' })
     fireEvent.click(showFolder)
-    expect(openFile).toHaveBeenLastCalledWith('.')
+    expect(openNative).toHaveBeenLastCalledWith('.')
+    expect(openFile).not.toHaveBeenCalledWith('.')
 
     available = 150
     act(() => { resize?.([], {} as ResizeObserver) })

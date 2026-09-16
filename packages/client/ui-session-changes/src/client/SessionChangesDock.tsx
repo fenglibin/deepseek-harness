@@ -1,7 +1,7 @@
 /**
  * SessionChangesDock: the changed-files list docked above the message composer
  * (input dock strip). It shows every file the agent mutated in this Session and
- * lets the user accept a file to clear it from the list.
+ * lets the user accept a file to clear it from the pending list.
  *
  * The list's source is the host `changedFiles` projection, which folds the
  * COMPLETE durable log — a client that has paged in only the tail of a long
@@ -11,12 +11,20 @@
  *
  * Accepting changes nothing on disk; it is a surface-only dismissal. Accept is
  * remembered against the seq of the change the reader saw, so a file the agent
- * mutates again AFTER the accept returns to the list. Reject is deliberately out
- * of scope (no per-call prior-content snapshot exists to roll a file back).
+ * mutates again AFTER the accept returns to the pending list. Reject is
+ * deliberately out of scope (no per-call prior-content snapshot exists to roll
+ * a file back).
+ *
+ * The screen offers two readings of the SAME data: the pending list, and every
+ * file the Session changed including the accepted ones. Both derive from the
+ * projection plus the accept record, so a path occupies at most one row in
+ * either. The record lives in a session-scoped store rather than component
+ * state, because a rebind (reload, or switching Sessions and back) would
+ * otherwise resurrect every accepted path at once; see `./accept-store.ts`.
  */
 
 import { useCallback, useMemo, useState } from 'react'
-import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: the `deliverables` ConversationTurnDataMap key merge and its
 // mutation operation kind. Type imports are erased, so the shared vocabulary
@@ -34,6 +42,7 @@ import { workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
 import {
   IconCheckOutline16, IconChevronDownOutline14, IconChevronUpOutline14, IconEditOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { createAcceptedChangesStore, type AcceptedChanges } from './accept-store.ts'
 import css from './SessionChangesDock.module.css'
 
 export { canonicalMutationPath }
@@ -54,9 +63,12 @@ export interface SessionChangesInjected {
   openFile: (path: string) => Promise<void>
 }
 
-/** Full props of the dock entry: session standard kit (`useConversation`) + the injected opener + the locale seat. */
+/** Full props of the dock entry: session standard kit (`useConversation`) + the injected opener + the accept store + the locale seat. */
 export type SessionChangesDockProps =
-  PropsRuntime<'conversation.input.dock'> & InjectFace<SessionChangesInjected> & PropsLocale<'session-changes'>
+  PropsRuntime<'conversation.input.dock'>
+  & InjectFace<SessionChangesInjected>
+  & PropsStore<ReturnType<typeof createAcceptedChangesStore>>
+  & PropsLocale<'session-changes'>
 
 /**
  * One session change: the produced path, its user-visible operation kind, and
@@ -74,9 +86,6 @@ export interface SessionChange {
   /** Seq of this path's latest mutation; what an accept is recorded against. */
   readonly lastSeq: number
 }
-
-/** Accept bookkeeping: one accepted `lastSeq` per path, owned by the dock adapter. */
-export type AcceptedChanges = Readonly<Record<string, number>>
 
 /** Leading directory of one path, kept with its trailing separator. */
 function directoryOf(path: string): string {
@@ -153,30 +162,41 @@ export function sessionChanges(conversation: ConversationSnapshot, cwd?: string)
 }
 
 /**
- * The changes still awaiting the reader's attention: every path whose latest
- * mutation is newer than the seq the reader accepted for it.
+ * Whether one changed path still awaits the reader's attention: it has no
+ * accept at all, or the list has moved past the seq that was accepted.
  *
- * A path with no accept at all is always pending; a path accepted at a seq the
- * list has since moved past is pending again. That single comparison is what
- * makes "accept, then the agent edits it again" put the file back.
+ * This one comparison is what makes "accept, then the agent edits it again"
+ * put the file back, so `pendingChanges` and the row's accept control both read
+ * it rather than restating the rule.
+ * @param change - one changed path with its seq bounds.
+ * @param accepted - one accepted `lastSeq` per path.
+ * @returns true when the path is pending.
+ */
+export function isPendingChange(change: SessionChange, accepted: AcceptedChanges): boolean {
+  const acceptedSeq = accepted[change.path]
+  return acceptedSeq === undefined || change.lastSeq > acceptedSeq
+}
+
+/**
+ * The changes still awaiting the reader's attention, in the input's order.
  * @param changes - the Session's changed files, in first-seen order.
  * @param accepted - one accepted `lastSeq` per path.
- * @returns the pending changes, in the input's order.
+ * @returns the pending changes.
  */
 export function pendingChanges(
   changes: readonly SessionChange[],
   accepted: AcceptedChanges,
 ): readonly SessionChange[] {
-  return changes.filter((change) => {
-    const acceptedSeq = accepted[change.path]
-    return acceptedSeq === undefined || change.lastSeq > acceptedSeq
-  })
+  return changes.filter(change => isPendingChange(change, accepted))
 }
 
-/** Props of the pure list panel: the folded changes plus the locale seat. */
+/** Which reading of the changed-file list the panel shows. */
+export type ChangesView = 'pending' | 'all'
+
+/** Props of the pure list panel: the folded changes, the accept record, and the locale seat. */
 export type SessionChangesPanelProps = {
   changes: readonly SessionChange[]
-  /** Accepted `lastSeq` per path, owned by the dock adapter so it survives a new request. */
+  /** Accepted `lastSeq` per path, owned by the accept store so it outlives this mount. */
   accepted: AcceptedChanges
   /** Record one file's accept at the seq the reader saw. */
   onAccept: (change: SessionChange) => void
@@ -188,11 +208,12 @@ export type SessionChangesPanelProps = {
   cwd: string | undefined
 } & PropsLocale<'session-changes'>
 
-/** The folded list rendered from the adapter-owned accept set. */
+/** The folded list rendered from the store-owned accept record. */
 export function SessionChangesPanel({
   changes, accepted, onAccept, onAcceptAll, openFile, cwd, t,
 }: SessionChangesPanelProps) {
   const [expanded, setExpanded] = useState(false)
+  const [view, setView] = useState<ChangesView>('pending')
   const [openError, setOpenError] = useState<string | null>(null)
 
   // The dock is a one-line strip above the composer: a refused open reports
@@ -204,8 +225,10 @@ export function SessionChangesPanel({
     )
   }
 
+  // Nothing was ever changed in this Session: the strip has no subject at all.
+  if (changes.length === 0) return null
   const pending = pendingChanges(changes, accepted)
-  if (pending.length === 0) return null
+  const rows = view === 'pending' ? pending : changes
 
   return (
     <section className={css.root} data-testid="session-changes" aria-label={t('title')}>
@@ -218,54 +241,92 @@ export function SessionChangesPanel({
         >
           <span className={css.lead} aria-hidden><IconEditOutline16 size={14} /></span>
           <span className={css.title}>{t('title')}</span>
-          <span className={css.count}>{t('summary', { count: pending.length })}</span>
+          <span className={css.count}>
+            {view === 'pending'
+              ? t('summary', { count: pending.length })
+              : t('summaryAll', { count: changes.length })}
+          </span>
           <span className={css.chevron} aria-hidden>
             {expanded ? <IconChevronDownOutline14 /> : <IconChevronUpOutline14 />}
           </span>
         </button>
-        <button
-          type="button"
-          className={css.bulkAccept}
-          onClick={() => { onAcceptAll(pending) }}
-        >
-          <IconCheckOutline16 size={14} />
-          {t('acceptAll')}
-        </button>
+        {pending.length > 0 && (
+          <button
+            type="button"
+            className={css.bulkAccept}
+            onClick={() => { onAcceptAll(pending) }}
+          >
+            <IconCheckOutline16 size={14} />
+            {t('acceptAll')}
+          </button>
+        )}
       </div>
       {expanded && (
-        <ul className={css.list}>
-          {pending.map((change) => {
-            const shown = displayPath(change.path, cwd)
-            return (
-              <li key={change.path} className={css.item}>
-                <button
-                  type="button"
-                  className={css.path}
-                  // The absolute path stays the hover text: it is the identity
-                  // the fold and the opener use, and the row shows it shortened.
-                  title={change.path}
-                  aria-label={t('open', { name: shown })}
-                  onClick={() => { open(change.path) }}
-                >
-                  <span className={css.dirName}>{directoryOf(shown)}</span>
-                  <span className={css.baseName}>{workspaceTitleOf(shown)}</span>
-                </button>
-                <span className={css.operation} data-operation={change.operation}>
-                  {t(change.operation === 'write' ? 'operation.write' : 'operation.edit')}
-                </span>
-                <button
-                  type="button"
-                  className={css.accept}
-                  onClick={() => { onAccept(change) }}
-                  aria-label={t('accept')}
-                >
-                  <IconCheckOutline16 size={14} />
-                  {t('accept')}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
+        <>
+          {/* Two readings of one list: the strip stays reachable after every
+              file is accepted, because the all-view entry must not vanish
+              with the pending rows. */}
+          <div className={css.views} role="tablist" aria-label={t('title')}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'pending'}
+              className={css.viewTab}
+              data-active={view === 'pending'}
+              onClick={() => { setView('pending') }}
+            >
+              {t('view.pending')}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'all'}
+              className={css.viewTab}
+              data-active={view === 'all'}
+              onClick={() => { setView('all') }}
+            >
+              {t('view.all')}
+            </button>
+          </div>
+          <ul className={css.list}>
+            {rows.map((change) => {
+              const shown = displayPath(change.path, cwd)
+              const isPending = isPendingChange(change, accepted)
+              return (
+                <li key={change.path} className={css.item}>
+                  <button
+                    type="button"
+                    className={css.path}
+                    // The absolute path stays the hover text: it is the identity
+                    // the fold and the opener use, and the row shows it shortened.
+                    title={change.path}
+                    aria-label={t('open', { name: shown })}
+                    onClick={() => { open(change.path) }}
+                  >
+                    <span className={css.dirName}>{directoryOf(shown)}</span>
+                    <span className={css.baseName}>{workspaceTitleOf(shown)}</span>
+                  </button>
+                  <span className={css.operation} data-operation={change.operation}>
+                    {t(change.operation === 'write' ? 'operation.write' : 'operation.edit')}
+                  </span>
+                  {isPending ? (
+                    <button
+                      type="button"
+                      className={css.accept}
+                      onClick={() => { onAccept(change) }}
+                      aria-label={t('accept')}
+                    >
+                      <IconCheckOutline16 size={14} />
+                      {t('accept')}
+                    </button>
+                  ) : (
+                    <span className={css.accepted}>{t('accepted')}</span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </>
       )}
       {openError !== null && (
         <p className={css.openError} role="alert">{t('openFailed', { message: openError })}</p>
@@ -276,10 +337,10 @@ export function SessionChangesPanel({
 
 /**
  * Dock adapter: reads the whole-log projection (falling back to the loaded
- * window) and owns the accept set so a new request keeps prior accepts.
+ * window) and writes accepts into the session-scoped store.
  */
 export function SessionChangesDock({
-  useConversation, useProjection, cwd, openFile, t,
+  useConversation, useProjection, useStore, actions, cwd, openFile, t,
 }: SessionChangesDockProps) {
   const projected = useProjection('changedFiles')
   const conversation = useConversation(snapshot => snapshot)
@@ -290,33 +351,22 @@ export function SessionChangesDock({
     () => projected === undefined ? sessionChanges(conversation, cwd) : projected.files,
     [projected, conversation, cwd],
   )
-  // The accept set lives on the adapter, not the panel: a new user request
-  // adds new turns to the timeline without unmounting the dock, but a
-  // panel that returns null while pending is empty would otherwise drop the
-  // accepted set on the next mount. Keeping it here means the user's prior
-  // accepts persist across every render of the same dock registration.
-  const [accepted, setAccepted] = useState<AcceptedChanges>({})
+  // The accept record lives in the session-scoped store, not on this component:
+  // a new user request adds turns to the timeline without remounting the dock,
+  // but a rebind (reload, or switching Sessions and back) would otherwise drop
+  // every prior accept and resurrect the whole list. The store also persists,
+  // so the record outlives the page.
+  const accepted = useStore(state => state)
   const accept = useCallback((change: SessionChange): void => {
-    setAccepted((previous) => {
-      // The row that calls this disappears once its path is accepted, so no
-      // second call for one path can reach the fold.
-      /* v8 ignore next -- an accepted path is dropped from the pending list that sources this call. */
-      if (previous[change.path] === change.lastSeq) return previous
-      return { ...previous, [change.path]: change.lastSeq }
-    })
-  }, [])
+    // The row that calls this disappears once its path is accepted, so no
+    // second call for one path can reach the store.
+    /* v8 ignore next -- an accepted path is dropped from the pending list that sources this call. */
+    if (accepted[change.path] === change.lastSeq) return
+    actions.accept(change.path, change.lastSeq)
+  }, [accepted, actions])
   const acceptAll = useCallback((changes: readonly SessionChange[]): void => {
-    setAccepted((previous) => {
-      let next: AcceptedChanges | null = null
-      for (const change of changes) {
-        /* v8 ignore next -- every change handed here is pending, hence not accepted at this seq. */
-        if (previous[change.path] === change.lastSeq) continue
-        next = { ...next ?? previous, [change.path]: change.lastSeq }
-      }
-      /* v8 ignore next -- the bulk button renders only while at least one file is pending. */
-      return next ?? previous
-    })
-  }, [])
+    actions.acceptMany(changes)
+  }, [actions])
   return (
     <SessionChangesPanel
       changes={changes}

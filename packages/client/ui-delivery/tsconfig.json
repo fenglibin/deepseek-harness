@@ -30,6 +30,9 @@
       "path": "../ui-conversation"
     },
     {
+      "path": "../ui-file-browser"
+    },
+    {
       "path": "../ui-renderer"
     },
     {

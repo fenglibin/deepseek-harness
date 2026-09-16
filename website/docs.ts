@@ -428,11 +428,11 @@ const reference = [
     order,
   }))),
   ...mirroredPages(([
-    ['inherited.md', '继承接口面', 'Inherited surface'],
-  ] as const).map(([file, rootLabel, enLabel], order): MirroredPage => ({
+    ['inherited.zh.md', 'reference/cordis-api/inherited.md', '继承接口面', 'Inherited surface'],
+  ] as const).map(([file, route, rootLabel, enLabel], order): MirroredPage => ({
     source: `docs/cordis-api/${file}`,
-    route: `reference/cordis-api/${file}`,
-    contentLocale: 'en-US',
+    route,
+    contentLocale: 'zh-CN',
     label: { root: rootLabel, en: enLabel },
     sidebar: { root: 'zh-reference', en: 'en-reference' },
     section: { root: 'Cordis API', en: 'Cordis Core API' },

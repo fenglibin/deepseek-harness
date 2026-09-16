@@ -93,6 +93,14 @@ recordDesign(agent: Agent, ref: DeliveryTaskRef, text: string): DeliveryView
 recordSpec(agent: Agent, ref: DeliveryTaskRef, text: string): DeliveryView
 
 /**
+ * Mark requirement analysis and alignment complete for the current task.
+ * @param agent - owning live agent.
+ * @param ref - expected current revision.
+ * @returns the view with `analysisDone` set to true.
+ */
+markAnalyzed(agent: Agent, ref: DeliveryTaskRef): DeliveryView
+
+/**
  * Record the implementation checklist for the current task, replacing any
  * earlier list. The write is checked with the decoder the replay uses, so a
  * checklist that could not be replayed is rejected at the write instead.

@@ -185,7 +185,7 @@ Source: [`packages/session/session-projection-cache/src/index.ts`](../../package
 
 ### `ctx.sessionProjections` — `SessionProjectionRegistry`
 
-`ctx.sessionProjections`: the projection unit table and its drive. The service subscribes to `session/event` once; every committed event passes every registered unit's `apply` (eager drive), and a changed state reference in a client-visible unit notifies the change feed with the schema-validated view. Cells build lazily — a unit registered after events flowed, or a session older than the registry, folds `init` over the in-memory log on first touch (event or read). Registration is an effect (disposer rides the calling fiber): an unloaded domain plugin's key disappears from snapshots and clients read it as capability absence. A host reader either declares `sessionProjections` in its plugin `inject` or fails explicitly when the registry or required key is absent. Contributors may preserve optional registration through `ctx.inject(['sessionProjections'], ...)`. Registrants sharing a key share one unit and are counted: the same tool package mounted in N agent presets registers N times, and the key survives until the last one unloads.
+`ctx.sessionProjections`: the projection unit table and its drive. The service subscribes to `session/event` once; every committed event passes every registered unit's `apply` (eager drive). A changed state reference computes the next client view; the change feed is notified only when its raw result changes by `Object.is`. Cells build lazily — a unit registered after events flowed, or a session older than the registry, folds `init` over the in-memory log on first touch (event or read). Registration is an effect (disposer rides the calling fiber): an unloaded domain plugin's key disappears from snapshots and clients read it as capability absence. A host reader either declares `sessionProjections` in its plugin `inject` or fails explicitly when the registry or required key is absent. Contributors may preserve optional registration through `ctx.inject(['sessionProjections'], ...)`. Registrants sharing a key share one unit and are counted: the same tool package mounted in N agent presets registers N times, and the key survives until the last one unloads.
 
 ```ts cordis-catalog
 /**
@@ -209,7 +209,7 @@ register< K extends Exclude<keyof SessionProjectionStateMap, keyof SessionProjec
 /**
  * Subscribe to the change feed. The registration is an effect on the
  * calling context's fiber.
- * @param listener - called once per client-visible unit whose state reference changed, per committed event.
+ * @param listener - called once per client-visible unit whose raw view changed by `Object.is`, per committed event.
  * @returns the exact disposer that unsubscribes.
  */
 onChanged(listener: ProjectionChangeListener): () => void

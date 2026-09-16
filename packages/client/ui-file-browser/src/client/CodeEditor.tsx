@@ -189,6 +189,12 @@ export function CodeEditor({
             spellCheck={false}
             autoCapitalize="off"
             autoCorrect="off"
+            // Soft wrapping would break the two layers apart: the highlight layer
+            // renders one line per source line, so a wrapped textarea would put
+            // its glyphs on rows the colored layer never draws. `off` keeps a
+            // long line on one row and scrolls it, which is also what makes the
+            // horizontal scrollbar appear.
+            wrap="off"
             aria-label={path}
             onChange={(event) => { onChange(event.target.value) }}
             onScroll={syncScroll}

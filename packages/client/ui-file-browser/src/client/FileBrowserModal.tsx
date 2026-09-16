@@ -15,13 +15,14 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { Button, Input, Modal, RiskConfirmation } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconCloseOutline16, IconPlusOutline16, IconProjectAddOutline16, Input, Modal, RiskConfirmation } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ClientRemote } from '@deepseek-ai/dsh-api-remotes/client'
 import type { FileBrowserEntry } from '@deepseek-ai/dsh-api-file-browser/types'
-import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
+import { isFileRequest, type FileBrowserRequest } from './request.ts'
 import { CodeEditor } from './CodeEditor.tsx'
 import { FileTree, type TreeLevel } from './FileTree.tsx'
+import { useResizeHandles } from './use-resize.ts'
 import css from './FileBrowserModal.module.css'
 
 /**
@@ -43,12 +44,18 @@ export type FileBrowserContentValue =
 export interface FileBrowserModalProps {
   /** Whether the dialog is open; a closed dialog renders nothing. */
   open: boolean
-  /** The Workspace being browsed (its id and title). */
-  workspace?: { workspaceId: WorkspaceId; title: string } | undefined
+  /** The open request: browse a Workspace, or view one file read-only. */
+  request?: FileBrowserRequest | undefined
   /** Close without changing anything. */
   onClose: () => void
   /** The fileBrowser Remote namespace. */
   remote: FileBrowserRemote
+  /**
+   * Open one path through the Host desktop opener. Omitted — the remote
+   * deployment case — the viewer simply offers no such action. Resolves to the
+   * refusal message, or undefined when the Host accepted it.
+   */
+  openNative?: ((path: string) => Promise<string | undefined>) | undefined
   /** Localized chrome. */
   t: TranslateNS<'fileBrowser'>
 }
@@ -84,11 +91,27 @@ function parentOf(path: string): string {
  * @param props - see {@link FileBrowserModalProps}.
  * @returns the dialog element.
  */
-export function FileBrowserModal({ open, workspace, onClose, remote, t }: FileBrowserModalProps) {
-  const workspaceId = workspace?.workspaceId
+export function FileBrowserModal({ open, request, onClose, remote, openNative, t }: FileBrowserModalProps) {
+  const workspaceId = request?.kind === 'workspace' || request?.kind === 'file' ? request.workspaceId : undefined
+  // A file request opens that file directly and read-only; a workspace request
+  // starts at the tree. Deriving both from the one discriminated value keeps
+  // "browse read-only" unrepresentable rather than merely unhandled.
+  const fileView = isFileRequest(request)
+  const directPath = request?.kind === 'file' ? request.path : undefined
+  const readOnly = request?.kind === 'file'
+  // The dialog heading names the Workspace being browsed, when there is one.
+  const title = request === undefined || request.kind === 'unavailable' ? undefined : request.title
+  const { onFramePointerDown, onSplitPointerDown } = useResizeHandles()
   const [levels, setLevels] = useState<ReadonlyMap<string, TreeLevel>>(new Map())
+  // The root level's own state gates the create verbs: creating into a level
+  // that failed to load would just fail again.
+  const rootLevel = levels.get('')
+  const rootReady = rootLevel !== undefined && !rootLevel.loading && rootLevel.error === undefined
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set())
   const [selected, setSelected] = useState<string | undefined>(undefined)
+  // The create destination, tracked apart from the open file: selecting a
+  // directory means "create in here", and the root is the initial destination.
+  const [selectedDirectory, setSelectedDirectory] = useState<string>('')
   const [file, setFile] = useState<OpenFile | undefined>(undefined)
   const [buffer, setBuffer] = useState('')
   const [version, setVersion] = useState<string | undefined>(undefined)
@@ -97,6 +120,9 @@ export function FileBrowserModal({ open, workspace, onClose, remote, t }: FileBr
   const [saveError, setSaveError] = useState<string | undefined>(undefined)
   const [conflict, setConflict] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
+  // The desktop opener's refusal. Held here rather than in the request so a
+  // failed hand-off never discards the file already on screen.
+  const [openLocalError, setOpenLocalError] = useState<string | undefined>(undefined)
 
   const [query, setQuery] = useState('')
   const [searchState, setSearchState] = useState<
@@ -148,16 +174,20 @@ export function FileBrowserModal({ open, workspace, onClose, remote, t }: FileBr
 
   // Opening the dialog (or switching Workspace, or flipping the hidden-files
   // choice) restarts from the root: the loaded levels describe a different
-  // listing than the one being asked for.
+  // listing than the one being asked for. A file view has no tree, so it skips
+  // the listing entirely.
   useEffect(() => {
     if (!open || workspaceId === undefined) return
     setLevels(new Map())
     setExpanded(new Set())
     setSelected(undefined)
+    setSelectedDirectory('')
     setFile(undefined)
     setQuery('')
     setSearchState({ status: 'idle' })
+    setOpenLocalError(undefined)
     listSequence.current += 1
+    if (fileView) return
     const sequence = listSequence.current
     patchLevel('', { entries: [], truncated: false, loading: true })
     void remote.list({ workspaceId, showHidden }).then(
@@ -174,7 +204,14 @@ export function FileBrowserModal({ open, workspace, onClose, remote, t }: FileBr
         patchLevel('', { entries: [], truncated: false, loading: false, error: t('tree.failed') })
       },
     )
-  }, [open, workspaceId, showHidden, patchLevel, remote, t])
+  }, [open, workspaceId, showHidden, patchLevel, remote, t, fileView])
+
+  /** Hand the viewed file to the desktop opener and report any refusal. */
+  const openLocal = useCallback((path: string): void => {
+    if (openNative === undefined) return
+    setOpenLocalError(undefined)
+    void openNative(path).then((message) => { setOpenLocalError(message) })
+  }, [openNative])
 
   /** Read one file into the content pane. */
   const openFile = useCallback((path: string): void => {
@@ -199,6 +236,14 @@ export function FileBrowserModal({ open, workspace, onClose, remote, t }: FileBr
       () => { setReadError(t('content.failed')) },
     )
   }, [remote, t, workspaceId])
+
+  // A file request opens that file as soon as the dialog is showing. Declared
+  // after the reset effect above so the two run in that order within one commit:
+  // the reset clears the pane, then this fills it.
+  useEffect(() => {
+    if (!open || directPath === undefined) return
+    openFile(directPath)
+  }, [directPath, open, openFile])
 
   /** Write the buffer back, guarded by the version the file was read at. */
   const save = useCallback(async (force: boolean): Promise<void> => {
@@ -229,6 +274,13 @@ export function FileBrowserModal({ open, workspace, onClose, remote, t }: FileBr
     setVersion(result.value.version)
     setFile({ path: file.path, content: { kind: 'text', text: buffer, version: result.value.version, size: buffer.length } })
   }, [buffer, file, remote, t, version, workspaceId])
+
+  /** Open the create dialog for one destination directory and entry kind. */
+  const openCreate = useCallback((directory: string, kind: 'file' | 'directory'): void => {
+    setCreateTarget({ directory, kind })
+    setCreateName('')
+    setCreateError(undefined)
+  }, [])
 
   const toggle = useCallback((path: string): void => {
     setExpanded((current) => {
@@ -376,6 +428,16 @@ export function FileBrowserModal({ open, workspace, onClose, remote, t }: FileBr
 
   /** The content pane's body, decided by the loaded file's arm. */
   const contentPane = (): React.ReactNode => {
+    // A request that could not be resolved states why instead of showing a
+    // pane that will never fill.
+    if (request?.kind === 'unavailable') {
+      return (
+        <div className={css.notice} role="alert">
+          <span>{t('content.noWorkspace')}</span>
+          <span className={css.path}>{request.path}</span>
+        </div>
+      )
+    }
     if (readError !== undefined) return <div className={css.notice} role="alert">{readError}</div>
     if (file === undefined) {
       return <div className={css.notice}>{selected === undefined ? t('content.none') : t('tree.loading')}</div>
@@ -394,8 +456,8 @@ export function FileBrowserModal({ open, workspace, onClose, remote, t }: FileBr
             conflict={conflict}
             onOverwrite={() => { void save(true) }}
             loading={false}
-            readOnly={false}
-            error={saveError}
+            readOnly={readOnly}
+            error={readOnly ? readError : saveError}
             labels={editorLabels}
           />
         )
@@ -410,14 +472,30 @@ export function FileBrowserModal({ open, workspace, onClose, remote, t }: FileBr
           </div>
         )
       case 'binary':
-        return <div className={css.notice}>{t('content.binary')}</div>
+        return (
+          <div className={css.notice}>
+            <span>{t('content.binary')}</span>
+            {openNative !== undefined && (
+              <button type="button" className={css.linkButton} onClick={() => { openLocal(file.path) }}>
+                {t('content.openLocal')}
+              </button>
+            )}
+          </div>
+        )
       case 'too-large':
         return (
           <div className={css.notice}>
-            {t('content.tooLarge', {
-              size: formatBytes(file.content.size, t),
-              limit: formatBytes(file.content.limit, t),
-            })}
+            <span>
+              {t('content.tooLarge', {
+                size: formatBytes(file.content.size, t),
+                limit: formatBytes(file.content.limit, t),
+              })}
+            </span>
+            {openNative !== undefined && (
+              <button type="button" className={css.linkButton} onClick={() => { openLocal(file.path) }}>
+                {t('content.openLocal')}
+              </button>
+            )}
           </div>
         )
       /* v8 ignore next -- closed union backstop; the Host answers only the four arms above. */
@@ -426,88 +504,166 @@ export function FileBrowserModal({ open, workspace, onClose, remote, t }: FileBr
     }
   }
 
+  /** The browsing layout: the tree column beside the content pane. */
+  const browseLayout = (
+    <div className={css.layout}>
+      <div className={css.side}>
+        <div className={css.treeHost}>
+          {searchState.status === 'idle'
+            ? (
+              <FileTree
+                levels={levels}
+                expanded={expanded}
+                onToggle={toggle}
+                selected={selected}
+                selectedDirectory={selectedDirectory}
+                t={t}
+                actions={{
+                  load: loadLevel,
+                  select: openFile,
+                  selectDirectory: setSelectedDirectory,
+                  rename: (entry) => { setRenameTarget(entry); setRenameName(entry.name); setRenameError(undefined) },
+                  remove: (entry) => { setDeleteTarget(entry); setDeleteAcknowledged(false) },
+                }}
+              />
+            )
+            : (
+              <div className={css.results} role="tree" aria-label={t('search.results.aria')}>
+                {searchState.status === 'loading' && <div className={css.notice}>{t('tree.loading')}</div>}
+                {searchState.status === 'error' && <div className={css.notice} role="alert">{searchState.message}</div>}
+                {searchState.status === 'ready' && searchState.matches.length === 0 && (
+                  <div className={css.notice}>{t('search.empty')}</div>
+                )}
+                {searchState.status === 'ready' && searchState.matches.map(match => (
+                  <button
+                    key={match.path}
+                    type="button"
+                    className={css.resultRow}
+                    role="treeitem"
+                    onClick={() => { revealMatch(match.path, match.kind) }}
+                  >
+                    {match.path}
+                  </button>
+                ))}
+                {searchState.status === 'ready' && searchState.truncated && (
+                  <div className={css.notice}>
+                    {t('search.truncated', { n: String(searchState.matches.length) })}
+                  </div>
+                )}
+              </div>
+            )}
+        </div>
+      </div>
+      <div
+        className={css.resizeHandle}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label={t('split.aria')}
+        onPointerDown={onSplitPointerDown}
+      />
+      <div className={css.content}>{contentPane()}</div>
+    </div>
+  )
+
   return (
     <>
       <Modal
         open={open}
         onClose={onClose}
-        title={workspace === undefined ? t('dialog.title') : `${t('dialog.title')} — ${workspace.title}`}
-        closeLabel={t('dialog.close')}
+        title={title === undefined ? t('dialog.title') : `${t('dialog.title')} — ${title}`}
         className={clsx(css.dialog)}
         contentClassName={clsx(css.dialogContent)}
         bodyClassName={clsx(css.dialogBody)}
+        // The toolbar row below owns the title and the close control, so the
+        // card renders the children alone rather than a second header.
+        headless
       >
-        <div className={css.layout}>
-          <div className={css.side}>
-            <div className={css.search}>
-              <Input
-                value={query}
-                placeholder={t('search.placeholder')}
-                aria-label={t('search.aria')}
-                maxLength={200}
-                onChange={(event) => { setQuery(event.target.value) }}
-              />
-              {query !== '' && (
-                <button type="button" className={css.linkButton} onClick={() => { setQuery('') }}>
-                  {t('search.clear')}
-                </button>
-              )}
-            </div>
-            <label className={css.toggle}>
-              <input
-                type="checkbox"
-                checked={showHidden}
-                onChange={(event) => { setShowHidden(event.target.checked) }}
-              />
-              <span>{t('tree.showHidden')}</span>
-            </label>
-            <div className={css.treeHost}>
-              {searchState.status === 'idle'
-                ? (
-                  <FileTree
-                    levels={levels}
-                    expanded={expanded}
-                    onToggle={toggle}
-                    selected={selected}
-                    t={t}
-                    actions={{
-                      load: loadLevel,
-                      select: openFile,
-                      rename: (entry) => { setRenameTarget(entry); setRenameName(entry.name); setRenameError(undefined) },
-                      remove: (entry) => { setDeleteTarget(entry); setDeleteAcknowledged(false) },
-                      create: (directory, kind) => { setCreateTarget({ directory, kind }); setCreateName(''); setCreateError(undefined) },
-                    }}
-                  />
-                )
-                : (
-                  <div className={css.results} role="tree" aria-label={t('search.results.aria')}>
-                    {searchState.status === 'loading' && <div className={css.notice}>{t('tree.loading')}</div>}
-                    {searchState.status === 'error' && <div className={css.notice} role="alert">{searchState.message}</div>}
-                    {searchState.status === 'ready' && searchState.matches.length === 0 && (
-                      <div className={css.notice}>{t('search.empty')}</div>
-                    )}
-                    {searchState.status === 'ready' && searchState.matches.map(match => (
-                      <button
-                        key={match.path}
-                        type="button"
-                        className={css.resultRow}
-                        role="treeitem"
-                        onClick={() => { revealMatch(match.path, match.kind) }}
-                      >
-                        {match.path}
-                      </button>
-                    ))}
-                    {searchState.status === 'ready' && searchState.truncated && (
-                      <div className={css.notice}>
-                        {t('search.truncated', { n: String(searchState.matches.length) })}
-                      </div>
-                    )}
-                  </div>
+        {/* One toolbar row owns every control: the title, the name search, the
+            hidden-entries toggle, and the two create verbs. Stacking them would
+            push the tree down by a row each while saying nothing more. */}
+        <div className={css.toolbar}>
+          <span className={css.toolbarTitle} title={title}>
+            {title === undefined ? t('dialog.title') : `${t('dialog.title')} — ${title}`}
+          </span>
+          {/* A file view is one file: the search box, the hidden-entries
+              toggle, and the create verbs all address the tree, which this
+              mode does not show. */}
+          {!fileView && (
+            <>
+              <span className={css.search}>
+                <Input
+                  value={query}
+                  placeholder={t('search.placeholder')}
+                  aria-label={t('search.aria')}
+                  maxLength={200}
+                  onChange={(event) => { setQuery(event.target.value) }}
+                />
+                {query !== '' && (
+                  <button type="button" className={css.linkButton} onClick={() => { setQuery('') }}>
+                    {t('search.clear')}
+                  </button>
                 )}
-            </div>
-          </div>
-          <div className={css.content}>{contentPane()}</div>
+              </span>
+              <label className={css.toggle} title={t('tree.showHidden')}>
+                <input
+                  type="checkbox"
+                  checked={showHidden}
+                  onChange={(event) => { setShowHidden(event.target.checked) }}
+                />
+                <span>{t('tree.showHiddenShort')}</span>
+              </label>
+            </>
+          )}
+          {/* The desktop opener is a secondary action here: the content is
+              already on screen, so this only offers the editor when the page
+              is on the Host itself. It leads the right-hand group so the close
+              control keeps the far-right seat in both modes. */}
+          <span className={css.toolbarEnd}>
+            {/* The create verbs act on the tree, so they exist only while it
+                does; they ride this group to keep one right-aligned edge. */}
+            {!fileView && (
+              <span className={css.toolbarActions}>
+                <button
+                  type="button"
+                  className={css.iconButton}
+                  aria-label={t('file.newFile')}
+                  title={t('file.newFile')}
+                  disabled={!rootReady}
+                  onClick={() => { openCreate(selectedDirectory, 'file') }}
+                >
+                  <IconPlusOutline16 />
+                </button>
+                <button
+                  type="button"
+                  className={css.iconButton}
+                  aria-label={t('file.newFolder')}
+                  title={t('file.newFolder')}
+                  disabled={!rootReady}
+                  onClick={() => { openCreate(selectedDirectory, 'directory') }}
+                >
+                  <IconProjectAddOutline16 />
+                </button>
+              </span>
+            )}
+            {readOnly && openNative !== undefined && directPath !== undefined && (
+              <button type="button" className={css.linkButton} onClick={() => { openLocal(directPath) }}>
+                {t('content.openLocal')}
+              </button>
+            )}
+            <button type="button" className={css.iconButton} aria-label={t('dialog.close')} onClick={onClose}>
+              <IconCloseOutline16 size={14} />
+            </button>
+          </span>
         </div>
+        {/* The desktop opener's refusal sits directly under the toolbar that
+            raised it, so the file on screen stays where it is. */}
+        {openLocalError !== undefined && (
+          <div className={css.error} role="alert">
+            {t('content.openLocalFailed')}: {openLocalError}
+          </div>
+        )}
+        {fileView ? <div className={css.content}>{contentPane()}</div> : browseLayout}
+        {!fileView && <div className={css.sizeGrip} aria-hidden="true" onPointerDown={onFramePointerDown} />}
       </Modal>
 
       <Modal

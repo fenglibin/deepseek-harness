@@ -2,6 +2,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+// Type-only: pulls the optional `fileViewer` Context merge (ctx.get).
+import type {} from '@deepseek-ai/dsh-client-ui-file-browser/client'
 import type { SessionBinding } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { BoundActions, ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -118,6 +120,15 @@ export function apply(ctx: Context): void {
           },
           fileMentions: (owner: TurnTailOwnerProps) => ctx.get('chatFileMentions')?.forClosing(owner),
           openFile: async (path) => {
+            // The viewer owns session-to-Workspace resolution and reports a
+            // miss itself, so this call needs no path or capability logic.
+            // Composing the viewer out is the off state: the desktop opener
+            // remains the only way to open a file then.
+            const viewer = ctx.get('fileViewer')
+            if (viewer !== undefined) {
+              viewer.open({ sessionId, path })
+              return
+            }
             const cwd = ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd
             const result = await ctx.remote.session.openWorkspacePath({
               path: resolveWorkspacePath(cwd, path),

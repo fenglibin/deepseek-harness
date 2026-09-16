@@ -221,6 +221,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['{RemoteError} with the corresponding stable preset code and details when deletion is refused.'],
       },
       {
+        signature: '@Remote(\'setRowDisabled\') async setRowDisabled(agentPreset: string, entryId: string, disabled: boolean): Promise<void>',
+        description: 'Enable or disable one plugin row of one preset\'s composition.\n\nA shipped preset is edited in place, at the composition file discovery resolved: the deployment ships the decision to run a row, not a veto over whether this user runs it. Only the row\'s own `disabled` line moves, so the comments a shipped composition records its design in survive.\n\nThe write reaches the composition FILE first, then reconciles every standing mount of this preset with the new enablement. Without that step a session that already composed the preset keeps the generation it started on and the inventory keeps answering from the stale mount, so a reader would see the old state until restart. The row is addressed by the id its file declares, so a row a listing shows without an id cannot be changed at all.',
+        parameters: [{ name: 'agentPreset', description: 'the preset whose composition to change.' }, { name: 'entryId', description: 'the id the target row declares.' }, { name: 'disabled', description: 'whether the row should be stopped.' }],
+        returns: 'once the composition file carries the change and live mounts match.',
+        throws: ['{RemoteError} `gateway/bad-request` for an empty id, `agent-preset/not-found` when no root supplies the preset, or `agent-preset/invalid` when the write is refused.'],
+      },
+      {
         signature: 'serviceFor<K extends string & keyof Context>(agent: { ctx: Context }, name: K): Context[K] | undefined',
         description: 'One agent\'s instance of a service its preset mounted.\n\nA preset publishes services behind `isolate` realms, which are invisible outside the group that declares them — including to the host. This is how a caller holding the agent reads one anyway: a request that is ABOUT a session but arrives from outside it, which is every browser RPC.\n\nRead addressing only. A host row that `inject`s a service cannot use this, because injection resolves before any session exists and has no agent to key by; such a service belongs on the host plane instead.',
         parameters: [{ name: 'agent', description: 'the agent whose composition to look inside.' }, { name: 'name', description: 'the service name as the preset\'s rows resolve it.' }],
@@ -818,6 +825,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the view with the incremented spec count.',
       },
       {
+        signature: 'markAnalyzed(agent: Agent, ref: DeliveryTaskRef): DeliveryView',
+        description: 'Mark requirement analysis and alignment complete for the current task.',
+        parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'ref', description: 'expected current revision.' }],
+        returns: 'the view with `analysisDone` set to true.',
+      },
+      {
         signature: 'recordTasks(agent: Agent, ref: DeliveryTaskRef, changeId: string, items: readonly DeliveryTaskItem[]): void',
         description: 'Record the implementation checklist for the current task, replacing any earlier list. The write is checked with the decoder the replay uses, so a checklist that could not be replayed is rejected at the write instead.',
         parameters: [{ name: 'agent', description: 'owning live agent.' }, { name: 'ref', description: 'expected current revision.' }, { name: 'changeId', description: 'OpenSpec change id carrying the checklist.' }, { name: 'items', description: 'complete checklist; a later write replaces an earlier one.' }],
@@ -897,6 +910,55 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [],
         returns: 'the created sandbox after the configured cwd exists.',
         throws: ['when E2B rejects creation or the service is disposing.'],
+      },
+    ],
+  },
+  {
+    key: 'fileBrowserController',
+    summary: 'Host service backing the generated `ctx.remote.fileBrowser` namespace.',
+    description: 'Host service backing the generated `ctx.remote.fileBrowser` namespace.',
+    methods: [
+      {
+        signature: '@Remote(\'list\') list(request: FileBrowserListRequest): Promise<FileBrowserListing>',
+        description: 'List one directory level of a workspace.',
+        parameters: [{ name: 'request', description: 'workspace, directory, and hidden-files choice.' }],
+        returns: 'the level\'s direct children.',
+      },
+      {
+        signature: '@Remote(\'read\') read(request: FileBrowserReadRequest): Promise<FileBrowserContent>',
+        description: 'Read one file as content the browser can present.',
+        parameters: [{ name: 'request', description: 'workspace and workspace-relative file path.' }],
+        returns: 'the arm describing this file (text, image, binary, or over the bound).',
+      },
+      {
+        signature: '@Remote(\'write\') write(request: FileBrowserWriteRequest): Promise<FileBrowserWriteValue>',
+        description: 'Write one file, atomically and optionally guarded by the version read.',
+        parameters: [{ name: 'request', description: 'workspace, path, content, and the version the caller read.' }],
+        returns: 'the version the write produced.',
+      },
+      {
+        signature: '@Remote(\'create\') create(request: FileBrowserCreateRequest): Promise<FileBrowserCreateValue>',
+        description: 'Create one file or directory inside a workspace directory.',
+        parameters: [{ name: 'request', description: 'workspace, parent directory, name, and entry kind.' }],
+        returns: 'the created entry\'s workspace-relative path.',
+      },
+      {
+        signature: '@Remote(\'rename\') rename(request: FileBrowserRenameRequest): Promise<FileBrowserRenameValue>',
+        description: 'Rename one entry within its own directory.',
+        parameters: [{ name: 'request', description: 'workspace, current path, and the replacement base name.' }],
+        returns: 'the entry\'s path after the move.',
+      },
+      {
+        signature: '@Remote(\'delete\') delete(request: FileBrowserDeleteRequest): Promise<void>',
+        description: 'Delete one file or directory.',
+        parameters: [{ name: 'request', description: 'workspace and workspace-relative entry path.' }],
+        returns: 'nothing on success; a refusal rejects.',
+      },
+      {
+        signature: '@Remote(\'search\') search(request: FileBrowserSearchRequest): Promise<FileBrowserSearchResult>',
+        description: 'Search entry names under a workspace root.',
+        parameters: [{ name: 'request', description: 'workspace and case-insensitive name fragment.' }],
+        returns: 'the matches with a truncation flag.',
       },
     ],
   },
@@ -1334,6 +1396,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'mcpResources',
+    summary: '按作用域的资源访问，加上由已配置 MCP 服务器共享的三个工具。',
+    description: '按作用域的资源访问，加上由已配置 MCP 服务器共享的三个工具。',
+    methods: [
+      {
+        signature: 'register(server: string, provider: McpResourceProvider): () => void',
+        description: '注册一个服务器，并在该作用域存在提供方期间暴露资源工具。',
+        parameters: [{ name: 'server', description: '已配置的服务器名，在本作用域内唯一。' }, { name: 'provider', description: '由连接拥有的资源操作。' }],
+        returns: '这次确切注册的 effect disposer。',
+      },
+    ],
+  },
+  {
     key: 'messageFeedback',
     summary: 'Storage-domain sidecar service.',
     description: 'Storage-domain sidecar service. It inspects persisted Session history and never creates or resumes an Agent or Session.',
@@ -1720,7 +1795,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   {
     key: 'sessionProjections',
     summary: '`ctx.sessionProjections`: the projection unit table and its drive.',
-    description: '`ctx.sessionProjections`: the projection unit table and its drive. The service subscribes to `session/event` once; every committed event passes every registered unit\'s `apply` (eager drive), and a client-visible unit whose raw view reference changed (state/view `Object.is` gates) notifies the change feed with the schema-validated view. Cells build lazily — a unit registered after events flowed, or a session older than the registry, folds `init` over the in-memory log on first touch (event or read). Registration is an effect (disposer rides the calling fiber): an unloaded domain plugin\'s key disappears from snapshots and clients read it as capability absence. A host reader either declares `sessionProjections` in its plugin `inject` or fails explicitly when the registry or required key is absent. Contributors may preserve optional registration through `ctx.inject([\'sessionProjections\'], ...)`. Registrants sharing a key share one unit and are counted: the same tool package mounted in N agent presets registers N times, and the key survives until the last one unloads.',
+    description: '`ctx.sessionProjections`: the projection unit table and its drive. The service subscribes to `session/event` once; every committed event passes every registered unit\'s `apply` (eager drive). A changed state reference computes the next client view; the change feed is notified only when its raw result changes by `Object.is`. Cells build lazily — a unit registered after events flowed, or a session older than the registry, folds `init` over the in-memory log on first touch (event or read). Registration is an effect (disposer rides the calling fiber): an unloaded domain plugin\'s key disappears from snapshots and clients read it as capability absence. A host reader either declares `sessionProjections` in its plugin `inject` or fails explicitly when the registry or required key is absent. Contributors may preserve optional registration through `ctx.inject([\'sessionProjections\'], ...)`. Registrants sharing a key share one unit and are counted: the same tool package mounted in N agent presets registers N times, and the key survives until the last one unloads.',
     methods: [
       {
         signature: 'register< K extends keyof SessionProjectionMap, S extends SessionProjectionStateMap[K], >( definition: Omit<ProjectionDefinition<K, S>, \'wire\'> & { wire: NonNullable<ProjectionDefinition<K, S>[\'wire\']> }, ): () => void',
@@ -1737,7 +1812,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       {
         signature: 'onChanged(listener: ProjectionChangeListener): () => void',
         description: 'Subscribe to the change feed. The registration is an effect on the calling context\'s fiber.',
-        parameters: [{ name: 'listener', description: 'called once per client-visible unit whose raw view reference changed, per committed event.' }],
+        parameters: [{ name: 'listener', description: 'called once per client-visible unit whose raw view changed by `Object.is`, per committed event.' }],
         returns: 'the exact disposer that unsubscribes.',
       },
       {
@@ -2213,6 +2288,19 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Enumerate plugin-contributed variables without executing their resolvers.',
         parameters: [],
         returns: 'declarations sorted by environment variable name.',
+      },
+    ],
+  },
+  {
+    key: 'skillRoots',
+    summary: 'Read-only view of the roots this provider scans.',
+    description: 'Read-only view of the roots this provider scans. A management surface consumes it so its writes land in directories the discovery pass actually reads; deriving roots independently would let the two drift apart whenever this provider\'s configuration changes.\n\nOnly the deployment-level instance publishes it: the roots a management surface edits are the deployment\'s, while a preset instance\'s roots belong to that preset (its own bundled `skills/` directory, for one) and cannot be edited from a surface that has no session to resolve them against.',
+    methods: [
+      {
+        signature: 'list: (cwd?: string) => Promise<SkillRootInfo[]>',
+        description: 'List the roots one cwd selects, in precedence order.',
+        parameters: [{ name: 'cwd', description: 'workspace directory whose project roots participate; omit for global roots alone.' }],
+        returns: 'absolute root descriptors, including roots that do not exist yet.',
       },
     ],
   },
@@ -3721,7 +3809,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'AssembledSection',
-    declaration: 'export interface AssembledSection {\n    name: string;\n    text: string;\n}',
+    declaration: 'export interface AssembledSection {\n    name: string;\n    text: string;\n    interpolate?: boolean;\n}',
   },
   {
     name: 'AssistantMessage',
@@ -4089,7 +4177,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DeliveryOperation',
-    declaration: 'export type DeliveryOperation = \'create\' | \'advance\' | \'record-change\' | \'record-design\' | \'record-spec\' | \'clear\';',
+    declaration: 'export type DeliveryOperation = \'create\' | \'advance\' | \'record-change\' | \'record-design\' | \'record-spec\' | \'mark-analyzed\' | \'clear\';',
   },
   {
     name: 'DeliveryPhase',
@@ -4101,7 +4189,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DeliverySnapshot',
-    declaration: 'export interface DeliverySnapshot extends DeliveryTaskRef {\n    readonly objective: string;\n    readonly phase: DeliveryPhase;\n    readonly level: DeliveryLevel;\n    readonly changeCount: number;\n    readonly designCount: number;\n    readonly specCount: number;\n}',
+    declaration: 'export interface DeliverySnapshot extends DeliveryTaskRef {\n    readonly objective: string;\n    readonly phase: DeliveryPhase;\n    readonly level: DeliveryLevel;\n    readonly changeCount: number;\n    readonly designCount: number;\n    readonly specCount: number;\n    readonly analysisDone: boolean;\n}',
   },
   {
     name: 'DeliveryTaskId',
@@ -4109,11 +4197,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'DeliveryTaskItem',
-    declaration: 'export interface DeliveryTaskItem {\n    readonly content: string;\n    readonly phase: DeliveryPhase;\n    readonly done: boolean;\n}',
+    declaration: 'export interface DeliveryTaskItem {\n    readonly content: string;\n    readonly phase: DeliveryPhase;\n    readonly status: DeliveryTaskStatus;\n}',
   },
   {
     name: 'DeliveryTaskRef',
     declaration: 'export interface DeliveryTaskRef {\n    readonly id: DeliveryTaskId;\n    readonly revision: number;\n}',
+  },
+  {
+    name: 'DeliveryTaskStatus',
+    declaration: 'export type DeliveryTaskStatus = \'pending\' | \'in_progress\' | \'completed\';',
   },
   {
     name: 'DeliveryTasksView',
@@ -4246,6 +4338,70 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'FiberState',
     declaration: 'export type FiberState = FiberStateEnum;',
+  },
+  {
+    name: 'FileBrowserContent',
+    declaration: 'export type FileBrowserContent = {\n    readonly kind: \'text\';\n    readonly text: string;\n    readonly version: string;\n    readonly size: number;\n} | {\n    readonly kind: \'image\';\n    readonly mediaType: FileBrowserImageMediaType;\n    readonly size: number;\n    readonly url: string;\n} | {\n    readonly kind: \'binary\';\n    readonly size: number;\n} | {\n    readonly kind: \'too-large\';\n    readonly size: number;\n    readonly limit: number;\n};',
+  },
+  {
+    name: 'FileBrowserCreateRequest',
+    declaration: 'export interface FileBrowserCreateRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly directory?: string;\n    readonly name: string;\n    readonly kind: \'file\' | \'directory\';\n}',
+  },
+  {
+    name: 'FileBrowserCreateValue',
+    declaration: 'export interface FileBrowserCreateValue {\n    readonly path: string;\n}',
+  },
+  {
+    name: 'FileBrowserDeleteRequest',
+    declaration: 'export interface FileBrowserDeleteRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly path: string;\n}',
+  },
+  {
+    name: 'FileBrowserEntry',
+    declaration: 'export interface FileBrowserEntry {\n    readonly name: string;\n    readonly path: string;\n    readonly kind: \'file\' | \'directory\';\n    readonly size?: number;\n}',
+  },
+  {
+    name: 'FileBrowserImageMediaType',
+    declaration: 'export type FileBrowserImageMediaType = \'image/png\' | \'image/jpeg\' | \'image/webp\' | \'image/gif\';',
+  },
+  {
+    name: 'FileBrowserListing',
+    declaration: 'export interface FileBrowserListing {\n    readonly path: string;\n    readonly entries: readonly FileBrowserEntry[];\n    readonly truncated: boolean;\n}',
+  },
+  {
+    name: 'FileBrowserListRequest',
+    declaration: 'export interface FileBrowserListRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly path?: string;\n    readonly showHidden?: boolean;\n}',
+  },
+  {
+    name: 'FileBrowserReadRequest',
+    declaration: 'export interface FileBrowserReadRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly path: string;\n}',
+  },
+  {
+    name: 'FileBrowserRenameRequest',
+    declaration: 'export interface FileBrowserRenameRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly path: string;\n    readonly name: string;\n}',
+  },
+  {
+    name: 'FileBrowserRenameValue',
+    declaration: 'export interface FileBrowserRenameValue {\n    readonly path: string;\n}',
+  },
+  {
+    name: 'FileBrowserSearchMatch',
+    declaration: 'export interface FileBrowserSearchMatch {\n    readonly path: string;\n    readonly kind: \'file\' | \'directory\';\n}',
+  },
+  {
+    name: 'FileBrowserSearchRequest',
+    declaration: 'export interface FileBrowserSearchRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly query: string;\n}',
+  },
+  {
+    name: 'FileBrowserSearchResult',
+    declaration: 'export interface FileBrowserSearchResult {\n    readonly matches: readonly FileBrowserSearchMatch[];\n    readonly truncated: boolean;\n}',
+  },
+  {
+    name: 'FileBrowserWriteRequest',
+    declaration: 'export interface FileBrowserWriteRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly path: string;\n    readonly content: string;\n    readonly version?: string;\n}',
+  },
+  {
+    name: 'FileBrowserWriteValue',
+    declaration: 'export interface FileBrowserWriteValue {\n    readonly version: string;\n}',
   },
   {
     name: 'FileDiff',
@@ -4656,6 +4812,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ManualCompactAgentContext extends CompactionAgentContext {\n    runMaintenance<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T>;\n}',
   },
   {
+    name: 'McpResourceProvider',
+    declaration: 'export interface McpResourceProvider {\n    request(request: McpResourceRequest, exec: ToolExecution): Promise<JsonValue>;\n}',
+  },
+  {
+    name: 'McpResourceRequest',
+    declaration: 'export type McpResourceRequest = {\n    method: \'resources/list\' | \'resources/templates/list\';\n    cursor?: string;\n} | {\n    method: \'resources/read\';\n    uri: string;\n};',
+  },
+  {
     name: 'Message',
     declaration: 'export interface Message {\n    readonly id: MessageId;\n    readonly role: \'system\' | \'user\' | \'assistant\';\n    readonly content: ContentBlock[];\n    readonly source: MessageSource;\n}',
   },
@@ -4881,7 +5045,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PromptSection',
-    declaration: 'export interface PromptSection {\n    readonly name: string;\n    readonly order: number;\n    readonly text: string | ((context: AssembleContext) => string);\n    readonly complete?: boolean;\n}',
+    declaration: 'export interface PromptSection {\n    readonly name: string;\n    readonly order: number;\n    readonly text: string | ((context: AssembleContext) => string);\n    readonly interpolate?: boolean;\n    readonly complete?: boolean;\n}',
   },
   {
     name: 'PromptSectionOrderName',
@@ -5592,10 +5756,6 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SkillEntry {\n    readonly name: string;\n    readonly description: string;\n    readonly whenToUse?: string;\n    readonly modelInvocable: boolean;\n}',
   },
   {
-    name: 'SkillInvocationPolicy',
-    declaration: 'export interface SkillInvocationPolicy {\n    readonly modelInvocable: boolean;\n    readonly userInvocable: boolean;\n}',
-  },
-  {
     name: 'SkillListRequest',
     declaration: 'export interface SkillListRequest {\n    readonly sessionId: SessionId;\n}',
   },
@@ -5628,8 +5788,8 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type SkillResourceBase = {\n    readonly kind: \'directory\';\n    readonly path: string;\n} | {\n    readonly kind: \'url\';\n    readonly url: string;\n} | {\n    readonly kind: \'opaque\';\n    readonly description: string;\n};',
   },
   {
-    name: 'SkillSource',
-    declaration: 'export type SkillSource = \'project-dsh\' | \'project-agents\' | \'runtime\' | \'user-dsh\' | \'user-agents\' | \'custom\' | \'bundled\' | (string & {});',
+    name: 'SkillRootInfo',
+    declaration: 'export interface SkillRootInfo {\n    readonly path: string;\n    readonly source: SkillSource;\n    readonly rank: number;\n    readonly projectRoot?: string;\n    readonly readOnly: boolean;\n}',
   },
   {
     name: 'SkillSummary',
@@ -6200,16 +6360,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export abstract class TypertRemoteService<out T = never> extends Service<T> {\n    readonly typertRemote: TypertGatewayBinding<this>;\n}',
   },
   {
-    name: 'TypertSchemaFilter',
-    declaration: 'export interface TypertSchemaFilter {\n    readonly package?: string;\n    readonly face?: TypertFace;\n}',
-  },
-  {
     name: 'TypertSchema',
     declaration: 'export interface TypertSchema<Output = unknown> {\n    parse(value: unknown): Output;\n}',
   },
   {
     name: 'TypertSchemaFactory',
     declaration: 'export interface TypertSchemaFactory {\n    readonly name: string;\n    readonly create: () => z.ZodType;\n}',
+  },
+  {
+    name: 'TypertSchemaFilter',
+    declaration: 'export interface TypertSchemaFilter {\n    readonly package?: string;\n    readonly face?: TypertFace;\n}',
   },
   {
     name: 'TypertSchemaRecord',
