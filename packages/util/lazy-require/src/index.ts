@@ -9,6 +9,7 @@ import { createRequire } from 'node:module'
  * @param parentURL - 调用方的 `import.meta.url`，由它决定 package 解析基准。
  * @returns 一个零参数 loader，在首次使用时解析该依赖。
  */
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- 保留调用方给出的模块类型
 export function createLazyRequire<T>(specifier: string, parentURL: string | URL): () => T {
   const require = createRequire(parentURL)
   let loaded = false
