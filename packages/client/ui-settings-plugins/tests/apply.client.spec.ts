@@ -9,7 +9,7 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply as settingsApply, inject as settingsInject } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { apply, inject } from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 import type {
-  ConfigurablePluginsTabFace, PluginsSettingsSectionInjected,
+  ConfigurablePluginsTabFace, DeliveryCardFace, PluginsSettingsSectionInjected,
 } from '@deepseek-ai/dsh-client-ui-settings-plugins/client'
 import { SubagentModelSelectionCardController } from '../src/client/subagent-model-selection-card-controller.ts'
 
@@ -127,7 +127,7 @@ describe('ui-settings-plugins apply', () => {
     await ctx.plugin({ inject: [...inject], apply }).await()
 
     expect(slots.entries('settings.plugin.item').map(entry => entry.options.key))
-      .toEqual(['shell', 'agent-loop', 'subagent-model-selection', 'web-search-deepseek'])
+      .toEqual(['shell', 'agent-loop', 'subagent-model-selection', 'web-search-deepseek', 'delivery'])
   })
 
   it('dispatches the served namespaces its cards claim, and no others', async () => {
@@ -143,6 +143,38 @@ describe('ui-settings-plugins apply', () => {
       expect(face.hooks.configurablePlugins.getSnapshot().namespaces)
         .toEqual(['agent-loop', 'web-search-deepseek'])
     })
+  })
+
+  it('dispatches the delivery card against the served delivery namespace', async () => {
+    // The delivery policy is a Host-registered namespace like any other, so its
+    // card is dispatched only when this deployment actually serves it.
+    const { ctx, slots } = await bench(['delivery', 'agent-loop'])
+    declareRoot(slots)
+    await ctx.plugin({ inject: [...inject], apply }).await()
+
+    const tab = slots.entries('settings.plugins.tab')[0]!
+    const face = (tab.inject as unknown as () => ConfigurablePluginsTabFace)()
+    await vi.waitFor(() => {
+      expect(face.hooks.configurablePlugins.getSnapshot().namespaces).toEqual(['agent-loop', 'delivery'])
+    })
+  })
+
+  it('injects a card face that exposes every delivery field', async () => {
+    const { ctx, slots } = await bench(['delivery'])
+    declareRoot(slots)
+    await ctx.plugin({ inject: [...inject], apply }).await()
+
+    const entry = slots.entries('settings.plugin.item').find(item => item.options.key === 'delivery')!
+    const face = (entry.inject as unknown as () => DeliveryCardFace)()
+    const state = face.hooks.deliveryCard.getSnapshot()
+    // Every configured field renders as its own control state.
+    expect(state.enforcement).toBeDefined()
+    expect(state.enabled).toBeDefined()
+    expect(state.autoDetect).toBeDefined()
+    expect(state.designTodoCount).toBeDefined()
+    expect(state.specChars).toBeDefined()
+    expect(state.strongSignals).toBeDefined()
+    expect(state.postHooks).toBeDefined()
   })
 
   it('re-reads the served namespaces when the Host commits a settings document', async () => {
@@ -230,7 +262,7 @@ describe('ui-settings-plugins apply', () => {
     declareRoot(slots)
     const fiber = ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
-    expect(slots.entries('settings.plugin.item')).toHaveLength(4)
+    expect(slots.entries('settings.plugin.item')).toHaveLength(5)
 
     await fiber.dispose()
 

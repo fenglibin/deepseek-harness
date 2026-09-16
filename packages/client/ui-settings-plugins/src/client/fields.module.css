@@ -111,3 +111,18 @@
   line-height: 1.5;
   color: var(--dsw-alias-label-tertiary);
 }
+
+/* The question mark beside a label: a hover affordance, so it neither takes
+   focus nor announces itself as an action. Muted until hovered, which keeps a
+   form of thirty fields from reading as thirty buttons. */
+.helpMark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: help;
+}
+
+.helpMark:hover {
+  color: var(--dsw-alias-label-secondary);
+}

@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client'
 import { RemoteError, stubSettingsScope, type StubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
-import { CardForm, numberField, textField } from '../src/client/card-form.ts'
+import { CardForm, booleanField, enumField, listField, numberField, textField } from '../src/client/card-form.ts'
 import { AgentLoopCardController, type AgentLoopSettings } from '../src/client/agent-loop-card-controller.ts'
 import { BashCardController, type BashSettings } from '../src/client/bash-card-controller.ts'
 import {
@@ -1156,5 +1156,79 @@ describe('ConfigurablePluginsTabController', () => {
 
     expect(controller.inject().hooks.configurablePlugins.getSnapshot())
       .toEqual({ loaded: true, namespaces: [] })
+  })
+})
+
+describe('CardForm field controls', () => {
+  it('accepts a boolean draft and distinguishes clear from false', () => {
+    const spec = booleanField('enabled')
+    expect(spec.parse('true')).toEqual({ kind: 'set', value: true })
+    expect(spec.parse('false')).toEqual({ kind: 'set', value: false })
+    expect(spec.parse('')).toEqual({ kind: 'clear' })
+    // A false value is not the same statement as no override.
+    expect(spec.parse('yes')).toBeUndefined()
+    expect(spec.format(false)).toBe('false')
+    expect(spec.format(undefined)).toBe('')
+  })
+
+  it('rejects an enum draft outside its accepted values', () => {
+    const spec = enumField('enforcement', ['stateful', 'advisory', 'off'])
+    expect(spec.parse('advisory')).toEqual({ kind: 'set', value: 'advisory' })
+    expect(spec.parse('off')).toEqual({ kind: 'set', value: 'off' })
+    expect(spec.parse('')).toEqual({ kind: 'clear' })
+    expect(spec.parse('nonsense')).toBeUndefined()
+    expect(spec.options).toEqual(['stateful', 'advisory', 'off'])
+    expect(spec.control).toBe('enum')
+  })
+
+  it('needs at least one value for an enum field', () => {
+    expect(() => enumField('x', [])).toThrow(/at least one value/)
+  })
+
+  it('splits a list draft into trimmed entries and drops blank lines', () => {
+    const spec = listField('postHooks')
+    expect(spec.parse('pnpm run test\n\n  openspec validate x  \n'))
+      .toEqual({ kind: 'set', value: ['pnpm run test', 'openspec validate x'] })
+    expect(spec.parse('   \n  ')).toEqual({ kind: 'clear' })
+    expect(spec.format(['a', 'b'])).toBe('a\nb')
+    expect(spec.format(undefined)).toBe('')
+  })
+
+  it('writes a nested field path through mutate rather than set', async () => {
+    const host = stubSettingsScope<{ openspecThreshold?: { todoCount?: number } }>()
+    acceptWrites(host)
+    host.publish({
+      status: 'ready',
+      writable: true,
+      value: { openspecThreshold: { todoCount: 15 } },
+      base: { openspecThreshold: { todoCount: 15 } },
+      user: {},
+    })
+    const subject = new CardForm(host.scope, [numberField('openspecThreshold.todoCount')])
+    expect(subject.field('openspecThreshold.todoCount').text).toBe('15')
+
+    subject.actions().edit('openspecThreshold.todoCount', '25')
+    await subject.save()
+
+    // A dotted path cannot ride the scalar `set`, so it must reach `mutate`.
+    expect(host.set).not.toHaveBeenCalled()
+    expect(host.mutate).toHaveBeenCalled()
+    const op = host.mutate.mock.calls[0]?.[0]?.[0]
+    expect(op).toEqual({ op: 'set', path: ['openspecThreshold', 'todoCount'], value: 25 })
+  })
+
+  it('reads the override badge from the nested user layer', () => {
+    const host = stubSettingsScope<{ openspecThreshold?: { todoCount?: number } }>()
+    host.publish({
+      status: 'ready',
+      writable: true,
+      value: { openspecThreshold: { todoCount: 25 } },
+      base: { openspecThreshold: { todoCount: 15 } },
+      user: { openspecThreshold: { todoCount: 25 } },
+    })
+    const subject = new CardForm(host.scope, [numberField('openspecThreshold.todoCount')])
+    // The leaf is overridden, which a check of the top-level key alone could
+    // not see because the intermediate object always exists.
+    expect(subject.field('openspecThreshold.todoCount').overridden).toBe(true)
   })
 })

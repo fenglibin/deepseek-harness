@@ -20,23 +20,25 @@ import type {} from '@deepseek-ai/dsh-system-prompt'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import {
-  coverageReport,
-  describeCoverageGap,
-  designPoints,
-  hasCoverageGap,
-  parseChecklist,
-  scenarioPoints,
-} from './coverage.ts'
-import type { CoveragePoint } from './coverage.ts'
-import {
   DEFAULT_MEDIUM_SIGNALS,
   DEFAULT_STRONG_SIGNALS,
   DEFAULT_WEAK_SIGNALS,
+  explainGrading,
   gradeObjective,
 } from './grading.ts'
-import type { GradingPolicy } from './grading.ts'
+import type { GradingPolicy, GradingRationale } from './grading.ts'
 import { changeArtifactPath, isValidChangeId } from './openspec.ts'
 import type { SpecKind } from './openspec.ts'
+import {
+  COVERAGE_REVIEW_PREFIX,
+  MIN_CONFIRMATION_CHARS,
+  checklistGap,
+  checklistMismatch,
+  coverageGap,
+  requirementCoverageGap,
+  reviewRoundsSpent,
+  verificationCommandFailure,
+} from './verification.ts'
 
 export const name = 'tool-delivery'
 export const inject = ['agents', 'delivery', 'tools', 'fs', 'shell', 'systemPrompt']
@@ -259,6 +261,15 @@ function guidance(): string {
     + 'implemented, record at least one change with '
     + 'record_change (writes .dsh/changes/<task-id>.md). Record the checklist with record_tasks (empty '
     + 'change_id for a non-l2 task) so it persists across turns and drives verification. '
+    + 'Verification covers three inputs — the original request, the task list, and the design documents. '
+    + 'For an l1 or l2 task it requires every point to be claimed by a COMPLETED checklist item through a '
+    + 'trailing `(covers: <key>)` annotation on that item\'s content. The keys are: `req/<n>` for the n-th '
+    + 'numbered item of the original request (so a request written as "1、… 2、… 3、…" needs req/1, req/2 and '
+    + 'req/3), `design/<Dn>` for each `### D<n>` heading in a design document, and '
+    + '`<capability>/<Scenario name>` for each `#### Scenario:` in the change\'s spec delta. An l1 task '
+    + 'driven by todo_write still needs these annotations: write the item content as '
+    + '"the work (covers: req/1, design/D2)". An l0 task owes no checklist, so it carries no annotations '
+    + 'and verifies against the request alone. '
     + 'Call get_delivery_task first and copy its exact '
     + 'task_id and revision into every record and advance call. Use todo_write only for lightweight '
     + 'multi-step tracking; use the delivery tools when the work must leave a design or change record on disk.'
@@ -369,67 +380,6 @@ function reachesDesign(signals: SizeSignals, resolved: ResolvedConfig): boolean 
     || signals.touchedFiles >= resolved.designFiles
 }
 
-/** Review rounds already spent per task and phase, counted in-process. */
-const reviewRounds = new Map<string, number>()
-
-/** Shortest confirmation that is specific enough to release a coverage gap. */
-const MIN_CONFIRMATION_CHARS = 20
-
-/**
- * Collect the coverage gaps of the agent's current change: points the delta
- * specs and the design declare that no checklist item claims, and items
- * claiming points that do not exist. Points are read from the spec headings
- * themselves because `openspec show --json` reports scenarios without names.
- * @param ctx - plugin context.
- * @param agent - owning live agent.
- * @returns a one-line gap description, or `undefined` when coverage is
- * complete, when no change is recorded, or when the OpenSpec CLI is absent so
- * that the validate gate remains the authority.
- */
-async function coverageGap(ctx: Context, agent: Agent): Promise<string | undefined> {
-  const recorded = ctx.delivery.getTasks(agent)
-  if (recorded === undefined) return undefined
-  const changeId = recorded.changeId
-  const cwd = agent.session.header.cwd
-  const read = async (path: string): Promise<string | undefined> => {
-    try {
-      const target = cwd === undefined
-        ? await ctx.fs.resolve(path)
-        : await ctx.fs.resolve(path, { cwd })
-      return await ctx.fs.readText(target)
-    } catch {
-      return undefined
-    }
-  }
-  const shown = await ctx.shell.run(ctx.shell.resolve({
-    command: `openspec show ${changeId} --json`,
-    ...cwd === undefined ? {} : { workdir: cwd },
-  }))
-  if (shown.exitCode !== 0) return undefined
-  let capabilities: readonly string[] = []
-  try {
-    const parsed = JSON.parse(shown.stdout.text) as {
-      deltas?: ReadonlyArray<{ spec?: string }>
-    }
-    capabilities = (parsed.deltas ?? [])
-      .map(delta => delta.spec ?? '')
-      .filter(spec => spec.length > 0)
-  } catch {
-    return undefined
-  }
-  const points: CoveragePoint[] = []
-  for (const capability of capabilities) {
-    const spec = await read(`openspec/changes/${changeId}/specs/${capability}/spec.md`)
-    if (spec !== undefined) points.push(...scenarioPoints(capability, spec))
-  }
-  const design = await read(`openspec/changes/${changeId}/design.md`)
-  if (design !== undefined) points.push(...designPoints(design))
-  const tasks = await read(`openspec/changes/${changeId}/tasks.md`)
-  if (tasks === undefined || points.length === 0) return undefined
-  const report = coverageReport(points, parseChecklist(tasks))
-  if (!hasCoverageGap(report)) return undefined
-  return describeCoverageGap(report)
-}
 
 /** Whether any openspec-threshold measure is met. */
 function reachesSpec(signals: SizeSignals, objective: string, resolved: ResolvedConfig): boolean {
@@ -509,10 +459,61 @@ async function appendArtifact(ctx: Context, agent: Agent, path: string, entry: s
   await ctx.fs.writeText(target, `${prefix}${entry}`, undefined, undefined, sandboxPolicyFor(ctx, agent))
 }
 
+/**
+ * Record why one task was placed at its level.
+ *
+ * Written into the task's own change artifact rather than into the task
+ * snapshot: that snapshot's decoder rejects unknown fields, and the rationale
+ * is a creation-time fact rather than mutable task state. The line names the
+ * deciding rule and the concrete patterns, so a reader who disagrees with the
+ * tier sees which evidence produced it instead of re-deriving the scan.
+ * @param ctx - plugin context.
+ * @param agent - owning live agent.
+ * @param taskId - created task id, which names the artifact file.
+ * @param rationale - the grading evidence.
+ */
+async function recordGradingRationale(
+  ctx: Context,
+  agent: Agent,
+  taskId: string,
+  rationale: GradingRationale,
+): Promise<void> {
+  const evidence = [
+    ...rationale.matched.strong.map(pattern => `strong:${pattern}`),
+    ...rationale.matched.medium.map(pattern => `medium:${pattern}`),
+    ...rationale.numberedList ? ['medium:numbered-list'] : [],
+    ...rationale.matched.weak.map(pattern => `weak:${pattern}`),
+  ]
+  const detail = evidence.length === 0 ? 'no signal matched' : evidence.join(', ')
+  await appendArtifact(
+    ctx,
+    agent,
+    `.dsh/changes/${taskId}.md`,
+    `- graded ${rationale.level} by ${rationale.decidedBy} `
+    + `(${rationale.chars} chars vs floor ${rationale.charFloor}; ${detail})\n`,
+  )
+}
+
 /** Checkbox regex reused by `renderTasksMarkdown`; matches `[ ]`, `[x]`, `[X]`. */
 const TASKS_CHECKBOX = /^\s*[-*]\s+\[([ xX])\]\s*(.*)$/
 /** Trailing `(covers: ...)` or `(覆盖: ...)` annotation preserved on each line. */
 const TASKS_COVERS = /\((?:covers|覆盖)\s*:\s*[^)]*\)\s*$/i
+
+/**
+ * Strip the trailing `covers:` annotation from one checklist content line.
+ *
+ * Checklist item content carries its own annotation, because that is where the
+ * model declares which verification point the item implements. A line written
+ * to `tasks.md` therefore reads `做它 (covers: req/1)`, and comparing it with a
+ * rendered item requires both sides to drop the annotation first.
+ * @param content - item or line content, with or without an annotation.
+ * @returns the content without its trailing annotation, trimmed.
+ */
+function withoutCovers(content: string): string {
+  const trimmed = content.trim()
+  const annotation = TASKS_COVERS.exec(trimmed)
+  return annotation === null ? trimmed : trimmed.slice(0, annotation.index).trim()
+}
 
 /**
  * Render the `openspec/changes/<change>/tasks.md` body that mirrors one
@@ -542,13 +543,9 @@ export function renderTasksMarkdown(
       output.push(line)
       continue
     }
-    const body = match[2].trim()
-    const annotation = TASKS_COVERS.exec(body)
-    const lineContent = annotation === null
-      ? body
-      : body.slice(0, annotation.index).trim()
+    const lineContent = withoutCovers(match[2])
     const matchingIdx = items.findIndex(
-      (item, idx) => !consumed.has(idx) && item.content === lineContent,
+      (item, idx) => !consumed.has(idx) && withoutCovers(item.content) === lineContent,
     )
     if (matchingIdx < 0) {
       output.push(line)
@@ -592,13 +589,9 @@ export function orderItemsByMarkdown(
   for (const line of lines) {
     const match = TASKS_CHECKBOX.exec(line)
     if (match === null || match[2] === undefined) continue
-    const body = match[2].trim()
-    const annotation = TASKS_COVERS.exec(body)
-    const lineContent = annotation === null
-      ? body
-      : body.slice(0, annotation.index).trim()
+    const lineContent = withoutCovers(match[2])
     const matchingIdx = items.findIndex(
-      (item, idx) => !consumed.has(idx) && item.content === lineContent,
+      (item, idx) => !consumed.has(idx) && withoutCovers(item.content) === lineContent,
     )
     if (matchingIdx < 0) continue
     consumed.add(matchingIdx)
@@ -673,101 +666,33 @@ async function writeTasksMarkdown(
   }
 }
 
-/** Issue messages reported by one `validate --json` result, when it produced JSON. */
-function validationIssues(stdout: string): readonly string[] {
-  try {
-    const parsed = JSON.parse(stdout) as {
-      items?: ReadonlyArray<{ id?: string; issues?: ReadonlyArray<{ message?: string }> }>
-    }
-    const messages: string[] = []
-    for (const item of parsed.items ?? []) {
-      for (const issue of item.issues ?? []) {
-        if (typeof issue.message === 'string') messages.push(`${item.id ?? 'change'}: ${issue.message}`)
-      }
-    }
-    return messages
-  } catch {
-    return []
-  }
-}
-
-/** Run the configured post-hooks in order and return the first failure, if any. */
-async function runPostHooks(ctx: Context, agent: Agent, hooks: readonly string[]): Promise<string | undefined> {
-  for (const hook of hooks) {
-    const cwd = agent.session.header.cwd
-    const request: { command: string; workdir?: string } = { command: hook }
-    if (cwd !== undefined) request.workdir = cwd
-    const result = await ctx.shell.run(ctx.shell.resolve(request))
-    if (result.exitCode === 0 && !result.timedOut && !result.aborted) continue
-    const issues = validationIssues(result.stdout.text)
-    const detail = issues.length > 0
-      ? issues.join('; ')
-      : result.stderr.text.trim() || result.stdout.text.trim()
-    return `post-hook "${hook}" failed${detail.length > 0 ? `: ${detail}` : ''}`
-  }
-  return undefined
-}
-
-/** Done and total counts of the checkbox lines in one markdown checklist. */
-function checkboxCounts(text: string): { done: number; total: number } {
-  let done = 0
-  let total = 0
-  for (const line of text.split('\n')) {
-    const match = /^\s*[-*]\s+\[([ xX])\]/.exec(line)
-    if (match === null) continue
-    total += 1
-    if ((match[1] ?? '').toLowerCase() === 'x') done += 1
-  }
-  return { done, total }
-}
 
 /**
- * Compare the recorded checklist with `tasks.md` on disk. The disk file is the
- * authority OpenSpec reads, so a checklist that only claims completion is a
- * mismatch rather than a pass.
- * @param ctx - plugin context.
- * @param agent - owning live agent.
- * @returns a mismatch description, or `undefined` when the two agree or no
- * checklist has been recorded.
+ * Enforce one gate decision under the policy currently in force.
+ *
+ * `enforcement` is read per decision rather than only at load: a deployment
+ * that turns the gate off from the settings namespace has already registered
+ * the tools, so the switch has to take effect where the decision is made. The
+ * `stateful`/`advisory` split decides whether the message blocks or only
+ * reminds, and `off` makes the gate a no-op.
+ * @param exec - running tool execution, used to queue an advisory reminder.
+ * @param code - error code a blocking decision carries.
+ * @param message - gate message shown to the model.
+ * @param policy - reader for the policy currently in force.
  */
-async function checklistMismatch(ctx: Context, agent: Agent): Promise<string | undefined> {
-  const recorded = ctx.delivery.getTasks(agent)
-  if (recorded === undefined) return undefined
-  // A non-l2 task has no OpenSpec change, so its checklist is not cross-checked
-  // against a tasks.md on disk.
-  const current = ctx.delivery.get(agent)
-  if (current === undefined || current.level !== 'l2') return undefined
-  const path = `openspec/changes/${recorded.changeId}/tasks.md`
-  const cwd = agent.session.header.cwd
-  const target = cwd === undefined
-    ? await ctx.fs.resolve(path)
-    : await ctx.fs.resolve(path, { cwd })
-  let text: string
-  try {
-    text = await ctx.fs.readText(target)
-  } catch {
-    return `${path} is missing; write the checklist before implementing`
-  }
-  const disk = checkboxCounts(text)
-  const reported = recorded.items.reduce(
-    (counts, item) => ({
-      done: counts.done + (item.status === 'completed' ? 1 : 0),
-      total: counts.total + 1,
-    }),
-    { done: 0, total: 0 },
-  )
-  if (disk.done === reported.done && disk.total === reported.total) return undefined
-  // A differing total means the checklist contents drifted — a content
-  // mismatch, an added item, or a removed item — while an equal total with a
-  // differing done count means the statuses alone are stale. The two have
-  // different remedies, so name the failing one instead of a generic "align".
-  if (disk.total !== reported.total) {
-    return `${path} has ${disk.total} checkbox line(s) but the recorded checklist has ${reported.total} item(s): `
-      + 'their contents drifted (a content mismatch, an added item, or a removed item). '
-      + 'Rewrite tasks.md with record_spec(kind: "tasks") or re-record record_tasks with contents matching tasks.md.'
-  }
-  return `${path} has ${disk.done}/${disk.total} done but the recorded checklist reports ${reported.done}/${reported.total}: `
-    + 're-record record_tasks to sync the statuses before implementing.'
+function enforceGate(
+  exec: ToolRunContext,
+  code: string,
+  message: string,
+  policy: () => ResolvedConfig,
+): void {
+  const enforcement = policy().enforcement
+  if (enforcement === 'off') return
+  if (enforcement === 'stateful') throw new HarnessError(message, code)
+  exec.deferContext(createUserMessage({
+    content: [{ type: 'text', text: `Delivery reminder: ${message}` }],
+    source: { kind: 'plugin', plugin: 'tool-delivery', form: 'notice', summary: 'delivery gate' },
+  }))
 }
 
 /** The first change, design, and spec records are prerequisites for their phases. */
@@ -797,14 +722,12 @@ function gateAnalysisDone(
 ): void {
   const current = ctx.delivery.get(agent)
   if (current === undefined || current.analysisDone) return
-  const message = 'requirement analysis is not complete; call mark_analysis_done before writing a design'
-  if (policy().enforcement === 'stateful') {
-    throw new HarnessError(message, 'DELIVERY_GATE_BLOCKED')
-  }
-  exec.deferContext(createUserMessage({
-    content: [{ type: 'text', text: `Delivery reminder: ${message}` }],
-    source: { kind: 'plugin', plugin: 'tool-delivery', form: 'notice', summary: 'delivery analysis' },
-  }))
+  enforceGate(
+    exec,
+    'DELIVERY_GATE_BLOCKED',
+    'requirement analysis is not complete; call mark_analysis_done before writing a design',
+    policy,
+  )
 }
 
 /** Why an l2 task refuses the lightweight todo list. */
@@ -884,13 +807,17 @@ export function apply(ctx: Context, config: Config): void {
           if (objective.length > 0) {
             // The automatic path grades the text alone; the model's own size
             // estimates only exist when it calls create_delivery_task itself.
-            // Only a graded l2 creates a task here: l0 and l1 both go to the
-            // model, because a single medium or two weak keyword hits are too
-            // thin a basis for imposing the discipline on a request the model
-            // may read as a small fix.
-            const level = gradeObjective(objective, gradingPolicyOf(policy()))
-            if (level === 'l2') {
-              ctx.delivery.create(agent, { objective, level })
+            // Both l1 and l2 create a task here: leaving l1 to the model made
+            // that tier's existence depend on the model volunteering a call,
+            // so a graded-l1 request often ran with no task and no progress
+            // surface at all. Only l0 stays free.
+            const gradePolicy = gradingPolicyOf(policy())
+            const level = gradeObjective(objective, gradePolicy)
+            if (level === 'l2' || level === 'l1') {
+              const created = ctx.delivery.create(agent, { objective, level })
+              // The rationale is written after the create commits, so a failed
+              // artifact write cannot leave a task without its own record.
+              await recordGradingRationale(ctx, agent, String(created.id), explainGrading(objective, gradePolicy))
             } else {
               // Hand the rubric to the model once per turn so it can declare
               // a level for a request the scan could not settle.
@@ -962,7 +889,7 @@ export function apply(ctx: Context, config: Config): void {
       schema: DELIVERY_OUTPUT_SCHEMA,
       render: (_args: unknown, value: DeliveryToolValue) => [{ type: 'text' as const, text: JSON.stringify(value) }],
     },
-    execute(args, exec) {
+    async execute(args, exec) {
       const agent = deliveryAgent(ctx, exec)
       const signals: SizeSignals = {
         todoCount: typeof args.todo_count === 'number' && Number.isSafeInteger(args.todo_count) ? args.todo_count : 0,
@@ -971,7 +898,14 @@ export function apply(ctx: Context, config: Config): void {
       }
       const level = args.level === undefined ? inferLevel(args.objective, signals, policy()) : args.level
       const view = ctx.delivery.create(agent, { objective: args.objective, level })
-      return Promise.resolve(deliveryValue(view))
+      // An explicit level is a model decision, not a graded one, so only the
+      // inferred path has a rationale to record.
+      if (args.level === undefined) {
+        await recordGradingRationale(
+          ctx, agent, String(view.id), explainGrading(args.objective, gradingPolicyOf(policy())),
+        )
+      }
+      return deliveryValue(view)
     },
     presentCall: args => present('Create delivery task', 'other', args.objective),
   }))
@@ -1053,6 +987,8 @@ export function apply(ctx: Context, config: Config): void {
       + 'remove-, refactor-). In design.md, name each decision with a `### D<n> <title>` heading. In tasks.md, '
       + 'anchor each checkbox to the point it implements with a trailing `(covers: <capability>/<Scenario name>, '
       + 'design/D<n>)` annotation, so verification can confirm every scenario and decision is covered. '
+      + 'name each delta requirement with a `### Requirement: <name>` heading, because that heading plus the '
+      + '`#### Scenario:` names are the verification points a checklist must claim. '
       + 'A task must record at least one spec before it can reach specified.',
     parameters: {
       task_id: { type: 'string', required: true, description: 'Exact id returned by get_delivery_task.' },
@@ -1090,7 +1026,12 @@ export function apply(ctx: Context, config: Config): void {
       + 'persists and is what the progress panel and verification read. The checklist drives the per-phase '
       + 'progress shown for the task and '
       + 'is checked against openspec tasks.md before the task may reach implemented, so keep it aligned with '
-      + 'that file.',
+      + 'that file. Verification requires every point of the original request and of the design documents to '
+      + 'be claimed by a COMPLETED item, so end each item\'s content with a trailing annotation: '
+      + '"<the work> (covers: req/1, design/D2)" — `req/<n>` for the n-th numbered item of the original '
+      + 'request, `design/<Dn>` for each `### D<n>` design heading, and `<capability>/<Scenario name>` for '
+      + 'each `#### Scenario:` in the l2 change\'s spec delta. An unannotated item covers nothing, so a '
+      + 'checklist without annotations cannot reach verified.',
     parameters: {
       task_id: { type: 'string', required: true, description: 'Exact id returned by get_delivery_task.' },
       revision: { type: 'number', required: true, description: 'Exact positive revision returned by get_delivery_task.' },
@@ -1166,75 +1107,71 @@ export function apply(ctx: Context, config: Config): void {
       if (args.phase === 'implemented') {
         const mismatch = await checklistMismatch(ctx, agent)
         if (mismatch !== undefined) {
-          if (policy().enforcement === 'stateful') {
-            throw new HarnessError(mismatch, 'DELIVERY_GATE_BLOCKED')
-          }
-          exec.deferContext(createUserMessage({
-            content: [{ type: 'text', text: `Delivery reminder: ${mismatch}` }],
-            source: {
-              kind: 'plugin',
-              plugin: 'tool-delivery',
-              form: 'notice',
-              summary: 'delivery checklist',
-            },
-          }))
+          enforceGate(exec, 'DELIVERY_GATE_BLOCKED', mismatch, policy)
         }
       }
       if (args.phase === 'verified') {
-        const gap = await coverageGap(ctx, agent)
-        if (gap !== undefined) {
-          const key = `${args.task_id}:verified`
-          const rounds = (reviewRounds.get(key) ?? 0) + 1
-          reviewRounds.set(key, rounds)
-          const confirmation = typeof args.coverage_confirmation === 'string'
-            ? args.coverage_confirmation.trim()
-            : ''
+        const confirmation = typeof args.coverage_confirmation === 'string'
+          ? args.coverage_confirmation.trim()
+          : ''
+        // Four checks run here, against the request, the checklist, and the
+        // design documents. Only the coverage checks may be released by a
+        // specific confirmation within the review budget; the checklist and
+        // command checks are deterministic and a confirmation cannot waive
+        // them, so a task never verifies on the model's word alone.
+        const checklist = await checklistGap(ctx, agent)
+        if (checklist !== undefined) {
+          enforceGate(
+            exec,
+            'DELIVERY_GATE_BLOCKED',
+            `delivery verification blocked: ${checklist}`,
+            policy,
+          )
+        }
+        const commandFailure = await verificationCommandFailure(ctx, agent, policy().postHooks)
+        if (commandFailure !== undefined) {
+          enforceGate(
+            exec,
+            'DELIVERY_POST_HOOK_FAILED',
+            `delivery verification blocked: ${commandFailure}`,
+            policy,
+          )
+        }
+        const gaps = [
+          await coverageGap(ctx, agent),
+          await requirementCoverageGap(ctx, agent),
+        ].filter((gap): gap is string => gap !== undefined)
+        if (gaps.length > 0) {
+          const rounds = reviewRoundsSpent(agent)
           const specific = confirmation.length >= MIN_CONFIRMATION_CHARS
-          if (specific && rounds <= policy().maxReviewRounds) {
-            // A specific confirmation releases the gap and is recorded, so a
-            // later reader sees who reviewed what rather than a silent pass.
-            const view = ctx.delivery.recordChange(agent, ref, `coverage review: ${confirmation}`)
+          if (specific && rounds < policy().maxReviewRounds) {
+            // A specific confirmation releases the coverage gap and is
+            // recorded, so a later reader sees who reviewed what rather than a
+            // silent pass.
+            const view = ctx.delivery.recordChange(agent, ref, `${COVERAGE_REVIEW_PREFIX}${confirmation}`)
             await appendArtifact(
               ctx,
               agent,
               `.dsh/changes/${view.id}.md`,
-              `- [revision ${view.revision}] coverage review: ${confirmation}\n`,
+              `- [revision ${view.revision}] ${COVERAGE_REVIEW_PREFIX}${confirmation}\n`,
             )
             ref = { id: view.id, revision: view.revision }
           } else {
-            throw new HarnessError(
-              `delivery coverage gap: ${gap}. Resolve it, or confirm each gap specifically with `
-              + 'coverage_confirmation; a bare "done" is not accepted.',
+            enforceGate(
+              exec,
               'DELIVERY_GATE_BLOCKED',
+              `delivery coverage gap: ${gaps.join('; ')}. Resolve it by completing the uncovered work and `
+              + 'anchoring each point with a `(covers: <key>)` annotation on a completed checklist item, or '
+              + `confirm each gap specifically with coverage_confirmation (${rounds}/${policy().maxReviewRounds} `
+              + 'review rounds already used); a bare "done" is not accepted.',
+              policy,
             )
-          }
-        }
-        // A non-l2 task verifies against its recorded checklist: every item
-        // must be completed. An l2 task is verified by coverage instead.
-        const recorded = ctx.delivery.getTasks(agent)
-        if (current !== undefined && current.level !== 'l2' && recorded !== undefined) {
-          const unfinished = recorded.items.filter(item => item.status !== 'completed')
-          if (unfinished.length > 0) {
-            const message = `delivery checklist has ${unfinished.length} unfinished item(s); complete them before verifying`
-            if (policy().enforcement === 'stateful') {
-              throw new HarnessError(message, 'DELIVERY_GATE_BLOCKED')
-            }
-            exec.deferContext(createUserMessage({
-              content: [{ type: 'text', text: `Delivery reminder: ${message}` }],
-              source: { kind: 'plugin', plugin: 'tool-delivery', form: 'notice', summary: 'delivery checklist' },
-            }))
           }
         }
       }
       const gate = gateAdvance(current, args.phase)
       if (gate !== undefined) {
-        if (policy().enforcement === 'stateful') {
-          throw new HarnessError(gate, 'DELIVERY_GATE_BLOCKED')
-        }
-        exec.deferContext(createUserMessage({
-          content: [{ type: 'text', text: `Delivery reminder: ${gate}` }],
-          source: { kind: 'plugin', plugin: 'tool-delivery', form: 'notice', summary: 'delivery gate' },
-        }))
+        enforceGate(exec, 'DELIVERY_GATE_BLOCKED', gate, policy)
       }
       const needsCoverage = args.phase === 'accepted' && current !== undefined
         && (current.designCount > 0 || current.specCount > 0)
@@ -1242,40 +1179,16 @@ export function apply(ctx: Context, config: Config): void {
         ? (typeof args.coverage_confirmation === 'string' ? args.coverage_confirmation.trim() : '')
         : ''
       if (needsCoverage && confirmation.length === 0) {
-        const message = 'at least one design or spec record is unconfirmed; provide coverage_confirmation stating each was implemented'
-        if (policy().enforcement === 'stateful') {
-          throw new HarnessError(message, 'DELIVERY_GATE_BLOCKED')
-        }
-        exec.deferContext(createUserMessage({
-          content: [{ type: 'text', text: `Delivery reminder: ${message}` }],
-          source: { kind: 'plugin', plugin: 'tool-delivery', form: 'notice', summary: 'delivery gate' },
-        }))
+        enforceGate(
+          exec,
+          'DELIVERY_GATE_BLOCKED',
+          'at least one design or spec record is unconfirmed; provide coverage_confirmation stating each was implemented',
+          policy,
+        )
       }
-      if (args.phase === 'accepted') {
-        // Validation targets this task's own change id, so unrelated legacy
-        // changes under openspec/changes/ cannot block acceptance. The grammar
-        // is re-checked here rather than trusted from the recording: only an l2
-        // task is validated when it records, and the id is interpolated into a
-        // shell command below. A non-l2 task records an empty id, and a blank
-        // target would turn the command into a bare `openspec validate`, which
-        // validates nothing and always fails.
-        const changeId = ctx.delivery.getTasks(agent)?.changeId
-        const hooks = changeId === undefined || !isValidChangeId(changeId)
-          ? policy().postHooks
-          : [`openspec validate ${changeId} --strict --json`, ...policy().postHooks]
-        if (hooks.length > 0) {
-          const failure = await runPostHooks(ctx, agent, hooks)
-          if (failure !== undefined) {
-            if (policy().enforcement === 'stateful') {
-              throw new HarnessError(failure, 'DELIVERY_POST_HOOK_FAILED')
-            }
-            exec.deferContext(createUserMessage({
-              content: [{ type: 'text', text: `Delivery reminder: ${failure}` }],
-              source: { kind: 'plugin', plugin: 'tool-delivery', form: 'notice', summary: 'delivery post-hook' },
-            }))
-          }
-        }
-      }
+      // The verification commands run at `verified`, the phase that claims the
+      // work was verified; acceptance only records the outcome, so a passing
+      // task is not held to a second run of the same commands.
       if (args.phase === 'accepted' && current !== undefined) {
         if (confirmation.length > 0) {
           const view = ctx.delivery.recordChange(agent, ref, `coverage confirmation: ${confirmation}`)

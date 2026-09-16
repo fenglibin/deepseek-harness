@@ -48,7 +48,7 @@ import type { DeliveryChanged } from './domain.ts'
 export type * from './types.ts'
 export type * from './domain.ts'
 export { DELIVERY_CHANGE_VERSION, DeliveryError, DeliveryTaskId } from './runtime.ts'
-export { decodeDeliveryChange, foldDelivery, nextDeliveryPhase } from './fold.ts'
+export { decodeDeliveryChange, foldDelivery, LEVEL_PHASES, nextDeliveryPhase } from './fold.ts'
 export {
   decodeDeliveryTasks,
   deliveryTasksProjectionDefinition,

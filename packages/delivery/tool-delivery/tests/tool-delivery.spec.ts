@@ -658,44 +658,60 @@ describe('tool-delivery artifact persistence', () => {
 })
 
 describe('tool-delivery post-hooks', () => {
-  /** Create an l0 task and walk it to verified, ready for acceptance. */
-  async function advanceToVerified(ctx: Context, agent: Agent): Promise<Record<string, unknown>> {
+  /**
+   * Create an l0 task and walk it to implemented.
+   *
+   * The verification commands now run at `verified`, so each case below drives
+   * that transition and reads its outcome; acceptance only records it.
+   */
+  async function advanceToImplemented(ctx: Context, agent: Agent): Promise<Record<string, unknown>> {
     let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'post-hook', level: 'l0' }, agent))
     task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
     task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
-    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'verified' }, agent))
     return task
   }
 
-  it('runs post-hooks before accepting a task', async () => {
+  /** Walk an l0 task to verified, optionally asserting the transition failed. */
+  async function advanceToVerified(
+    ctx: Context,
+    agent: Agent,
+  ): Promise<{ task: Record<string, unknown>; blocked: boolean }> {
+    const implemented = await advanceToImplemented(ctx, agent)
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: implemented['id'], revision: implemented['revision'], phase: 'verified',
+    }, agent)
+    if (result.isError) return { task: implemented, blocked: true }
+    return { task: resultTask(result), blocked: false }
+  }
+
+  it('runs post-hooks before verifying a task', async () => {
     const { ctx, agent } = await harness({ postHooks: ['pnpm run test'] })
-    const verified = await advanceToVerified(ctx, agent)
+    const { task, blocked } = await advanceToVerified(ctx, agent)
+    expect(blocked).toBe(false)
     const accepted = resultTask(await execute(ctx, 'advance_delivery_task', {
-      task_id: verified['id'], revision: verified['revision'], phase: 'accepted',
+      task_id: task['id'], revision: task['revision'], phase: 'accepted',
     }, agent))
     expect(accepted).toMatchObject({ phase: 'accepted' })
   })
 
-  it('blocks acceptance when a post-hook fails under stateful', async () => {
+  it('blocks verification when a post-hook fails under stateful', async () => {
     const { ctx, agent } = await harness(
       { postHooks: ['pnpm run test'] },
       { exitCode: 1, stderr: { text: 'tests failed', truncated: false } },
     )
-    const verified = await advanceToVerified(ctx, agent)
-    const result = await execute(ctx, 'advance_delivery_task', {
-      task_id: verified['id'], revision: verified['revision'], phase: 'accepted',
-    }, agent)
-    expect(result.isError).toBe(true)
+    const { blocked } = await advanceToVerified(ctx, agent)
+    expect(blocked).toBe(true)
   })
 
-  it('reminds but still accepts when a post-hook fails under advisory', async () => {
+  it('reminds but still verifies when a post-hook fails under advisory', async () => {
     const { ctx, agent } = await harness(
       { enforcement: 'advisory', postHooks: ['pnpm run test'] },
       { exitCode: 1, stderr: { text: 'tests failed', truncated: false } },
     )
-    const verified = await advanceToVerified(ctx, agent)
+    const { task, blocked } = await advanceToVerified(ctx, agent)
+    expect(blocked).toBe(false)
     const accepted = resultTask(await execute(ctx, 'advance_delivery_task', {
-      task_id: verified['id'], revision: verified['revision'], phase: 'accepted',
+      task_id: task['id'], revision: task['revision'], phase: 'accepted',
     }, agent))
     expect(accepted).toMatchObject({ phase: 'accepted' })
   })
@@ -705,40 +721,31 @@ describe('tool-delivery post-hooks', () => {
     expect(() => { toolDelivery.apply(ctx, { postHooks: ['  '] }) }).toThrow(TypeError)
   })
 
-  it('blocks acceptance when a post-hook times out', async () => {
+  it('blocks verification when a post-hook times out', async () => {
     const { ctx, agent } = await harness(
       { postHooks: ['slow command'] },
       { timedOut: true, exitCode: null },
     )
-    const verified = await advanceToVerified(ctx, agent)
-    const result = await execute(ctx, 'advance_delivery_task', {
-      task_id: verified['id'], revision: verified['revision'], phase: 'accepted',
-    }, agent)
-    expect(result.isError).toBe(true)
+    const { blocked } = await advanceToVerified(ctx, agent)
+    expect(blocked).toBe(true)
   })
 
-  it('blocks acceptance when a post-hook is aborted', async () => {
+  it('blocks verification when a post-hook is aborted', async () => {
     const { ctx, agent } = await harness(
       { postHooks: ['abortable command'] },
       { aborted: true, exitCode: null },
     )
-    const verified = await advanceToVerified(ctx, agent)
-    const result = await execute(ctx, 'advance_delivery_task', {
-      task_id: verified['id'], revision: verified['revision'], phase: 'accepted',
-    }, agent)
-    expect(result.isError).toBe(true)
+    const { blocked } = await advanceToVerified(ctx, agent)
+    expect(blocked).toBe(true)
   })
 
-  it('blocks acceptance for a failed post-hook with no output', async () => {
+  it('blocks verification for a failed post-hook with no output', async () => {
     const { ctx, agent } = await harness(
       { postHooks: ['silent failure'] },
       { exitCode: 1 },
     )
-    const verified = await advanceToVerified(ctx, agent)
-    const result = await execute(ctx, 'advance_delivery_task', {
-      task_id: verified['id'], revision: verified['revision'], phase: 'accepted',
-    }, agent)
-    expect(result.isError).toBe(true)
+    const { blocked } = await advanceToVerified(ctx, agent)
+    expect(blocked).toBe(true)
   })
 
   it('accepts a non-l2 task whose checklist records an empty change id', async () => {
@@ -815,9 +822,10 @@ describe('tool-delivery post-hooks', () => {
       { version: SESSION_FORMAT_VERSION, id, createdAt: Date.now(), cwd },
     ))
     ctx.agents.register(agent)
-    const verified = await advanceToVerified(ctx, agent)
+    const { task, blocked } = await advanceToVerified(ctx, agent)
+    expect(blocked).toBe(false)
     const accepted = resultTask(await execute(ctx, 'advance_delivery_task', {
-      task_id: verified['id'], revision: verified['revision'], phase: 'accepted',
+      task_id: task['id'], revision: task['revision'], phase: 'accepted',
     }, agent))
     expect(accepted).toMatchObject({ phase: 'accepted' })
   })
@@ -881,34 +889,37 @@ describe('tool-delivery auto-detect', () => {
     + '4、点击“配置 MCP”时在当前页面弹出 mcp.json 编辑页并支持高亮；\n'
     + '5、编辑后配置要立即生效。'
 
-  it('creates an l2 task for a multi-part request the old rule graded as l1', async () => {
+  it('creates an l1 task for a multi-part request', async () => {
+    // A numbered multi-part list expresses decomposability, which the design
+    // document tier covers; it is no longer read as a structural-contract
+    // change. The task is still created automatically, so the request never
+    // runs without a progress surface.
     const { ctx, agent } = await harness()
     await preStep(ctx, agent, [createUserMessage({
       content: [{ type: 'text', text: MULTI_PART_REQUEST }],
       source: { kind: 'user' },
     })])
-    expect(ctx.delivery.get(agent)?.level).toBe('l2')
+    expect(ctx.delivery.get(agent)?.level).toBe('l1')
   })
 
-  it('creates an l2 task when a short request hits a strong signal', async () => {
+  it('creates an l1 task when a short request uses a loose restructuring word', async () => {
     const { ctx, agent } = await harness()
     await preStep(ctx, agent, [createUserMessage({
       content: [{ type: 'text', text: '重构这个模块的内部实现' }],
       source: { kind: 'user' },
     })])
-    expect(ctx.delivery.get(agent)?.level).toBe('l2')
+    expect(ctx.delivery.get(agent)?.level).toBe('l1')
   })
 
-  it('leaves a medium-signal request to the model instead of creating an l1 task', async () => {
+  it('creates an l1 task when a single medium signal matches', async () => {
+    // l1 no longer waits for the model to volunteer a create call: doing so
+    // left graded-l1 requests with no task and no progress surface.
     const { ctx, agent } = await harness()
     await preStep(ctx, agent, [createUserMessage({
       content: [{ type: 'text', text: '新增一个小能力' }],
       source: { kind: 'user' },
     })])
-    expect(ctx.delivery.get(agent)).toBeUndefined()
-    const injected = agent.inbox.nextStep
-    expect(injected.some(message => message.source.kind === 'plugin'
-      && message.source.plugin === 'tool-delivery')).toBe(true)
+    expect(ctx.delivery.get(agent)?.level).toBe('l1')
   })
 
   it('injects the grading rubric once per turn when no signal matches', async () => {
@@ -1343,6 +1354,153 @@ describe('tool-delivery settings wiring', () => {
     })])
     expect(ctx.delivery.get(agent)).toBeUndefined()
   })
+
+  it('lets a gate through when the settings resolve enforcement to off', async () => {
+    // Composition is stateful, the user section says off: the decision point
+    // must honour the user section even though the tools were registered at
+    // load under stateful. Without a per-decision read the loaded policy would
+    // keep blocking a gate the user already turned off.
+    const { ctx, agent } = await harness({ enforcement: 'stateful' }, {}, new StubSettings({
+      enforcement: 'off',
+    }))
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'gate it', level: 'l0' }, agent))
+    // No record_change: under stateful this is exactly the blocked transition.
+    task = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'implemented',
+    }, agent))
+    expect(task).toMatchObject({ phase: 'implemented' })
+  })
+})
+
+describe('tool-delivery verification inputs', () => {
+  /**
+   * Walk an l1 task to implemented, leaving the verified transition to the case.
+   *
+   * The checklist content is supplied so each case can choose what its items
+   * claim to cover.
+   */
+  async function l1ReadyToVerify(
+    ctx: Context,
+    agent: Agent,
+    objective: string,
+    designText: string,
+    items: readonly { content: string; phase: string; status: string }[],
+  ): Promise<Record<string, unknown>> {
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective, level: 'l1' }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
+    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: designText }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
+    task = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: '', items,
+    }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+    return task
+  }
+
+  it('verifies an l1 task whose items cover every request item and design decision', async () => {
+    const { ctx, agent } = await harness()
+    const task = await l1ReadyToVerify(
+      ctx,
+      agent,
+      '1、做甲\n2、做乙',
+      '### D1 先做甲\n### D2 再做乙\n',
+      [
+        { content: '做甲 (covers: req/1, design/D1)', phase: 'implemented', status: 'completed' },
+        { content: '做乙 (covers: req/2, design/D2)', phase: 'implemented', status: 'completed' },
+      ],
+    )
+    const verified = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent))
+    expect(verified).toMatchObject({ phase: 'verified' })
+  })
+
+  it('blocks verification when a numbered request item is not covered', async () => {
+    const { ctx, agent } = await harness()
+    const task = await l1ReadyToVerify(
+      ctx,
+      agent,
+      '1、做甲\n2、做乙',
+      '### D1 先做甲\n',
+      [
+        { content: '做甲 (covers: req/1, design/D1)', phase: 'implemented', status: 'completed' },
+      ],
+    )
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent)
+    expect(result.isError).toBe(true)
+    expect(JSON.stringify(result.content)).toContain('req/2')
+  })
+
+  it('blocks verification when a design decision is not covered', async () => {
+    const { ctx, agent } = await harness()
+    const task = await l1ReadyToVerify(
+      ctx,
+      agent,
+      '做甲',
+      '### D1 先做甲\n### D2 再做乙\n',
+      [{ content: '做甲 (covers: design/D1)', phase: 'implemented', status: 'completed' }],
+    )
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent)
+    expect(result.isError).toBe(true)
+    expect(JSON.stringify(result.content)).toContain('design/D2')
+  })
+
+  it('does not count an unfinished item as covering its point', async () => {
+    const { ctx, agent } = await harness()
+    const task = await l1ReadyToVerify(
+      ctx,
+      agent,
+      '1、做甲',
+      '### D1 先做甲\n',
+      [
+        { content: '做甲 (covers: req/1, design/D1)', phase: 'implemented', status: 'in_progress' },
+      ],
+    )
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent)
+    // The unfinished item is reported first as an unfinished checklist item.
+    expect(result.isError).toBe(true)
+  })
+
+  it('verifies an l0 task that covers its request without a checklist', async () => {
+    // l0 owes no checklist, so its request is the only verification input.
+    const { ctx, agent } = await harness()
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: '修复拼写', level: 'l0' }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+    const verified = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent))
+    expect(verified).toMatchObject({ phase: 'verified' })
+  })
+
+  it('releases an uncovered point only through a specific confirmation', async () => {
+    const { ctx, agent } = await harness()
+    const task = await l1ReadyToVerify(
+      ctx,
+      agent,
+      '1、做甲',
+      '### D1 先做甲\n',
+      [{ content: '做甲', phase: 'implemented', status: 'completed' }],
+    )
+    // A bare "done" is below the specificity floor and stays blocked.
+    const bare = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+      coverage_confirmation: 'done',
+    }, agent)
+    expect(bare.isError).toBe(true)
+    const specific = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+      coverage_confirmation: 'req/1 与 design/D1 已由该项实现并验证通过',
+    }, agent))
+    expect(specific).toMatchObject({ phase: 'verified' })
+  })
 })
 
 describe('tool-delivery acceptance gate', () => {
@@ -1355,17 +1513,55 @@ describe('tool-delivery acceptance gate', () => {
     return task
   }
 
-  /** Walk an l1 task (with a design record) to verified. */
+  /** Walk an l1 task (with a design record and a completed checklist) to verified. */
   async function advanceL1ToVerified(ctx: Context, agent: Agent): Promise<Record<string, unknown>> {
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l1 task', level: 'l1' }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
+    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
+    task = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: '',
+      items: [{ content: 'the fix', phase: 'implemented', status: 'completed' }],
+    }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'verified' }, agent))
+    return task
+  }
+
+  it('blocks verifying an l1 task that recorded no checklist', async () => {
+    // An l1 task owes a checklist; the previous gate returned early when none
+    // was recorded, so the task verified without any evidence of the work.
+    const { ctx, agent } = await harness()
     let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l1 task', level: 'l1' }, agent))
     task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
     task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
     task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
     task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
     task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
-    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'verified' }, agent))
-    return task
-  }
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent)
+    expect(result.isError).toBe(true)
+  })
+
+  it('blocks verifying an l1 task whose checklist still has unfinished items', async () => {
+    const { ctx, agent } = await harness()
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l1 task', level: 'l1' }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
+    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
+    task = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: '',
+      items: [{ content: 'the fix', phase: 'implemented', status: 'in_progress' }],
+    }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent)
+    expect(result.isError).toBe(true)
+  })
 
   it('accepts an l0 task without coverage confirmation', async () => {
     const { ctx, agent } = await harness()
@@ -1679,5 +1875,281 @@ describe('tool-delivery task checklist disk sync', () => {
     expect(view.items.map(item => item.content)).toEqual(['build first', 'ship it', 'verify it'])
     expect(readFileSync(join(dir, 'tasks.md'), 'utf8'))
       .toBe('- [x] build first\n- [ ] ship it\n- [ ] verify it\n')
+  })
+})
+
+describe('tool-delivery l1 mirror path', () => {
+  /** Walk an l1 task to implemented with a design document, ready to verify. */
+  async function l1MirrorReady(
+    ctx: Context,
+    agent: Agent,
+    cwd: string,
+    todos: readonly { content: string; status: string }[],
+  ): Promise<Record<string, unknown>> {
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: '1、做A\n2、做B', level: 'l1' }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
+    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
+    mkdirSync(join(cwd, '.dsh/design'), { recursive: true })
+    writeFileSync(join(cwd, `.dsh/design/${String(task['id'])}.md`), '### D1 先做A\n### D2 再做B\n')
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
+    // An l1 task drives its work through todo_write, so its checklist arrives
+    // by mirror rather than by record_tasks.
+    agent.session.append('todo/write', { todos: todos as never })
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'done' }, agent))
+    return resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+  }
+
+  it('verifies an l1 task whose mirrored todo list covers request and design', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const task = await l1MirrorReady(ctx, agent, cwd, [
+      { content: '做A (covers: req/1, design/D1)', status: 'completed' },
+      { content: '做B (covers: req/2, design/D2)', status: 'completed' },
+    ])
+    const verified = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent))
+    expect(verified).toMatchObject({ phase: 'verified' })
+  })
+
+  it('blocks an l1 mirror path that leaves a design decision uncovered', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const task = await l1MirrorReady(ctx, agent, cwd, [
+      { content: '做A (covers: req/1, design/D1)', status: 'completed' },
+      { content: '做B (covers: req/2)', status: 'completed' },
+    ])
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent)
+    expect(result.isError).toBe(true)
+    expect(JSON.stringify(result.content)).toContain('design/D2')
+  })
+})
+
+describe('tool-delivery l2 scenario coverage', () => {
+  /**
+   * Walk an l2 task to implemented, then attempt the verified transition.
+   *
+   * The checklist is supplied as items the model would pass to record_tasks;
+   * the same list reaches the disk through record_spec so the cross-check
+   * between the two authorities agrees.
+   *
+   * @returns the outcome of the verified transition.
+   */
+  async function l2Verify(
+    ctx: Context,
+    agent: Agent,
+    cwd: string,
+    items: readonly { content: string; status: string }[],
+  ): Promise<ToolExecutionResult> {
+    const step = async (name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> => {
+      const r = await execute(ctx, name, args, agent)
+      if (r.isError) throw new Error(`${name} FAILED: ${JSON.stringify(r.content).slice(0, 400)}`)
+      return resultTask(r)
+    }
+    let task = await step('create_delivery_task', { objective: 'l2 work', level: 'l2' })
+    const ref = (): Record<string, unknown> => ({ task_id: task['id'], revision: task['revision'] })
+    task = await step('mark_analysis_done', ref())
+    task = await step('record_design', { ...ref(), text: 'd' })
+    task = await step('advance_delivery_task', { ...ref(), phase: 'designed' })
+    const dir = join(cwd, 'openspec/changes/add-demo-change')
+    mkdirSync(join(dir, 'specs/demo-cap'), { recursive: true })
+    writeFileSync(join(dir, 'proposal.md'), 'why\n')
+    writeFileSync(join(dir, 'design.md'), '### D1 做它\n')
+    writeFileSync(join(dir, 'specs/demo-cap/spec.md'), '#### Scenario: 它应当工作\n')
+    const checklist = items.map(item => `- [x] ${item.content}\n`).join('')
+    task = await step('record_spec', { ...ref(), change_id: 'add-demo-change', kind: 'tasks', text: checklist })
+    task = await step('record_tasks', {
+      ...ref(), change_id: 'add-demo-change',
+      items: items.map(item => ({ ...item, phase: 'implemented' })),
+    })
+    task = await step('advance_delivery_task', { ...ref(), phase: 'specified' })
+    task = await step('record_change', { ...ref(), text: 'c' })
+    task = await step('advance_delivery_task', { ...ref(), phase: 'implemented' })
+    return execute(ctx, 'advance_delivery_task', { ...ref(), phase: 'verified' }, agent)
+  }
+
+  it('verifies an l2 task whose checklist covers every scenario and design point', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const r = await l2Verify(ctx, agent, cwd, [
+      { content: '做它 (covers: demo-cap/它应当工作, design/D1)', status: 'completed' },
+    ])
+    expect(r.isError).toBe(false)
+  })
+
+  it('blocks an l2 task whose checklist omits a scenario', async () => {
+    const { ctx, agent, cwd } = await harness()
+    const r = await l2Verify(ctx, agent, cwd, [
+      { content: '做它 (covers: design/D1)', status: 'completed' },
+    ])
+    expect(r.isError).toBe(true)
+    expect(JSON.stringify(r.content)).toContain('demo-cap/它应当工作')
+  })
+})
+
+describe('tool-delivery l0 numbered request', () => {
+  it('verifies an l0 task whose numbered request has no checklist to annotate', async () => {
+    const { ctx, agent } = await harness()
+    // An l0 task owes no checklist, so a numbered request cannot be covered by
+    // an annotation. This must not become a permanent block.
+    let task = resultTask(await execute(ctx, 'create_delivery_task', {
+      objective: '1、修复甲\n2、修复乙\n3、修复丙', level: 'l0',
+    }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+    const r = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent)
+    expect(r.isError).toBe(false)
+  })
+})
+
+describe('tool-delivery verification false-positive guard', () => {
+  it('verifies an l1 task whose plain request has no numbered items to cover', async () => {
+    const { ctx, agent } = await harness()
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: '把按钮改成蓝色', level: 'l1' }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
+    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'd' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
+    task = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: '',
+      items: [{ content: '改颜色', phase: 'implemented', status: 'completed' }],
+    }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'c' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+    // No numbered request items and no design document on disk means no points
+    // to cover, so verification must not invent a gap.
+    const r = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent)
+    expect(r.isError).toBe(false)
+  })
+
+  it('does not invent a gap for an l2 task whose recorded design has no document', async () => {
+    // The task records a design but never writes the document the record points
+    // at, and its change declares no delta specs. With no readable points there
+    // is nothing to cover, so verification must pass rather than manufacture a
+    // gap the model cannot satisfy.
+    const { ctx, agent, cwd } = await harness()
+    const step = async (name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> => {
+      const r = await execute(ctx, name, args, agent)
+      if (r.isError) throw new Error(`${name} FAILED: ${JSON.stringify(r.content).slice(0, 300)}`)
+      return resultTask(r)
+    }
+    let task = await step('create_delivery_task', { objective: 'l2 work', level: 'l2' })
+    const ref = (): Record<string, unknown> => ({ task_id: task['id'], revision: task['revision'] })
+    task = await step('mark_analysis_done', ref())
+    task = await step('record_design', { ...ref(), text: 'd' })
+    task = await step('advance_delivery_task', { ...ref(), phase: 'designed' })
+    const dir = join(cwd, 'openspec/changes/add-docless-change')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'proposal.md'), 'why\n')
+    task = await step('record_spec', { ...ref(), change_id: 'add-docless-change', kind: 'tasks', text: '- [x] 做它\n' })
+    task = await step('record_tasks', {
+      ...ref(), change_id: 'add-docless-change',
+      items: [{ content: '做它', phase: 'implemented', status: 'completed' }],
+    })
+    task = await step('advance_delivery_task', { ...ref(), phase: 'specified' })
+    task = await step('record_change', { ...ref(), text: 'c' })
+    task = await step('advance_delivery_task', { ...ref(), phase: 'implemented' })
+    const r = await execute(ctx, 'advance_delivery_task', { ...ref(), phase: 'verified' }, agent)
+    expect(r.isError).toBe(false)
+  })
+})
+
+describe('tool-delivery review rounds', () => {
+  /**
+   * Walk an l1 task to implemented with an uncovered request item.
+   *
+   * The checklist carries no `covers:` annotation, so `req/1` stays uncovered
+   * and each attempt spends a review round rather than passing on its own.
+   */
+  async function readyToReview(ctx: Context, agent: Agent): Promise<Record<string, unknown>> {
+    let task = resultTask(await execute(ctx, 'create_delivery_task', {
+      objective: '1、做甲', level: 'l1',
+    }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
+    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'd' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
+    task = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: '',
+      items: [{ content: '做甲', phase: 'implemented', status: 'completed' }],
+    }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'c' }, agent))
+    return resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'implemented',
+    }, agent))
+  }
+
+  /** A confirmation long enough to clear the specificity floor. */
+  const CONFIRM = '已逐项核对 req/1 的实现位置与证据，确认完成'
+
+  /** Register one more live agent on the same composed context. */
+  function addAgent(ctx: Context): Agent {
+    const agent = stubAgent(`delivery-tool-${Math.random()}`)
+    ctx.agents.register(agent)
+    return agent
+  }
+
+  it('counts a review round from the session log and records it', async () => {
+    const { ctx, agent } = await harness({ maxReviewRounds: 2 })
+    const task = await readyToReview(ctx, agent)
+    const reviewed = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+      coverage_confirmation: CONFIRM,
+    }, agent))
+    expect(reviewed['phase']).toBe('verified')
+    // The round is durably recorded, which is what makes the count survive a
+    // resume instead of living in a process-level map.
+    const recorded = ctx.delivery.getTasks(agent)
+    expect(recorded).toBeDefined()
+    const log = agent.session.events.filter(event => event.type === 'delivery/change')
+    const reviews = log.filter(event =>
+      (event.data as { text?: string }).text?.startsWith('coverage review: ') === true)
+    expect(reviews).toHaveLength(1)
+  })
+
+  it('does not carry a previous task rounds into a new task in the same session', async () => {
+    // The count is scoped to the current task id. Without that scope, clearing
+    // a task and starting another left the new task with no review budget at
+    // all, because it inherited every round the cleared one had spent.
+    const { ctx, agent } = await harness({ maxReviewRounds: 1 })
+    const first = await readyToReview(ctx, agent)
+    const reviewed = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: first['id'], revision: first['revision'], phase: 'verified',
+      coverage_confirmation: CONFIRM,
+    }, agent))
+    expect(reviewed['phase']).toBe('verified')
+
+    // Clear the settled task and start a fresh one in the same session.
+    const settled = ctx.delivery.get(agent)
+    const ref = { id: first['id'] as never, revision: settled?.revision ?? 1 }
+    ctx.delivery.clear(agent, ref)
+    const second = await readyToReview(ctx, agent)
+    const fresh = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: second['id'], revision: second['revision'], phase: 'verified',
+      coverage_confirmation: CONFIRM,
+    }, agent))
+    expect(fresh['phase']).toBe('verified')
+  })
+
+  it('gives each session its own review budget', async () => {
+    // The counter used to be a process-level map, so rounds spent by one task
+    // were charged against every other task in the process.
+    const { ctx, agent } = await harness({ maxReviewRounds: 1 })
+    const first = await readyToReview(ctx, agent)
+    const spent = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: first['id'], revision: first['revision'], phase: 'verified',
+      coverage_confirmation: CONFIRM,
+    }, agent))
+    expect(spent['phase']).toBe('verified')
+
+    // A second session in the same process still has its full budget.
+    const other = addAgent(ctx)
+    const second = await readyToReview(ctx, other)
+    const fresh = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: second['id'], revision: second['revision'], phase: 'verified',
+      coverage_confirmation: CONFIRM,
+    }, other))
+    expect(fresh['phase']).toBe('verified')
   })
 })

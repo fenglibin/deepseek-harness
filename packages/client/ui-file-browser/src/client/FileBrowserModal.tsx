@@ -424,7 +424,13 @@ export function FileBrowserModal({ open, request, onClose, remote, openNative, t
     overwrite: t('content.overwrite'),
     readonly: t('content.readonly'),
     loading: t('tree.loading'),
-  }), [t])
+    preview: t('content.preview'),
+    previewFrame: t('content.previewFrame', { name: file?.path ?? '' }),
+    copy: t('content.copy'),
+    copied: t('content.copied'),
+    footnotes: t('content.footnotes'),
+    diagramError: t('content.diagramError'),
+  }), [file?.path, t])
 
   /** The content pane's body, decided by the loaded file's arm. */
   const contentPane = (): React.ReactNode => {

@@ -7,7 +7,7 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
-  'menu.open': '文件浏览器',
+  'menu.open': '🗂️ 文件浏览器',
   'dialog.title': '文件浏览器',
   'dialog.close': '关闭',
 
@@ -56,6 +56,12 @@ export const zh = {
   'content.conflict': '该文件已在磁盘上被其它程序改动，未覆盖。',
   'content.overwrite': '强制覆盖',
   'content.image.aria': '图片预览：{name}',
+  'content.preview': '预览',
+  'content.previewFrame': 'HTML 预览：{name}',
+  'content.copy': '复制',
+  'content.copied': '已复制',
+  'content.footnotes': '脚注',
+  'content.diagramError': '这张图没能渲染出来',
   'size.bytes': '{n} B',
   'size.kilobytes': '{n} KB',
   'size.megabytes': '{n} MB',

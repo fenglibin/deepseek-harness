@@ -2,7 +2,9 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { SecretField, ValueField } from '../src/client/fields.tsx'
+import { DeliveryHelp } from '../src/client/DeliveryHelp.tsx'
+import { ChoiceField, ListField, SecretField, ValueField } from '../src/client/fields.tsx'
+import { zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
 
@@ -148,5 +150,86 @@ describe('SecretField', () => {
     )
 
     expect(screen.getByLabelText('API key')).toHaveProperty('disabled', true)
+  })
+})
+
+describe('field help mark', () => {
+  it('renders no question mark when a field has no extra explanation', () => {
+    render(<ValueField {...frame} text="60000" onEdit={vi.fn()} onReset={vi.fn()} />)
+    expect(screen.queryByTestId('field-help-field')).toBeNull()
+  })
+
+  it('renders a question mark carrying the field explanation', () => {
+    const help = 'Gate strength: stateful blocks, advisory reminds, off disables.'
+    render(
+      <ValueField {...frame} text="60000" onEdit={vi.fn()} onReset={vi.fn()} help={help} />,
+    )
+    const mark = screen.getByTestId('field-help-field')
+    expect(mark.getAttribute('aria-label')).toBe(help)
+    // A hover affordance inside a label must not add a second tab stop for the
+    // field the user is already on.
+    expect(mark.tagName).toBe('SPAN')
+  })
+
+  it('offers the same mark on the choice and list controls', () => {
+    render(
+      <ChoiceField
+        {...frame}
+        id="choice"
+        text="stateful"
+        options={['stateful', 'off']}
+        clearLabel="Use default"
+        help="Which gates block."
+        onEdit={vi.fn()}
+        onReset={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('field-help-choice').getAttribute('aria-label')).toBe('Which gates block.')
+    cleanup()
+    render(
+      <ListField
+        {...frame}
+        id="list"
+        text="a"
+        help="One entry per line."
+        onEdit={vi.fn()}
+        onReset={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('field-help-list').getAttribute('aria-label')).toBe('One entry per line.')
+  })
+})
+
+describe('DeliveryHelp', () => {
+  /** Copy reader over the real dictionary, so the dialog's keys must exist. */
+  const t = (key: keyof typeof zh): string => zh[key]
+
+  it('renders nothing while closed', () => {
+    render(<DeliveryHelp open={false} onClose={vi.fn()} t={t as never} />)
+    expect(screen.queryByText(zh.deliveryHelpTiersHeading)).toBeNull()
+  })
+
+  it('documents every tier, the flow, the artifacts, and the four checks', () => {
+    render(<DeliveryHelp open onClose={vi.fn()} t={t as never} />)
+    expect(screen.getByText(zh.deliveryHelpTiersHeading)).toBeDefined()
+    for (const tier of [zh.deliveryTierL0Name, zh.deliveryTierL1Name, zh.deliveryTierL2Name]) {
+      expect(screen.getByText(tier)).toBeDefined()
+    }
+    expect(screen.getByText(zh.deliveryHelpFlowHeading)).toBeDefined()
+    expect(screen.getByText(zh.deliveryHelpArtifactsHeading)).toBeDefined()
+    expect(screen.getByText(zh.deliveryHelpVerifyHeading)).toBeDefined()
+    for (const step of [zh.deliveryHelpVerifyStep1, zh.deliveryHelpVerifyStep2,
+      zh.deliveryHelpVerifyStep3, zh.deliveryHelpVerifyStep4]) {
+      expect(screen.getByText(step)).toBeDefined()
+    }
+    expect(screen.getByText(zh.deliveryHelpCoversHeading)).toBeDefined()
+    expect(screen.getByText(zh.deliveryHelpConfigHeading)).toBeDefined()
+  })
+
+  it('closes from the footer action', () => {
+    const onClose = vi.fn()
+    render(<DeliveryHelp open onClose={onClose} t={t as never} />)
+    fireEvent.click(screen.getByText(zh.close))
+    expect(onClose).toHaveBeenCalled()
   })
 })

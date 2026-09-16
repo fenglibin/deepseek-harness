@@ -245,3 +245,105 @@ describe('delivery tasks projection', () => {
     }).toThrow(/phase/)
   })
 })
+
+describe('delivery tasks mirror an l1 todo list', () => {
+  /**
+   * Compose the whole stack and create a task at one level.
+   *
+   * This bench attaches its session through `SessionStore`, which is what makes
+   * the append reentrancy guard live. A hand-built `Session.create()` leaves
+   * the store's attachment map empty, so an append attempted from inside a
+   * `session/event` listener would silently succeed here and fail in
+   * production.
+   */
+  async function mirrorBench(level: 'l0' | 'l1' | 'l2'): Promise<Bench> {
+    const bench = await harness()
+    bench.ctx.delivery.create(bench.agent, { objective: 'mirror it', level })
+    return bench
+  }
+
+  /** Read the checklist projection value. */
+  function view(bench: Bench): DeliveryTasksView | null {
+    return bench.tailValues()['delivery-tasks'] as DeliveryTasksView | null
+  }
+
+
+  it('mirrors a todo list written by an l1 task without appending an event', async () => {
+    const bench = await mirrorBench('l1')
+    const before = bench.session.events.length
+    bench.session.append('todo/write', { todos: [
+      { content: 'first step', status: 'pending' },
+      { content: 'second step', status: 'in_progress' },
+    ] })
+    const mirrored = view(bench)
+    expect(mirrored?.source).toBe('mirrored')
+    expect(mirrored?.items.map(item => item.content)).toEqual(['first step', 'second step'])
+    expect(mirrored?.items.every(item => item.phase === 'implemented')).toBe(true)
+    expect(mirrored?.progress.implemented).toEqual({ done: 0, total: 2 })
+    // One event in, one event out: the mirror writes nothing, which is what
+    // keeps it clear of the append reentrancy guard.
+    expect(bench.session.events.length).toBe(before + 1)
+  })
+
+  it('replaces the mirrored checklist wholesale on each write', async () => {
+    const bench = await mirrorBench('l1')
+    bench.session.append('todo/write', { todos: [{ content: 'old', status: 'pending' }] })
+    bench.session.append('todo/write', { todos: [{ content: 'new', status: 'completed' }] })
+    const mirrored = view(bench)
+    expect(mirrored?.items.map(item => item.content)).toEqual(['new'])
+    expect(mirrored?.progress.implemented).toEqual({ done: 1, total: 1 })
+  })
+
+  it('does not mirror a todo list for an l0 task', async () => {
+    const bench = await mirrorBench('l0')
+    bench.session.append('todo/write', { todos: [{ content: 'ignored', status: 'pending' }] })
+    expect(view(bench)).toBeNull()
+  })
+
+  it('does not mirror a todo list for an l2 task', async () => {
+    const bench = await mirrorBench('l2')
+    bench.session.append('todo/write', { todos: [{ content: 'ignored', status: 'pending' }] })
+    expect(view(bench)).toBeNull()
+  })
+
+  it('keeps a recorded l2 checklist instead of overwriting it with a todo list', async () => {
+    const bench = await mirrorBench('l2')
+    const task = bench.ctx.delivery.get(bench.agent)
+    bench.ctx.delivery.recordTasks(
+      bench.agent,
+      { id: task!.id, revision: task!.revision },
+      'add-thing',
+      [{ content: 'recorded step', phase: 'implemented', status: 'pending' }],
+    )
+    bench.session.append('todo/write', { todos: [{ content: 'todo step', status: 'completed' }] })
+    const kept = view(bench)
+    expect(kept?.source).toBe('recorded')
+    expect(kept?.changeId).toBe('add-thing')
+    expect(kept?.items.map(item => item.content)).toEqual(['recorded step'])
+  })
+
+  it('places a mirrored item in the task current phase', async () => {
+    const bench = await mirrorBench('l1')
+    const created = bench.ctx.delivery.get(bench.agent)!
+    let ref: DeliveryTaskRef = { id: created.id, revision: created.revision }
+    bench.ctx.delivery.markAnalyzed(bench.agent, ref)
+    ref = { id: created.id, revision: created.revision + 1 }
+    bench.ctx.delivery.recordDesign(bench.agent, ref, 'the design')
+    ref = { id: created.id, revision: created.revision + 2 }
+    bench.ctx.delivery.advance(bench.agent, ref, 'designed')
+    bench.session.append('todo/write', { todos: [{ content: 'designed step', status: 'pending' }] })
+    expect(view(bench)?.items[0]?.phase).toBe('implemented')
+  })
+
+  it('drops the mirror when the task is cleared', async () => {
+    const bench = await mirrorBench('l1')
+    bench.session.append('todo/write', { todos: [{ content: 'gone', status: 'pending' }] })
+    expect(view(bench)?.source).toBe('mirrored')
+    const task = bench.ctx.delivery.get(bench.agent)!
+    bench.ctx.delivery.clear(bench.agent, { id: task.id, revision: task.revision })
+    // A cleared task leaves the last mirrored view in place but drops the level
+    // the mirror depends on, so a later todo list no longer mirrors.
+    bench.session.append('todo/write', { todos: [{ content: 'after clear', status: 'pending' }] })
+    expect(view(bench)?.items.map(item => item.content)).toEqual(['gone'])
+  })
+})

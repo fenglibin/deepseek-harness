@@ -223,6 +223,37 @@
   min-width: 0;
 }
 
+/* One lifecycle stage inside the tasks group. The stage heading carries the
+   stage's done/total so a reader sees where the plan stands without reading
+   every item, and the list below it holds only that stage's items. */
+.phaseGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.phaseHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.phaseLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.phaseCounts {
+  flex: none;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-tertiary);
+}
+
 .taskList {
   margin: 2px 0 0;
   padding: 0 0 0 14px;

@@ -19,6 +19,7 @@ export const zh = {
   'progress.verify': '实现验证',
   'progress.tasks.none': '待拆分',
   'progress.tasks.source.todo': '来自当轮清单',
+  'progress.tasks.source.recorded': '来自任务清单',
   'progress.design.open': '打开 {path}',
   'progress.design.openFailed': '打开失败：{reason}',
   'status.todo': '待实现',

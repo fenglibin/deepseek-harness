@@ -230,6 +230,9 @@ export interface DeliveryTasksChangeMeta {
   readonly updatedAt: number
 }
 
+/** Where the current checklist came from. */
+export type DeliveryTasksSource = 'recorded' | 'mirrored'
+
 /** Client value of the `delivery-tasks` projection. */
 export interface DeliveryTasksView {
   /** OpenSpec change id carrying this checklist; empty for a non-l2 task. */
@@ -238,6 +241,13 @@ export interface DeliveryTasksView {
   readonly items: readonly DeliveryTaskItem[]
   /** Per-phase counts derived from the checklist. */
   readonly progress: Readonly<Record<DeliveryPhase, DeliveryPhaseProgress>>
+  /**
+   * Whether the checklist came from `record_tasks` or was mirrored from the
+   * task's `todo_write` list. A reader needs the distinction: a mirrored list
+   * is the model's own working plan, which l1 maintains through `todo_write`
+   * rather than through an explicit checklist record.
+   */
+  readonly source: DeliveryTasksSource
 }
 
 /** Host state of the `delivery-tasks` projection. */
@@ -246,6 +256,15 @@ export interface DeliveryTasksState {
   readonly current: DeliveryTasksView | null
   /** First strict replay failure, or null while the durable stream is valid. */
   readonly failure: string | null
+  /**
+   * Level of the current task, tracked from `delivery/change`.
+   *
+   * Held here because whether a `todo_write` list is mirrored depends on the
+   * task's level, and a projection fold can read only its own state.
+   */
+  readonly level: DeliveryLevel | null
+  /** Current task phase, used to place a mirrored item in a checklist phase. */
+  readonly phase: DeliveryPhase | null
 }
 
 declare module '@deepseek-ai/dsh-session/types' {

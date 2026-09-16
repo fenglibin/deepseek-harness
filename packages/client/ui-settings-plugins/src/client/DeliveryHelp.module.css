@@ -1,0 +1,90 @@
+/* Delivery help dialog: wider and taller than the primitive's 380px default,
+   because it carries the full grading reference. `width`, not `max-width`:
+   the primitive's own rule is `width: min(380px, 100%)`, so a later
+   single-class rule wins. */
+.dialog {
+  width: min(820px, 100%);
+}
+
+/* Only the reference scrolls, so the title and the close action stay put while
+   a user reads the tiers. */
+.body {
+  overflow-y: auto;
+  max-height: min(68vh, 620px);
+}
+
+.intro,
+.footnote {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--dsw-alias-label-primary);
+}
+
+.footnote {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.section {
+  margin-top: 20px;
+}
+
+.heading {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* One tier: its name on its own line, then the explanation. The rule above
+   separates tiers from each other without boxing each one. */
+.tier {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.tierName {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-primary);
+}
+
+.note {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* A numbered verification step: the marker is styled rather than an <ol>, so a
+   step's text can wrap under itself instead of under the marker. */
+.step {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* `pre` keeps the example's own line breaks, so it can be pasted unchanged. */
+.example {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-layer-2);
+  font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.example code {
+  font: inherit;
+  white-space: pre;
+}

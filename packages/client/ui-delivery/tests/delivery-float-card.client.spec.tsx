@@ -13,7 +13,7 @@ import {
   DeliveryFloatCard, type DeliveryFloatCardProps,
 } from '../src/client/DeliveryFloatCard.tsx'
 import { zh } from '../src/client/locales.ts'
-import { createDeliveryCardStore, DELIVERY_CARD_PERSIST_KEY } from '../src/client/visibility-store.ts'
+import { createDeliveryCardStore, DELIVERY_CARD_PERSIST_KEY, type DeliveryCardPreference } from '../src/client/visibility-store.ts'
 
 const t: DeliveryFloatCardProps['t'] = makeTranslate(zh, commonZh)
 
@@ -52,6 +52,7 @@ const CHECKLIST: DeliveryTasksView = {
     verified: { done: 0, total: 2 },
     accepted: { done: 0, total: 0 },
   },
+  source: 'recorded',
 }
 
 const TODOS: readonly TodoItem[] = [
@@ -63,18 +64,18 @@ interface MountOptions {
   checklist?: DeliveryTasksView | undefined
   todos?: readonly TodoItem[] | undefined
   openFile?: (path: string) => Promise<void>
-  /** Toggle visibility before the first render, the state the card's own tests assume. */
-  visible?: boolean
+  /** Preference to seed before the first render. */
+  preference?: DeliveryCardPreference
 }
 
 function renderCard(value: DeliveryProjection | null | undefined, over: MountOptions = {}) {
   // Real store instance — the sanctioned zero-machinery path for tests. The
-  // visibility write goes through store.set rather than the toggle action
-  // because a persisted value from an earlier mount in the same test would
-  // otherwise cancel the toggle out.
+  // preference is written through store.set rather than an action because a
+  // persisted value from an earlier mount in the same test would otherwise
+  // change what an action lands on.
   const handle = createDeliveryCardStore()
   const instance = handle.create()
-  if (over.visible === true) instance.store.set({ visible: true })
+  if (over.preference !== undefined) instance.store.set({ preference: over.preference })
   const openFile = over.openFile ?? vi.fn<(path: string) => Promise<void>>(() => Promise.resolve())
   const props = {
     useProjection: (key: string) => {
@@ -94,7 +95,7 @@ function renderCard(value: DeliveryProjection | null | undefined, over: MountOpt
 
 /** Mount with the card already shown, the pre-toggle state the layout tests assume. */
 function renderVisible(value: DeliveryProjection | null | undefined, over: MountOptions = {}) {
-  return renderCard(value, { ...over, visible: true })
+  return renderCard(value, { ...over, preference: 'shown' })
 }
 
 afterEach(() => {
@@ -103,42 +104,49 @@ afterEach(() => {
 })
 
 describe('DeliveryFloatCard visibility', () => {
-  it('renders nothing until Ctrl+Shift+P asks for the card', () => {
+  it('shows the card by default while a task is current', () => {
     const { container } = renderCard(makeProjection())
-    expect(container.firstChild).toBeNull()
+    // The card follows the task by default, so progress is visible without the
+    // reader discovering a shortcut.
+    expect(container.querySelector('[data-delivery-float]')).not.toBeNull()
   })
 
   it('ignores other key combinations', () => {
-    const { container } = renderCard(makeProjection())
+    const { store } = renderCard(makeProjection())
     fireEvent.keyDown(document, { key: 'p' })
     fireEvent.keyDown(document, { key: 'p', ctrlKey: true })
     fireEvent.keyDown(document, { key: 'p', shiftKey: true })
     fireEvent.keyDown(document, { key: 'o', ctrlKey: true, shiftKey: true })
-    expect(container.firstChild).toBeNull()
+    expect(store.getSnapshot()).toEqual({ preference: 'auto' })
   })
 
-  it('Ctrl+Shift+P shows the card and hides it again', () => {
-    const { container } = renderCard(makeProjection())
+  it('Ctrl+Shift+P cycles the preference through shown, hidden, and auto', () => {
+    const { container, store } = renderCard(makeProjection())
     fireEvent.keyDown(document, { key: 'P', ctrlKey: true, shiftKey: true })
+    expect(store.getSnapshot()).toEqual({ preference: 'shown' })
     expect(container.querySelector('[data-delivery-float]')).not.toBeNull()
     fireEvent.keyDown(document, { key: 'p', ctrlKey: true, shiftKey: true })
+    expect(store.getSnapshot()).toEqual({ preference: 'hidden' })
     expect(container.firstChild).toBeNull()
+    fireEvent.keyDown(document, { key: 'p', ctrlKey: true, shiftKey: true })
+    expect(store.getSnapshot()).toEqual({ preference: 'auto' })
+    expect(container.querySelector('[data-delivery-float]')).not.toBeNull()
   })
 
   it('persists the choice under the declared key', async () => {
     const { store } = renderCard(makeProjection())
     fireEvent.keyDown(document, { key: 'p', ctrlKey: true, shiftKey: true })
     await waitFor(() => {
-      expect(JSON.parse(localStorage.getItem(DELIVERY_CARD_PERSIST_KEY) ?? 'null')).toEqual({ visible: true })
+      expect(JSON.parse(localStorage.getItem(DELIVERY_CARD_PERSIST_KEY) ?? 'null')).toEqual({ preference: 'shown' })
     })
-    expect(store.getSnapshot()).toEqual({ visible: true })
+    expect(store.getSnapshot()).toEqual({ preference: 'shown' })
   })
 
   it('stops listening once the card unmounts', () => {
     const { unmount, store } = renderCard(makeProjection())
     unmount()
     fireEvent.keyDown(document, { key: 'p', ctrlKey: true, shiftKey: true })
-    expect(store.getSnapshot()).toEqual({ visible: false })
+    expect(store.getSnapshot()).toEqual({ preference: 'auto' })
   })
 })
 
@@ -248,14 +256,52 @@ describe('DeliveryFloatCard design document link', () => {
 })
 
 describe('DeliveryFloatCard todo fallback', () => {
-  it('renders the todo projection when no delivery checklist is recorded', () => {
+  it('reads the checklist from the delivery-tasks projection, not the todo projection', () => {
+    // `delivery-tasks` is the single authority: the host fold mirrors an l1
+    // todo list into it, so the card never falls back to the todo projection.
+    // A todo list with no mirrored checklist therefore renders nothing here.
     const { container } = renderVisible(makeProjection(), { todos: TODOS })
     const tasks = container.querySelector('[data-group="tasks"]')
-    expect(tasks?.querySelectorAll('[data-source="todo"]')).toHaveLength(2)
+    expect(tasks?.querySelectorAll('[data-source="todo"]')).toHaveLength(0)
+    expect(screen.queryByText('do the thing')).toBeNull()
+    expect(screen.getByText('待拆分')).toBeDefined()
+  })
+
+  it('shows a mirrored checklist with its source marker', () => {
+    const mirrored = {
+      changeId: '',
+      items: [
+        { content: 'do the thing', phase: 'implemented' as const, status: 'pending' as const },
+        { content: 'check the thing', phase: 'implemented' as const, status: 'completed' as const },
+      ],
+      progress: {
+        created: { done: 0, total: 0 },
+        designed: { done: 0, total: 0 },
+        specified: { done: 0, total: 0 },
+        implemented: { done: 1, total: 2 },
+        verified: { done: 0, total: 0 },
+        accepted: { done: 0, total: 0 },
+      },
+      source: 'mirrored' as const,
+    }
+    const { container } = renderVisible(makeProjection(), { checklist: mirrored })
+    const tasks = container.querySelector('[data-group="tasks"]')
+    expect(tasks?.querySelectorAll('[data-phase="implemented"]')).toHaveLength(1)
     expect(screen.getByText('do the thing')).toBeDefined()
-    expect(screen.getByText('check the thing')).toBeDefined()
     expect(screen.getByText('来自当轮清单')).toBeDefined()
-    expect(screen.queryByText('待拆分')).toBeNull()
+  })
+
+  it('groups the checklist by phase with per-phase counts', () => {
+    const { container } = renderVisible(makeProjection(), { checklist: CHECKLIST })
+    const tasks = container.querySelector('[data-group="tasks"]')
+    // CHECKLIST carries one implemented item and two verified items, so both
+    // stages render and an empty stage does not.
+    expect(tasks?.querySelectorAll('[data-phase="verified"]')).toHaveLength(1)
+    expect(tasks?.querySelectorAll('[data-phase="implemented"]')).toHaveLength(1)
+    expect(tasks?.querySelectorAll('[data-phase="designed"]')).toHaveLength(0)
+    expect(screen.getByText('1/1 已完成')).toBeDefined()
+    expect(screen.getByText('0/2 已完成')).toBeDefined()
+    expect(screen.getByText('来自任务清单')).toBeDefined()
   })
 
   it('keeps the delivery checklist authoritative when both exist', () => {

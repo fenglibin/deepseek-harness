@@ -37,6 +37,11 @@ export interface PluginCardProps {
   onDiscard: () => void
   /** The plugin's controls. */
   children: ReactNode
+  /**
+   * Opens this plugin's full help reference, when it ships one. A card without
+   * help renders no link rather than a link to nothing.
+   */
+  onHelp?: () => void
 }
 
 /**
@@ -81,6 +86,15 @@ export function PluginCard(props: PluginCardProps) {
       {open
         ? (
           <div className={css.body}>
+            {props.onHelp === undefined
+              ? null
+              : (
+                <p className={css.helpRow}>
+                  <button type="button" className={css.helpLink} onClick={props.onHelp}>
+                    {props.t('deliveryHelpLink')}
+                  </button>
+                </p>
+              )}
             {!state.writable ? <p className={css.readOnly} role="status">{props.t('readOnly')}</p> : null}
             {props.children}
             <div className={css.footer}>

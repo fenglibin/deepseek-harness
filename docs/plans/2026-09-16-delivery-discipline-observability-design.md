@@ -70,11 +70,15 @@ const todoItems = items.length === 0 ? todos ?? [] : []
 
 ### D1 任务列表统一到单一权威源 `delivery-tasks`
 
-l1 保留 `todo_write`，但在 l1 任务存续期间由 `tool-delivery` 监听 `session/event` 捕获 `todo/write`，并追加一条持久的 `delivery/tasks` 事件，使 `delivery-tasks` 成为唯一权威源。
+l1 保留 `todo_write`，但由 `delivery-tasks` 投影**直接 fold `todo/write` 事件**，使 `delivery-tasks` 成为唯一权威源，无须任何额外日志写入。
 
-依据：`session/event` 是 post-commit 的观察者事件（`packages/core/session/src/index.ts`），`packages/context/agent-instructions/src/index.ts` 已有一致的用法。由此 FloatCard 无需在两个源之间二选一，跨轮丢失问题同时消除。
+**机制修订记录。** 最初的设计是让 `tool-delivery` 监听 `session/event` 捕获 `todo/write`，再追加一条持久的 `delivery/tasks` 事件。该机制经实测**不可行**：`Session.append` 禁止重入（`packages/core/session/src/index.ts` 的 `if (entry?.appending) throw new Error('session append cannot reenter while another append is being published')`），而 `session/event` 监听器正是在 `appending = true` 期间被调用的，因此在回调内写日志必然抛错。实测输出为 `session append cannot reenter while another append is being published`，且 `delivery-tasks` 投影保持 `null`（写入完全失败）。
 
-被放弃的方案：l1 也禁用 `todo_write` 强制 `record_tasks`（源唯一但模型需多调一个更重的工具）；保持双源只改 UI 分别展示（漂移问题依旧）。
+修订后的机制不需要任何写入：投影本就是 fold，`todo/write` 已在日志中，`delivery-tasks` 只需在同一 fold 内同时跟踪 `delivery/change`（取得当前任务等级）与 `todo/write`（取得清单），即可在零重入风险、零延迟的前提下完成镜像。
+
+由此 `DeliveryFloatCard` 移除 `items.length === 0 ? todos ?? [] : []` 的双源择一逻辑，只读 `delivery-tasks`。
+
+被放弃的方案：l1 也禁用 `todo_write` 强制 `record_tasks`（源唯一但模型须多调一个更重的工具）；保持双源仅改 UI 分别展示（漂移问题依旧，只是变得可见）；在 `agent/pre-step` 等 append 之外补写（可行但引入轮次延迟）。
 
 ### D2 实现验证改为「三类输入 + 确定性门禁 + 逐条对账」
 

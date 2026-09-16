@@ -25,7 +25,15 @@ export const LEVEL_LABELS = {
   l2: 'level.l2',
 } as const satisfies Record<DeliveryLevel, DeliveryKey>
 
-/** The phases each size tier actually traverses. */
+/**
+ * The phases each size tier actually traverses.
+ *
+ * A local copy rather than an import: the `@deepseek-ai/dsh-delivery/client`
+ * entry is a pure type outlet with no runtime exports, so the host table
+ * cannot be reached from the browser half. `delivery-phases.client.spec.ts`
+ * asserts this copy equals the host's `LEVEL_PHASES`, so the two cannot drift
+ * silently.
+ */
 export const LEVEL_PHASES: Record<DeliveryLevel, readonly DeliveryPhase[]> = {
   l0: ['created', 'implemented', 'verified', 'accepted'],
   l1: ['created', 'designed', 'implemented', 'verified', 'accepted'],

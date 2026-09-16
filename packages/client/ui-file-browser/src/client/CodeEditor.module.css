@@ -19,11 +19,14 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* One dense row: the path takes the slack, so the status, the preview switch,
+   and the write actions keep their intrinsic width beside it. */
 .toolbar {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  min-height: 32px;
+  padding: 4px 8px 4px 12px;
   border-bottom: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-markdown-code-block-banner);
 }
@@ -46,6 +49,20 @@
   flex: none;
   font-size: 12px;
   line-height: 18px;
+}
+
+/* The preview switch sits with the status and the write actions: it changes
+   what the content column shows, which is the toolbar's own subject. */
+.toggle {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 .muted {

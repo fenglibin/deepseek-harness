@@ -16,11 +16,13 @@
 
 `DeliveryTaskItem` 是实施清单的一项：描述文本 `content`、所属生命周期阶段 `phase`、以及是否完成 `done`。`DeliveryTasksView` 把整份清单与按阶段聚合的 `progress`（每个阶段的 done 与 total）一起暴露，正是 `delivery-tasks` 投影发布的值。该投影独立于 `delivery` 投影，因此写入清单不会扩大 `DeliverySnapshot` 的字段集合——后者的解码器会拒绝未知字段。
 
+`delivery-tasks` 的 fold 消费三类事件。`delivery/tasks` 承载一次显式记录的清单；`delivery/change` 让 fold 自持当前任务的 `level` 与 `phase`（投影单元只能读取自身状态，无法查询 `delivery` 投影）；`todo/write` 在任务为 `l1` 时被镜像为清单，使 l1 的轻量待办列表无需第二次写入就进入同一权威源。镜像不追加任何事件，因此不受 `Session.append` 的重入限制——该限制禁止在 `session/event` 回调内写入日志。`DeliveryTasksView.source` 标记清单来自显式记录（`recorded`）还是镜像（`mirrored`）。
+
 `delivery/change` 是承载每次变更的会话事件：`create` 与 `advance` 携带完整快照，`record-change`、`record-design` 与 `record-spec` 携带增量记录，`clear` 则携带一个墓碑。`delivery/tasks` 单独承载一次清单写入，携带 change id 与完整清单，后一次写入整体替换前一次。`delivery/changed` 是在一次持久变更提交后发出的 Host 侧通知；它按 agent 划定作用域，因此为某个 agent 注册的监听器绝不会看到另一个 agent 的任务。
 
 ## 服务行为
 
-[`DeliveryService`](../../packages/delivery/delivery/src/index.ts) 为每个会话创建、推进、记录并清除一份任务，并在启动时注册 `delivery` 投影单元；缺少投影注册表的组装无法激活 `ctx.delivery`。它强制执行阶段顺序与比较并设置式身份，但不决定策略：任务何时推进、是否必须有变更记录，以及模型看到多强的门禁，都属于 [`dsh-tool-delivery`](../../packages/delivery/tool-delivery/README.zh.md)。该包 [README](../../packages/delivery/delivery/README.zh.md) 定义了可调用 API 与持久错误码。
+[`DeliveryService`](../../packages/delivery/delivery/src/index.ts) 为每个会话创建、推进、记录并清除一份任务，并在启动时注册 `delivery` 与 `delivery-tasks` 两个投影单元；缺少投影注册表的组装无法激活 `ctx.delivery`。它强制执行阶段顺序与比较并设置式身份，但不决定策略：任务何时推进、是否必须有变更记录、如何分级，以及「实现验证」检查什么，都属于 [`dsh-tool-delivery`](../../packages/delivery/tool-delivery/README.zh.md)。后者的策略阈值为该部署可调，并经设置服务的 `delivery` namespace 暴露给设置界面。`DeliveryService` 与 `dsh-delivery` 包 [README](../../packages/delivery/delivery/README.zh.md) 定义了可调用 API 与持久错误码。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

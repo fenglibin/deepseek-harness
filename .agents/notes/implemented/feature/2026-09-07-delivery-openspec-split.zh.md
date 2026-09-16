@@ -12,7 +12,7 @@
 
 ## 砍掉的
 
-- 用 `openspec show --json` 作验证点来源——其 scenario 条目只有 `rawText` 而无标题，无法作为 `covers:` 引用键。
+- 用 `openspec show --json` 作验证点来源——其 scenario 条目只有 `rawText` 而无标题，无法作为 `covers:` 引用键。**部分被取代**：该命令随后被证实会拒绝 proposal.md 使用非英文标题的 change（中文部署写 `## 为什么`），而非零退出被当作「无需检查」，使 `l2` 的 scenario 点静默消失；capability 现改为直接枚举 `openspec/changes/<id>/specs/`，见[交付纪律的分级语义、任务源与实现验证](2026-09-16-delivery-discipline-grading-mirror-and-verification.zh.md)。
 - 历史 `task-<uuid>/spec.md` 产物迁移——不合规也不符合 openspec 布局，保持原状；validate 按 change id 定向校验而不使用 `--all`。
 
 ## 验证

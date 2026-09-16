@@ -28,8 +28,14 @@ const PHASES: ReadonlySet<DeliveryPhase> = new Set([
 ])
 const LEVELS: ReadonlySet<DeliveryLevel> = new Set(['l0', 'l1', 'l2'])
 
-/** Ordered phases each task level must traverse in sequence. */
-const LEVEL_PHASES: Record<DeliveryLevel, readonly DeliveryPhase[]> = {
+/**
+ * Ordered phases each task level must traverse in sequence.
+ *
+ * Exported because the browser half needs the same table to render per-level
+ * phase progress; a client-side copy would be free to drift from the order the
+ * fold actually enforces.
+ */
+export const LEVEL_PHASES: Record<DeliveryLevel, readonly DeliveryPhase[]> = {
   l0: ['created', 'implemented', 'verified', 'accepted'],
   l1: ['created', 'designed', 'implemented', 'verified', 'accepted'],
   l2: ['created', 'designed', 'specified', 'implemented', 'verified', 'accepted'],

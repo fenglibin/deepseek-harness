@@ -60,11 +60,12 @@
 }
 
 /* The search field is the only flexible child: everything else keeps its
-   intrinsic width so the row never wraps. */
+   intrinsic width so the row never wraps. It is narrower than the shared input
+   atom's own ceiling because it shares this row with five other controls. */
 .search {
   flex: 1 1 auto;
   min-width: 120px;
-  max-width: 340px;
+  max-width: 260px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -73,6 +74,15 @@
 .search > :first-child {
   flex: 1;
   min-width: 0;
+  /* The shared input atom is 32px tall at 14px, sized for a form rather than a
+     dense toolbar. Scoped to this row the box drops to the height of the icon
+     buttons beside it; the atom keeps its default geometry everywhere else. */
+  height: 26px;
+}
+
+.search input {
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .toggle {

@@ -1,0 +1,57 @@
+/*
+ * The preview fills the content column and scrolls on its own: the editor's
+ * panes are replaced rather than stacked, so the preview owns the whole height
+ * the toolbar leaves.
+ *
+ * The frame's fill is the document's own default sheet, not the host theme's
+ * surface. A page that declares no colours — the common shape of produced HTML
+ * — gets black text from the UA stylesheet, so a dark-theme fill here would
+ * paint that text onto a dark surface and make it unreadable. The frame is a
+ * document, so it keeps a document's white sheet in both themes; the host's
+ * surrounding chrome still tells the reader which theme they are in.
+ */
+.frame {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  background: rgb(255 255 255);
+}
+
+.markdown {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 20px;
+  color: var(--dsw-alias-label-primary);
+}
+
+/*
+ * The renderer emits a wrapper div whose own layout suits a message body; a
+ * document preview wants prose spacing and tighter heading sizes, matching how
+ * the trajectory and README readers present the same pipeline.
+ */
+.markdown > div {
+  gap: 8px;
+  font: var(--dsw-font-xs-13);
+}
+
+.markdown > div h1 {
+  font: 600 18px/26px var(--dsw-font-family);
+}
+
+.markdown > div h2 {
+  font: 600 16px/24px var(--dsw-font-family);
+}
+
+.markdown > div :where(h3, h4, h5, h6) {
+  font: 600 14px/22px var(--dsw-font-family);
+}
+
+.markdown > div > :first-child {
+  margin-top: 0;
+}
+
+.markdown > div > :last-child {
+  margin-bottom: 0;
+}

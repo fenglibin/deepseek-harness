@@ -71,14 +71,6 @@ export const DEFAULT_STRONG_SIGNALS: readonly string[] = [
   'deprecat',
   '迁移',
   'migrat',
-  '重构',
-  'refactor',
-  '重写',
-  'rewrite',
-  '升级',
-  'upgrad',
-  '替换',
-  'replac',
   '删除公共',
 ]
 
@@ -100,6 +92,16 @@ export const DEFAULT_MEDIUM_SIGNALS: readonly string[] = [
   '权衡',
   '选型',
   'tradeoff',
+  // Restructuring words are used loosely in ordinary requests, so they raise
+  // a request to the design-document tier rather than to the OpenSpec tier.
+  '重构',
+  'refactor',
+  '重写',
+  'rewrite',
+  '升级',
+  'upgrad',
+  '替换',
+  'replac',
 ]
 
 /** Decomposability, performance budget, and user-visible presentation work. */
@@ -123,7 +125,7 @@ export const DEFAULT_WEAK_SIGNALS: readonly string[] = [
 /** Numbered requirement items; three or more means decomposable work. */
 const NUMBERED_ITEM = /(?:^|\n)\s*\d{1,2}\s*[、.．)）]\s*\S/g
 
-/** Minimum numbered items that count as one strong signal. */
+/** Minimum numbered items that count as one medium signal. */
 const DECOMPOSABLE_ITEMS = 3
 
 /** Count how many patterns occur in the normalized text. */
@@ -144,17 +146,86 @@ function numberedItemCount(objective: string): number {
 
 /**
  * Count the signals the objective matches at each strength.
+ *
+ * A numbered list is one medium signal, not a strong one: listing several
+ * points expresses decomposability, which `l1` already covers with a design
+ * document, while `l2` means a structural-contract change that owes the full
+ * OpenSpec change set. Counting the list as strong made every request written
+ * as three numbered points an `l2` regardless of its size.
  * @param objective - normalized request text.
  * @param policy - grading patterns and the spec threshold.
- * @returns hits per strength; decomposable numbered lists count as strong.
+ * @returns hits per strength; decomposable numbered lists count as medium.
  */
 export function scanSignals(objective: string, policy: GradingPolicy): SignalHits {
   const text = objective.toLowerCase()
   const decomposable = numberedItemCount(objective) >= DECOMPOSABLE_ITEMS ? 1 : 0
   return {
-    strong: countHits(text, policy.strongSignals) + decomposable,
-    medium: countHits(text, policy.mediumSignals),
+    strong: countHits(text, policy.strongSignals),
+    medium: countHits(text, policy.mediumSignals) + decomposable,
     weak: countHits(text, policy.weakSignals),
+  }
+}
+
+/**
+ * The concrete evidence behind one graded level.
+ *
+ * A level alone is not actionable to a reader who disagrees with it: the
+ * question is always which threshold or which pattern produced it. Each field
+ * therefore names the fact that decided the tier.
+ */
+export interface GradingRationale {
+  /** The level this grading produced. */
+  readonly level: DeliveryLevel
+  /** Which rule decided it: the character floor, the signal scan, or nothing. */
+  readonly decidedBy: 'character-floor' | 'signal-scan' | 'nothing'
+  /** Objective length, and the floor it was compared against. */
+  readonly chars: number
+  readonly charFloor: number
+  /** Patterns the objective matched, per strength. */
+  readonly matched: {
+    readonly strong: readonly string[]
+    readonly medium: readonly string[]
+    readonly weak: readonly string[]
+  }
+  /** Whether a numbered list contributed one of the medium hits. */
+  readonly numberedList: boolean
+}
+
+/** The patterns of one list that occur in the normalized text. */
+function matchedPatterns(text: string, patterns: readonly string[]): readonly string[] {
+  return patterns.filter((pattern) => {
+    const needle = pattern.trim().toLowerCase()
+    return needle.length > 0 && text.includes(needle)
+  })
+}
+
+/**
+ * Explain how one objective was graded, naming the deciding evidence.
+ * @param objective - direct human request text.
+ * @param policy - grading thresholds and patterns.
+ * @returns the level and the facts that produced it.
+ */
+export function explainGrading(objective: string, policy: GradingPolicy): GradingRationale {
+  const text = objective.toLowerCase()
+  const strong = matchedPatterns(text, policy.strongSignals)
+  const medium = matchedPatterns(text, policy.mediumSignals)
+  const weak = matchedPatterns(text, policy.weakSignals)
+  const numbered = numberedItemCount(objective) >= DECOMPOSABLE_ITEMS
+  // The floor is checked first and returns before any scanning, so an
+  // over-floor request reports length as the decision even when it also
+  // matches patterns.
+  const decidedBy = objective.length > policy.specChars
+    ? 'character-floor'
+    : strong.length > 0 || medium.length > 0 || weak.length > 0 || numbered
+      ? 'signal-scan'
+      : 'nothing'
+  return {
+    level: gradeObjective(objective, policy),
+    decidedBy,
+    chars: objective.length,
+    charFloor: policy.specChars,
+    matched: { strong, medium, weak },
+    numberedList: numbered,
   }
 }
 
@@ -163,8 +234,8 @@ export function scanSignals(objective: string, policy: GradingPolicy): SignalHit
  * character floor, then signal scan, then nothing (free execution).
  * @param objective - direct human request text.
  * @param policy - grading thresholds and patterns.
- * @returns `l2` above the character floor or on a strong signal, `l1` on one
- * medium or two weak signals, and `l0` when nothing is hit.
+ * @returns `l2` above the character floor or on a strong signal or two medium
+ * signals, `l1` on one medium or two weak signals, and `l0` when nothing is hit.
  */
 export function gradeObjective(objective: string, policy: GradingPolicy): DeliveryLevel {
   if (objective.length > policy.specChars) return 'l2'

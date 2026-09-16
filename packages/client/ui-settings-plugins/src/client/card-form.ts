@@ -23,7 +23,11 @@ export type FieldWrite =
 
 /** How one section field converts between its stored value and its draft text. */
 export interface CardFieldSpec {
-  /** Field name inside the namespace section. */
+  /**
+   * Field path inside the namespace section. A dotted path reads and writes a
+   * nested key (`designThreshold.todoCount`), which is how the delivery policy
+   * groups its thresholds.
+   */
   field: string
   /** Render a stored value as draft text; the empty string when the section carries none. */
   format: (value: unknown) => string
@@ -32,6 +36,13 @@ export interface CardFieldSpec {
    * value this field accepts — which blocks the save rather than discarding it.
    */
   parse: (text: string) => FieldWrite | undefined
+  /**
+   * Which control renders this field. Absent means the plain text input every
+   * card started with, so existing cards need no change.
+   */
+  control?: 'text' | 'number' | 'boolean' | 'enum' | 'list'
+  /** The accepted values of an `enum` control, in the order it should offer them. */
+  options?: readonly string[]
 }
 
 /**
@@ -142,6 +153,81 @@ export function textField(field: string): CardFieldSpec {
       const trimmed = text.trim()
       return trimmed === '' ? { kind: 'clear' } : { kind: 'set', value: trimmed }
     },
+  }
+}
+
+/**
+ * A boolean field.
+ *
+ * The draft renders as `true`/`false` and any other draft is rejected, so a
+ * section key that holds a boolean cannot be given a string by a mistyped
+ * control. An empty draft clears the key, which is distinct from `false`: a
+ * cleared key falls back to the schema default while `false` overrides it.
+ * @param field - field name inside the namespace section.
+ * @returns the field's conversion spec.
+ */
+export function booleanField(field: string): CardFieldSpec {
+  return {
+    field,
+    format: value => typeof value === 'boolean' ? String(value) : '',
+    parse: (text) => {
+      const trimmed = text.trim().toLowerCase()
+      if (trimmed === '') return { kind: 'clear' }
+      if (trimmed === 'true') return { kind: 'set', value: true }
+      if (trimmed === 'false') return { kind: 'set', value: false }
+      return undefined
+    },
+    control: 'boolean',
+  }
+}
+
+/**
+ * A field restricted to one of a fixed set of strings.
+ *
+ * A draft outside the set is rejected rather than written, so the section can
+ * never hold a value the Host schema would refuse.
+ * @param field - field name inside the namespace section.
+ * @param values - the accepted values, in the order a control should offer them.
+ * @returns the field's conversion spec.
+ */
+export function enumField(field: string, values: readonly string[]): CardFieldSpec {
+  if (values.length === 0) throw new TypeError(`enumField(${field}) needs at least one value`)
+  return {
+    field,
+    format: value => typeof value === 'string' && values.includes(value) ? value : '',
+    parse: (text) => {
+      const trimmed = text.trim()
+      if (trimmed === '') return { kind: 'clear' }
+      return values.includes(trimmed) ? { kind: 'set', value: trimmed } : undefined
+    },
+    control: 'enum',
+    options: [...values],
+  }
+}
+
+/**
+ * A list of strings, one per line.
+ *
+ * Blank lines are dropped, so a trailing newline or a stray blank row never
+ * becomes an empty entry. An empty draft clears the key, which is how a
+ * deployment returns the list to its schema default.
+ * @param field - field name inside the namespace section.
+ * @returns the field's conversion spec.
+ */
+export function listField(field: string): CardFieldSpec {
+  return {
+    field,
+    format: value => Array.isArray(value)
+      ? value.filter(entry => typeof entry === 'string').join('\n')
+      : '',
+    parse: (text) => {
+      const entries = text
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+      return entries.length === 0 ? { kind: 'clear' } : { kind: 'set', value: entries }
+    },
+    control: 'list',
   }
 }
 
@@ -301,13 +387,36 @@ export class CardForm<T> {
   }
 
   private async clear(field: string): Promise<boolean> {
-    await this.scope.unset(field)
+    const path = fieldPath(field)
+    if (path.length === 1) await this.scope.unset(field)
+    else await this.scope.mutate([{ op: 'unset', path }])
     return !this.stored(field)
   }
 
   private async store(field: string, value: unknown): Promise<boolean> {
-    await this.scope.set(field, value)
-    return this.userLayer()?.[field] === value
+    const path = fieldPath(field)
+    if (path.length === 1) await this.scope.set(field, value)
+    else await this.scope.mutate([{ op: 'set', path, value: value as never }])
+    return this.userValue(field) === value
+  }
+
+  /**
+   * The value the user layer holds for one field path.
+   *
+   * A dotted path walks into the nested object, because the user layer is the
+   * plain document the section was stored as.
+   * @param field - field path inside the namespace section.
+   * @returns the stored value, or undefined when the layer does not carry it.
+   */
+  private userValue(field: string): unknown {
+    const layer = this.userLayer()
+    if (layer === undefined) return undefined
+    let cursor: unknown = layer
+    for (const key of fieldPath(field)) {
+      if (typeof cursor !== 'object' || cursor === null || Array.isArray(cursor)) return undefined
+      cursor = (cursor as Record<string, unknown>)[key]
+    }
+    return cursor
   }
 
   private stage(field: string, edit: StagedEdit): void {
@@ -329,11 +438,11 @@ export class CardForm<T> {
   }
 
   private sectionValue(field: string): unknown {
-    return (this.snapshotOf().value as Record<string, unknown> | undefined)?.[field]
+    return readPath(this.snapshotOf().value, fieldPath(field))
   }
 
   private baseValue(field: string): unknown {
-    return (this.snapshotOf().base as Record<string, unknown> | undefined)?.[field]
+    return readPath(this.snapshotOf().base, fieldPath(field))
   }
 
   private userLayer(): Record<string, unknown> | undefined {
@@ -342,10 +451,40 @@ export class CardForm<T> {
 
   private stored(field: string): boolean {
     const user = this.userLayer()
-    return user !== undefined && Object.hasOwn(user, field)
+    if (user === undefined) return false
+    // An override is a stored key, walked to the last segment: an intermediate
+    // object exists but does not by itself mean this leaf was chosen.
+    const path = fieldPath(field)
+    const parent = path.length === 1 ? user : readPath(user, path.slice(0, -1))
+    if (typeof parent !== 'object' || parent === null || Array.isArray(parent)) return false
+    return Object.hasOwn(parent, path[path.length - 1] ?? '')
   }
 
   private publish(): void {
     for (const listener of this.listeners) listener()
   }
+}
+
+/**
+ * Split one field spec path into its segments.
+ * @param field - field path, dotted for a nested key.
+ * @returns the path segments, in order.
+ */
+function fieldPath(field: string): string[] {
+  return field.split('.').filter(segment => segment.length > 0)
+}
+
+/**
+ * Read one nested value out of a plain document.
+ * @param source - document to walk, or undefined.
+ * @param path - segments to follow.
+ * @returns the value at the path, or undefined when any segment is absent.
+ */
+function readPath(source: unknown, path: readonly string[]): unknown {
+  let cursor = source
+  for (const key of path) {
+    if (typeof cursor !== 'object' || cursor === null || Array.isArray(cursor)) return undefined
+    cursor = (cursor as Record<string, unknown>)[key]
+  }
+  return cursor
 }

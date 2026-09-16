@@ -6,12 +6,12 @@
  * @module @deepseek-ai/dsh-tool-delivery/coverage
  */
 
-/** One verification point: a spec scenario or a design decision. */
+/** One verification point: a spec scenario, a design decision, or a requirement. */
 export interface CoveragePoint {
   /** Key a `covers:` annotation must use to declare this point. */
   readonly key: string
-  /** Whether the point comes from a spec scenario or a design decision. */
-  readonly source: 'scenario' | 'design'
+  /** Whether the point comes from a spec scenario, a design decision, or the request itself. */
+  readonly source: 'scenario' | 'design' | 'requirement'
 }
 
 /** One checklist item with the points it declares. */
@@ -77,6 +77,41 @@ export function designPoints(text: string): readonly CoveragePoint[] {
     points.push({ key: `design/${match[1]}`, source: 'design' })
   }
   return points
+}
+
+/** A numbered requirement item, as a request usually lists its demands. */
+const REQUEST_ITEM = /^\s*(\d{1,2})\s*[、.．)）]\s*(.+?)\s*$/
+
+/**
+ * Extract the individual demands of the original request.
+ *
+ * A request written as a numbered list states each demand as its own point;
+ * verification has to confirm every one of them, which a single free-text
+ * confirmation cannot do. A request with no numbered list yields no points, so
+ * callers fall back to the checklist and design coverage they already have
+ * rather than reporting the whole request as one uncovered point.
+ * @param objective - the original request text.
+ * @returns one point per numbered item, keyed `req/<n>`.
+ */
+export function requirementPoints(objective: string): readonly CoveragePoint[] {
+  const points: CoveragePoint[] = []
+  for (const line of objective.split('\n')) {
+    const match = REQUEST_ITEM.exec(line)
+    if (match?.[1] === undefined || match[2] === undefined) continue
+    if (match[2].trim().length === 0) continue
+    points.push({ key: `req/${match[1]}`, source: 'requirement' })
+  }
+  return points
+}
+
+/**
+ * The point keys one checklist item content declares.
+ * @param content - item text, with or without a trailing annotation.
+ * @returns declared keys; empty when the item carries no annotation.
+ */
+export function coversOf(content: string): readonly string[] {
+  const annotation = COVERS.exec(content.trim())
+  return annotation?.[1] === undefined ? [] : splitKeys(annotation[1])
 }
 
 /**

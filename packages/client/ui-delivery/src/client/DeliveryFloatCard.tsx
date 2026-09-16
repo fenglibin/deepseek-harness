@@ -19,9 +19,8 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { DeliveryPhase, DeliveryTaskStatus } from '@deepseek-ai/dsh-delivery/client'
-import type { TodoItem } from '@deepseek-ai/dsh-tool-todo/client'
-import { designArtifact, LEVEL_LABELS } from './delivery-phases.ts'
-import type { createDeliveryCardStore } from './visibility-store.ts'
+import { designArtifact, LEVEL_LABELS, LEVEL_PHASES, PHASE_LABELS } from './delivery-phases.ts'
+import { cardVisible, type createDeliveryCardStore } from './visibility-store.ts'
 import css from './DeliveryFloatCard.module.css'
 
 /** Business callbacks and hooks the plugin injects into the floating card. */
@@ -77,8 +76,7 @@ export function DeliveryFloatCard({
 }: DeliveryFloatCardProps) {
   const projection = useProjection('delivery')
   const checklist = useProjection('delivery-tasks')
-  const todos = useProjection('todos')
-  const visible = useStore(state => state.visible)
+  const preference = useStore(state => state.preference)
   const [expanded, setExpanded] = useState(true)
   const [openError, setOpenError] = useState<string | null>(null)
 
@@ -89,20 +87,37 @@ export function DeliveryFloatCard({
     const onKeyDown = (event: KeyboardEvent): void => {
       if (!isToggleShortcut(event)) return
       event.preventDefault()
-      actions.toggle()
+      actions.cycle()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => { document.removeEventListener('keydown', onKeyDown) }
   }, [actions])
 
-  if (!visible) return null
+  // The card follows the task by default, so a reader sees progress without
+  // discovering the shortcut; an explicit preference overrides that both ways.
+  const hasTask = projection !== undefined && projection !== null
+  if (!cardVisible(preference, hasTask)) return null
   if (projection === undefined || projection === null) return null
   const task = projection.task
+  // `delivery-tasks` is the single authority for the checklist: an l1 task's
+  // todo list is mirrored into it by the host fold, and an l2 task records one
+  // directly. Reading the todo projection here as a second source made the
+  // card freeze on whichever list was written first.
   const items = checklist === undefined || checklist === null ? [] : checklist.items
-  // An empty delivery checklist means the model is tracking the work with
-  // todo_write instead, so the todo projection is what the reader can actually
-  // watch. The two sources never mix: a recorded checklist is authoritative.
-  const todoItems: readonly TodoItem[] = items.length === 0 ? todos ?? [] : []
+  const source = checklist === undefined || checklist === null ? undefined : checklist.source
+  // Grouping by phase is what makes the checklist readable: a flat list of a
+  // long plan hides which stage of the work is actually behind. Phases with no
+  // items are dropped, so the card shows only stages that carry work.
+  const progress = checklist === undefined || checklist === null ? undefined : checklist.progress
+  const phaseGroups = progress === undefined
+    ? []
+    : LEVEL_PHASES[task.level]
+      .filter(phase => (progress[phase]?.total ?? 0) > 0)
+      .map(phase => ({
+        phase,
+        progress: progress[phase] ?? { done: 0, total: 0 },
+        items: items.filter(item => item.phase === phase),
+      }))
   const analysis: GroupState = task.analysisDone ? 'done' : 'doing'
   const design: GroupState = task.designCount > 0 ? 'done' : 'writing'
   const verify = verifyState(task.phase)
@@ -158,33 +173,33 @@ export function DeliveryFloatCard({
           <div className={css.group} data-group="tasks">
             <div className={css.groupHead}>
               <span className={css.groupLabel}>{t('progress.tasks')}</span>
-              {items.length === 0 && todoItems.length === 0 && (
+              {items.length === 0 && (
                 <span className={css.groupState}>{t('progress.tasks.none')}</span>
               )}
-              {todoItems.length > 0 && (
-                <span className={css.groupState}>{t('progress.tasks.source.todo')}</span>
+              {source !== undefined && items.length > 0 && (
+                <span className={css.groupState} data-source={source}>
+                  {t(source === 'mirrored' ? 'progress.tasks.source.todo' : 'progress.tasks.source.recorded')}
+                </span>
               )}
             </div>
-            {items.length > 0 && (
-              <ol className={css.taskList}>
-                {items.map(item => (
-                  <li key={item.content} className={css.taskItem} data-status={item.status}>
-                    <span className={css.taskContent}>{item.content}</span>
-                    <span className={css.taskState}>{itemStateText(item.status, t)}</span>
-                  </li>
-                ))}
-              </ol>
-            )}
-            {todoItems.length > 0 && (
-              <ol className={css.taskList}>
-                {todoItems.map(item => (
-                  <li key={item.content} className={css.taskItem} data-status={item.status} data-source="todo">
-                    <span className={css.taskContent}>{item.content}</span>
-                    <span className={css.taskState}>{itemStateText(item.status, t)}</span>
-                  </li>
-                ))}
-              </ol>
-            )}
+            {phaseGroups.map(group => (
+              <div key={group.phase} className={css.phaseGroup} data-phase={group.phase}>
+                <div className={css.phaseHead}>
+                  <span className={css.phaseLabel}>{t(PHASE_LABELS[group.phase])}</span>
+                  <span className={css.phaseCounts}>
+                    {t('progress.counts', { done: group.progress.done, total: group.progress.total })}
+                  </span>
+                </div>
+                <ol className={css.taskList}>
+                  {group.items.map(item => (
+                    <li key={item.content} className={css.taskItem} data-status={item.status}>
+                      <span className={css.taskContent}>{item.content}</span>
+                      <span className={css.taskState}>{itemStateText(item.status, t)}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ))}
           </div>
           <div className={css.group} data-group="verify" data-state={verify}>
             <span className={css.groupLabel}>{t('progress.verify')}</span>
