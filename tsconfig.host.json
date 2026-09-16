@@ -259,6 +259,7 @@
     { "path": "./packages/fs/fs-observation-policy" },
     { "path": "./packages/fs/fs-sandbox" },
     { "path": "./packages/fs/file-changes" },
+    { "path": "./packages/fs/session-file-revisions" },
     { "path": "./packages/fs/tool-fs" },
     { "path": "./packages/fs/tool-fs-search" },
     { "path": "./packages/fs/tool-str-replace-editor" },
