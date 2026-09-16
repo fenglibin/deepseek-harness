@@ -24,7 +24,12 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the optional `fileViewer` Context merge (ctx.get).
 import type {} from '@deepseek-ai/dsh-client-ui-file-browser/client'
+// Type-only: registers the `sessionFileRevisions` Remote namespace merge, so
+// `ctx.remote.sessionFileRevisions` resolves to this package's verbs.
+import type {} from '@deepseek-ai/dsh-api-session-file-revisions/remote'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { RevisionDiff, RevertFileResult } from '@deepseek-ai/dsh-api-session-file-revisions/types'
+import type { RevisionRemote } from './RevisionDiffPanel.tsx'
 import { createAcceptedChangesStore } from './accept-store.ts'
 import { SessionChangesDock, type SessionChangesInjected } from './SessionChangesDock.tsx'
 import { zh, type SessionChangesKey } from './locales.ts'
@@ -56,6 +61,38 @@ export const inject = ['slots', 'locale', 'sessions', 'remote', 'remote.session'
  * Client plugin body: register the dictionaries and the input-dock entry.
  * @param ctx - client root context.
  */
+/**
+ * The diff-reading verb the panel drives, over the same Remote namespace.
+ * @param ctx - client root context.
+ * @param sessionId - the session the dock entry serves.
+ * @returns the verbs, or undefined when the Remote namespace is absent.
+ */
+/**
+ * The revision verbs the dock drives, over the session-revisions Remote.
+ * @param ctx - client root context.
+ * @returns the verbs, or undefined when the Remote namespace is absent.
+ */
+function remoteVerbs(ctx: ClientContext): RevisionRemote | undefined {
+  const remote = ctx.remote.sessionFileRevisions
+  return {
+    diff: async (id: string, path: string): Promise<RevisionDiff> => {
+      const result = await remote.diff({ sessionId: id as SessionId, path })
+      if (!result.ok) throw new Error(result.error.message)
+      return result.value
+    },
+    revertAll: async (paths: readonly string[]): Promise<readonly RevertFileResult[]> => {
+      const current = ctx.sessions.list.getSnapshot().current
+      if (current === undefined) return []
+      const result = await remote.revert({
+        sessionId: current,
+        ...paths.length === 1 ? { path: paths[0] } : {},
+      })
+      if (!result.ok) throw new Error(result.error.message)
+      return result.value.results
+    },
+  }
+}
+
 export function apply(ctx: ClientContext): void {
   const acceptStore = createAcceptedChangesStore()
   ctx.effect(() => ctx.locale.register(NS, { zh }), 'ui-session-changes: dictionaries')
@@ -71,6 +108,7 @@ export function apply(ctx: ClientContext): void {
     store: acceptStore,
     inject: (sessionId: SessionId): SessionChangesInjected => ({
       cwd: ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd,
+      revisions: remoteVerbs(ctx),
       openFile: async (path) => {
         // The viewer resolves the session's Workspace and reports its own
         // misses; composing it out leaves the desktop opener as the only way.

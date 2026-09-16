@@ -269,6 +269,17 @@
     - id: ui-session-changes
       name: '@deepseek-ai/dsh-client-ui-session-changes'
 
+    # Per-session file baselines behind the dock's view-diff and revert: the
+    # capture listening on settled write/edit results. Without it the dock lists
+    # paths only, and neither action is offered.
+    - id: session-file-revisions
+      name: '@deepseek-ai/dsh-session-file-revisions'
+
+    # The sessionFileRevisions Remote namespace: list, cumulative diff, and
+    # revert over the captured baselines. Its client half is ui-session-changes.
+    - id: session-file-revisions-api
+      name: '@deepseek-ai/dsh-api-session-file-revisions'
+
 
     - id: ui-workspace
       name: '@deepseek-ai/dsh-client-ui-workspace'

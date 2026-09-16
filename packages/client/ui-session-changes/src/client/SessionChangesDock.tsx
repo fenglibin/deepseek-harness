@@ -42,7 +42,10 @@ import { workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
 import {
   IconCheckOutline16, IconChevronDownOutline14, IconChevronUpOutline14, IconEditOutline16,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { createAcceptedChangesStore, type AcceptedChanges } from './accept-store.ts'
+import {
+  createAcceptedChangesStore, summarize, type AcceptedChanges, type RevertSummary,
+} from './accept-store.ts'
+import { RevisionDiffPanel, type RevisionRemote } from './RevisionDiffPanel.tsx'
 import css from './SessionChangesDock.module.css'
 
 export { canonicalMutationPath }
@@ -61,6 +64,12 @@ export interface SessionChangesInjected {
    * @throws Error carrying the Host's refusal reason.
    */
   openFile: (path: string) => Promise<void>
+  /**
+   * The session-revision Remote verbs, or undefined when this composition
+   * captures no revisions. Its absence is what turns the view-diff and revert
+   * controls off while leaving the list intact.
+   */
+  revisions: RevisionRemote | undefined
 }
 
 /** Full props of the dock entry: session standard kit (`useConversation`) + the injected opener + the accept store + the locale seat. */
@@ -206,11 +215,20 @@ export type SessionChangesPanelProps = {
   openFile: (path: string) => Promise<void>
   /** Session Workspace root; rows are spelled relative to it. */
   cwd: string | undefined
+  /**
+   * Open one file's cumulative diff, or undefined when this composition
+   * captures no revisions and the action is not offered.
+   */
+  onViewDiff?: ((change: SessionChange) => void) | undefined
+  /** Whether a revert is running, so the control can say so. */
+  reverting?: boolean | undefined
+  /** Revert every file this session changed; undefined when not offered. */
+  onRevertAll?: (() => void) | undefined
 } & PropsLocale<'session-changes'>
 
 /** The folded list rendered from the store-owned accept record. */
 export function SessionChangesPanel({
-  changes, accepted, onAccept, onAcceptAll, openFile, cwd, t,
+  changes, accepted, onAccept, onAcceptAll, openFile, cwd, onViewDiff, reverting, onRevertAll, t,
 }: SessionChangesPanelProps) {
   const [expanded, setExpanded] = useState(false)
   const [view, setView] = useState<ChangesView>('pending')
@@ -258,6 +276,17 @@ export function SessionChangesPanel({
           >
             <IconCheckOutline16 size={14} />
             {t('acceptAll')}
+          </button>
+        )}
+        {onRevertAll !== undefined && changes.length > 0 && (
+          <button
+            type="button"
+            className={css.revertAll}
+            onClick={onRevertAll}
+            disabled={reverting === true}
+            aria-label={t('revertAll')}
+          >
+            {reverting === true ? t('reverting') : t('revertAll')}
           </button>
         )}
       </div>
@@ -309,6 +338,16 @@ export function SessionChangesPanel({
                   <span className={css.operation} data-operation={change.operation}>
                     {t(change.operation === 'write' ? 'operation.write' : 'operation.edit')}
                   </span>
+                  {onViewDiff !== undefined && (
+                    <button
+                      type="button"
+                      className={css.viewDiff}
+                      onClick={() => { onViewDiff(change) }}
+                      aria-label={t('viewChanges')}
+                    >
+                      {t('viewChanges')}
+                    </button>
+                  )}
                   {isPending ? (
                     <button
                       type="button"
@@ -340,9 +379,10 @@ export function SessionChangesPanel({
  * window) and writes accepts into the session-scoped store.
  */
 export function SessionChangesDock({
-  useConversation, useProjection, useStore, actions, cwd, openFile, t,
+  useConversation, useProjection, useStore, actions, sessionId, cwd, openFile, revisions, t,
 }: SessionChangesDockProps) {
   const projected = useProjection('changedFiles')
+  const revisionsRef = revisions
   const conversation = useConversation(snapshot => snapshot)
   // The projection is the whole-log answer; the window fold is the fallback for
   // a composition that mounts no projection registry. Both produce the same
@@ -367,15 +407,75 @@ export function SessionChangesDock({
   const acceptAll = useCallback((changes: readonly SessionChange[]): void => {
     actions.acceptMany(changes)
   }, [actions])
+  const [viewing, setViewing] = useState<SessionChange | undefined>(undefined)
+  // The revert's progress and outcome are this mount's own business: nothing
+  // about an in-flight or finished revert has to survive a reload, and a
+  // restored `reverting` flag would disable the control with no operation behind
+  // it.
+  const [reverting, setReverting] = useState(false)
+  const [summary, setSummary] = useState<RevertSummary | null>(null)
+  const [revertError, setRevertError] = useState<string | null>(null)
+  const revertAll = useCallback((): void => {
+    if (revisionsRef === undefined) return
+    setReverting(true)
+    setSummary(null)
+    setRevertError(null)
+    void revisionsRef.revertAll(changes.map(change => change.path)).then(
+      (results) => {
+        setReverting(false)
+        setSummary(summarize(results))
+      },
+      (error: unknown) => {
+        setReverting(false)
+        setRevertError(error instanceof Error ? error.message : String(error))
+      },
+    )
+  }, [revisionsRef, changes])
   return (
-    <SessionChangesPanel
-      changes={changes}
-      accepted={accepted}
-      onAccept={accept}
-      onAcceptAll={acceptAll}
-      openFile={openFile}
-      cwd={cwd}
-      t={t}
-    />
+    <>
+      <SessionChangesPanel
+        changes={changes}
+        accepted={accepted}
+        onAccept={accept}
+        onAcceptAll={acceptAll}
+        openFile={openFile}
+        cwd={cwd}
+        onViewDiff={revisionsRef === undefined ? undefined : setViewing}
+        reverting={reverting}
+        onRevertAll={revisionsRef === undefined ? undefined : revertAll}
+        t={t}
+      />
+      {revisionsRef !== undefined && viewing !== undefined && (
+        <RevisionDiffPanel
+          sessionId={sessionId}
+          entry={{
+            path: viewing.path,
+            operation: viewing.operation,
+            added: 0,
+            removed: 0,
+            oversized: false,
+          }}
+          entries={changes.map(change => ({
+            path: change.path,
+            operation: change.operation,
+            added: 0,
+            removed: 0,
+            oversized: false,
+          }))}
+          remote={revisionsRef}
+          onClose={() => { setViewing(undefined) }}
+          t={t}
+        />
+      )}
+      {revertError !== null && (
+        <p className={css.openError} role="alert">{t('revertFailed', { message: revertError })}</p>
+      )}
+      {revertError === null && summary !== null && summary.conflicts > 0 && (
+        <p className={css.openError} role="alert">{t('revertConflict', { count: summary.conflicts })}</p>
+      )}
+      {revertError === null && summary !== null && summary.conflicts === 0 && (
+        <p className={css.revertDone} role="status">{t('revertDone', { count: summary.reverted })}</p>
+      )}
+    </>
   )
 }

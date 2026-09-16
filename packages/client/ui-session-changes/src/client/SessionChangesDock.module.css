@@ -244,3 +244,54 @@
   color: var(--dsw-alias-state-success-primary);
   border-color: var(--dsw-alias-state-success-primary);
 }
+
+/* The view-diff control opens a reading surface, so it stays quieter than the
+   accept control beside it: the row's decision is accept, its detail is view. */
+.viewDiff {
+  flex: none;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.viewDiff:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Revert is the one control here that changes the workspace, so it takes the
+   caution colour and sits apart from the accept pair. */
+.revertAll {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.revertAll:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.revertAll:disabled {
+  color: var(--dsw-alias-label-caption);
+  cursor: default;
+}
+
+.revertDone {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-state-success-primary);
+}

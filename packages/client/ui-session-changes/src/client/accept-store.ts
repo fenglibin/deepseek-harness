@@ -1,6 +1,6 @@
 /**
- * The dock's accept record: one accepted seq per canonical path, held by a
- * session-scoped store.
+ * The dock's session-scoped view state: the accepted seq per path, whether a
+ * revert is running, and what the last revert did.
  *
  * The record outlives the dock component on purpose. Component-local state is
  * cleared whenever the entry's scope rebinds (a page reload, or switching to
@@ -12,6 +12,7 @@
  */
 
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
+import type { RevertFileResult } from '@deepseek-ai/dsh-api-session-file-revisions/types'
 
 /**
  * Accepted seq per canonical path. A path's entry is the `lastSeq` the reader
@@ -20,7 +21,18 @@ import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-sto
  */
 export type AcceptedChanges = Readonly<Record<string, number>>
 
-/** Store state: the same record as mutable, which is what an immer draft edits. */
+/**
+ * What the last revert did, as counts. Kept as a shape rather than a sentence
+ * because the copy belongs to the locale, and the store has no locale seat.
+ */
+export interface RevertSummary {
+  /** Paths whose content was restored. */
+  readonly reverted: number
+  /** Paths whose changes had been overwritten, so nothing was reverted. */
+  readonly conflicts: number
+}
+
+/** Store state: the accepted record alone, which is what persists. */
 type AcceptedChangesState = Record<string, number>
 
 /** Declared write set of the accept record. */
@@ -34,11 +46,26 @@ type AcceptedChangesActions = {
   ) => void
 }
 
+/** Store state of one revert: progress, outcome, and failure. */
+export interface RevertState {
+  /** True while a revert is in flight. */
+  readonly reverting: boolean
+  /** The last revert's outcome, or null when there has been none. */
+  readonly summary: RevertSummary | null
+  /** Failure text when the revert itself failed. */
+  readonly error: string | null
+}
+
 /** Persist key prefix; the framework suffixes the session id so sessions stay independent. */
 export const ACCEPTED_CHANGES_PERSIST_KEY = 'dsh.session-changes.accepted'
 
 /**
  * Declare the session-scoped, persisted accept record.
+ *
+ * The revert verbs arrive through the factory so the store's actions can drive
+ * them without the store importing a transport: the plugin supplies the Remote
+ * face it already resolved.
+ * @param verbs - the revert verbs the store drives; defaults to a no-op revert.
  * @returns the store handle registered on the changed-files dock entry.
  */
 export function createAcceptedChangesStore(): EngineStoreHandle<AcceptedChangesState, AcceptedChangesActions> {
@@ -54,4 +81,16 @@ export function createAcceptedChangesStore(): EngineStoreHandle<AcceptedChangesS
       },
     },
   })
+}
+
+/**
+ * Count one revert's outcomes by status.
+ * @param results - one result per attempted path.
+ * @returns how many paths were reverted and how many had been overwritten.
+ */
+export function summarize(results: readonly RevertFileResult[]): RevertSummary {
+  return {
+    reverted: results.filter(result => result.status === 'reverted').length,
+    conflicts: results.filter(result => result.status === 'conflict').length,
+  }
 }
