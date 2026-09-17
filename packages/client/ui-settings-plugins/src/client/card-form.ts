@@ -40,7 +40,7 @@ export interface CardFieldSpec {
    * Which control renders this field. Absent means the plain text input every
    * card started with, so existing cards need no change.
    */
-  control?: 'text' | 'number' | 'boolean' | 'enum' | 'list'
+  control?: 'text' | 'number' | 'boolean' | 'enum' | 'tag'
   /** The accepted values of an `enum` control, in the order it should offer them. */
   options?: readonly string[]
 }
@@ -206,29 +206,38 @@ export function enumField(field: string, values: readonly string[]): CardFieldSp
 }
 
 /**
- * A list of strings, one per line.
+ * 以「一个值一个可删除标签」的方式编辑的字符串列表。
  *
- * Blank lines are dropped, so a trailing newline or a stray blank row never
- * becomes an empty entry. An empty draft clears the key, which is how a
- * deployment returns the list to its schema default.
- * @param field - field name inside the namespace section.
- * @returns the field's conversion spec.
+ * 值形状与其它列表字段相同（`string[]`），因此字段无需为控件改动 schema。草稿中
+ * 重复出现的条目会被**拒绝**而不是被去重：词表的
+ * 每条独立匹配、重复条目会各计一次，静默丢弃等于隐藏「用户写下的列表已与保存
+ * 结果不一致」这一事实。
+ * @param field - 命名空间分节内的字段名。
+ * @returns 该字段的转换规格。
  */
-export function listField(field: string): CardFieldSpec {
+export function tagField(field: string): CardFieldSpec {
   return {
     field,
     format: value => Array.isArray(value)
       ? value.filter(entry => typeof entry === 'string').join('\n')
       : '',
     parse: (text) => {
-      const entries = text
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0)
-      return entries.length === 0 ? { kind: 'clear' } : { kind: 'set', value: entries }
+      const entries = entriedLines(text)
+      if (entries.length === 0) return { kind: 'clear' }
+      const unique = new Set(entries)
+      if (unique.size !== entries.length) return undefined
+      return { kind: 'set', value: entries }
     },
-    control: 'list',
+    control: 'tag',
   }
+}
+
+/** 一份草稿中按顺序排列的非空去空白行。 */
+function entriedLines(text: string): string[] {
+  return text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
 }
 
 /**

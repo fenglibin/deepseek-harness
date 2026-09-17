@@ -17,10 +17,10 @@ Status: implemented
 
 **Spec checkbox 机检。** 延后：完整 openspec `tasks.md` 布局尚不存在（`record_spec` 写的是 `spec.md`），因此在该布局落地前，spec 覆盖与 design 一样走模型确认。
 
-**默认 `postHooks` 基线。** 作为部署决策延后：`openspec validate --strict` 在没有 `openspec/` 目录的项目上会失败，`pnpm run test` 作为无条件默认又太重。`postHooks` 字段保持可按部署覆盖。
+**默认验收命令基线。** 作为部署决策延后：`openspec validate --strict` 在没有 `openspec/` 目录的项目上会失败，`pnpm run test` 作为无条件默认又太重。验收命令字段（原 `postHooks`，现 `verificationCommands`）保持可按部署覆盖。
 
 ## 后果
 
 - **获得** 程序化后置闸：带 design/spec 记录的任务在模型确认覆盖前无法到达 `accepted`，且每个完成任务都至少有一条变更记录。
 - **代价** `advance_delivery_task` 新增一个 `coverage_confirmation` 参数与一个 `changeCount === 0` 的自动记录分支，外加在多次变更之间重新读取任务以保持 CAS ref 最新。
-- **延后** openspec `tasks.md` checkbox 检查与默认 `postHooks` 基线。
+- **延后** openspec `tasks.md` checkbox 检查与默认验收命令基线。

@@ -25,7 +25,7 @@ import { revertContent } from '@deepseek-ai/dsh-session-file-revisions'
 import type { FileRevision } from '@deepseek-ai/dsh-session-file-revisions/types'
 import { containPath, EscapeError } from './containment.ts'
 import type {
-  RevisionDiff, RevisionEntry, RevertFileResult, RevertResult,
+  RevisionDiff, RevisionEntry, RevertFileResult, RevertResult, RevertStatus,
   RevisionsDiffRequest, RevisionsListRequest, RevisionsRevertRequest,
 } from './types.ts'
 
@@ -46,14 +46,34 @@ declare module '@deepseek-ai/cordis' {
 
 /**
  * Count the added and removed lines between two texts, split on LF.
- * @param baseline - content before, or null when the file did not exist.
- * @param endState - content after.
+ *
+ * An `unknown` origin has no captured baseline, so neither count is derivable:
+ * reporting the end state's lines as "added" would claim a whole-file addition
+ * the capture cannot support. Both counts are 0 and `origin` carries the reason.
+ * @param revision - the revision to measure.
  * @returns the line counts of each side.
  */
-function lineCounts(baseline: string | null, endState: string): { added: number; removed: number } {
+export function lineCounts(revision: FileRevision): { added: number; removed: number } {
+  if (revision.origin === 'unknown') return { added: 0, removed: 0 }
+  const { baseline, endState } = revision
   const removed = baseline === null ? 0 : baseline.split('\n').length - (baseline.endsWith('\n') ? 1 : 0)
   const added = endState.split('\n').length - (endState.endsWith('\n') ? 1 : 0)
   return { added, removed }
+}
+
+/**
+ * Whether a revert outcome means the session's change is gone from the file.
+ *
+ * Only a completed revert retires the path's record. A conflict or a missing
+ * file still holds this session's change — or leaves its fate undecided — so
+ * retiring there would drop the only record of what the session did. An
+ * unchanged outcome means no revert actually happened, which leaves the record
+ * as the sole description of the file's current state.
+ * @param status - one path's revert outcome.
+ * @returns true when the path's revision should be dropped.
+ */
+export function retiresRevision(status: RevertStatus): boolean {
+  return status === 'reverted'
 }
 
 /** Host service backing the generated `ctx.remote.sessionFileRevisions` namespace. */
@@ -75,10 +95,11 @@ export class SessionRevisionController extends TypertRemoteService {
     return Promise.resolve({
       entries: this.revisions(request.sessionId).map((revision): RevisionEntry => {
         const oversized = this.isOversized(revision)
-        const counts = lineCounts(revision.baseline, revision.endState)
+        const counts = lineCounts(revision)
         return {
           path: revision.path,
           operation: revision.operation,
+          origin: revision.origin,
           ...counts,
           oversized,
         }
@@ -89,19 +110,39 @@ export class SessionRevisionController extends TypertRemoteService {
   /**
    * Read one file's cumulative diff for this session.
    * @param request - the session and the path to read.
-   * @returns both content sides, or neither when the file is oversized.
+   * @returns both content sides, or neither when the file is oversized or has no baseline.
    */
   @Remote('diff')
   diff(request: RevisionsDiffRequest): Promise<RevisionDiff> {
     const revision = this.revisionOf(request.sessionId, request.path)
-    return Promise.resolve(this.isOversized(revision)
-      ? { path: revision.path, baseline: null, endState: '', oversized: true }
-      : {
+    // An uncaptured baseline has nothing to compare against; sending the end
+    // state beside a null baseline would draw the whole file as newly added,
+    // which is a claim the capture cannot support.
+    if (revision.origin === 'unknown') {
+      return Promise.resolve({
         path: revision.path,
-        baseline: revision.baseline,
-        endState: revision.endState,
-        oversized: false,
+        origin: revision.origin,
+        baseline: null,
+        endState: '',
+        withheld: 'baseline-missing',
       })
+    }
+    if (this.isOversized(revision)) {
+      return Promise.resolve({
+        path: revision.path,
+        origin: revision.origin,
+        baseline: null,
+        endState: '',
+        withheld: 'oversized',
+      })
+    }
+    return Promise.resolve({
+      path: revision.path,
+      origin: revision.origin,
+      baseline: revision.baseline,
+      endState: revision.endState,
+      withheld: null,
+    })
   }
 
   /**
@@ -121,7 +162,14 @@ export class SessionRevisionController extends TypertRemoteService {
       : [this.revisionOf(request.sessionId, request.path)]
     const results: RevertFileResult[] = []
     for (const revision of targets) {
-      results.push(await this.revertOne(root, revision))
+      const result = await this.revertOne(root, revision)
+      // Retiring here is what stops the surface from offering a file that is
+      // already back to its baseline — and, once the record is durable, from
+      // offering it again after every restart.
+      if (retiresRevision(result.status)) {
+        await this.ctx.sessionFileRevisions.dropPath(request.sessionId, result.path)
+      }
+      results.push(result)
     }
     return { results }
   }
@@ -143,10 +191,21 @@ export class SessionRevisionController extends TypertRemoteService {
       throw error
     }
     const current = await this.readOrNull(contained)
+    // `unknown` means this session overwrote a file whose prior content was
+    // never captured. Its baseline cannot be reconstructed, so refusing is the
+    // only honest outcome: the session may well have created the file, but
+    // deleting it on that guess would destroy content the session never made.
+    if (revision.origin === 'unknown') {
+      return {
+        path: revision.path,
+        status: 'conflict',
+        reason: 'this session overwrote a file whose prior content was not captured',
+      }
+    }
     // The session created this file: reverting means removing it again, but
     // only while it still holds what the session wrote — content someone else
     // put there afterwards is not this session's to delete.
-    if (revision.baseline === null) {
+    if (revision.origin === 'absent') {
       if (current === null) return { path: revision.path, status: 'unchanged' }
       if (current !== revision.endState) {
         return { path: revision.path, status: 'conflict', reason: 'file changed after this session created it' }
@@ -155,7 +214,7 @@ export class SessionRevisionController extends TypertRemoteService {
       return { path: revision.path, status: 'reverted' }
     }
     if (current === null) return { path: revision.path, status: 'missing' }
-    const result = revertContent(revision.baseline, revision.endState, current)
+    const result = revertContent(revision.baseline as string, revision.endState, current)
     if (result.applied === 'none') {
       return { path: revision.path, status: 'conflict', reason: 'this session\'s changes were overwritten' }
     }

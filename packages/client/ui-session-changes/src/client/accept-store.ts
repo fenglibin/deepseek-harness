@@ -62,10 +62,8 @@ export const ACCEPTED_CHANGES_PERSIST_KEY = 'dsh.session-changes.accepted'
 /**
  * Declare the session-scoped, persisted accept record.
  *
- * The revert verbs arrive through the factory so the store's actions can drive
- * them without the store importing a transport: the plugin supplies the Remote
- * face it already resolved.
- * @param verbs - the revert verbs the store drives; defaults to a no-op revert.
+ * The store owns only the accepted seq per path; the revert verbs stay with the
+ * component, which resolves them from the injected Remote face.
  * @returns the store handle registered on the changed-files dock entry.
  */
 export function createAcceptedChangesStore(): EngineStoreHandle<AcceptedChangesState, AcceptedChangesActions> {

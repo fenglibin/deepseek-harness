@@ -16,6 +16,7 @@ import subagentsRemote from '@deepseek-ai/dsh-subagent/remote'
 import sessionRemote from '@deepseek-ai/dsh-api-session-controller/remote'
 import fileBrowserRemote from '@deepseek-ai/dsh-api-file-browser/remote'
 import workspaceRemote from '@deepseek-ai/dsh-api-workspace-controller/remote'
+import sessionFileRevisionsRemote from '@deepseek-ai/dsh-api-session-file-revisions/remote'
 import type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
 
 export type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
@@ -47,6 +48,7 @@ export type {} from '@deepseek-ai/dsh-api-session-controller/remote'
 export type * from '@deepseek-ai/dsh-api-session-controller/types'
 export type {} from '@deepseek-ai/dsh-api-workspace-controller/remote'
 export type {} from '@deepseek-ai/dsh-api-file-browser/remote'
+export type {} from '@deepseek-ai/dsh-api-session-file-revisions/remote'
 export type * from '@deepseek-ai/dsh-api-workspace-controller/types'
 export type * from '@deepseek-ai/dsh-api-file-browser/types'
 export type { SessionJob as JobView } from '@deepseek-ai/dsh-api-session-controller/types'
@@ -167,6 +169,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
       agentPresetsRemote, commandsRemote, settingsControllerRemote, goalsRemote, llmRemote, dynamicRemote,
       pluginInventoryRemote, skillManagerRemote, messageFeedbackRemote, sessionReferencesRemote,
       subagentsRemote, sessionRemote, workspaceRemote, fileBrowserRemote, mcpRemote,
+      sessionFileRevisionsRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))
     }

@@ -30,7 +30,7 @@ Status: implemented
 
 ### 验证按三类输入执行四道检查
 
-推进到 `verified` 时依次检查清单完整性、覆盖性、产物核验与逐条对账。覆盖关系由清单项内容行尾的 `(covers: <key>)` 注解承载：`req/<n>` 对应原始需求的第 n 条编号项，`design/<Dn>` 对应设计文档的 `### D<n>` 标题，`<capability>/<Scenario name>` 对应增量 spec 的 `#### Scenario:`。`postHooks` 与 `openspec validate --strict --json` 从 `accepted` 前移到 `verified`，因为声称「已验证」的阶段才是必须拿出证据的阶段。`l0` 不参与注解覆盖：它没有清单义务，也就没有承载注解的地方。
+推进到 `verified` 时依次检查清单完整性、覆盖性、产物核验与逐条对账。覆盖关系由清单项内容行尾的 `(covers: <key>)` 注解承载：`req/<n>` 对应原始需求的第 n 条编号项，`design/<Dn>` 对应设计文档的 `### D<n>` 标题，`<capability>/<Scenario name>` 对应增量 spec 的 `#### Scenario:`。验收与 `openspec validate --strict --json` 从 `accepted` 前移到 `verified`，因为声称「已验证」的阶段才是必须拿出证据的阶段。用户可配置的验收此后由提示词命令承载（见[验收命令与卡片可用性](2026-09-16-delivery-acceptance-commands-and-card-usability.zh.md)），其记录要求同样在 `verified` 判定。`l0` 不参与注解覆盖：它没有清单义务，也就没有承载注解的地方。
 
 ### capability 目录从磁盘枚举，不经过 `openspec show`
 

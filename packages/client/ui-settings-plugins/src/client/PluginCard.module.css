@@ -19,6 +19,17 @@
 }
 
 .header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+}
+
+/* 该按钮只覆盖标题行：其下的描述行同时承载帮助按钮，而按钮嵌套按钮是无效的。 */
+.headerToggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   width: 100%;
   appearance: none;
   border: 0;
@@ -26,34 +37,32 @@
   font: inherit;
   color: inherit;
   text-align: left;
+  padding: 0;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 12px;
 }
 
-.header:focus-visible {
+.headerToggle:focus-visible {
   outline: 2px solid var(--dsw-alias-brand-primary);
-  outline-offset: -2px;
+  outline-offset: 2px;
 }
 
-/* Name over description: the description is what tells two plugins apart, so
-   it gets its own line rather than trailing the name. */
-.headText {
+/* 名称在上、描述在下：区分两个插件靠的是描述，因此它独占一行而不跟在名称后。 */
+.name {
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.name {
   font-size: 15px;
   font-weight: 600;
   line-height: 1.4;
   color: var(--dsw-alias-label-primary);
+}
+
+/* 描述与帮助链接共处一行，使链接读起来是它所展开那句话的延续。 */
+.subline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
 }
 
 .description {
@@ -156,15 +165,10 @@
   outline-offset: 1px;
 }
 
-/* The Help link sits above the controls, right-aligned so it reads as a
-   property of the card rather than of the first field. */
-.helpRow {
-  display: flex;
-  justify-content: flex-end;
-  margin: 0 0 4px;
-}
-
+/* 帮助链接跟在描述行之后；它是展开按钮的兄弟节点而非其子节点的原因见上方
+   `.subline`。 */
 .helpLink {
+  flex: none;
   padding: 0;
   border: 0;
   background: none;

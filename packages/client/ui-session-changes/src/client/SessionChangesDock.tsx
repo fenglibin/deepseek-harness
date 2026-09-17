@@ -23,7 +23,7 @@
  * otherwise resurrect every accepted path at once; see `./accept-store.ts`.
  */
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ConversationSnapshot } from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: the `deliverables` ConversationTurnDataMap key merge and its
@@ -45,7 +45,8 @@ import {
 import {
   createAcceptedChangesStore, summarize, type AcceptedChanges, type RevertSummary,
 } from './accept-store.ts'
-import { RevisionDiffPanel, type RevisionRemote } from './RevisionDiffPanel.tsx'
+import { revisionFailureText, type RevisionRemote } from './revision-remote.ts'
+import type { RevisionViewerRequest } from './revision-viewer-request.ts'
 import css from './SessionChangesDock.module.css'
 
 export { canonicalMutationPath }
@@ -70,6 +71,14 @@ export interface SessionChangesInjected {
    * controls off while leaving the list intact.
    */
   revisions: RevisionRemote | undefined
+  /**
+   * Ask the full-screen viewer to show one file's change.
+   *
+   * The viewer lives outside every session (it occupies a root-scoped overlay),
+   * so the dock cannot render it directly — it publishes a request the overlay
+   * occupant picks up.
+   */
+  openViewer: (request: RevisionViewerRequest) => void
 }
 
 /** Full props of the dock entry: session standard kit (`useConversation`) + the injected opener + the accept store + the locale seat. */
@@ -220,6 +229,12 @@ export type SessionChangesPanelProps = {
    * captures no revisions and the action is not offered.
    */
   onViewDiff?: ((change: SessionChange) => void) | undefined
+  /**
+   * Whether one path has a recorded revision, so the diff and revert controls
+   * can be offered for it. The changed-file list and the revision record have
+   * different lifetimes, so a listed path is not always a viewable one.
+   */
+  hasRevision: (path: string) => boolean
   /** Whether a revert is running, so the control can say so. */
   reverting?: boolean | undefined
   /** Revert every file this session changed; undefined when not offered. */
@@ -228,7 +243,8 @@ export type SessionChangesPanelProps = {
 
 /** The folded list rendered from the store-owned accept record. */
 export function SessionChangesPanel({
-  changes, accepted, onAccept, onAcceptAll, openFile, cwd, onViewDiff, reverting, onRevertAll, t,
+  changes, accepted, onAccept, onAcceptAll, openFile, cwd, onViewDiff, hasRevision,
+  reverting, onRevertAll, t,
 }: SessionChangesPanelProps) {
   const [expanded, setExpanded] = useState(false)
   const [view, setView] = useState<ChangesView>('pending')
@@ -278,7 +294,10 @@ export function SessionChangesPanel({
             {t('acceptAll')}
           </button>
         )}
-        {onRevertAll !== undefined && changes.length > 0 && (
+        {/* The bulk control reverts what the Host RECORDED, not what the list
+            shows, so it is offered only while the recorded set covers at least
+            one listed path. Otherwise it would promise "reverted 0 files". */}
+        {onRevertAll !== undefined && changes.some(change => hasRevision(change.path)) && (
           <button
             type="button"
             className={css.revertAll}
@@ -338,7 +357,7 @@ export function SessionChangesPanel({
                   <span className={css.operation} data-operation={change.operation}>
                     {t(change.operation === 'write' ? 'operation.write' : 'operation.edit')}
                   </span>
-                  {onViewDiff !== undefined && (
+                  {onViewDiff !== undefined && hasRevision(change.path) && (
                     <button
                       type="button"
                       className={css.viewDiff}
@@ -379,7 +398,8 @@ export function SessionChangesPanel({
  * window) and writes accepts into the session-scoped store.
  */
 export function SessionChangesDock({
-  useConversation, useProjection, useStore, actions, sessionId, cwd, openFile, revisions, t,
+  useConversation, useProjection, useStore, actions, sessionId, cwd, openFile, revisions,
+  openViewer, t,
 }: SessionChangesDockProps) {
   const projected = useProjection('changedFiles')
   const revisionsRef = revisions
@@ -407,7 +427,31 @@ export function SessionChangesDock({
   const acceptAll = useCallback((changes: readonly SessionChange[]): void => {
     actions.acceptMany(changes)
   }, [actions])
-  const [viewing, setViewing] = useState<SessionChange | undefined>(undefined)
+  // Which paths the Host actually recorded a revision for. The changed-file
+  // list is folded from the durable log while the revision record lives on the
+  // Host's own side, so the two disagree for paths the list knows and the record
+  // does not — offering the controls there would promise an action that cannot
+  // be answered. The set is refetched after a revert because a successful one
+  // retires its path.
+  const [recorded, setRecorded] = useState<ReadonlySet<string>>(() => new Set())
+  const refreshRecorded = useCallback((): void => {
+    if (revisionsRef === undefined) return
+    void revisionsRef.list(sessionId).then(
+      (entries) => { setRecorded(new Set(entries.map(entry => entry.path))) },
+      () => { setRecorded(new Set()) },
+    )
+  }, [revisionsRef, sessionId])
+  // Refetch when the change list grows, not only on mount: the agent mutates
+  // files while the dock stays mounted, and the Host records each as it lands.
+  // A mount-only read would leave a newly changed file without its controls
+  // until the reader reloaded the page — which is the ordinary case, since the
+  // reader is watching the session the agent is working in.
+  //
+  // The dependency is the NUMBER of changes rather than the list reference:
+  // the projection rebuilds its array on every conversation change, so keying
+  // on the reference would refetch on each one.
+  const changeCount = changes.length
+  useEffect(() => { refreshRecorded() }, [refreshRecorded, changeCount])
   // The revert's progress and outcome are this mount's own business: nothing
   // about an in-flight or finished revert has to survive a reload, and a
   // restored `reverting` flag would disable the control with no operation behind
@@ -420,17 +464,19 @@ export function SessionChangesDock({
     setReverting(true)
     setSummary(null)
     setRevertError(null)
-    void revisionsRef.revertAll(changes.map(change => change.path)).then(
+    void revisionsRef.revertAll().then(
       (results) => {
         setReverting(false)
         setSummary(summarize(results))
+        refreshRecorded()
       },
       (error: unknown) => {
         setReverting(false)
-        setRevertError(error instanceof Error ? error.message : String(error))
+        setRevertError(revisionFailureText(error, t, 'revertFailed'))
       },
     )
-  }, [revisionsRef, changes])
+  }, [revisionsRef, refreshRecorded, t])
+  const hasRevision = useCallback((path: string): boolean => recorded.has(path), [recorded])
   return (
     <>
       <SessionChangesPanel
@@ -440,35 +486,16 @@ export function SessionChangesDock({
         onAcceptAll={acceptAll}
         openFile={openFile}
         cwd={cwd}
-        onViewDiff={revisionsRef === undefined ? undefined : setViewing}
+        onViewDiff={revisionsRef === undefined ? undefined : (change) => {
+          openViewer({ sessionId, path: change.path, fileCount: changes.length })
+        }}
+        hasRevision={hasRevision}
         reverting={reverting}
         onRevertAll={revisionsRef === undefined ? undefined : revertAll}
         t={t}
       />
-      {revisionsRef !== undefined && viewing !== undefined && (
-        <RevisionDiffPanel
-          sessionId={sessionId}
-          entry={{
-            path: viewing.path,
-            operation: viewing.operation,
-            added: 0,
-            removed: 0,
-            oversized: false,
-          }}
-          entries={changes.map(change => ({
-            path: change.path,
-            operation: change.operation,
-            added: 0,
-            removed: 0,
-            oversized: false,
-          }))}
-          remote={revisionsRef}
-          onClose={() => { setViewing(undefined) }}
-          t={t}
-        />
-      )}
       {revertError !== null && (
-        <p className={css.openError} role="alert">{t('revertFailed', { message: revertError })}</p>
+        <p className={css.openError} role="alert">{revertError}</p>
       )}
       {revertError === null && summary !== null && summary.conflicts > 0 && (
         <p className={css.openError} role="alert">{t('revertConflict', { count: summary.conflicts })}</p>

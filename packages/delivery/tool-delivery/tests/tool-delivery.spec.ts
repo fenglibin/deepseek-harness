@@ -7,16 +7,22 @@ import AgentRegistry, { Inbox, agentEvents } from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import DeliveryService from '@deepseek-ai/dsh-delivery'
 import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
-import { ToolCallId, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { LlmRuntime, ToolCallId, createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { Session, SessionId, SESSION_FORMAT_VERSION, type UserMessage } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { ShellExecutor } from '@deepseek-ai/dsh-shell'
 import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellRunResult } from '@deepseek-ai/dsh-shell'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+import CommandRegistry from '@deepseek-ai/dsh-commands'
+import * as promptConfig from '@deepseek-ai/dsh-command-prompt-config'
+import SettingsProvider from '@deepseek-ai/dsh-settings'
+import z from '@deepseek-ai/schemastery'
 import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
 import type { ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import * as toolDelivery from '@deepseek-ai/dsh-tool-delivery'
 import { orderItemsByMarkdown, renderTasksMarkdown } from '@deepseek-ai/dsh-tool-delivery/src/index.ts'
+import { ACCEPTANCE_RECORD_PREFIX } from '@deepseek-ai/dsh-tool-delivery/src/verification.ts'
 
 const testToolSignal = new AbortController().signal
 
@@ -36,7 +42,7 @@ function validatesNothing(command: string): boolean {
   return !(match[1] ?? '').split(/\s+/).some(token => token !== '' && !token.startsWith('-'))
 }
 
-/** In-memory shell whose `run` returns a fixed outcome, for post-hook tests. */
+/** In-memory shell whose `run` returns a fixed outcome, for validation tests. */
 class StubShell extends ShellExecutor {
   /** Every command run through this shell, in order. */
   readonly commands: string[] = []
@@ -72,7 +78,24 @@ class StubShell extends ShellExecutor {
   }
 
   start(_spec: ShellExecSpec): ShellProcess {
-    throw new Error('StubShell.start is not used by post-hook tests')
+    throw new Error('StubShell.start is not used by validation tests')
+  }
+}
+
+/**
+ * In-memory settings provider: the real Service Definition, so
+ * `describe()`/`installSection` behave exactly as a file provider's would.
+ */
+class InMemorySettings extends SettingsProvider {
+  static Config = z.object({})
+  readonly writable = true
+  /** One section per namespace, as a provider's raw document holds them. */
+  private readonly sections = new Map<string, Record<string, unknown>>()
+  protected async load(): Promise<Record<string, unknown>> {
+    return Object.fromEntries(this.sections)
+  }
+  protected async persist(ns: string, section: Record<string, unknown>): Promise<void> {
+    this.sections.set(ns, section)
   }
 }
 
@@ -96,9 +119,24 @@ function stubAgent(rawId: string, supplied?: Session): Agent {
   }
 }
 
-/** Minimal settings provider that resolves one overridden policy section. */
+/**
+ * Minimal settings provider that resolves the delivery policy section and,
+ * when given one, a `prompt-commands` section the acceptance gate reads prompt
+ * bodies from. `describe()` serves the same values so the cross-namespace read
+ * sees exactly what the editor would.
+ */
 class StubSettings {
-  constructor(private readonly override: Record<string, unknown>) {}
+  private readonly sections = new Map<string, unknown>()
+
+  constructor(
+    private readonly override: Record<string, unknown>,
+    commands?: readonly { name: string; prompt: string }[],
+  ) {
+    // In a real deployment `command-prompt-config` registers this namespace;
+    // the harness composes only the delivery plugin, so the section is seeded
+    // directly and `describe()` serves it like any other registration.
+    if (commands !== undefined) this.sections.set('prompt-commands', { commands })
+  }
 
   installSection<T>(
     _owner: Context,
@@ -109,15 +147,50 @@ class StubSettings {
   ): void {
     expect(ns).toBe('delivery')
     const merged = { ...(entry as Record<string, unknown>), ...this.override } as T
+    this.sections.set(ns, merged)
     hooks.setSource(() => merged)
     hooks.onChange()
   }
+
+  /** Every registered namespace with its resolved value. */
+  describe(): readonly { ns: string; value: unknown }[] {
+    return [...this.sections].map(([ns, value]) => ({ ns, value }))
+  }
+}
+
+/**
+ * Scripted LLM whose grading replies the test decides, so a graded tier is
+ * deterministic without a provider. Any other call is a defect: only the
+ * grading path reaches the model.
+ */
+class StubLlm extends LlmRuntime {
+  /** Every request this stub was asked to serve, in order. */
+  readonly requests: GenerateOptions[] = []
+
+  constructor(ctx: Context, private readonly reply: string | (() => string) = 'l0') {
+    super(ctx)
+  }
+
+  override async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    this.requests.push(options)
+    const text = typeof this.reply === 'function' ? this.reply() : this.reply
+    yield { type: 'text-delta', text } as StreamChunk
+    yield { type: 'finish', reason: { kind: 'stop' } } as StreamChunk
+  }
+}
+
+/** The scripted grading model a harness composed, for asserting its calls. */
+function llmOf(ctx: Context): StubLlm {
+  const llm = ctx.get('llm')
+  if (!(llm instanceof StubLlm)) throw new Error('expected the scripted grading model')
+  return llm
 }
 
 async function harness(
   config: toolDelivery.Config = {},
   shellOutcome: Partial<ShellRunResult> = {},
   settings?: StubSettings,
+  gradingReply: string | (() => string) = 'l0',
 ) {
   const ctx = new Context()
   const cwd = mkdtempSync(join(tmpdir(), 'dsh-delivery-'))
@@ -127,10 +200,16 @@ async function harness(
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(LocalFileSystem, { cwd })
   await ctx.plugin(StubShell, shellOutcome)
+  await ctx.plugin(StubLlm, gradingReply)
   if (settings !== undefined) ctx.provide('settings', settings)
   await ctx.plugin(DeliveryService)
   const fiber = await ctx.plugin(toolDelivery, config)
+  // The agent carries its own route so grading has a provider and model to
+  // call; without one every grade would take the no-route fallback and the
+  // scripted reply below would never be consulted.
   const agent = stubAgent(`delivery-tool-${Math.random()}`)
+  agent.options.provider = 'stub'
+  agent.options.model = 'stub-grader'
   ctx.agents.register(agent)
   return { ctx, fiber, agent, cwd }
 }
@@ -163,6 +242,14 @@ function resultJson(result: ToolExecutionResult): Record<string, unknown> {
   const block = result.content[0]
   if (block?.type !== 'text') throw new Error('expected text tool result')
   return JSON.parse(block.text) as Record<string, unknown>
+}
+
+/** The text of a failed tool result, for asserting what a gate reported. */
+function errorText(result: ToolExecutionResult): string {
+  expect(result.isError).toBe(true)
+  const block = result.content[0]
+  if (block?.type !== 'text') throw new Error('expected text tool result')
+  return block.text
 }
 
 /** Return the task sub-object from a successful tool result. */
@@ -214,10 +301,21 @@ describe('tool-delivery registration', () => {
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(DeliveryService)
-    expect(() => { toolDelivery.apply(ctx, { designThreshold: { descriptionChars: 0 } }) }).toThrow(TypeError)
-    expect(() => { toolDelivery.apply(ctx, { designThreshold: { descriptionChars: 1.5 } }) }).toThrow(TypeError)
     expect(() => { toolDelivery.apply(ctx, { designThreshold: { todoCount: 0 } }) }).toThrow(TypeError)
     expect(() => { toolDelivery.apply(ctx, { designThreshold: { touchedFiles: 1.5 } }) }).toThrow(TypeError)
+    expect(ctx.tools.get('create_delivery_task')).toBeUndefined()
+  })
+
+  it('rejects an empty grading prompt before registering anything', async () => {
+    // An empty prompt makes every grading call answer with nothing and fall
+    // back to l1, so it is refused rather than silently degrading every grade.
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(DeliveryService)
+    expect(() => { toolDelivery.apply(ctx, { gradingPrompt: '   ' }) }).toThrow(TypeError)
     expect(ctx.tools.get('create_delivery_task')).toBeUndefined()
   })
 
@@ -460,54 +558,100 @@ describe('tool-delivery design discipline', () => {
     expect(result.isError).toBe(true)
   })
 
-  it('auto-tiers a long objective to l1', async () => {
-    const { ctx, agent } = await harness({ designThreshold: { descriptionChars: 10 } })
-    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'a very long objective' }, agent))
-    expect(created).toMatchObject({ level: 'l1' })
+  it('grades an objective past the length floor to l2 without calling a model', async () => {
+    const { ctx, agent } = await harness({}, {}, undefined, 'l0')
+    const created = resultTask(await execute(ctx, 'create_delivery_task', {
+      objective: 'x'.repeat(201),
+    }, agent))
+    // The floor is deterministic and outranks any model reply, so the scripted
+    // l0 must not be consulted at all.
+    expect(created).toMatchObject({ level: 'l2' })
+    expect(llmOf(ctx).requests).toHaveLength(0)
   })
 
-  it('keeps a short objective at l0 under a raised threshold', async () => {
-    const { ctx, agent } = await harness({ designThreshold: { descriptionChars: 10 } })
+  it('takes the tier the grading model names', async () => {
+    const { ctx, agent } = await harness({}, {}, undefined, 'l1')
+    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'short' }, agent))
+    expect(created).toMatchObject({ level: 'l1' })
+    expect(llmOf(ctx).requests).toHaveLength(1)
+  })
+
+  it('keeps a short objective at l0 when the model says so', async () => {
+    const { ctx, agent } = await harness({}, {}, undefined, 'l0')
     const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'short' }, agent))
     expect(created).toMatchObject({ level: 'l0' })
   })
 
-  it('accepts an explicit level override regardless of objective length', async () => {
+  it('sends the configured grading prompt as the system message', async () => {
+    const { ctx, agent } = await harness({ gradingPrompt: 'always answer l2' }, {}, undefined, 'l1')
+    await execute(ctx, 'create_delivery_task', { objective: 'short' }, agent)
+    // The rules are deployment text, so what the model receives has to be that
+    // text and not a copy baked into the code.
+    expect(llmOf(ctx).requests[0]?.system).toBe('always answer l2')
+  })
+
+  it('falls back to l1 when the grading response names no tier', async () => {
+    const { ctx, agent } = await harness({}, {}, undefined, 'I cannot tell')
+    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'short' }, agent))
+    // An unreadable answer must not release the request as a small fix.
+    expect(created).toMatchObject({ level: 'l1' })
+  })
+
+  it('falls back to l1 when the grading call throws', async () => {
+    const { ctx, agent } = await harness({}, {}, undefined, () => {
+      throw new Error('provider down')
+    })
+    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'short' }, agent))
+    expect(created).toMatchObject({ level: 'l1' })
+  })
+
+  it('accepts an explicit level override without grading', async () => {
     const { ctx, agent } = await harness()
     const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'x', level: 'l1' }, agent))
     expect(created).toMatchObject({ level: 'l1' })
+    expect(llmOf(ctx).requests).toHaveLength(0)
   })
 
-  it('auto-tiers on a todo_count estimate', async () => {
-    const { ctx, agent } = await harness({ designThreshold: { todoCount: 5 } })
-    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'short', todo_count: 6 }, agent))
+  it('raises a graded tier with a todo_count estimate', async () => {
+    const { ctx, agent } = await harness({ designThreshold: { todoCount: 5 } }, {}, undefined, 'l0')
+    const created = resultTask(await execute(ctx, 'create_delivery_task', {
+      objective: 'short', todo_count: 6,
+    }, agent))
     expect(created).toMatchObject({ level: 'l1' })
   })
 
-  it('auto-tiers on a touched_files estimate', async () => {
-    const { ctx, agent } = await harness({ designThreshold: { touchedFiles: 3 } })
-    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'short', touched_files: 4 }, agent))
+  it('raises a graded tier with a touched_files estimate', async () => {
+    const { ctx, agent } = await harness({ designThreshold: { touchedFiles: 3 } }, {}, undefined, 'l0')
+    const created = resultTask(await execute(ctx, 'create_delivery_task', {
+      objective: 'short', touched_files: 4,
+    }, agent))
+    expect(created).toMatchObject({ level: 'l1' })
+  })
+
+  it('lets no estimate lower the tier the model named', async () => {
+    const { ctx, agent } = await harness({ designThreshold: { todoCount: 50 } }, {}, undefined, 'l1')
+    const created = resultTask(await execute(ctx, 'create_delivery_task', {
+      objective: 'short', todo_count: 1, touched_files: 0,
+    }, agent))
+    // Estimates may only raise: a small estimate is not evidence against a
+    // model that judged the work to need a design.
     expect(created).toMatchObject({ level: 'l1' })
   })
 
   it('forces l2 for a non-small bug under requireOpenspecForBugs', async () => {
-    const { ctx, agent } = await harness({ designThreshold: { descriptionChars: 10 } })
+    const { ctx, agent } = await harness({ designThreshold: { todoCount: 2 } }, {}, undefined, 'l1')
     const created = resultTask(await execute(ctx, 'create_delivery_task', {
-      objective: 'a bug fix that is definitely not small', is_bug: true,
+      objective: 'a bug fix', is_bug: true, todo_count: 3,
     }, agent))
     expect(created).toMatchObject({ level: 'l2' })
   })
 
-  it('keeps a bug at l0 when below the design threshold', async () => {
-    const { ctx, agent } = await harness({ designThreshold: { descriptionChars: 10 } })
-    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'tiny', is_bug: true }, agent))
-    expect(created).toMatchObject({ level: 'l0' })
-  })
-
   it('does not force l2 for a bug when requireOpenspecForBugs is off', async () => {
-    const { ctx, agent } = await harness({ designThreshold: { descriptionChars: 10 }, requireOpenspecForBugs: false })
+    const { ctx, agent } = await harness(
+      { designThreshold: { todoCount: 2 }, requireOpenspecForBugs: false }, {}, undefined, 'l1',
+    )
     const created = resultTask(await execute(ctx, 'create_delivery_task', {
-      objective: 'a bug fix that is definitely not small', is_bug: true,
+      objective: 'a bug fix', is_bug: true, todo_count: 3,
     }, agent))
     expect(created).toMatchObject({ level: 'l1' })
   })
@@ -640,6 +784,7 @@ describe('tool-delivery artifact persistence', () => {
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(LocalFileSystem, { cwd: mkdtempSync(join(tmpdir(), 'dsh-delivery-fs-')) })
     await ctx.plugin(StubShell)
+    await ctx.plugin(StubLlm)
     await ctx.plugin(DeliveryService)
     await ctx.plugin(toolDelivery, {})
     const id = SessionId(`delivery-cwd-${Math.random()}`)
@@ -657,100 +802,160 @@ describe('tool-delivery artifact persistence', () => {
   })
 })
 
-describe('tool-delivery post-hooks', () => {
+describe('tool-delivery acceptance commands', () => {
   /**
    * Create an l0 task and walk it to implemented.
    *
-   * The verification commands now run at `verified`, so each case below drives
-   * that transition and reads its outcome; acceptance only records it.
+   * The structural validation command runs at `verified`, so each case below
+   * drives that transition and reads its outcome.
    */
   async function advanceToImplemented(ctx: Context, agent: Agent): Promise<Record<string, unknown>> {
-    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'post-hook', level: 'l0' }, agent))
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'acceptance', level: 'l0' }, agent))
     task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
     task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
     return task
   }
 
-  /** Walk an l0 task to verified, optionally asserting the transition failed. */
+  /** Walk an l0 task to verified and report whether the transition was blocked. */
   async function advanceToVerified(
     ctx: Context,
     agent: Agent,
-  ): Promise<{ task: Record<string, unknown>; blocked: boolean }> {
+  ): Promise<{ task: Record<string, unknown>; blocked: boolean; error?: string }> {
     const implemented = await advanceToImplemented(ctx, agent)
     const result = await execute(ctx, 'advance_delivery_task', {
       task_id: implemented['id'], revision: implemented['revision'], phase: 'verified',
     }, agent)
-    if (result.isError) return { task: implemented, blocked: true }
+    if (result.isError) return { task: implemented, blocked: true, error: errorText(result) }
     return { task: resultTask(result), blocked: false }
   }
 
-  it('runs post-hooks before verifying a task', async () => {
-    const { ctx, agent } = await harness({ postHooks: ['pnpm run test'] })
-    const { task, blocked } = await advanceToVerified(ctx, agent)
-    expect(blocked).toBe(false)
-    const accepted = resultTask(await execute(ctx, 'advance_delivery_task', {
-      task_id: task['id'], revision: task['revision'], phase: 'accepted',
-    }, agent))
-    expect(accepted).toMatchObject({ phase: 'accepted' })
-  })
+  /** The prompt-commands section these cases offer the acceptance gate. */
+  const COMMANDS = [
+    { name: 'smoke', prompt: 'Run the smoke suite and report every failure.' },
+    { name: 'docs', prompt: 'Check the docs build without warnings.' },
+  ]
 
-  it('blocks verification when a post-hook fails under stateful', async () => {
-    const { ctx, agent } = await harness(
-      { postHooks: ['pnpm run test'] },
-      { exitCode: 1, stderr: { text: 'tests failed', truncated: false } },
-    )
-    const { blocked } = await advanceToVerified(ctx, agent)
+  it('blocks verification until each configured command has a recorded run', async () => {
+    const settings = new StubSettings({ verificationCommands: ['smoke'] }, COMMANDS)
+    const { ctx, agent } = await harness({ verificationCommands: ['smoke'] }, {}, settings)
+    const { blocked, error } = await advanceToVerified(ctx, agent)
     expect(blocked).toBe(true)
+    // The gate names the command AND carries its prompt: deferContext is
+    // dropped on a blocking throw, so the instruction must ride the message.
+    expect(error).toContain('/smoke')
+    expect(error).toContain('Run the smoke suite and report every failure.')
+    expect(error).toContain('record_change')
   })
 
-  it('reminds but still verifies when a post-hook fails under advisory', async () => {
-    const { ctx, agent } = await harness(
-      { enforcement: 'advisory', postHooks: ['pnpm run test'] },
-      { exitCode: 1, stderr: { text: 'tests failed', truncated: false } },
-    )
-    const { task, blocked } = await advanceToVerified(ctx, agent)
-    expect(blocked).toBe(false)
-    const accepted = resultTask(await execute(ctx, 'advance_delivery_task', {
-      task_id: task['id'], revision: task['revision'], phase: 'accepted',
-    }, agent))
-    expect(accepted).toMatchObject({ phase: 'accepted' })
+  it('allows verification once the command has a recorded run', async () => {
+    const settings = new StubSettings({ verificationCommands: ['smoke'] }, COMMANDS)
+    const { ctx, agent } = await harness({ verificationCommands: ['smoke'] }, {}, settings)
+    const implemented = await advanceToImplemented(ctx, agent)
+    await execute(ctx, 'record_change', {
+      task_id: implemented['id'], revision: implemented['revision'],
+      text: `${ACCEPTANCE_RECORD_PREFIX}smoke: suite passed`,
+    }, agent)
+    const current = await execute(ctx, 'get_delivery_task', {}, agent)
+    const revision = resultTask(current)['revision']
+    const verified = await execute(ctx, 'advance_delivery_task', {
+      task_id: implemented['id'], revision, phase: 'verified',
+    }, agent)
+    expect(verified.isError).toBe(false)
   })
 
-  it('rejects a blank post-hook command before registering anything', () => {
+  it('requires one record per command', async () => {
+    const settings = new StubSettings({ verificationCommands: ['smoke', 'docs'] }, COMMANDS)
+    const { ctx, agent } = await harness({ verificationCommands: ['smoke', 'docs'] }, {}, settings)
+    const implemented = await advanceToImplemented(ctx, agent)
+    await execute(ctx, 'record_change', {
+      task_id: implemented['id'], revision: implemented['revision'],
+      text: `${ACCEPTANCE_RECORD_PREFIX}smoke: suite passed`,
+    }, agent)
+    const current = await execute(ctx, 'get_delivery_task', {}, agent)
+    const revision = resultTask(current)['revision']
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: implemented['id'], revision, phase: 'verified',
+    }, agent)
+    expect(result.isError).toBe(true)
+    const message = errorText(result)
+    expect(message).toContain('/docs')
+    expect(message).not.toContain('/smoke:')
+  })
+
+  it('names only the next command and its position in the configured order', async () => {
+    const settings = new StubSettings({ verificationCommands: ['smoke', 'docs'] }, COMMANDS)
+    const { ctx, agent } = await harness({ verificationCommands: ['smoke', 'docs'] }, {}, settings)
+    const implemented = await advanceToImplemented(ctx, agent)
+    // Nothing recorded yet: the gate must ask for the first command only, so
+    // the configured order is enforced rather than left to the model.
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: implemented['id'], revision: implemented['revision'], phase: 'verified',
+    }, agent)
+    expect(result.isError).toBe(true)
+    const message = errorText(result)
+    expect(message).toContain('acceptance command 1 of 2')
+    expect(message).toContain('/smoke')
+    expect(message).not.toContain('/docs:')
+  })
+
+  it('holds the second command back until the first has a record', async () => {
+    const settings = new StubSettings({ verificationCommands: ['smoke', 'docs'] }, COMMANDS)
+    const { ctx, agent } = await harness({ verificationCommands: ['smoke', 'docs'] }, {}, settings)
+    const implemented = await advanceToImplemented(ctx, agent)
+    // Record only the SECOND command: the first still has no record, so the
+    // gate keeps asking for it and advancing stays blocked.
+    await execute(ctx, 'record_change', {
+      task_id: implemented['id'], revision: implemented['revision'],
+      text: `${ACCEPTANCE_RECORD_PREFIX}docs: checked the docs`,
+    }, agent)
+    const current = await execute(ctx, 'get_delivery_task', {}, agent)
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: resultTask(current)['id'], revision: resultTask(current)['revision'], phase: 'verified',
+    }, agent)
+    expect(result.isError).toBe(true)
+    expect(errorText(result)).toContain('/smoke')
+  })
+
+  it('advances through the configured order one command at a time', async () => {
+    const settings = new StubSettings({ verificationCommands: ['smoke', 'docs'] }, COMMANDS)
+    const { ctx, agent } = await harness({ verificationCommands: ['smoke', 'docs'] }, {}, settings)
+    let task = await advanceToImplemented(ctx, agent)
+    for (const name of ['smoke', 'docs']) {
+      await execute(ctx, 'record_change', {
+        task_id: task['id'], revision: task['revision'], text: `${ACCEPTANCE_RECORD_PREFIX}${name}: done`,
+      }, agent)
+      const current = await execute(ctx, 'get_delivery_task', {}, agent)
+      task = resultTask(current)
+    }
+    const verified = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent)
+    expect(verified.isError).toBe(false)
+  })
+
+  it('rejects a blank acceptance command name before registering anything', () => {
     const ctx = new Context()
-    expect(() => { toolDelivery.apply(ctx, { postHooks: ['  '] }) }).toThrow(TypeError)
+    expect(() => { toolDelivery.apply(ctx, { verificationCommands: ['  '] }) }).toThrow(TypeError)
   })
 
-  it('blocks verification when a post-hook times out', async () => {
-    const { ctx, agent } = await harness(
-      { postHooks: ['slow command'] },
-      { timedOut: true, exitCode: null },
-    )
-    const { blocked } = await advanceToVerified(ctx, agent)
+  it('reports a selected command that no longer exists', async () => {
+    const settings = new StubSettings({ verificationCommands: ['gone'] }, COMMANDS)
+    const { ctx, agent } = await harness({ verificationCommands: ['gone'] }, {}, settings)
+    const { blocked, error } = await advanceToVerified(ctx, agent)
     expect(blocked).toBe(true)
+    expect(error).toContain('/gone')
+    expect(error).toContain('no command with this name')
   })
 
-  it('blocks verification when a post-hook is aborted', async () => {
-    const { ctx, agent } = await harness(
-      { postHooks: ['abortable command'] },
-      { aborted: true, exitCode: null },
-    )
+  it('verifies freely when no acceptance command is configured', async () => {
+    const { ctx, agent } = await harness()
     const { blocked } = await advanceToVerified(ctx, agent)
-    expect(blocked).toBe(true)
-  })
-
-  it('blocks verification for a failed post-hook with no output', async () => {
-    const { ctx, agent } = await harness(
-      { postHooks: ['silent failure'] },
-      { exitCode: 1 },
-    )
-    const { blocked } = await advanceToVerified(ctx, agent)
-    expect(blocked).toBe(true)
+    expect(blocked).toBe(false)
   })
 
   it('accepts a non-l2 task whose checklist records an empty change id', async () => {
     const { ctx, agent } = await harness()
-    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l1 post-hook', level: 'l1' }, agent))
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l1 acceptance', level: 'l1' }, agent))
     task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
     task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
     task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
@@ -777,7 +982,7 @@ describe('tool-delivery post-hooks', () => {
 
   it('validates the change id of an l2 task at acceptance', async () => {
     const { ctx, agent } = await harness()
-    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l2 post-hook', level: 'l2' }, agent))
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l2 acceptance', level: 'l2' }, agent))
     task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
     task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
     task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
@@ -800,11 +1005,34 @@ describe('tool-delivery post-hooks', () => {
       coverage_confirmation: 'the design and spec are implemented',
     }, agent))
     expect(accepted).toMatchObject({ phase: 'accepted' })
-    // An l2 task owns a change, so its acceptance still validates that change.
+    // An l2 task owns a change, so verification still validates that change.
     expect((ctx.get('shell') as StubShell).commands).toContain('openspec validate add-thing --strict --json')
   })
 
-  it('passes the session cwd to post-hooks', async () => {
+  it('blocks verification when the l2 structural validation fails', async () => {
+    const { ctx, agent } = await harness({}, { exitCode: 1, stderr: { text: 'invalid change', truncated: false } })
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'l2 structural', level: 'l2' }, agent))
+    task = resultTask(await execute(ctx, 'mark_analysis_done', { task_id: task['id'], revision: task['revision'] }, agent))
+    task = resultTask(await execute(ctx, 'record_design', { task_id: task['id'], revision: task['revision'], text: 'the design' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'designed' }, agent))
+    task = resultTask(await execute(ctx, 'record_spec', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing', kind: 'proposal', text: 'why',
+    }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'specified' }, agent))
+    task = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing',
+      items: [{ content: 'the fix', phase: 'implemented', status: 'completed' }],
+    }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent)
+    expect(result.isError).toBe(true)
+    expect(errorText(result)).toContain('openspec validate')
+  })
+
+  it('runs the structural validation in the session cwd', async () => {
     const ctx = new Context()
     const cwd = mkdtempSync(join(tmpdir(), 'dsh-delivery-ph-'))
     await ctx.plugin(SystemPrompt)
@@ -813,8 +1041,9 @@ describe('tool-delivery post-hooks', () => {
     await ctx.plugin(SessionProjectionRegistry)
     await ctx.plugin(LocalFileSystem, { cwd: mkdtempSync(join(tmpdir(), 'dsh-delivery-fs-')) })
     await ctx.plugin(StubShell)
+    await ctx.plugin(StubLlm)
     await ctx.plugin(DeliveryService)
-    await ctx.plugin(toolDelivery, { postHooks: ['pnpm run test'] })
+    await ctx.plugin(toolDelivery, {})
     const id = SessionId(`delivery-ph-${Math.random()}`)
     const agent = stubAgent(`ph-agent-${Math.random()}`, Session.create(
       id,
@@ -828,6 +1057,190 @@ describe('tool-delivery post-hooks', () => {
       task_id: task['id'], revision: task['revision'], phase: 'accepted',
     }, agent))
     expect(accepted).toMatchObject({ phase: 'accepted' })
+  })
+
+  it('accepts a record whose name carries a slash or trailing colon', async () => {
+    const settings = new StubSettings({ verificationCommands: ['smoke'] }, COMMANDS)
+    const { ctx, agent } = await harness({ verificationCommands: ['smoke'] }, {}, settings)
+    const implemented = await advanceToImplemented(ctx, agent)
+    // 模型可能照抄界面上的 `/smoke:` 写法，因此解析接受这两种装饰。
+    await execute(ctx, 'record_change', {
+      task_id: implemented['id'], revision: implemented['revision'],
+      text: `${ACCEPTANCE_RECORD_PREFIX}/smoke: 全部通过`,
+    }, agent)
+    const revision = resultTask(await execute(ctx, 'get_delivery_task', {}, agent))['revision']
+    const verified = await execute(ctx, 'advance_delivery_task', {
+      task_id: implemented['id'], revision, phase: 'verified',
+    }, agent)
+    expect(verified.isError).toBe(false)
+  })
+
+  it('ignores an acceptance record the current task did not write', async () => {
+    const settings = new StubSettings({ verificationCommands: ['smoke'] }, COMMANDS)
+    const { ctx, agent } = await harness({ verificationCommands: ['smoke'] }, {}, settings)
+    const implemented = await advanceToImplemented(ctx, agent)
+    // 另一任务的记录不能替本任务放行：门禁按当前任务 id 过滤。
+    await execute(ctx, 'record_change', {
+      task_id: 'task-elsewhere', revision: 1,
+      text: `${ACCEPTANCE_RECORD_PREFIX}smoke: 与他人无关`,
+    }, agent)
+    const revision = resultTask(await execute(ctx, 'get_delivery_task', {}, agent))['revision']
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: implemented['id'], revision, phase: 'verified',
+    }, agent)
+    expect(result.isError).toBe(true)
+  })
+
+  it('ignores a change record that is not an acceptance record', async () => {
+    const settings = new StubSettings({ verificationCommands: ['smoke'] }, COMMANDS)
+    const { ctx, agent } = await harness({ verificationCommands: ['smoke'] }, {}, settings)
+    const implemented = await advanceToImplemented(ctx, agent)
+    // 普通变更记录不得被读成验收记录，否则门禁形同虚设。
+    await execute(ctx, 'record_change', {
+      task_id: implemented['id'], revision: implemented['revision'],
+      text: 'smoke: 这只是一条普通变更',
+    }, agent)
+    const revision = resultTask(await execute(ctx, 'get_delivery_task', {}, agent))['revision']
+    const result = await execute(ctx, 'advance_delivery_task', {
+      task_id: implemented['id'], revision, phase: 'verified',
+    }, agent)
+    expect(result.isError).toBe(true)
+  })
+
+  it('reports an empty configured prompt as such', async () => {
+    // 命令存在但提示词为空时，门禁说明原因，而不是静默放宽要求。
+    const settings = new StubSettings({ verificationCommands: ['smoke'] }, [{ name: 'smoke', prompt: '   ' }])
+    const { ctx, agent } = await harness({ verificationCommands: ['smoke'] }, {}, settings)
+    const { blocked, error } = await advanceToVerified(ctx, agent)
+    expect(blocked).toBe(true)
+    expect(error).toContain('its configured prompt is empty')
+  })
+
+  it('reports an unavailable settings provider by name', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(LocalFileSystem, { cwd: mkdtempSync(join(tmpdir(), 'dsh-delivery-ns-')) })
+    await ctx.plugin(StubShell)
+    await ctx.plugin(StubLlm)
+    await ctx.plugin(DeliveryService)
+    await ctx.plugin(toolDelivery, { verificationCommands: ['smoke'] })
+    const agent = stubAgent(`ns-agent-${Math.random()}`)
+    ctx.agents.register(agent)
+    // 未挂载设置服务时无法读到提示词正文，门禁说明该原因而不是放行。
+    const { blocked, error } = await advanceToVerified(ctx, agent)
+    expect(blocked).toBe(true)
+    expect(error).toContain('serves no settings provider')
+  })
+})
+
+describe('tool-delivery acceptance commands over the real settings service', () => {
+  /**
+   * Compose the real settings provider and the real prompt-command plugin so
+   * the cross-namespace read is exercised end to end: the hand-written stub
+   * proves the gate's logic, not that a deployed composition wires it.
+   */
+  async function realHarness(promptCommands: readonly { name: string; prompt: string }[]) {
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(AgentRegistry)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(SessionProjectionRegistry)
+    await ctx.plugin(LocalFileSystem, { cwd: mkdtempSync(join(tmpdir(), 'delivery-real-')) })
+    await ctx.plugin(StubShell)
+    await ctx.plugin(StubLlm)
+    await ctx.plugin(InMemorySettings, {})
+    await ctx.plugin(CommandRegistry)
+    await ctx.plugin(promptConfig, { commands: [...promptCommands] })
+    await ctx.plugin(DeliveryService)
+    await ctx.plugin(toolDelivery, { verificationCommands: promptCommands.map(command => command.name) })
+    const agent = stubAgent(`real-${Math.random()}`)
+    agent.options.provider = 'stub'
+    agent.options.model = 'stub-grader'
+    ctx.agents.register(agent)
+    return { ctx, agent }
+  }
+
+  /** Walk an l0 task to implemented through the registered tools. */
+  async function realToImplemented(ctx: Context, agent: Agent) {
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'real', level: 'l0' }, agent))
+    task = resultTask(await execute(ctx, 'record_change', {
+      task_id: task['id'], revision: task['revision'], text: 'the fix',
+    }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'implemented',
+    }, agent))
+    return task
+  }
+
+  it('carries the real prompt body into the gate message, then lets a record through', async () => {
+    const { ctx, agent } = await realHarness([{ name: 'smoke', prompt: '运行冒烟测试并报告全部失败项' }])
+    const task = await realToImplemented(ctx, agent)
+    const blocked = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent)
+    expect(blocked.isError).toBe(true)
+    const message = errorText(blocked)
+    // The body comes from the real prompt-commands section, not from a stub.
+    expect(message).toContain('运行冒烟测试并报告全部失败项')
+    expect(message).toContain('/smoke')
+
+    const current = resultTask(await execute(ctx, 'get_delivery_task', {}, agent))
+    await execute(ctx, 'record_change', {
+      task_id: task['id'], revision: current['revision'],
+      text: `${ACCEPTANCE_RECORD_PREFIX}smoke 全部通过`,
+    }, agent)
+    const revision = resultTask(await execute(ctx, 'get_delivery_task', {}, agent))['revision']
+    const verified = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision, phase: 'verified',
+    }, agent)
+    expect(verified.isError).toBe(false)
+  })
+
+  it('reports a selected command the live plugin does not offer, and stays recoverable', async () => {
+    // 选中的名字不在 prompt-commands 里时门禁照常阻止并说明该命令没有正文；
+    // 模型记录该名字即可通过，因此任务不会不可挽回地卡住。
+    const { ctx, agent } = await realHarness([])
+    const task = await realToImplemented(ctx, agent)
+    // 部署把验收命令配成一条提示词命令插件并未提供的名字。
+    await ctx.get('settings')!.update('delivery', { verificationCommands: ['gone'] })
+    const blocked = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent)
+    expect(blocked.isError).toBe(true)
+    expect(errorText(blocked)).toContain('/gone')
+    expect(errorText(blocked)).toContain('no command with this name')
+
+    const current = resultTask(await execute(ctx, 'get_delivery_task', {}, agent))
+    await execute(ctx, 'record_change', {
+      task_id: task['id'], revision: current['revision'],
+      text: `${ACCEPTANCE_RECORD_PREFIX}gone 已核对`,
+    }, agent)
+    const revision = resultTask(await execute(ctx, 'get_delivery_task', {}, agent))['revision']
+    const verified = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision, phase: 'verified',
+    }, agent)
+    expect(verified.isError).toBe(false)
+  })
+
+  it('changes gate behavior the moment the user saves a selection', async () => {
+    // 用户改设置 → 门禁行为改变 的完整闭环：写入真实 settings 服务后立即生效。
+    const { ctx, agent } = await realHarness([])
+    const task = await realToImplemented(ctx, agent)
+    const free = await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'verified',
+    }, agent)
+    expect(free.isError).toBe(false)
+
+    const second = await realHarness([])
+    const other = await realToImplemented(second.ctx, second.agent)
+    await second.ctx.get('settings')!.update('delivery', { verificationCommands: ['smoke'] })
+    const gated = await execute(second.ctx, 'advance_delivery_task', {
+      task_id: other['id'], revision: other['revision'], phase: 'verified',
+    }, second.agent)
+    expect(gated.isError).toBe(true)
   })
 })
 
@@ -845,13 +1258,33 @@ describe('tool-delivery auto-detect', () => {
     expect(view?.level).toBe('l2')
   })
 
-  it('does not create a task for a short request', async () => {
+  it('creates an l0 task for a short request so the discipline covers it', async () => {
     const { ctx, agent } = await harness()
     await preStep(ctx, agent, [createUserMessage({
       content: [{ type: 'text', text: 'fix the typo' }],
       source: { kind: 'user' },
     })])
-    expect(ctx.delivery.get(agent)).toBeUndefined()
+    const view = ctx.delivery.get(agent)
+    expect(view?.level).toBe('l0')
+  })
+
+  it('replaces an unfinished l0 task with the next request', async () => {
+    // An l0 task the model never advances must not reject later requests:
+    // `create` refuses a new task while a non-accepted one is current and no
+    // tool clears a task, so the replacement is what keeps the session usable.
+    const { ctx, agent } = await harness()
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'fix the typo' }],
+      source: { kind: 'user' },
+    })])
+    const first = ctx.delivery.get(agent)
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'fix another typo' }],
+      source: { kind: 'user' },
+    })])
+    const second = ctx.delivery.get(agent)
+    expect(second?.id).not.toBe(first?.id)
+    expect(second?.objective).toBe('fix another typo')
   })
 
   it('does not create a second task when one already exists', async () => {
@@ -889,54 +1322,66 @@ describe('tool-delivery auto-detect', () => {
     + '4、点击“配置 MCP”时在当前页面弹出 mcp.json 编辑页并支持高亮；\n'
     + '5、编辑后配置要立即生效。'
 
-  it('creates an l1 task for a multi-part request', async () => {
-    // A numbered multi-part list expresses decomposability, which the design
-    // document tier covers; it is no longer read as a structural-contract
-    // change. The task is still created automatically, so the request never
-    // runs without a progress surface.
-    const { ctx, agent } = await harness()
+  it('takes the tier the model names for a multi-part request', async () => {
+    // The list's shape no longer decides the tier: the grading call reads the
+    // request and answers. The task is still created automatically, so the
+    // request never runs without a progress surface.
+    const { ctx, agent } = await harness({}, {}, undefined, 'l1')
     await preStep(ctx, agent, [createUserMessage({
       content: [{ type: 'text', text: MULTI_PART_REQUEST }],
       source: { kind: 'user' },
     })])
     expect(ctx.delivery.get(agent)?.level).toBe('l1')
+    // The model sees the request text itself, which is what makes a semantic
+    // judgement possible at all.
+    const sent = llmOf(ctx).requests[0]?.messages[0]
+    expect(JSON.stringify(sent)).toContain('MCP')
   })
 
-  it('creates an l1 task when a short request uses a loose restructuring word', async () => {
-    const { ctx, agent } = await harness()
+  it('sends the request text rather than a keyword verdict', async () => {
+    const { ctx, agent } = await harness({}, {}, undefined, 'l0')
     await preStep(ctx, agent, [createUserMessage({
       content: [{ type: 'text', text: '重构这个模块的内部实现' }],
       source: { kind: 'user' },
     })])
-    expect(ctx.delivery.get(agent)?.level).toBe('l1')
+    const request = llmOf(ctx).requests[0]
+    expect(request?.system).toContain('l0')
+    const text = JSON.stringify(request?.messages)
+    // The words that used to decide the tier now only travel as content.
+    expect(text).toContain('重构这个模块的内部实现')
+    expect(request?.maxTokens).toBeLessThan(64)
   })
 
-  it('creates an l1 task when a single medium signal matches', async () => {
-    // l1 no longer waits for the model to volunteer a create call: doing so
-    // left graded-l1 requests with no task and no progress surface.
-    const { ctx, agent } = await harness()
-    await preStep(ctx, agent, [createUserMessage({
-      content: [{ type: 'text', text: '新增一个小能力' }],
-      source: { kind: 'user' },
-    })])
-    expect(ctx.delivery.get(agent)?.level).toBe('l1')
+  it('records the grading evidence in the change artifact', async () => {
+    const { ctx, agent, cwd } = await harness({}, {}, undefined, 'l1')
+    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'short' }, agent))
+    // A reader who disagrees with the tier must be able to see what decided it.
+    const artifact = readFileSync(join(cwd, '.dsh', 'changes', `${created['id']}.md`), 'utf8')
+    expect(artifact).toContain('graded l1 by model')
   })
 
-  it('injects the grading rubric once per turn when no signal matches', async () => {
-    const { ctx, agent } = await harness()
+  it('records a fallback grade as such', async () => {
+    const { ctx, agent, cwd } = await harness({}, {}, undefined, 'no idea')
+    const created = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'short' }, agent))
+    const artifact = readFileSync(join(cwd, '.dsh', 'changes', `${created['id']}.md`), 'utf8')
+    expect(artifact).toContain('graded l1 by fallback')
+  })
+
+  it('does not grade again while an l1 task holds the session', async () => {
+    // An l1/l2 task keeps its claim, so a later direct request must not spend
+    // another grading call or replace the task.
+    const { ctx, agent } = await harness({}, {}, undefined, 'l1')
     await preStep(ctx, agent, [createUserMessage({
-      content: [{ type: 'text', text: 'fix the typo' }],
+      content: [{ type: 'text', text: 'first' }],
       source: { kind: 'user' },
     })])
-    expect(ctx.delivery.get(agent)).toBeUndefined()
-    const injected = agent.inbox.nextStep
-    expect(injected.some(message => message.source.kind === 'plugin'
-      && message.source.plugin === 'tool-delivery')).toBe(true)
+    const first = ctx.delivery.get(agent)
     await preStep(ctx, agent, [createUserMessage({
-      content: [{ type: 'text', text: 'fix the typo again' }],
+      content: [{ type: 'text', text: 'second' }],
       source: { kind: 'user' },
     })])
-    expect(agent.inbox.nextStep.length).toBe(injected.length)
+    expect(ctx.delivery.get(agent)?.id).toBe(first?.id)
+    expect(llmOf(ctx).requests).toHaveLength(1)
   })
 })
 
@@ -1042,6 +1487,54 @@ async function toSpecified(ctx: Context, agent: Agent): Promise<Record<string, u
     task_id: task['id'], revision: task['revision'], phase: 'specified',
   }, agent))
 }
+
+describe('tool-delivery corrected annotations', () => {
+  it('lets a task pass verification after the model corrects its covers list', async () => {
+    // The scenario check reads the disk tasks.md, so a corrected annotation has
+    // to reach that file. When rendering preserved the old annotation, a task
+    // that fixed its checklist was still blocked forever — the correction was
+    // simply unrepresentable.
+    const { ctx, agent, cwd } = await harness()
+    const task = await toSpecified(ctx, agent)
+    const dir = join(cwd, 'openspec', 'changes', 'add-thing')
+    mkdirSync(join(dir, 'specs', 'demo'), { recursive: true })
+    writeFileSync(join(dir, 'design.md'), '### D1 做它\n')
+    writeFileSync(join(dir, 'specs', 'demo', 'spec.md'), '#### Scenario: 它要工作\n')
+
+    // The first checklist misses the scenario key, so verification blocks.
+    let current = resultTask(await execute(ctx, 'record_spec', {
+      task_id: task['id'], revision: task['revision'], change_id: 'add-thing', kind: 'tasks',
+      text: '- [x] 做它 (covers: design/D1)\n',
+    }, agent))
+    current = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: current['id'], revision: current['revision'], change_id: 'add-thing',
+      items: [{ content: '做它 (covers: design/D1)', phase: 'implemented', status: 'completed' }],
+    }, agent))
+    current = resultTask(await execute(ctx, 'record_change', {
+      task_id: current['id'], revision: current['revision'], text: 'the fix',
+    }, agent))
+    current = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: current['id'], revision: current['revision'], phase: 'implemented',
+    }, agent))
+    const blocked = await execute(ctx, 'advance_delivery_task', {
+      task_id: current['id'], revision: current['revision'], phase: 'verified',
+    }, agent)
+    expect(blocked.isError).toBe(true)
+
+    // Correcting the annotation writes it through to the disk checklist.
+    current = resultTask(await execute(ctx, 'record_tasks', {
+      task_id: current['id'], revision: current['revision'], change_id: 'add-thing',
+      items: [{ content: '做它 (covers: demo/它要工作, design/D1)', phase: 'implemented', status: 'completed' }],
+    }, agent))
+    expect(readFileSync(join(dir, 'tasks.md'), 'utf8'))
+      .toBe('- [x] 做它 (covers: demo/它要工作, design/D1)\n')
+
+    const verified = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: current['id'], revision: current['revision'], phase: 'verified',
+    }, agent))
+    expect(verified).toMatchObject({ phase: 'verified' })
+  })
+})
 
 describe('tool-delivery checklist cross-check', () => {
 
@@ -1335,24 +1828,41 @@ describe('tool-delivery coverage review', () => {
 })
 
 describe('tool-delivery settings wiring', () => {
-  it('grades with the settings-resolved policy when a provider is mounted', async () => {
+  it('grades with the settings-resolved length floor when a provider is mounted', async () => {
+    // The floor is a settings field, so a user section has to move it: at 20
+    // the 25-character request is over the floor and grades l2 with no call.
     const { ctx, agent } = await harness({}, {}, new StubSettings({
       openspecThreshold: { todoCount: 15, descriptionChars: 20 },
-    }))
+    }), 'l0')
     await preStep(ctx, agent, [createUserMessage({
       content: [{ type: 'text', text: 'a'.repeat(25) }],
       source: { kind: 'user' },
     })])
     expect(ctx.delivery.get(agent)?.level).toBe('l2')
+    expect(llmOf(ctx).requests).toHaveLength(0)
+  })
+
+  it('uses the settings-resolved grading prompt', async () => {
+    // The rules are user-editable text, so the call must carry the resolved
+    // section rather than the composition default.
+    const { ctx, agent } = await harness({}, {}, new StubSettings({
+      gradingPrompt: 'always answer l1',
+    }), 'l0')
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'short' }],
+      source: { kind: 'user' },
+    })])
+    expect(llmOf(ctx).requests[0]?.system).toBe('always answer l1')
   })
 
   it('keeps the composition policy when no provider is mounted', async () => {
-    const { ctx, agent } = await harness()
+    const { ctx, agent } = await harness({}, {}, undefined, 'l0')
     await preStep(ctx, agent, [createUserMessage({
       content: [{ type: 'text', text: 'a'.repeat(25) }],
       source: { kind: 'user' },
     })])
-    expect(ctx.delivery.get(agent)).toBeUndefined()
+    // 25 characters is under the 200-character floor, so the model decides.
+    expect(ctx.delivery.get(agent)?.level).toBe('l0')
   })
 
   it('lets a gate through when the settings resolve enforcement to off', async () => {
@@ -1613,6 +2123,17 @@ describe('tool-delivery acceptance gate', () => {
 })
 
 describe('renderTasksMarkdown', () => {
+  it('writes a corrected annotation through to the disk line', () => {
+    // The scenario and design checks read this file, so a model that fixes its
+    // `covers:` list must be able to make that correction reach the disk.
+    // Rewriting only the checkbox left the old annotation in place forever.
+    const rendered = renderTasksMarkdown(
+      '- [ ] ship it (covers: design/D1)\n',
+      [{ content: 'ship it (covers: cap/scenario, design/D1)', phase: 'implemented', status: 'completed' }],
+    )
+    expect(rendered).toBe('- [x] ship it (covers: cap/scenario, design/D1)\n')
+  })
+
   it('updates the checkbox of a matching line and preserves a covers annotation', () => {
     const rendered = renderTasksMarkdown(
       '- [ ] ship it (covers: cap/a, cap/b)\n',

@@ -24,4 +24,4 @@ Status: implemented
 
 - **获得** 需求分析成为程序化前置环节，进度栏以语义分组呈现整体完成状态，非 `l2` 也有基于清单的逐点验证。
 - **代价** `delivery` 投影快照新增 `analysisDone` 字段（旧事件回放按 `false` 折叠）；任务清单项由二态改为三态，`checklistMismatch` 的磁盘核对随之适配；模型需多一次 `mark_analysis_done` 与 `record_tasks` 调用。
-- **延后** 设置界面编辑阈值与 `postHooks` 的 UI 卡片；门禁通过/失败与后置命令结果的时间线节点。
+- **延后** 门禁通过/失败与验收结果的时间线节点。

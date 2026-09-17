@@ -34,7 +34,7 @@ l1 任务存续期间，`tool-delivery` 监听 `session/event` 捕获 `todo/writ
 
 1. **清单完整性**：权威源（l2 为磁盘 `tasks.md`，l0/l1 为 `delivery-tasks`）的全部项均为 `completed`。l0/l1 未记录清单时不再静默放行。
 2. **覆盖性**：每条原始需求要点与每个 `### D<n>` 设计决策均被至少一条已完成项通过 `covers:` 声明覆盖，l1 一并纳入。
-3. **产物核验**：`openspec validate <change_id> --strict --json`（l2）与 `postHooks` 由 `accepted` 前移至 `verified`；`accepted` 只做最终确认。
+3. **产物核验**：`openspec validate <change_id> --strict --json`（l2）由 `accepted` 前移至 `verified`。配置的验收命令是提示词命令而非 shell 命令——它们的正文由模型执行，没有退出码可判——因此改为在 `accepted` 校验该任务是否留下了每条命令的执行记录；`accepted` 不再重复执行 shell 核验。
 4. **逐条对账**：模型须结构化输出「原始需求第 N 条 → 实现位置与证据」，取代现有的一段 ≥20 字自由文本。
 
 第 1、3 道为确定性判定，不可由模型叙述豁免；第 2、4 道允许在轮次上限内复核。

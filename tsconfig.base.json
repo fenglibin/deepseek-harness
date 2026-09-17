@@ -81,6 +81,9 @@
       "@deepseek-ai/dsh-api-session-file-revisions": ["./packages/api/session-file-revisions/src/index.ts"],
       "@deepseek-ai/dsh-api-session-file-revisions/invariant": ["./packages/api/session-file-revisions/src/invariant.ts"],
       "@deepseek-ai/dsh-api-session-file-revisions/types": ["./packages/api/session-file-revisions/src/types.ts"],
+      // The Remote namespace assembly mounts the generated Client contribution,
+      // which only exists as post-build output; the generator cannot map it.
+      "@deepseek-ai/dsh-api-session-file-revisions/remote": ["./packages/api/session-file-revisions/lib/typert.remote-client.d.ts"],
       "@deepseek-ai/dsh-typert-protocol": ["./packages/typert/protocol/src/index.ts"],
       "@deepseek-ai/dsh-typert-protocol/types": ["./packages/typert/protocol/src/types.ts"],
       "@deepseek-ai/dsh-typert-loader": ["./packages/typert/loader/src/index.ts"],

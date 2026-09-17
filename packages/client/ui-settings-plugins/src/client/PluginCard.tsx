@@ -69,32 +69,36 @@ export function PluginCard(props: PluginCardProps) {
   const blocked = !state.dirty || state.invalid || state.saving
   return (
     <li className={clsx(css.card, open && css.cardOpen)}>
-      <button
-        type="button"
-        className={css.header}
-        aria-expanded={open}
-        aria-label={`${props.t(open ? 'collapse' : 'expand')}: ${title}`}
-        onClick={() => { setOpen(!open) }}
-      >
-        <span className={css.headText}>
+      <div className={css.header}>
+        <button
+          type="button"
+          className={css.headerToggle}
+          aria-expanded={open}
+          aria-label={`${props.t(open ? 'collapse' : 'expand')}: ${title}`}
+          onClick={() => { setOpen(!open) }}
+        >
           <span className={css.name}>{title}</span>
+          {state.dirty ? <span className={css.pending}>{props.t('unsaved')}</span> : null}
+          <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
+        </button>
+        {/* The Help link trails the sentence describing what this card's
+            settings govern, because that sentence is what it expands on. It is
+            a sibling of the disclosure button rather than a child: a button
+            inside a button is invalid and unreachable by keyboard. */}
+        <p className={css.subline}>
           <span className={css.description}>{props.t(props.descriptionKey)}</span>
-        </span>
-        {state.dirty ? <span className={css.pending}>{props.t('unsaved')}</span> : null}
-        <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
-      </button>
+          {props.onHelp === undefined
+            ? null
+            : (
+              <button type="button" className={css.helpLink} onClick={props.onHelp}>
+                {props.t('deliveryHelpLink')}
+              </button>
+            )}
+        </p>
+      </div>
       {open
         ? (
           <div className={css.body}>
-            {props.onHelp === undefined
-              ? null
-              : (
-                <p className={css.helpRow}>
-                  <button type="button" className={css.helpLink} onClick={props.onHelp}>
-                    {props.t('deliveryHelpLink')}
-                  </button>
-                </p>
-              )}
             {!state.writable ? <p className={css.readOnly} role="status">{props.t('readOnly')}</p> : null}
             {props.children}
             <div className={css.footer}>

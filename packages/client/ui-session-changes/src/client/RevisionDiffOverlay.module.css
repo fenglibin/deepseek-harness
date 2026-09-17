@@ -1,0 +1,277 @@
+/**
+ * The full-screen revision viewer: a two-column split view of one file.
+ *
+ * Layout is a fixed header, a two-lane body, and a navigation footer. The
+ * columns scroll horizontally (a diff is read by its indentation, so lines must
+ * not wrap) while the body scrolls vertically as ONE surface — two independently
+ * vertical-scrolling panes would let the rows drift apart, which is the one
+ * thing a comparison view cannot do.
+ */
+
+.frame {
+  --dsl-rv-width: min(1400px, 96vw);
+  --dsl-rv-height: min(900px, 92vh);
+  --dsl-rv-line-height: calc(22px + var(--dsh-content-font-delta, 0px));
+  --dsl-rv-gutter: 56px;
+  --dsl-rv-radius: 12px;
+
+  width: var(--dsl-rv-width);
+  height: var(--dsl-rv-height);
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Flex column so the body takes the leftover height and owns the only
+   vertical scrollbar. */
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  color: var(--dsw-alias-label-primary);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  flex: none;
+}
+
+.identity {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+/* The file name is what the reader looks for; it never truncates before the
+   directory does. */
+.file {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.directory {
+  color: var(--dsw-alias-label-caption);
+  font: var(--dsw-font-xs-13);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.totals {
+  display: flex;
+  gap: 8px;
+  font: var(--dsh-content-font-code);
+  flex: none;
+}
+
+.totalAdded {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.totalRemoved {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.count {
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+  white-space: nowrap;
+  flex: none;
+}
+
+.action,
+.step,
+.more {
+  background-color: transparent;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  padding: 3px 10px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  font: var(--dsw-font-xs-13);
+  flex: none;
+}
+
+.action:hover:not(:disabled),
+.step:hover:not(:disabled),
+.more:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.action:disabled,
+.step:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.close {
+  background-color: transparent;
+  border: none;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  font: var(--dsw-font-xs-13);
+  flex: none;
+}
+
+/* The two lane captions sit above the panes and share the pane geometry, so a
+   caption stays over the column it names even when a pane scrolls sideways. */
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  flex: none;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-markdown-code-block);
+}
+
+.columnLabel {
+  padding: 6px 12px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+}
+
+.columnLabel + .columnLabel {
+  border-left: 1px solid var(--dsw-alias-border-l1);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.notice,
+.error {
+  margin: 24px 16px;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+}
+
+.error {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.panes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100%;
+}
+
+/* Each lane clips its own horizontal overflow; `paneInner` carries the one
+   implicit row per diff row, so both lanes stay the same height. */
+.pane {
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-width: 0;
+  border-left: 1px solid var(--dsw-alias-border-l1);
+  font: var(--dsh-content-font-code);
+}
+
+.paneInner {
+  min-width: max-content;
+}
+
+.cell {
+  display: flex;
+  align-items: flex-start;
+  min-height: var(--dsl-rv-line-height);
+}
+
+/* No wrapping and no word-break: indentation is how a diff is read. */
+.code {
+  white-space: pre;
+  padding-right: 16px;
+}
+
+.gutter {
+  width: var(--dsl-rv-gutter);
+  padding-right: 12px;
+  text-align: right;
+  color: var(--dsw-alias-label-tertiary);
+  user-select: none;
+  flex: none;
+}
+
+.context {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* The diff's own meaning-carrying colors, matching the shared diff block: the
+   removed side reads on the error token and the added side on the success one. */
+.removed {
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 12%, transparent);
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.added {
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 12%, transparent);
+  color: var(--dsw-alias-state-success-primary);
+}
+
+/* A filler is the row's empty half: it keeps the two columns aligned without
+   claiming the file has a blank line there. */
+.filler {
+  background: color-mix(in srgb, var(--dsw-alias-border-l1) 35%, transparent);
+}
+
+/* The characters that actually changed inside a replaced line, drawn over the
+   row's own background so the eye lands on the edit rather than the line. */
+.inline {
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.inlineDel {
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary) 32%, transparent);
+}
+
+.inlineAdd {
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary) 32%, transparent);
+}
+
+.focused .cell {
+  box-shadow: inset 2px 0 0 var(--dsw-alias-state-business-primary);
+}
+
+.more {
+  display: block;
+  margin: 12px auto;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+  flex: none;
+}
+
+.hint {
+  color: var(--dsw-alias-label-caption);
+  font: var(--dsw-font-xs-13);
+}
+
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.position {
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+  min-width: 72px;
+  text-align: center;
+}

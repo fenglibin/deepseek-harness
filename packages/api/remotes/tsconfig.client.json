@@ -76,6 +76,9 @@
       "path": "../workspace-controller/tsconfig.client.json"
     },
     {
+      "path": "../session-file-revisions"
+    },
+    {
       "path": "../../mcp/mcp-manager"
     },
     {

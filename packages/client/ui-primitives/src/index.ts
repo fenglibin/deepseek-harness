@@ -58,6 +58,7 @@ export type {
 export { CodeBlock } from './markdown/CodeBlock.tsx'
 export type { CodeBlockProps } from './markdown/CodeBlock.tsx'
 export { grammarLoadCount, highlightLines, subscribeGrammarLoaded } from './markdown/highlight.ts'
+export { languageOfPath } from './file-language.ts'
 export type { HighlightSpan } from './markdown/highlight.ts'
 export { JsonBlock } from './markdown/JsonBlock.tsx'
 export { MarkdownText } from './markdown/MarkdownText.tsx'

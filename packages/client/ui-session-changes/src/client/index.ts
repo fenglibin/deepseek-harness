@@ -18,6 +18,9 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the Session standard useConversation seat.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
+// Type-only: pulls the layout's SlotMap merge declaring the root-scoped
+// `shell.overlay` hole this plugin's full-screen viewer occupies.
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 // Type-only: pulls the Session Controller's Context merge (ctx.sessions).
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 // Type-only: pulls the Session Remote's Context merge (ctx.remote.session).
@@ -28,10 +31,12 @@ import type {} from '@deepseek-ai/dsh-client-ui-file-browser/client'
 // `ctx.remote.sessionFileRevisions` resolves to this package's verbs.
 import type {} from '@deepseek-ai/dsh-api-session-file-revisions/remote'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import type { RevisionDiff, RevertFileResult } from '@deepseek-ai/dsh-api-session-file-revisions/types'
-import type { RevisionRemote } from './RevisionDiffPanel.tsx'
+import type { RevisionDiff, RevisionEntry, RevertFileResult } from '@deepseek-ai/dsh-api-session-file-revisions/types'
+import { RevisionError, type RevisionRemote } from './revision-remote.ts'
 import { createAcceptedChangesStore } from './accept-store.ts'
 import { SessionChangesDock, type SessionChangesInjected } from './SessionChangesDock.tsx'
+import { RevisionViewerOccupant, type RevisionViewerInjected } from './RevisionDiffOverlay.tsx'
+import { createRevisionViewerSource } from './revision-viewer-request.ts'
 import { zh, type SessionChangesKey } from './locales.ts'
 
 export {
@@ -42,6 +47,18 @@ export {
 } from './SessionChangesDock.tsx'
 export { ACCEPTED_CHANGES_PERSIST_KEY, createAcceptedChangesStore, type AcceptedChanges }
   from './accept-store.ts'
+export { RevisionError, revisionFailureText, type RevisionRemote } from './revision-remote.ts'
+export {
+  RevisionDiffOverlay, RevisionViewerOccupant, MAX_VISIBLE_ROWS,
+  type RevisionDiffOverlayProps, type RevisionViewerInjected, type RevisionViewerOccupantProps,
+} from './RevisionDiffOverlay.tsx'
+export {
+  createRevisionViewerSource, type RevisionViewerRequest, type RevisionViewerSource,
+} from './revision-viewer-request.ts'
+export {
+  EMPTY_SIDE_BY_SIDE, MAX_INLINE_DIFF_CHARS, sideBySide, unifiedDiffText,
+  type DiffRow, type DiffSide, type DiffSideKind, type InlineSpan, type SideBySide,
+} from './revision-diff-model.ts'
 export type { SessionChangesKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -58,43 +75,60 @@ const NS = 'session-changes'
 export const inject = ['slots', 'locale', 'sessions', 'remote', 'remote.session']
 
 /**
- * Client plugin body: register the dictionaries and the input-dock entry.
- * @param ctx - client root context.
- */
-/**
- * The diff-reading verb the panel drives, over the same Remote namespace.
- * @param ctx - client root context.
- * @param sessionId - the session the dock entry serves.
- * @returns the verbs, or undefined when the Remote namespace is absent.
- */
-/**
  * The revision verbs the dock drives, over the session-revisions Remote.
+ *
+ * The namespace exists only when this composition both composes the Host
+ * controller and mounts the namespace in its Client Remote assembly, so an
+ * absent one is capability absence: the dock hides the view-changes and revert
+ * controls and keeps the plain accept list.
  * @param ctx - client root context.
  * @returns the verbs, or undefined when the Remote namespace is absent.
  */
 function remoteVerbs(ctx: ClientContext): RevisionRemote | undefined {
-  const remote = ctx.remote.sessionFileRevisions
+  // Optional-service read: the namespace is capability absence when this
+  // composition mounts no Host controller, so it must not ride the declared
+  // inject face (reading `ctx.remote.<ns>` there throws without the inject).
+  const remote = ctx.get('remote.sessionFileRevisions')
+  if (remote === undefined) return undefined
   return {
+    list: async (id: string): Promise<readonly RevisionEntry[]> => {
+      const result = await remote.list({ sessionId: id as SessionId })
+      if (!result.ok) throw new RevisionError(result.error.code, result.error.message)
+      return result.value.entries
+    },
     diff: async (id: string, path: string): Promise<RevisionDiff> => {
       const result = await remote.diff({ sessionId: id as SessionId, path })
-      if (!result.ok) throw new Error(result.error.message)
+      // The failure code survives the crossing: the panel decides what to say
+      // from it, and only an unmapped code falls back to the Host's wording.
+      if (!result.ok) throw new RevisionError(result.error.code, result.error.message)
       return result.value
     },
-    revertAll: async (paths: readonly string[]): Promise<readonly RevertFileResult[]> => {
+    // Omitting `path` reverts every path the Host recorded for this session.
+    // The Host owns that set, so the dock does not narrow it to the rows the
+    // page happens to hold: a client that paged in part of a long Session
+    // would otherwise silently revert only part of the change.
+    revertAll: async (): Promise<readonly RevertFileResult[]> => {
       const current = ctx.sessions.list.getSnapshot().current
       if (current === undefined) return []
-      const result = await remote.revert({
-        sessionId: current,
-        ...paths.length === 1 ? { path: paths[0] } : {},
-      })
-      if (!result.ok) throw new Error(result.error.message)
+      const result = await remote.revert({ sessionId: current })
+      if (!result.ok) throw new RevisionError(result.error.code, result.error.message)
       return result.value.results
     },
   }
 }
 
+/**
+ * Client plugin body: register the dictionaries, the input-dock entry, and the
+ * full-screen viewer the dock opens.
+ * @param ctx - client root context.
+ */
 export function apply(ctx: ClientContext): void {
   const acceptStore = createAcceptedChangesStore()
+  // One source spanning both registrations: the dock publishes a request and
+  // the overlay occupant renders it. The dock is session-scoped and the viewer
+  // is root-scoped, so this observable — not the component tree — is what
+  // carries a request across that boundary.
+  const viewer = createRevisionViewerSource()
   ctx.effect(() => ctx.locale.register(NS, { zh }), 'ui-session-changes: dictionaries')
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
     name: 'conversation.input.dock',
@@ -109,12 +143,13 @@ export function apply(ctx: ClientContext): void {
     inject: (sessionId: SessionId): SessionChangesInjected => ({
       cwd: ctx.sessions.list.getSnapshot().byId[sessionId]?.cwd,
       revisions: remoteVerbs(ctx),
+      openViewer: viewer.publish,
       openFile: async (path) => {
         // The viewer resolves the session's Workspace and reports its own
         // misses; composing it out leaves the desktop opener as the only way.
-        const viewer = ctx.get('fileViewer')
-        if (viewer !== undefined) {
-          viewer.open({ sessionId, path })
+        const viewerService = ctx.get('fileViewer')
+        if (viewerService !== undefined) {
+          viewerService.open({ sessionId, path })
           return
         }
         const result = await ctx.remote.session.openWorkspacePath({ path })
@@ -122,4 +157,14 @@ export function apply(ctx: ClientContext): void {
       },
     }),
   }, SessionChangesDock))
+  ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+    name: 'shell.overlay',
+    id: 'session-changes-viewer',
+    locale: NS,
+    inject: (): RevisionViewerInjected => ({
+      hooks: { request: viewer.requests },
+      onClose: () => { viewer.publish(undefined) },
+      revisions: remoteVerbs(ctx),
+    }),
+  }, RevisionViewerOccupant))
 }

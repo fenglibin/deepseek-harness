@@ -407,7 +407,18 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'delivery/change': DeliveryChangeMeta
 ```
 
-来源：[`packages/delivery/delivery/src/types.ts:239`](../packages/delivery/delivery/src/types.ts)
+来源：[`packages/delivery/delivery/src/types.ts:276`](../packages/delivery/delivery/src/types.ts)
+
+<a id="deliverygrading-request--log-only"></a>
+
+#### `delivery/grading-request` — log-only
+
+```ts persistence-catalog
+/** Log-only pre-dispatch record of one delivery grading model request. */
+'delivery/grading-request': DeliveryGradingRequestEventData
+```
+
+来源：[`packages/delivery/tool-delivery/src/index.ts:495`](../packages/delivery/tool-delivery/src/index.ts)
 
 <a id="deliverytasks--log-only"></a>
 
@@ -418,7 +429,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 'delivery/tasks': DeliveryTasksChangeMeta
 ```
 
-来源：[`packages/delivery/delivery/src/types.ts:241`](../packages/delivery/delivery/src/types.ts)
+来源：[`packages/delivery/delivery/src/types.ts:278`](../packages/delivery/delivery/src/types.ts)
 
 ### `feedback/*`
 

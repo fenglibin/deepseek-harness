@@ -10,28 +10,30 @@ import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import { DeliveryTaskId, nextDeliveryPhase } from '@deepseek-ai/dsh-delivery'
 import type { DeliveryLevel, DeliveryPhase, DeliveryTaskItem, DeliveryTaskRef, DeliveryView } from '@deepseek-ai/dsh-delivery'
 import type {} from '@deepseek-ai/dsh-fs'
-import { createUserMessage, HarnessError } from '@deepseek-ai/dsh-llm'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import { BlockAssembler, createUserMessage, HarnessError } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, GenerateOptions } from '@deepseek-ai/dsh-llm'
+// Type-only: pulls the lightweight-model Context merge (ctx.lightweightModel).
+import type {} from '@deepseek-ai/dsh-lightweight-model'
 import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 import type { SandboxPolicyService } from '@deepseek-ai/dsh-sandbox-policy'
 import type { UserMessage } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-shell'
 import type {} from '@deepseek-ai/dsh-system-prompt'
+import { deadline } from '@deepseek-ai/dsh-timeout'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { GenericCallView, ToolRunContext } from '@deepseek-ai/dsh-tools'
 import {
-  DEFAULT_MEDIUM_SIGNALS,
-  DEFAULT_STRONG_SIGNALS,
-  DEFAULT_WEAK_SIGNALS,
-  explainGrading,
-  gradeObjective,
+  GRADING_CHARACTER_FLOOR,
+  gradeByLength,
+  parseGradedLevel,
 } from './grading.ts'
-import type { GradingPolicy, GradingRationale } from './grading.ts'
 import { changeArtifactPath, isValidChangeId } from './openspec.ts'
 import type { SpecKind } from './openspec.ts'
 import {
+  ACCEPTANCE_RECORD_PREFIX,
   COVERAGE_REVIEW_PREFIX,
   MIN_CONFIRMATION_CHARS,
+  acceptanceGap,
   checklistGap,
   checklistMismatch,
   coverageGap,
@@ -39,16 +41,15 @@ import {
   reviewRoundsSpent,
   verificationCommandFailure,
 } from './verification.ts'
+import type { AcceptanceGap } from './verification.ts'
 
 export const name = 'tool-delivery'
-export const inject = ['agents', 'delivery', 'tools', 'fs', 'shell', 'systemPrompt']
+export const inject = ['agents', 'delivery', 'tools', 'fs', 'shell', 'systemPrompt', 'llm']
 
 /** Size proxy that auto-tiers a task to `l1` when the model omits one. */
 export interface DesignThresholdConfig {
   /** Auto-tier to `l1` at or above this estimated todo-item count. */
   todoCount?: number
-  /** Auto-tier to `l1` when the objective is at least this many characters. */
-  descriptionChars?: number
   /** Auto-tier to `l1` at or above this estimated changed-file count. */
   touchedFiles?: number
 }
@@ -61,28 +62,62 @@ export interface OpenspecThresholdConfig {
   descriptionChars?: number
 }
 
+/** The tier rules used when the deployment configures none. */
+export const DEFAULT_GRADING_PROMPT = [
+  'You classify one software request into a delivery tier. Answer with exactly one label and nothing else:',
+  'l0, l1, or l2.',
+  '',
+  'l2 — the work changes a contract other code or deployments depend on: a capability seam, a session event,',
+  'a persisted schema or projection, a public API or protocol, a cross-version data format, or an authentication,',
+  'permission, sandbox, or other security boundary. Also l2 when it is a non-small bug fix touching data format,',
+  'protocol, compatibility, or security.',
+  '',
+  'l1 — the work needs a design decision written down before it is implemented: it spans host and client, touches',
+  'at least three packages, changes a widely referenced public symbol, adds a whole feature or capability, or is a',
+  'significant refactor or migration.',
+  '',
+  'l0 — a local, self-contained fix with no structural effect: wording, a typo, a style or layout tweak, a renamed',
+  'local variable, a small isolated bug.',
+  '',
+  'Judge the intent of the work, not the vocabulary it happens to contain. A small edit that merely mentions a',
+  'sensitive path or filename is still l0. When the request is genuinely between two tiers, choose the higher one.',
+].join('\n')
+
 /** Deployment policy for the delivery tools. */
 export interface Config {
   /** Whether the delivery tools are registered at all. */
   enabled?: boolean
   /** Gate strength: off (no tools), advisory (remind), stateful (block). */
   enforcement?: string
-  /** Size proxy: any measure at or above a threshold auto-tiers to `l1`. */
+  /** Size proxy: model-supplied estimates at or above a threshold auto-tier to `l1`. */
   designThreshold?: DesignThresholdConfig
-  /** Size proxy: any measure at or above a threshold auto-tiers to `l2`. */
+  /**
+   * The length floor that grades a request to `l2` without asking a model,
+   * plus the model-supplied estimate that does the same.
+   */
   openspecThreshold?: OpenspecThresholdConfig
   /** Whether a non-small bug fix (past the design threshold) forces `l2`. */
   requireOpenspecForBugs?: boolean
-  /** Post-execution commands run before a task may reach accepted. */
-  postHooks?: string[]
+  /**
+   * Names of the prompt commands the model must carry out before a task may
+   * reach `verified`. Names rather than command text because the prompt body
+   * lives in the `prompt-commands` settings section: editing a command there
+   * updates every task that selected it, and the selection stays readable in
+   * the settings document.
+   */
+  verificationCommands?: string[]
   /** Auto-create a task at pre-step when a direct human request meets the size proxy. */
   autoDetect?: boolean
-  /** Patterns whose first hit classifies a request as `l2`. */
-  strongSignals?: string[]
-  /** Patterns whose second hit classifies as `l2` and whose first hit classifies as `l1`. */
-  mediumSignals?: string[]
-  /** Patterns whose second hit classifies as `l1`. */
-  weakSignals?: string[]
+  /**
+   * The tier rules, as the system prompt of the grading call.
+   *
+   * Carried as text rather than as code so a deployment can retune what counts
+   * as `l0`/`l1`/`l2` without a code change. Keyword vocabularies previously
+   * decided this and were removed: substring matching cannot express the
+   * semantic difference between "fix a comment in auth.ts" and "change the
+   * auth protocol", so every vocabulary both under- and over-matched.
+   */
+  gradingPrompt?: string
   /** How many review rounds a blocked gate allows before it hard-blocks. */
   maxReviewRounds?: number
 }
@@ -93,19 +128,16 @@ export const Config: z<Config> = z.object({
   enforcement: z.string().default('stateful'),
   designThreshold: z.object({
     todoCount: z.number().default(5),
-    descriptionChars: z.number().default(60),
     touchedFiles: z.number().default(3),
-  }).default({ todoCount: 5, descriptionChars: 60, touchedFiles: 3 }),
+  }).default({ todoCount: 5, touchedFiles: 3 }),
   openspecThreshold: z.object({
     todoCount: z.number().default(15),
     descriptionChars: z.number().default(200),
   }).default({ todoCount: 15, descriptionChars: 200 }),
   requireOpenspecForBugs: z.boolean().default(true),
-  postHooks: z.array(z.string()).default([]),
+  verificationCommands: z.array(z.string()).default([]),
   autoDetect: z.boolean().default(true),
-  strongSignals: z.array(z.string()).default([...DEFAULT_STRONG_SIGNALS]),
-  mediumSignals: z.array(z.string()).default([...DEFAULT_MEDIUM_SIGNALS]),
-  weakSignals: z.array(z.string()).default([...DEFAULT_WEAK_SIGNALS]),
+  gradingPrompt: z.string().default(DEFAULT_GRADING_PROMPT),
   maxReviewRounds: z.number().default(2),
 })
 
@@ -114,16 +146,13 @@ interface ResolvedConfig {
   readonly enabled: boolean
   readonly enforcement: 'stateful' | 'advisory' | 'off'
   readonly designTodos: number
-  readonly designChars: number
   readonly designFiles: number
   readonly specTodos: number
   readonly specChars: number
   readonly requireOpenspecForBugs: boolean
-  readonly postHooks: readonly string[]
+  readonly verificationCommands: readonly string[]
   readonly autoDetect: boolean
-  readonly strongSignals: readonly string[]
-  readonly mediumSignals: readonly string[]
-  readonly weakSignals: readonly string[]
+  readonly gradingPrompt: string
   readonly maxReviewRounds: number
 }
 
@@ -292,6 +321,43 @@ function deliveryAgent(ctx: Context, exec: ToolRunContext): Agent {
   return agent
 }
 
+/**
+ * Retire the current task when the discipline policy allows the next one to
+ * take its place, then create that task.
+ *
+ * `DeliveryService.create` refuses a new task while any non-`accepted` one is
+ * current, and no tool clears a task. Policy — not the domain — decides which
+ * tiers may be replaced: every tier now runs under the discipline, so an l0
+ * task the model never advances would otherwise reject every later request in
+ * the session, while l1/l2 keep their claim because larger work needs
+ * continuity across turns. The clear leaves a durable tombstone, so a replaced
+ * task stays traceable in the session log.
+ * @param ctx - plugin context.
+ * @param agent - owning live agent.
+ * @param objective - the new task's objective.
+ * @param level - the new task's size class.
+ * @returns the created live view.
+ */
+function createReplacingL0(
+  ctx: Context,
+  agent: Agent,
+  objective: string,
+  level: DeliveryLevel,
+): DeliveryView {
+  const current = ctx.delivery.get(agent)
+  if (current !== undefined) {
+    if (current.level !== 'l0') {
+      throw new HarnessError(
+        `delivery task "${current.id}" already exists with phase "${current.phase}"; `
+        + 'only an l0 task may be replaced, so advance or clear it first',
+        'DELIVERY_TOOL_TASK_EXISTS',
+      )
+    }
+    ctx.delivery.clear(agent, { id: current.id, revision: current.revision })
+  }
+  return ctx.delivery.create(agent, { objective, level })
+}
+
 /** Build the exact compare-and-set ref from model arguments. */
 function deliveryRef(taskId: string, revision: number): DeliveryTaskRef {
   if (taskId.length === 0 || taskId !== taskId.trim()
@@ -313,21 +379,6 @@ function positiveInt(value: number | undefined, field: string, fallback: number)
   return resolved
 }
 
-/** Require a list of non-empty signal patterns, falling back to the defaults. */
-function signalList(
-  value: readonly string[] | undefined,
-  field: string,
-  fallback: readonly string[],
-): readonly string[] {
-  if (value === undefined) return fallback
-  for (const pattern of value) {
-    if (typeof pattern !== 'string' || pattern.trim().length === 0) {
-      throw new TypeError(`${field} must contain only non-empty pattern strings`)
-    }
-  }
-  return [...value]
-}
-
 /** Validate config even when apply is called directly outside Loader normalization. */
 function resolveConfig(config: Config): ResolvedConfig {
   const enforcement = config.enforcement ?? 'stateful'
@@ -335,34 +386,34 @@ function resolveConfig(config: Config): ResolvedConfig {
     throw new TypeError("enforcement must be 'stateful', 'advisory', or 'off'")
   }
   const designTodos = positiveInt(config.designThreshold?.todoCount, 'designThreshold.todoCount', 5)
-  const designChars = positiveInt(config.designThreshold?.descriptionChars, 'designThreshold.descriptionChars', 60)
   const designFiles = positiveInt(config.designThreshold?.touchedFiles, 'designThreshold.touchedFiles', 3)
   const specTodos = positiveInt(config.openspecThreshold?.todoCount, 'openspecThreshold.todoCount', 15)
-  const specChars = positiveInt(config.openspecThreshold?.descriptionChars, 'openspecThreshold.descriptionChars', 200)
-  const postHooks = config.postHooks ?? []
-  for (const hook of postHooks) {
-    if (typeof hook !== 'string' || hook.trim().length === 0) {
-      throw new TypeError('postHooks must contain only non-empty command strings')
+  const specChars = positiveInt(config.openspecThreshold?.descriptionChars, 'openspecThreshold.descriptionChars', GRADING_CHARACTER_FLOOR)
+  const verificationCommands = config.verificationCommands ?? []
+  for (const name of verificationCommands) {
+    if (typeof name !== 'string' || name.trim().length === 0) {
+      throw new TypeError('verificationCommands must contain only non-empty command names')
     }
   }
-  const strongSignals = signalList(config.strongSignals, 'strongSignals', DEFAULT_STRONG_SIGNALS)
-  const mediumSignals = signalList(config.mediumSignals, 'mediumSignals', DEFAULT_MEDIUM_SIGNALS)
-  const weakSignals = signalList(config.weakSignals, 'weakSignals', DEFAULT_WEAK_SIGNALS)
+  // An empty grading prompt would make the grading call answer with nothing and
+  // silently fall back to l1 for every request, so the misconfiguration is
+  // refused here rather than degrading every later grade.
+  const gradingPrompt = config.gradingPrompt ?? DEFAULT_GRADING_PROMPT
+  if (gradingPrompt.trim().length === 0) {
+    throw new TypeError('gradingPrompt must be a non-empty prompt')
+  }
   const maxReviewRounds = positiveInt(config.maxReviewRounds, 'maxReviewRounds', 2)
   return {
     enabled: config.enabled ?? true,
     enforcement,
     designTodos,
-    designChars,
     designFiles,
     specTodos,
     specChars,
     requireOpenspecForBugs: config.requireOpenspecForBugs ?? true,
-    postHooks,
+    verificationCommands,
     autoDetect: config.autoDetect ?? true,
-    strongSignals,
-    mediumSignals,
-    weakSignals,
+    gradingPrompt,
     maxReviewRounds,
   }
 }
@@ -382,37 +433,176 @@ function reachesDesign(signals: SizeSignals, resolved: ResolvedConfig): boolean 
 
 
 /** Whether any openspec-threshold measure is met. */
-function reachesSpec(signals: SizeSignals, objective: string, resolved: ResolvedConfig): boolean {
-  return objective.length >= resolved.specChars
-    || signals.todoCount >= resolved.specTodos
+function reachesSpec(signals: SizeSignals, resolved: ResolvedConfig): boolean {
+  return signals.todoCount >= resolved.specTodos
 }
 
-/** Project the resolved policy onto the pure grading inputs. */
-function gradingPolicyOf(resolved: ResolvedConfig): GradingPolicy {
-  return {
-    specChars: resolved.specChars,
-    strongSignals: resolved.strongSignals,
-    mediumSignals: resolved.mediumSignals,
-    weakSignals: resolved.weakSignals,
+/**
+ * Raise a tier with the model's own size estimates and the bug policy.
+ *
+ * This is the deterministic half of grading: the estimates come from the model
+ * that wrote them rather than from text matching, and each rule is a plain
+ * comparison, so nothing here can misread a request. The estimates may only
+ * ever raise the tier the grading call produced, so a request the model itself
+ * judged large cannot be graded down by a shorter objective.
+ * @param level - the tier from the length floor or the grading call.
+ * @param objective - direct human request text.
+ * @param signals - size estimates the caller supplied.
+ * @param resolved - deployment policy.
+ * @returns the final tier, never lower than the one passed in.
+ */
+function raiseByEstimates(
+  level: DeliveryLevel,
+  objective: string,
+  signals: SizeSignals,
+  resolved: ResolvedConfig,
+): DeliveryLevel {
+  if (level === 'l2') return 'l2'
+  const design = reachesDesign(signals, resolved)
+  // A non-small bug owes the OpenSpec set because its blast radius is unknown
+  // from the request text alone; the estimate decides "non-small".
+  if (resolved.requireOpenspecForBugs && signals.isBug && (design || objective.length > resolved.specChars)) {
+    return 'l2'
+  }
+  if (reachesSpec(signals, resolved) || objective.length > resolved.specChars) return 'l2'
+  if (level === 'l1' || design) return 'l1'
+  return 'l0'
+}
+
+/** Capability-owned timeout reason code for the grading call. */
+export const DELIVERY_GRADING_TIMEOUT_CODE = 'DELIVERY_GRADING_TIMEOUT'
+/** End-to-end deadline for one grading call. */
+const GRADING_TIMEOUT_MS = 30_000
+
+/** Output-token cap for one grading call: the answer is a single tier label. */
+const GRADING_MAX_OUTPUT_TOKENS = 16
+
+/** Log-only record of one grading request, which is a model call of its own. */
+interface DeliveryGradingRequestEventData {
+  /** Exact tier rules sent as the grading system prompt. */
+  readonly system: string
+  /** Exact user message carrying the request text. */
+  readonly messages: readonly UserMessage[]
+  /** Exact auxiliary route the call used. */
+  readonly route: { readonly provider: string; readonly model: string }
+  /** Exact output-token cap. */
+  readonly maxTokens: number
+}
+
+declare module '@deepseek-ai/dsh-session/types' {
+  interface SessionEventMap {
+    /** Log-only pre-dispatch record of one delivery grading model request. */
+    'delivery/grading-request': DeliveryGradingRequestEventData
   }
 }
 
 /**
- * Infer a task size class: the programmatic three-tier decision decides first,
- * and the model's own size estimates only raise the level when grading found
- * nothing, so a short but wide request cannot be graded down.
+ * The route one grading call should use, or `undefined` when none is known.
+ *
+ * Preference order puts an explicitly configured lightweight route first, then
+ * the route the conversation is already using, then the agent's own options:
+ * grading is an auxiliary classification, so a deployment that named a cheap
+ * model for auxiliary work should get that model rather than the main one.
+ * @param ctx - plugin context.
+ * @param agent - owning live agent.
+ * @returns provider and model, or `undefined` when no route is configured.
  */
-function inferLevel(objective: string, signals: SizeSignals, resolved: ResolvedConfig): DeliveryLevel {
-  const graded = gradeObjective(objective, gradingPolicyOf(resolved))
-  if (graded === 'l2') return 'l2'
-  if (resolved.requireOpenspecForBugs && signals.isBug
-    && (objective.length >= resolved.designChars || reachesDesign(signals, resolved))) {
-    return 'l2'
+function gradingRoute(ctx: Context, agent: Agent): { provider: string; model: string } | undefined {
+  const lightweight = ctx.get('lightweightModel')?.currentSelection()
+  if (lightweight !== undefined && lightweight.provider.length > 0 && lightweight.model.length > 0) {
+    return { provider: lightweight.provider, model: lightweight.model }
   }
-  if (reachesSpec(signals, objective, resolved)) return 'l2'
-  if (graded === 'l1' || reachesDesign(signals, resolved)
-    || objective.length >= resolved.designChars) return 'l1'
-  return 'l0'
+  const header = agent.session.requestHeader()?.config
+  if (header !== undefined && header.provider.length > 0 && header.model.length > 0) {
+    return { provider: header.provider, model: header.model }
+  }
+  const own = agent.options
+  if (own.provider !== undefined && own.provider.length > 0
+    && own.model !== undefined && own.model.length > 0) {
+    return { provider: own.provider, model: own.model }
+  }
+  return undefined
+}
+
+/** The outcome of one grading attempt. */
+type GradingOutcome =
+  | { readonly kind: 'graded'; readonly level: DeliveryLevel; readonly detail: string }
+  | { readonly kind: 'fallback'; readonly level: 'l1'; readonly detail: string }
+
+/**
+ * Classify one request by asking a model, with a deterministic fallback.
+ *
+ * Text matching cannot decide this: it cannot tell "fix a comment in auth.ts"
+ * from "change the auth protocol", so every keyword vocabulary both under- and
+ * over-matched. The rules therefore live in the editable `gradingPrompt` and
+ * the judgement is a model call.
+ *
+ * Every failure — no route, an abort, a provider error, or a response naming no
+ * tier — falls back to `l1` rather than `l0`. A request whose grade could not be
+ * determined still gets the discipline: falling back to `l0` would let an
+ * infrastructure failure become a discipline gap, while `l1` costs only a
+ * design record.
+ * @param ctx - plugin context.
+ * @param agent - owning live agent.
+ * @param objective - direct human request text.
+ * @param prompt - the configured tier rules.
+ * @param signal - turn cancellation signal.
+ * @returns the graded level and why, never throwing.
+ */
+async function gradeWithModel(
+  ctx: Context,
+  agent: Agent,
+  objective: string,
+  prompt: string,
+  signal: AbortSignal,
+): Promise<GradingOutcome> {
+  const route = gradingRoute(ctx, agent)
+  if (route === undefined) {
+    return { kind: 'fallback', level: 'l1', detail: 'no provider/model route is available for grading' }
+  }
+  const message = createUserMessage({
+    content: [{ type: 'text', text: objective }],
+    source: { kind: 'plugin', plugin: 'tool-delivery', form: 'notice', summary: 'delivery grading request' },
+  })
+  const options: GenerateOptions = {
+    provider: route.provider,
+    model: route.model,
+    messages: [message],
+    system: prompt,
+    maxTokens: GRADING_MAX_OUTPUT_TOKENS,
+    sessionId: agent.session.id,
+    purpose: 'session-title',
+    signal,
+  }
+  // The call is model-visible, so the repository rule requires it to be
+  // reconstructible from the log; this append happens before dispatch.
+  agent.session.append('delivery/grading-request', {
+    system: prompt,
+    messages: [message],
+    route,
+    maxTokens: GRADING_MAX_OUTPUT_TOKENS,
+  })
+  using callDeadline = deadline(signal, GRADING_TIMEOUT_MS, DELIVERY_GRADING_TIMEOUT_CODE)
+  const assembler = new BlockAssembler()
+  try {
+    for await (const chunk of ctx.llm.stream({ ...options, signal: callDeadline.signal })) {
+      callDeadline.signal.throwIfAborted()
+      assembler.push(chunk)
+    }
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? error.message : String(error)
+    return { kind: 'fallback', level: 'l1', detail: `grading call failed: ${detail}` }
+  }
+  const text = assembler.blocks()
+    .filter(block => block.type === 'text')
+    .map(block => block.text)
+    .join(' ')
+    .trim()
+  const level = parseGradedLevel(text)
+  if (level === undefined) {
+    return { kind: 'fallback', level: 'l1', detail: `grading response named no tier: ${text.slice(0, 80)}` }
+  }
+  return { kind: 'graded', level, detail: 'model judgement' }
 }
 
 /** The four OpenSpec change artifacts `record_spec` may write. */
@@ -459,14 +649,32 @@ async function appendArtifact(ctx: Context, agent: Agent, path: string, entry: s
   await ctx.fs.writeText(target, `${prefix}${entry}`, undefined, undefined, sandboxPolicyFor(ctx, agent))
 }
 
+/** Why one task was placed at its level, written into its change artifact. */
+interface GradingEvidence {
+  /** The final tier. */
+  readonly level: DeliveryLevel
+  /** Which rule decided it: the length floor, the grading call, or an estimate. */
+  readonly decidedBy: 'character-floor' | 'model' | 'estimates' | 'fallback'
+  /** Objective length, and the floor it was compared against. */
+  readonly chars: number
+  readonly charFloor: number
+  /** One short line of detail, e.g. the model's own words or the failing call. */
+  readonly detail: string
+}
+
 /**
  * Record why one task was placed at its level.
  *
  * Written into the task's own change artifact rather than into the task
  * snapshot: that snapshot's decoder rejects unknown fields, and the rationale
  * is a creation-time fact rather than mutable task state. The line names the
- * deciding rule and the concrete patterns, so a reader who disagrees with the
- * tier sees which evidence produced it instead of re-deriving the scan.
+ * deciding rule and the evidence behind it, so a reader who disagrees with the
+ * tier sees what produced it instead of re-deriving the judgement.
+ *
+ * A failed write is reported through `ctx.logger` rather than thrown: the task
+ * is already committed by the time this runs, so failing the tool call would
+ * tell the model its creation failed and leave it retrying a task that exists.
+ * The rationale is a trace, not a precondition.
  * @param ctx - plugin context.
  * @param agent - owning live agent.
  * @param taskId - created task id, which names the artifact file.
@@ -476,22 +684,20 @@ async function recordGradingRationale(
   ctx: Context,
   agent: Agent,
   taskId: string,
-  rationale: GradingRationale,
+  rationale: GradingEvidence,
 ): Promise<void> {
-  const evidence = [
-    ...rationale.matched.strong.map(pattern => `strong:${pattern}`),
-    ...rationale.matched.medium.map(pattern => `medium:${pattern}`),
-    ...rationale.numberedList ? ['medium:numbered-list'] : [],
-    ...rationale.matched.weak.map(pattern => `weak:${pattern}`),
-  ]
-  const detail = evidence.length === 0 ? 'no signal matched' : evidence.join(', ')
-  await appendArtifact(
-    ctx,
-    agent,
-    `.dsh/changes/${taskId}.md`,
-    `- graded ${rationale.level} by ${rationale.decidedBy} `
-    + `(${rationale.chars} chars vs floor ${rationale.charFloor}; ${detail})\n`,
-  )
+  try {
+    await appendArtifact(
+      ctx,
+      agent,
+      `.dsh/changes/${taskId}.md`,
+      `- graded ${rationale.level} by ${rationale.decidedBy} `
+      + `(${rationale.chars} chars vs floor ${rationale.charFloor}; ${rationale.detail})\n`,
+    )
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    ctx.logger.warn(`delivery grading rationale not written for ${taskId}: ${message}`)
+  }
 }
 
 /** Checkbox regex reused by `renderTasksMarkdown`; matches `[ ]`, `[x]`, `[X]`. */
@@ -554,7 +760,22 @@ export function renderTasksMarkdown(
     consumed.add(matchingIdx)
     const item = items[matchingIdx] as DeliveryTaskItem
     const done = item.status === 'completed'
-    output.push(line.replace(/^(\s*[-*]\s+)\[[ xX]\]/, `$1${done ? '[x]' : '[ ]'}`))
+    // The model's own annotation wins; an item that declares none keeps the one
+    // already on the line. Both halves matter: the scenario and design checks
+    // read this file, so a corrected `covers:` list has to reach it, while a
+    // checklist re-recorded without annotations must not silently erase the
+    // declarations a previous record established.
+    const itemAnnotation = TASKS_COVERS.exec(item.content.trim())
+    // The annotation keeps the single space that separates it from the content,
+    // so a re-recorded item reproduces the line it replaced byte for byte.
+    const keptAnnotation = TASKS_COVERS.exec(match[2].trim())?.[0]?.replace(/^\s*/, ' ') ?? ''
+    const content = itemAnnotation === null
+      ? `${withoutCovers(item.content)}${keptAnnotation}`
+      : item.content
+    output.push(line.replace(
+      /^(\s*[-*]\s+)\[[ xX]\]\s*(.*)$/,
+      `$1${done ? '[x]' : '[ ]'} ${content}`,
+    ))
   }
   for (let idx = 0; idx < items.length; idx += 1) {
     if (consumed.has(idx)) continue
@@ -735,15 +956,6 @@ const TODO_BLOCKED_REASON = 'this delivery task is l2, so its work is tracked by
   + 'instead: write openspec/changes/<change_id>/tasks.md with record_spec(kind: \'tasks\') and report the '
   + 'same checklist with record_tasks. todo_write is disabled while this task is l2.'
 
-/** Ask the model to grade a request the programmatic scan did not classify as `l2`. */
-const GRADING_RUBRIC = 'Delivery grading: the automatic size scan did not classify this request as l2, so '
-  + 'decide whether it needs a delivery task and at which level. Call create_delivery_task with l2 when it '
-  + 'changes a structure contract (a capability seam, a session event, a persisted schema or projection, a '
-  + 'public API or protocol, or a cross-version data format), or when it is a non-small bug fix touching '
-  + 'data format, protocol, compatibility, or security. Call it with l1 when it spans host and client, '
-  + 'touches at least three packages, changes a widely referenced public symbol, or adds a whole feature. '
-  + 'Do nothing when the request is a small fix.'
-
 /** The settings slice this plugin uses, kept local to avoid a hard dependency. */
 interface SettingsSectionHost {
   installSection<T>(
@@ -753,6 +965,8 @@ interface SettingsSectionHost {
     entry: T,
     hooks: { setSource(current: () => T): void; onChange(): void },
   ): void
+  /** Every registered namespace with its resolved value, for cross-namespace reads. */
+  describe(): readonly { ns: string; value: unknown }[]
 }
 
 /**
@@ -762,6 +976,84 @@ interface SettingsSectionHost {
  */
 function optionalSettings(ctx: Context): SettingsSectionHost | undefined {
   return ctx.reflect.get('settings') as SettingsSectionHost | undefined
+}
+
+/** Namespace owning the prompt commands an acceptance command names. */
+const PROMPT_COMMANDS_NS = 'prompt-commands'
+
+/** One prompt-command entry as the `prompt-commands` section stores it. */
+interface PromptCommandSectionEntry {
+  name?: unknown
+  title?: unknown
+  prompt?: unknown
+}
+
+/**
+ * The prompt body of each named command, in the order given.
+ *
+ * Read from the `prompt-commands` section through the shared descriptor rather
+ * than from the command registry: the registry exposes UI metadata but not the
+ * prompt text, and the section is also what the settings UI edits, so the gate
+ * and the editor can never disagree about a command's body. A selected name
+ * with no matching entry is reported as such instead of silently dropping out
+ * of the requirement — a deployment that deleted a command must see that its
+ * acceptance gate lost its body rather than pass without checking.
+ * @param ctx - plugin context.
+ * @param names - acceptance command names, without the leading slash.
+ * @returns one line per name.
+ */
+function acceptanceBodies(ctx: Context, names: readonly string[]): readonly string[] {
+  const settings = optionalSettings(ctx)
+  if (settings === undefined) {
+    return names.map(name => `/${name}: its prompt is unavailable because this deployment serves no settings provider`)
+  }
+  const descriptor = settings.describe().find(candidate => candidate.ns === PROMPT_COMMANDS_NS)
+  const section = descriptor?.value as { commands?: readonly PromptCommandSectionEntry[] } | undefined
+  const entries = new Map<string, PromptCommandSectionEntry>()
+  for (const entry of section?.commands ?? []) {
+    if (typeof entry.name === 'string') entries.set(entry.name, entry)
+  }
+  return names.map((name) => {
+    const entry = entries.get(name)
+    if (entry === undefined) {
+      return `/${name}: no command with this name is configured under ${PROMPT_COMMANDS_NS}`
+    }
+    if (typeof entry.prompt !== 'string' || entry.prompt.trim().length === 0) {
+      return `/${name}: its configured prompt is empty`
+    }
+    return `/${name}: ${entry.prompt.trim()}`
+  })
+}
+
+/**
+ * The gate message naming the next outstanding acceptance command and its prompt.
+ *
+ * The prompts ride the message rather than a deferred context because
+ * `ToolRunContext.deferContext` attaches context only to a SUCCESSFUL result
+ * (`packages/core/tools/src/index.ts`), so a blocking throw would discard it.
+ * A blocking message is what the model is guaranteed to read, which is where
+ * an instruction the model must act on has to live.
+ *
+ * Only the next command in the configured order is named, and the remaining
+ * count is stated, because the configured order is what the gate enforces: a
+ * message that listed every outstanding command would leave the model to work
+ * out which one comes first.
+ * @param ctx - plugin context.
+ * @param gap - the next command without a record, with its position.
+ * @returns the message shown to the model.
+ */
+function acceptanceRequirementMessage(ctx: Context, gap: AcceptanceGap): string {
+  const body = acceptanceBodies(ctx, [gap.name])[0] ?? `/${gap.name}`
+  const remaining = gap.total - gap.position + 1
+  const rest = gap.total === 1
+    ? ''
+    : ` This is acceptance command ${gap.position} of ${gap.total}; `
+      + `${remaining - 1} more follow${remaining - 1 === 1 ? 's' : ''} after it.`
+  return `delivery verification blocked: acceptance command ${gap.position} of ${gap.total} has no recorded run: `
+    + `- ${body}`
+    + `${rest} Carry out the prompt above, then record the outcome with record_change using `
+    + `"${ACCEPTANCE_RECORD_PREFIX}${gap.name}: <what you found>" so the task can be verified. `
+    + 'The gate reads those records, not a summary, and it requires them in the configured order.'
 }
 
 /**
@@ -798,43 +1090,34 @@ export function apply(ctx: Context, config: Config): void {
   })
 
   if (resolved.autoDetect) {
-    const rubricInjected = new Set<string>()
-    ctx.on('agent/pre-step', async ({ agent, messages, turn, signal }, next): Promise<PreStepDecision> => {
+    ctx.on('agent/pre-step', async ({ agent, messages, signal }, next): Promise<PreStepDecision> => {
       if (signal.aborted) return next()
       try {
-        if (ctx.delivery.get(agent) === undefined) {
-          const objective = directHumanText(messages)
-          if (objective.length > 0) {
-            // The automatic path grades the text alone; the model's own size
-            // estimates only exist when it calls create_delivery_task itself.
-            // Both l1 and l2 create a task here: leaving l1 to the model made
-            // that tier's existence depend on the model volunteering a call,
-            // so a graded-l1 request often ran with no task and no progress
-            // surface at all. Only l0 stays free.
-            const gradePolicy = gradingPolicyOf(policy())
-            const level = gradeObjective(objective, gradePolicy)
-            if (level === 'l2' || level === 'l1') {
-              const created = ctx.delivery.create(agent, { objective, level })
-              // The rationale is written after the create commits, so a failed
-              // artifact write cannot leave a task without its own record.
-              await recordGradingRationale(ctx, agent, String(created.id), explainGrading(objective, gradePolicy))
-            } else {
-              // Hand the rubric to the model once per turn so it can declare
-              // a level for a request the scan could not settle.
-              const key = `${agent.id}:${turn}`
-              if (!rubricInjected.has(key)) {
-                rubricInjected.add(key)
-                agent.inject(createUserMessage({
-                  content: [{ type: 'text', text: GRADING_RUBRIC }],
-                  source: {
-                    kind: 'plugin',
-                    plugin: 'tool-delivery',
-                    form: 'notice',
-                    summary: 'delivery size grading',
-                  },
-                }))
-              }
-            }
+        const objective = directHumanText(messages)
+        if (objective.length > 0) {
+          const current = ctx.delivery.get(agent)
+          // An l1/l2 task keeps its claim across turns, so this turn needs no
+          // grading call and proceeds untouched. An l0 task is a small fix the
+          // next direct request may replace, so it is graded like a fresh one.
+          if (current === undefined || current.level === 'l0') {
+            const floored = gradeByLength(objective, policy().specChars)
+            const outcome = floored === undefined
+              ? await gradeWithModel(ctx, agent, objective, policy().gradingPrompt, signal)
+              : { kind: 'graded' as const, level: floored, detail: 'objective exceeds the length floor' }
+            // The decision is made before the task is created, so the task
+            // starts at its final tier instead of being raised afterwards.
+            const created = createReplacingL0(ctx, agent, objective, outcome.level)
+            // The rationale is written after the create commits, so a failed
+            // artifact write cannot leave a task without its own record.
+            await recordGradingRationale(ctx, agent, String(created.id), {
+              level: outcome.level,
+              decidedBy: floored !== undefined
+                ? 'character-floor'
+                : outcome.kind === 'fallback' ? 'fallback' : 'model',
+              chars: objective.length,
+              charFloor: GRADING_CHARACTER_FLOOR,
+              detail: outcome.detail,
+            })
           }
         }
       } catch (error: unknown) {
@@ -896,14 +1179,30 @@ export function apply(ctx: Context, config: Config): void {
         touchedFiles: typeof args.touched_files === 'number' && Number.isSafeInteger(args.touched_files) ? args.touched_files : 0,
         isBug: args.is_bug === true,
       }
-      const level = args.level === undefined ? inferLevel(args.objective, signals, policy()) : args.level
-      const view = ctx.delivery.create(agent, { objective: args.objective, level })
-      // An explicit level is a model decision, not a graded one, so only the
-      // inferred path has a rationale to record.
+      // An omitted level is graded rather than defaulted: the length floor is
+      // settled first, then the model judge, and only then the size estimates
+      // the caller supplied — which may raise the tier but never lower it.
+      const floored = gradeByLength(args.objective, policy().specChars)
+      const outcome = floored === undefined && args.level === undefined
+        ? await gradeWithModel(ctx, agent, args.objective, policy().gradingPrompt, exec.signal)
+        : undefined
+      const base = args.level ?? floored ?? outcome?.level ?? 'l1'
+      const level = raiseByEstimates(base, args.objective, signals, policy())
+      const view = createReplacingL0(ctx, agent, args.objective, level)
+      // A level the model stated explicitly is its own decision, not a graded
+      // one, so only the graded path has a rationale to record.
       if (args.level === undefined) {
-        await recordGradingRationale(
-          ctx, agent, String(view.id), explainGrading(args.objective, gradingPolicyOf(policy())),
-        )
+        await recordGradingRationale(ctx, agent, String(view.id), {
+          level,
+          decidedBy: floored !== undefined
+            ? 'character-floor'
+            : outcome === undefined || outcome.kind === 'fallback' ? 'fallback' : 'model',
+          chars: args.objective.length,
+          charFloor: GRADING_CHARACTER_FLOOR,
+          detail: level === base
+            ? (outcome?.detail ?? 'no grading was needed')
+            : `raised to ${level} by the supplied size estimates`,
+        })
       }
       return deliveryValue(view)
     },
@@ -1128,12 +1427,25 @@ export function apply(ctx: Context, config: Config): void {
             policy,
           )
         }
-        const commandFailure = await verificationCommandFailure(ctx, agent, policy().postHooks)
+        const commandFailure = await verificationCommandFailure(ctx, agent)
         if (commandFailure !== undefined) {
           enforceGate(
             exec,
-            'DELIVERY_POST_HOOK_FAILED',
+            'DELIVERY_STRUCTURAL_VALIDATION_FAILED',
             `delivery verification blocked: ${commandFailure}`,
+            policy,
+          )
+        }
+        // The configured acceptance commands are prompt text the model carries
+        // out, so they have no exit code to read. The checkable fact is whether
+        // the task recorded running each one, and the configured order is
+        // enforced by requiring them one at a time from the front.
+        const acceptance = acceptanceGap(agent, policy().verificationCommands)
+        if (acceptance !== undefined) {
+          enforceGate(
+            exec,
+            'DELIVERY_GATE_BLOCKED',
+            acceptanceRequirementMessage(ctx, acceptance),
             policy,
           )
         }

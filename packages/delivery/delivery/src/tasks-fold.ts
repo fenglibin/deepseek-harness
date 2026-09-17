@@ -174,6 +174,39 @@ function mirroredPhase(phase: DeliveryPhase | null): DeliveryPhase {
   return phase
 }
 
+/** Trailing `(covers: ...)` / `(覆盖: ...)` annotation on one checklist line. */
+const COVERS = /\s*\((?:covers|覆盖)\s*:[^)]*\)\s*$/i
+
+/**
+ * Carry the coverage annotation of a recorded item onto its mirrored twin.
+ *
+ * The annotation is the only place an item declares which verification point it
+ * implements, and it lives in the item's own content. A mirrored item is built
+ * from a todo entry, which has no annotation to carry, so dropping the
+ * recorded one silently erased every declaration the moment a model used both
+ * lists — and the task could then never pass verification.
+ * @param content - the todo entry's content.
+ * @param recorded - items of the checklist the mirror replaces, when there is one.
+ * @returns the content, with the matching recorded annotation restored.
+ */
+function withRecordedCovers(
+  content: string,
+  recorded: readonly DeliveryTaskItem[] | undefined,
+): string {
+  if (recorded === undefined) return content
+  if (COVERS.test(content)) return content
+  const bare = content.trim()
+  const match = recorded.find(item => stripCovers(item.content) === bare)
+  if (match === undefined) return content
+  const annotation = COVERS.exec(match.content.trim())
+  return annotation === null ? content : `${bare}${annotation[0].replace(/\s+$/, '')}`
+}
+
+/** One checklist line without its trailing coverage annotation. */
+function stripCovers(content: string): string {
+  return content.trim().replace(COVERS, '').trim()
+}
+
 /**
  * Mirror one `todo_write` list into the checklist view.
  *
@@ -199,12 +232,14 @@ function mirrorTodos(
   // todo list does not overwrite it; the model keeps both in sync itself.
   if (recorded !== undefined && recorded.changeId.length > 0) return state
   const phase = mirroredPhase(state.phase)
+  const prior = recorded?.items
   const items: DeliveryTaskItem[] = todos.map(todo => ({
-    content: todo.content,
+    content: withRecordedCovers(todo.content, prior),
     phase,
     status: todo.status,
   }))
-  // A mirrored list is replaced wholesale, exactly like a recorded one.
+  // A mirrored list is replaced wholesale, exactly like a recorded one, except
+  // that each item keeps the coverage annotation its recorded twin declared.
   return {
     ...state,
     current: { changeId: '', items, progress: tasksProgress(items), source: 'mirrored' },

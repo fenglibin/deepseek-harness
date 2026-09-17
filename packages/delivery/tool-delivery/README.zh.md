@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## 概述
 
-`dsh-tool-delivery` 为模型提供七个操作持久化同会话交付任务的工具：`get_delivery_task` 读取当前任务，`create_delivery_task` 创建任务（按目标内容与规模信号分级），`record_change` 记录一条变更，`mark_analysis_done` 标记需求分析完成，`record_design` 记录一条设计，`record_spec` 记录一条 spec，`record_tasks` 记录实施清单，`advance_delivery_task` 推进阶段。门禁强度是部署选择：`stateful`（默认）在至少存在一条变更记录之前阻止推进到 `implemented`，在至少存在一条设计记录之前阻止推进到 `designed`，在至少存在一条 spec 记录之前阻止推进到 `specified`；`advisory` 只提醒而不阻止，`off`（或 `enabled: false`）完全不注册工具。当 agent 应当保持一个可见、可追溯变更并按纪律生命周期推进的任务时选择它。
+`dsh-tool-delivery` 为模型提供七个操作持久化同会话交付任务的工具：`get_delivery_task` 读取当前任务，`create_delivery_task` 创建任务（长度闸门加一次分级模型调用），`record_change` 记录一条变更，`mark_analysis_done` 标记需求分析完成，`record_design` 记录一条设计，`record_spec` 记录一条 spec，`record_tasks` 记录实施清单，`advance_delivery_task` 推进阶段。门禁强度是部署选择：`stateful`（默认）在至少存在一条变更记录之前阻止推进到 `implemented`，在至少存在一条设计记录之前阻止推进到 `designed`，在至少存在一条 spec 记录之前阻止推进到 `specified`；`advisory` 只提醒而不阻止，`off`（或 `enabled: false`）完全不注册工具。当 agent 应当保持一个可见、可追溯变更并按纪律生命周期推进的任务时选择它。
 
 ## 目录
 
@@ -36,9 +36,9 @@ kind: "package-reference"
       todoCount: 15
       descriptionChars: 200
     requireOpenspecForBugs: true
-    postHooks:
-      - 'openspec validate --strict'
-      - 'pnpm run test'
+    verificationCommands:
+      - smoke
+      - docs
 ```
 
 | 字段 | 默认值 | 含义 |
@@ -46,25 +46,24 @@ kind: "package-reference"
 | `enabled` | `true` | 是否注册工具 |
 | `enforcement` | `stateful` | `stateful` 阻止、`advisory` 提醒、`off` 不注册 |
 | `designThreshold.todoCount` | `5` | 预估 todo 数达到或超过该值时自动分级为 `l1` |
-| `designThreshold.descriptionChars` | `60` | 目标长度达到或超过该值时自动分级为 `l1` |
 | `designThreshold.touchedFiles` | `3` | 预估改动文件数达到或超过该值时自动分级为 `l1` |
 | `openspecThreshold.todoCount` | `15` | 预估 todo 数达到或超过该值时自动分级为 `l2` |
-| `openspecThreshold.descriptionChars` | `200` | 目标长度超过该值时直接分级为 `l2`，不再扫描信号 |
-| `requireOpenspecForBugs` | `true` | 非小微 bug 修复（超过 design 阈值）强制 `l2` |
-| `postHooks` | `[]` | 任务到达 `verified` 之前按序执行的后置命令 |
-| `strongSignals` | 内置词表 | 命中任一即分级为 `l2` 的模式（关键词或路径片段） |
-| `mediumSignals` | 内置词表 | 命中两个分级为 `l2`、命中一个分级为 `l1` 的模式 |
-| `weakSignals` | 内置词表 | 命中两个分级为 `l1` 的模式 |
-| `autoDetect` | `true` | 直接人类请求判定为 `l1` 或 `l2` 时自动创建任务；`l0` 改为注入分级判据由模型决定 |
+| `openspecThreshold.descriptionChars` | `200` | 目标长度超过该值时直接分级为 `l2`，不再调用分级模型 |
+| `requireOpenspecForBugs` | `true` | 非小微 bug 修复（预估规模达到 design 阈值）强制 `l2` |
+| `verificationCommands` | `[]` | 要求任务在执行时留下记录的验收命令名（对应 `prompt-commands` 命名空间的条目名）；缺少记录即阻止推进到 `verified` |
+| `gradingPrompt` | 内置规则文本 | 分级判定的系统提示词；判定由一次独立模型调用执行，模型只回一个分级标签 |
+| `autoDetect` | `true` | 直接人类请求判定为 `l0`/`l1`/`l2` 时一律自动创建任务；判定为 `l0` 时另注入一次分级判据，供模型按内容提高分级 |
 | `maxReviewRounds` | `2` | 门禁差异允许的模型复核轮次，超过即硬阻断 |
 
-阈值与信号清单同时注册为设置服务的 `delivery` namespace：组合配置作为 `base` 层，用户覆盖优先且实时生效；未挂载设置服务时回退到组合配置，行为不变。该 namespace 配有设置界面（`设置 → 插件 → 插件配置 → 交付纪律`），可编辑上表的全部字段，含布尔、枚举与词表控件。
+阈值、分级规则与验收清单同时注册为设置服务的 `delivery` namespace：组合配置作为 `base` 层，用户覆盖优先且实时生效；未挂载设置服务时回退到组合配置，行为不变。该 namespace 配有设置界面（`设置 → 插件 → 插件配置 → 交付纪律`），可编辑上表的全部字段，含布尔、枚举、数值与多行文本控件。
 
 ### 每次调用的作用
 
-- `create_delivery_task` 以目标和可选 `level`（`l0`/`l1`/`l2`）在 `created` 阶段启动一个任务；省略 `level` 时按三层判定推断：目标长度超过 `openspecThreshold.descriptionChars` 直接为 `l2`，否则扫描强/中/弱信号——命中任一强信号为 `l2`，中等信号达 2 个为 `l2`，中等 1 个或弱信号达 2 个为 `l1`，都不命中为 `l0`；bug（`is_bug`）可能强制 `l2`。
-- **编号列表计为中等信号，不是强信号。** 一段含 3 条及以上编号项的需求计一个中等信号，因此单独出现时判为 `l1`，需与另一个中等信号叠加才升 `l2`：列出多条要点表达的是「可拆分」，而 `l1` 的设计文档已经承担拆分，`l2` 的语义是必须产出 OpenSpec 四件套的结构契约级变更。把编号列表计为强信号会使任何写成三条要点的需求无条件进入 `l2`。
-- 直接人类请求到达时 `autoDetect` 先跑同一套程序化判定：判定为 `l1` 或 `l2` 都自动创建任务，使交付纪律覆盖所有非小微需求；判定为 `l0` 时注入一次分级判据提示（每个 turn 至多一次），由模型按内容决定是否创建任务。
+- 直接人类请求到达时 `autoDetect` 先定级、再创建任务，使交付纪律覆盖每一次直接请求。定级分两步：目标长度超过 `openspecThreshold.descriptionChars` 时直接为 `l2`，否则发一次分级模型调用（系统提示词即 `gradingPrompt`，模型只回一个分级标签）。**判定用模型而不是关键词表**：忽略大小写的子串匹配无法区分「改 auth.ts 里的注释」与「改 auth 协议」，任何词表都会同时漏判（「表演示一下这个界面」只命中一个弱信号仍是 `l0`）与误判（文件名里的 `auth` 把改注释抬成 `l2`）。分级失败——没有可用路由、调用报错、超时或响应里没有分级标签——一律回退 `l1`：与其放行一个未判定的请求，不如让它留下一条设计记录。
+- 分级调用是一个独立的模型调用，因此按「模型可见 ⟺ 已记录」写入 `delivery/grading-request` 会话事件（含路由、系统提示词、消息与输出上限）。路由优先级为 `lightweightModel` 设置 → 会话最近一次请求头路由 → agent 自身路由。
+- **未完成的 `l0` 任务会被下一条直接请求替换。** `create` 在存在任何非 `accepted` 当前任务时拒绝新建，而没有任何工具可以清空任务，因此若让一个模型没有推进的 `l0` 任务一直占位，它会使该会话随后的每个请求都被拒绝。`l0` 是彼此独立的小微修复，所以 `pre-step` 在创建下一个任务前先 `clear` 掉它；`clear` 留下 durable tombstone，被替换的任务仍可追溯。`l1`/`l2` 保留占用：较大的工作需要跨 turn 的连续性。代价是 `l0` 的自检保护为尽力而为——同一 turn 内没走完 `verified` 时，那次自检不会被门禁强制。
+- `create_delivery_task` 以目标和可选 `level`（`l0`/`l1`/`l2`）在 `created` 阶段启动一个任务；省略 `level` 时走与自动路径相同的判定：长度闸门优先，否则问分级模型，再由模型自估值与 bug 策略抬高。显式给出 `level` 时不发分级调用，也不记录分级依据。当前任务是 `l0` 时该调用会替换它，其它级别仍须先推进或清空。
+- **模型的规模自估值只能抬高分级，不能压低。** `todo_count`／`touched_files`／`is_bug` 由模型在创建任务时给出，达到 `openspecThreshold.todoCount` 即为 `l2`、达到 L1 阈值即为 `l1`；`requireOpenspecForBugs` 开启时，非小微 bug 直接为 `l2`。这些判据全是确定性比较，但都只在分级结果之上加码，因此一个自己判断需要设计的模型不会被一个偏小的估值降级。
 - `record_change` 针对精确的 `{ task_id, revision }` 记录一条变更（`text`），递增变更数，并把记录追加到 `.dsh/changes/<task-id>.md`。
 - `mark_analysis_done` 针对精确的 `{ task_id, revision }` 标记需求分析已完成。任务创建后应先澄清并对齐需求，再调用它；`record_design` 在分析完成前会被阻止。
 - `record_design` 针对精确的 `{ task_id, revision }` 记录一条设计（`text`），递增设计数，并把记录追加到 `.dsh/design/<task-id>.md`。
@@ -79,9 +78,10 @@ kind: "package-reference"
 
 推进到 `verified` 时按**原始需求、任务列表、设计文档**三类输入执行四道检查：
 
-1. **清单完整性**——权威任务列表（`l2` 为磁盘 `tasks.md`，`l1` 为 `delivery-tasks` 投影）的每一项都必须是 `completed`；`l1` 未记录清单会被阻止，`l0` 没有清单义务故豁免。
+1. **清单完整性**——权威任务列表（`l2` 为磁盘 `tasks.md`，`l1` 为 `delivery-tasks` 投影）的每一项都必须是 `completed`；`l1` 未记录清单会被阻止，`l0` 没有清单义务故豁免。`l0` 现在也创建任务并经过这道门禁，但其豁免不变：小微修复不因纳入验收而承担清单与 `covers` 注解的负担，因此 `l0` 走的是「验收命令」这一道而非全部四道。
 2. **覆盖性**——原始需求的每条编号项与设计文档的每个 `### D<n>` 决策，都必须被一条**已完成**清单项通过行尾 `(covers: <key>)` 注解声明覆盖。键名为 `req/<n>`、`design/<Dn>`，`l2` 另含 `<capability>/<Scenario name>`。
-3. **产物核验**——`l2` 先执行 `openspec validate <change_id> --strict --json`，随后按序执行配置的 `postHooks`。任一非零退出、超时或中止都会阻止验证，且不因模型确认完成而豁免。
+3. **产物核验**——`l2` 先执行 `openspec validate <change_id> --strict --json`，任一非零退出、超时或中止都会阻止验证，且不因模型确认完成而豁免。配置的验收命令是提示词命令（正文由模型执行），没有退出码可判，因此改为校验该任务是否为每条命令留下了执行记录：模型须为每条命令调用 `record_change`，记录文本以 `acceptance: <命令名> ` 开头（例如 `acceptance: smoke 全部通过`），命令名不带前导斜杠。
+   **顺序是机械要求。** 门禁每次只要求配置顺序中**最早**那条尚未记录的命令，并在消息里说明它是第几条、共几条，因此模型无法跳到后面某条，也无法一次声称全部完成。为第二条命令留下记录而不记录第一条，推进仍会被阻止。命令名在 `prompt-commands` 命名空间中已不存在时，门禁照常阻止并说明该命令没有对应的提示词。
 4. **逐条对账**——覆盖关系由上述注解承载，取代一段自由文本放行。
 
 第 1、3 道为确定性判定；第 2 道允许在 `maxReviewRounds` 轮次内由一段具体说明（`coverage_confirmation`，至少 20 字）放行并留痕，轮次按当前任务从会话日志计数。`accepted` 只做最终确认，不再重复执行验证命令。
@@ -108,7 +108,7 @@ kind: "package-reference"
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：配置 schema、工具注册、分级推断与门禁编排 |
 | [`src/verification.ts`](src/verification.ts) | 实现验证：清单完整性、覆盖性、产物核验与复核轮次计数 |
-| [`src/grading.ts`](src/grading.ts) | 规模分级：信号扫描与三层判定（不依赖 cordis，可独立测试） |
+| [`src/grading.ts`](src/grading.ts) | 长度闸门与分级响应解析（不依赖 cordis，可独立测试） |
 | [`src/coverage.ts`](src/coverage.ts) | 覆盖点提取与比对：`#### Scenario:`、`### D<n>`、原始需求编号项与 `covers:` 注解解析 |
 | [`src/openspec.ts`](src/openspec.ts) | OpenSpec change 布局：change-id 校验与四件套路径推导 |
 | [`src/invariant.ts`](src/invariant.ts) | 无运行时 invariant companion |
@@ -146,7 +146,8 @@ kind: "package-reference"
 - **门禁是逐次 advance 而非持续监控** — 在门禁策略变更之前创建的任务，只在其下一次 `advance` 时被重新检查。
 - **仅单一 owner 作用域** — 任务属于一个 agent 会话；子代理与共享作用域不在范围内。
 - **`enabled: false` 与 `enforcement: off` 不同** — 前者在加载期就不注册任何工具，因此设置界面无从关闭它；后者注册工具但在每次判定时短路，可在设置中实时切换。要彻底不暴露工具，只能在组合配置中设 `enabled: false`。
-- **`l0` 不参与注解覆盖** — `l0` 没有清单义务，因此其原始需求（即使写成编号列表）不要求 `covers:` 声明；对它而言纪律就是请求本身。这是刻意的：一段「1、修复甲 2、修复乙」的小微修复若被要求逐项注解，会在没有清单可承载时永久卡在验证。
+- **`l0` 不参与注解覆盖** — `l0` 没有清单义务，因此其原始需求（即使写成编号列表）不要求 `covers:` 声明；对它而言纪律就是请求本身。这是刻意的：一段「1、修复甲 2、修复乙」的小微修复若被要求逐项注解，会在没有清单可承载时永久卡在验证。`l0` 仍然经过「验收命令」这一道门禁。
+- **`l0` 的自检是尽力而为的** — 未完成的 `l0` 任务会被下一条直接请求替换，因此同一个 turn 内没有走完 `verified` 的任务，其验收命令门禁不会被执行。让 `l0` 保持轻量的代价；`l1`/`l2` 的门禁仍是硬的。
 - **镜像清单不做注解校验的来源区分** — 由 `todo_write` 镜像而来的 `l1` 清单同样需要 `covers:` 注解（写在 todo 项内容里）。镜像只在 l1 任务存续期间发生，且已记录的 `l2` 清单不会被镜像覆盖。
 
 <a id="dev-note"></a>

@@ -23,4 +23,4 @@ Status: implemented
 ## 后果
 
 - **获得** §6.4 完整的规模 proxy 集合与 `requireOpenspecForBugs`、零 lint 抑制、端到端生命周期覆盖（92 条单测，100% 覆盖率）。
-- **延期（不变，跨 capability）** — 写 `.dsh/changes/` / `.dsh/design/` 文件与真实 `openspec` CLI（`create`/`validate`/`archive`）仍需 `fs`/subprocess 集成；`postHooks`（B4）与客户端 UI（B5）仍是后续批次。
+- **延期（不变，跨 capability）** — 写 `.dsh/changes/` / `.dsh/design/` 文件与真实 `openspec` CLI（`create`/`validate`/`archive`）仍需 `fs`/subprocess 集成；客户端 UI 的其余批次仍未开始。

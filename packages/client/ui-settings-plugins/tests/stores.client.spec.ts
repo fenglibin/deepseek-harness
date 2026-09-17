@@ -6,7 +6,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SettingsPathOpView } from '@deepseek-ai/dsh-api-remotes/client'
 import { RemoteError, stubSettingsScope, type StubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
-import { CardForm, booleanField, enumField, listField, numberField, textField } from '../src/client/card-form.ts'
+import { CardForm, booleanField, enumField, numberField, tagField, textField } from '../src/client/card-form.ts'
+import {
+  DeliveryCardController, type DeliverySettings, type PromptCommandsSettings,
+} from '../src/client/delivery-card-controller.ts'
 import { AgentLoopCardController, type AgentLoopSettings } from '../src/client/agent-loop-card-controller.ts'
 import { BashCardController, type BashSettings } from '../src/client/bash-card-controller.ts'
 import {
@@ -1185,15 +1188,6 @@ describe('CardForm field controls', () => {
     expect(() => enumField('x', [])).toThrow(/at least one value/)
   })
 
-  it('splits a list draft into trimmed entries and drops blank lines', () => {
-    const spec = listField('postHooks')
-    expect(spec.parse('pnpm run test\n\n  openspec validate x  \n'))
-      .toEqual({ kind: 'set', value: ['pnpm run test', 'openspec validate x'] })
-    expect(spec.parse('   \n  ')).toEqual({ kind: 'clear' })
-    expect(spec.format(['a', 'b'])).toBe('a\nb')
-    expect(spec.format(undefined)).toBe('')
-  })
-
   it('writes a nested field path through mutate rather than set', async () => {
     const host = stubSettingsScope<{ openspecThreshold?: { todoCount?: number } }>()
     acceptWrites(host)
@@ -1230,5 +1224,184 @@ describe('CardForm field controls', () => {
     // The leaf is overridden, which a check of the top-level key alone could
     // not see because the intermediate object always exists.
     expect(subject.field('openspecThreshold.todoCount').overridden).toBe(true)
+  })
+})
+
+describe('tagField', () => {
+  it('round-trips a value list through newline-separated draft text', () => {
+    const subject = tagField('signals')
+    expect(subject.format(['协议', 'schema'])).toBe('协议\nschema')
+    expect(subject.parse('协议\nschema')).toEqual({ kind: 'set', value: ['协议', 'schema'] })
+  })
+
+  it('drops blank rows so a trailing newline is not an entry', () => {
+    const subject = tagField('signals')
+    expect(subject.parse('协议\n\n  \nschema\n')).toEqual({ kind: 'set', value: ['协议', 'schema'] })
+  })
+
+  it('clears the key when no entry remains', () => {
+    const subject = tagField('signals')
+    expect(subject.parse('')).toEqual({ kind: 'clear' })
+  })
+
+  it('rejects a duplicated entry rather than silently deduplicating it', () => {
+    const subject = tagField('signals')
+    // 词表的每条独立计分，重复条目会被算两次；静默去重会让保存结果与用户所写不符。
+    expect(subject.parse('协议\n协议')).toBeUndefined()
+  })
+
+  it('declares the tag control', () => {
+    expect(tagField('signals').control).toBe('tag')
+  })
+})
+
+describe('DeliveryCardController acceptance commands', () => {
+  /** A delivery scope whose section carries the selected command names. */
+  function deliveryHost(selected: string[]) {
+    const host = stubSettingsScope<DeliverySettings>()
+    acceptWrites(host)
+    host.publish({
+      status: 'ready',
+      writable: true,
+      value: { verificationCommands: selected },
+      base: {},
+      user: selected.length === 0 ? {} : { verificationCommands: selected },
+    })
+    return host
+  }
+
+  /** A prompt-commands scope offering the named commands. */
+  function commandsHost(commands: readonly { name: string; title?: string }[]) {
+    const host = stubSettingsScope<PromptCommandsSettings>()
+    host.publish({ status: 'ready', writable: true, value: { commands: [...commands] }, base: {}, user: {} })
+    return host
+  }
+
+  it('offers the prompt commands as candidates', () => {
+    const subject = new DeliveryCardController(
+      deliveryHost([]).scope,
+      commandsHost([{ name: 'smoke', title: '冒烟' }]).scope,
+    )
+    expect(subject.inject().hooks.deliveryCard.getSnapshot().verificationCandidates)
+      .toEqual([{ name: 'smoke', title: '冒烟' }])
+  })
+
+  it('drops an already-selected command from the candidate list', () => {
+    const subject = new DeliveryCardController(
+      deliveryHost(['smoke']).scope,
+      commandsHost([{ name: 'smoke' }, { name: 'docs' }]).scope,
+    )
+    const state = subject.inject().hooks.deliveryCard.getSnapshot()
+    // A command runs once, so it moves out of the candidates and into the
+    // ordered list rather than appearing in both.
+    expect(state.verificationCandidates).toEqual([{ name: 'docs' }])
+    expect(state.verificationSelected).toEqual(['smoke'])
+  })
+
+  it('appends a newly selected command after the ones already ordered', () => {
+    const host = deliveryHost(['docs'])
+    const subject = new DeliveryCardController(host.scope, commandsHost([{ name: 'smoke' }]).scope)
+    subject.inject().toggleVerificationCommand('smoke')
+    expect(subject.inject().hooks.deliveryCard.getSnapshot().verificationCommands.text).toBe('docs\nsmoke')
+  })
+
+  it('moves a selected command to the requested position', () => {
+    const host = deliveryHost(['docs', 'smoke', 'lint'])
+    const subject = new DeliveryCardController(host.scope)
+    subject.inject().moveVerificationCommand('lint', 0)
+    expect(subject.inject().hooks.deliveryCard.getSnapshot().verificationCommands.text)
+      .toBe('lint\ndocs\nsmoke')
+  })
+
+  it('moves a command down as well as up', () => {
+    const host = deliveryHost(['docs', 'smoke', 'lint'])
+    const subject = new DeliveryCardController(host.scope)
+    subject.inject().moveVerificationCommand('docs', 2)
+    expect(subject.inject().hooks.deliveryCard.getSnapshot().verificationCommands.text)
+      .toBe('smoke\nlint\ndocs')
+  })
+
+  it('clamps a move past either end of the list', () => {
+    const host = deliveryHost(['docs', 'smoke'])
+    const subject = new DeliveryCardController(host.scope)
+    subject.inject().moveVerificationCommand('smoke', 99)
+    expect(subject.inject().hooks.deliveryCard.getSnapshot().verificationCommands.text).toBe('docs\nsmoke')
+    subject.inject().moveVerificationCommand('smoke', -5)
+    expect(subject.inject().hooks.deliveryCard.getSnapshot().verificationCommands.text).toBe('smoke\ndocs')
+  })
+
+  it('ignores a move of a name that is not selected', () => {
+    const host = deliveryHost(['docs'])
+    const subject = new DeliveryCardController(host.scope)
+    subject.inject().moveVerificationCommand('absent', 0)
+    expect(subject.inject().hooks.deliveryCard.getSnapshot().verificationCommands.text).toBe('docs')
+  })
+
+  it('ignores a move onto the position the command already holds', () => {
+    const host = deliveryHost(['docs', 'smoke'])
+    const subject = new DeliveryCardController(host.scope)
+    const before = host.scope.getSnapshot()
+    subject.inject().moveVerificationCommand('docs', 0)
+    // An unchanged order must not stage a write: the card would otherwise
+    // report itself dirty after a no-op gesture.
+    expect(host.scope.getSnapshot()).toBe(before)
+    expect(subject.inject().hooks.deliveryCard.getSnapshot().verificationCommands.text).toBe('docs\nsmoke')
+  })
+
+  it('persists the reordered selection in the new order', async () => {
+    const host = deliveryHost(['docs', 'smoke'])
+    acceptWrites(host)
+    const subject = new DeliveryCardController(host.scope)
+    subject.inject().moveVerificationCommand('smoke', 0)
+    await subject.inject().save()
+    // The array order is what the gate reads, so it has to be the reordered one.
+    expect(host.scope.getSnapshot().value?.verificationCommands).toEqual(['smoke', 'docs'])
+  })
+
+  it('offers no candidate when the prompt-command namespace is absent', () => {
+    const subject = new DeliveryCardController(deliveryHost([]).scope)
+    const state = subject.inject().hooks.deliveryCard.getSnapshot()
+    expect(state.verificationCandidates).toEqual([])
+    expect(state.verificationMissing).toEqual([])
+  })
+
+  it('adds a name to the staged selection on toggle', () => {
+    const host = deliveryHost([])
+    const subject = new DeliveryCardController(host.scope, commandsHost([{ name: 'smoke' }]).scope)
+    subject.inject().toggleVerificationCommand('smoke')
+    expect(subject.inject().hooks.deliveryCard.getSnapshot().verificationCommands.text).toBe('smoke')
+  })
+
+  it('removes a staged name on a second toggle', () => {
+    const host = deliveryHost(['smoke'])
+    const subject = new DeliveryCardController(host.scope, commandsHost([{ name: 'smoke' }]).scope)
+    subject.inject().toggleVerificationCommand('smoke')
+    expect(subject.inject().hooks.deliveryCard.getSnapshot().verificationCommands.text).toBe('')
+  })
+
+  it('reports a selected name the prompt-command list no longer offers', () => {
+    const subject = new DeliveryCardController(
+      deliveryHost(['gone']).scope,
+      commandsHost([{ name: 'smoke' }]).scope,
+    )
+    // 已消失的命令仍然可见，用户才能把它取消勾选；否则它会悄悄留在下一次保存里。
+    expect(subject.inject().hooks.deliveryCard.getSnapshot().verificationMissing).toEqual(['gone'])
+  })
+
+  it('writes the selection to the verificationCommands key', async () => {
+    const host = deliveryHost([])
+    acceptWrites(host)
+    const subject = new DeliveryCardController(host.scope, commandsHost([{ name: 'smoke' }]).scope)
+    subject.inject().toggleVerificationCommand('smoke')
+    await subject.inject().save()
+    expect(host.scope.getSnapshot().value?.verificationCommands).toEqual(['smoke'])
+  })
+
+  it('re-reads candidates when the prompt-command list changes', () => {
+    const commands = commandsHost([{ name: 'smoke' }])
+    const subject = new DeliveryCardController(deliveryHost([]).scope, commands.scope)
+    commands.publish({ value: { commands: [{ name: 'smoke' }, { name: 'docs' }] } })
+    expect(subject.inject().hooks.deliveryCard.getSnapshot().verificationCandidates)
+      .toEqual([{ name: 'smoke' }, { name: 'docs' }])
   })
 })

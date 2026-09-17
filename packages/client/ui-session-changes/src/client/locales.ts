@@ -23,8 +23,12 @@ export const zh = {
   'revertDone': '已撤销 {count} 个文件',
   'revertConflict': '{count} 个文件的改动已被覆盖，未能撤销',
   'revertFailed': '撤销失败：{message}',
+  'diffFailed': '查看变更失败：{message}',
   'diff.title': '变更内容',
   'diff.oversized': '文件过大，无法预览',
+  'diff.baselineMissing': '会话覆写前的原始内容未捕获，无法预览也无法撤销',
+  'diff.noRecord': '本会话没有记录该文件的改动，无法显示变更',
+  'diff.noWorkspace': '无法确定该会话的工作区，无法显示变更',
   'diff.empty': '该文件没有可显示的变更',
   'diff.loading': '正在加载变更…',
   'diff.close': '关闭',
@@ -37,6 +41,12 @@ export const zh = {
   'diff.collapseAria': '收起差异',
   'diff.expandAria': '展开 {count} 行',
   'diff.files': '{count} 个文件',
+  'diff.previous': '上一处',
+  'diff.next': '下一处',
+  'diff.changes': '{count} 处变更',
+  'diff.position': '第 {current} / {count} 处',
+  'diff.hint': '按 J / K 在变更之间跳转',
+  'diff.viewerFailed': '打开变更视图失败：{message}',
 } satisfies Record<string, string>
 
 /** The session-changes namespace key union. */

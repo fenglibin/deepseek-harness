@@ -108,8 +108,13 @@
 
 #### Scenario: 命令核验失败阻止验证
 
-- **WHEN** `openspec validate --strict --json` 退出码非 0，或配置的 `postHooks` 命令未全绿
+- **WHEN** `openspec validate --strict --json` 退出码非 0
 - **THEN** 系统 SHALL 阻止推进到 `verified`，且 SHALL NOT 因模型确认完成而豁免
+
+#### Scenario: 未留下执行记录的验收命令阻止验收
+
+- **WHEN** 任务配置了验收命令，但推进到 `accepted` 时该任务没有记录它已执行其中某条
+- **THEN** 系统 SHALL 列出缺少记录的命令名并阻止验收，使选中的每条命令都必须留下可追溯的执行记录
 
 #### Scenario: 逐条对账取代自由文本
 

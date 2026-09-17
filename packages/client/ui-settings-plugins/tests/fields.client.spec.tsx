@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DeliveryHelp } from '../src/client/DeliveryHelp.tsx'
-import { ChoiceField, ListField, SecretField, ValueField } from '../src/client/fields.tsx'
+import { ChoiceField, SecretField, TagField, ValueField } from '../src/client/fields.tsx'
 import { zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
@@ -74,6 +74,26 @@ describe('ValueField', () => {
 
     expect(input.getAttribute('inputmode')).toBe('numeric')
     expect(input).toHaveProperty('placeholder', 'https://api.deepseek.com')
+  })
+
+  it('renders a multi-line control for prose and spans the whole row', () => {
+    // A prompt is prose: a one-line input would hide most of it and make
+    // editing impractical, so the control is a textarea on the full row.
+    const { container } = render(
+      <ValueField {...frame} text="answer with l0, l1 or l2" textarea onEdit={vi.fn()} onReset={vi.fn()} />,
+    )
+    const control = screen.getByLabelText('Command timeout')
+    expect(control.tagName).toBe('TEXTAREA')
+    expect(control).toHaveProperty('value', 'answer with l0, l1 or l2')
+    expect(control.closest('div[class*="wide"]')).toBeTruthy()
+    expect(container.querySelector('input')).toBeNull()
+  })
+
+  it('keeps the multi-line control editable and staged like the single-line one', () => {
+    const onEdit = vi.fn()
+    render(<ValueField {...frame} text="old rules" textarea onEdit={onEdit} onReset={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText('Command timeout'), { target: { value: 'new rules' } })
+    expect(onEdit).toHaveBeenCalledWith('new rules')
   })
 
   it('disables the control and its reset while the document is read-only', () => {
@@ -171,7 +191,7 @@ describe('field help mark', () => {
     expect(mark.tagName).toBe('SPAN')
   })
 
-  it('offers the same mark on the choice and list controls', () => {
+  it('offers the same mark on the choice control', () => {
     render(
       <ChoiceField
         {...frame}
@@ -185,18 +205,42 @@ describe('field help mark', () => {
       />,
     )
     expect(screen.getByTestId('field-help-choice').getAttribute('aria-label')).toBe('Which gates block.')
-    cleanup()
+  })
+
+  it('offers the same mark on the tag list control', () => {
     render(
-      <ListField
+      <TagField
         {...frame}
-        id="list"
-        text="a"
-        help="One entry per line."
+        id="tags"
+        text={'alpha\nbeta'}
+        help="One entry per tag."
+        addLabel="Add"
+        removeLabel="Remove"
+        editLabel="Rename"
+        duplicateLabel="Already added"
         onEdit={vi.fn()}
         onReset={vi.fn()}
       />,
     )
-    expect(screen.getByTestId('field-help-list').getAttribute('aria-label')).toBe('One entry per line.')
+    expect(screen.getByTestId('field-help-tags').getAttribute('aria-label')).toBe('One entry per tag.')
+  })
+
+  it('offers the same mark on the secret control', () => {
+    render(
+      <SecretField
+        id="secret"
+        label="API key"
+        hint="Stored outside the section."
+        text=""
+        disabled={false}
+        configured={false}
+        stateLabel="Not configured"
+        help="Written through the credential domain."
+        onEdit={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('field-help-secret').getAttribute('aria-label'))
+      .toBe('Written through the credential domain.')
   })
 })
 
@@ -231,5 +275,135 @@ describe('DeliveryHelp', () => {
     render(<DeliveryHelp open onClose={onClose} t={t as never} />)
     fireEvent.click(screen.getByText(zh.close))
     expect(onClose).toHaveBeenCalled()
+  })
+})
+
+describe('TagField', () => {
+  /** 该控件在测试中使用的标签与按钮文案。 */
+  const tagFrame = {
+    ...frame,
+    addLabel: 'Add',
+    removeLabel: 'Remove',
+    editLabel: 'Rename',
+    duplicateLabel: 'Already present.',
+    placeholder: 'Type one word',
+  }
+
+  it('renders one removable tag per value', () => {
+    render(<TagField {...tagFrame} text={'协议\nschema'} onEdit={vi.fn()} onReset={vi.fn()} />)
+    expect(screen.getByText('协议')).toBeTruthy()
+    expect(screen.getByText('schema')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Remove: 协议' })).toBeTruthy()
+  })
+
+  it('stages the whole list when one tag is removed', () => {
+    const onEdit = vi.fn()
+    render(<TagField {...tagFrame} text={'协议\nschema'} onEdit={onEdit} onReset={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove: 协议' }))
+    // 整份列表一次提交，草稿里不会留下半条内容。
+    expect(onEdit).toHaveBeenCalledWith('schema')
+  })
+
+  it('commits a typed entry on Enter and clears the pending input', () => {
+    const onEdit = vi.fn()
+    render(<TagField {...tagFrame} text="协议" onEdit={onEdit} onReset={vi.fn()} />)
+    const input = screen.getByLabelText('Command timeout')
+    fireEvent.change(input, { target: { value: 'schema' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onEdit).toHaveBeenCalledWith('协议\nschema')
+    expect(input).toHaveProperty('value', '')
+  })
+
+  it('commits a typed entry from the add control', () => {
+    const onEdit = vi.fn()
+    render(<TagField {...tagFrame} text="" onEdit={onEdit} onReset={vi.fn()} />)
+    fireEvent.change(screen.getByLabelText('Command timeout'), { target: { value: '协议' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    expect(onEdit).toHaveBeenCalledWith('协议')
+  })
+
+  it('refuses a duplicate instead of staging it twice', () => {
+    const onEdit = vi.fn()
+    render(<TagField {...tagFrame} text="协议" onEdit={onEdit} onReset={vi.fn()} />)
+    const input = screen.getByLabelText('Command timeout')
+    fireEvent.change(input, { target: { value: '协议' } })
+    // 重复条目会被独立计两次，因此拒绝而不是默默去重。
+    expect(screen.getByText('Already present.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Add' })).toHaveProperty('disabled', true)
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onEdit).not.toHaveBeenCalled()
+  })
+
+  it('disables every control on a read-only document', () => {
+    render(<TagField {...tagFrame} disabled text="协议" onEdit={vi.fn()} onReset={vi.fn()} />)
+    expect(screen.getByLabelText('Command timeout')).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'Add' })).toHaveProperty('disabled', true)
+    expect(screen.getByRole('button', { name: 'Remove: 协议' })).toHaveProperty('disabled', true)
+  })
+  it('turns a tag into an input when its text is clicked', () => {
+    render(<TagField {...tagFrame} text={'协议\nschema'} onEdit={vi.fn()} onReset={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Rename: 协议' }))
+    // 行内改写：原文字被输入框取代，且带入原值。
+    const input = screen.getByRole('textbox', { name: 'Rename: 协议' })
+    expect(input).toHaveProperty('value', '协议')
+  })
+
+  it('stages the renamed value on Enter and leaves edit mode', () => {
+    const onEdit = vi.fn()
+    render(<TagField {...tagFrame} text={'协议\nschema'} onEdit={onEdit} onReset={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Rename: 协议' }))
+    const input = screen.getByRole('textbox', { name: 'Rename: 协议' })
+    fireEvent.change(input, { target: { value: 'agreement' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onEdit).toHaveBeenCalledWith('agreement\nschema')
+    expect(screen.queryByRole('textbox', { name: 'Rename: 协议' })).toBeNull()
+  })
+
+  it('abandons the rename on Escape', () => {
+    const onEdit = vi.fn()
+    render(<TagField {...tagFrame} text="协议" onEdit={onEdit} onReset={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Rename: 协议' }))
+    const input = screen.getByRole('textbox', { name: 'Rename: 协议' })
+    fireEvent.change(input, { target: { value: 'discarded' } })
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(onEdit).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Rename: 协议' })).toBeTruthy()
+  })
+
+  it('refuses a rename that collides with another entry', () => {
+    const onEdit = vi.fn()
+    render(<TagField {...tagFrame} text={'协议\nschema'} onEdit={onEdit} onReset={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Rename: 协议' }))
+    const input = screen.getByRole('textbox', { name: 'Rename: 协议' })
+    fireEvent.change(input, { target: { value: 'schema' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    // 重复条目会被独立计两次，因此拒绝写入并留在编辑态。
+    expect(onEdit).not.toHaveBeenCalled()
+    expect(screen.getByRole('textbox', { name: 'Rename: 协议' })).toBeTruthy()
+  })
+
+  it('treats an emptied rename as a no-op rather than writing a blank entry', () => {
+    const onEdit = vi.fn()
+    render(<TagField {...tagFrame} text="协议" onEdit={onEdit} onReset={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Rename: 协议' }))
+    const input = screen.getByRole('textbox', { name: 'Rename: 协议' })
+    fireEvent.change(input, { target: { value: '   ' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onEdit).not.toHaveBeenCalled()
+  })
+
+  it('commits a valid rename on blur', () => {
+    const onEdit = vi.fn()
+    render(<TagField {...tagFrame} text={'协议\nschema'} onEdit={onEdit} onReset={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Rename: 协议' }))
+    const input = screen.getByRole('textbox', { name: 'Rename: 协议' })
+    fireEvent.change(input, { target: { value: 'agreement' } })
+    fireEvent.blur(input)
+    expect(onEdit).toHaveBeenCalledWith('agreement\nschema')
+  })
+
+  it('makes the tag text a disabled control on a read-only document', () => {
+    render(<TagField {...tagFrame} disabled text="协议" onEdit={vi.fn()} onReset={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Rename: 协议' })).toHaveProperty('disabled', true)
   })
 })

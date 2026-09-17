@@ -20,7 +20,7 @@
 
 - [x] 4.1 清单完整性检查：权威源（l2 磁盘 `tasks.md`，l0/l1 `delivery-tasks`）全部项须为 `completed`；l1 未记录清单不再静默放行，l0 因无清单义务而豁免 (covers: delivery-discipline/清单未完成阻止验证, design/D4)
 - [x] 4.2 覆盖性检查扩展至 l1：原始需求要点（`req/<n>`）与 `### D<n>` 设计决策须被已完成项的 `covers:` 覆盖 (covers: delivery-discipline/需求与设计点未覆盖被列出, design/D4)
-- [x] 4.3 `postHooks` 与 `openspec validate <change_id> --strict --json` 由 `accepted` 前移至 `verified`，`accepted` 只做最终确认 (covers: delivery-discipline/命令核验失败阻止验证, design/D4)
+- [x] 4.3 `openspec validate <change_id> --strict --json` 由 `accepted` 前移至 `verified`；验收命令改为在 `accepted` 校验其执行记录，缺少记录即阻止验收 (covers: delivery-discipline/命令核验失败阻止验证, delivery-discipline/未留下执行记录的验收命令阻止验收, design/D4)
 - [x] 4.4 覆盖以 `covers:` 注解承载，取代 ≥20 字自由文本放行；键名格式写入 guidance 与工具描述使模型可发现 (covers: delivery-discipline/逐条对账取代自由文本, design/D4)
 - [x] 4.5 测试：四道检查各自的阻断与放行路径，含 l1 镜像路径与 l2 scenario 覆盖路径（不依赖 `openspec show`） (covers: delivery-discipline/清单未完成阻止验证, delivery-discipline/命令核验失败阻止验证, delivery-discipline/逐条对账取代自由文本, design/D4)
 

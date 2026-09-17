@@ -1,6 +1,8 @@
 # 交付纪律 openspec 拆分与双进度方案
 
 > 状态：决策已对齐，待实施
+> 分级机制已变更：[交付纪律以模型判定替换关键词分级](delivery-llm-grading.zh.md)移除了本文描述的关键词表与程序化扫描，改以长度闸门加一次模型调用定级。本文其余部分作为当时的方案记录保留。
+
 > 目标读者：维护者与决策者
 > 关联诉求：让大需求按「方案文档 → openspec 拆分 → 按任务编码验证 → 进度可见 → 变更留痕」闭环执行，并满足确定性、可观测性、可追溯性、可验证性。
 > 关联文档：[交付纪律方案](delivery-discipline-rationale.zh.md)、[自动触发方案](delivery-discipline-auto-trigger-rationale.zh.md)

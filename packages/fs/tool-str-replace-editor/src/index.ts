@@ -220,21 +220,22 @@ async function viewPath(
   viewRange: number[] | undefined,
   maxOutputChars: number,
   exec: ToolRunContext,
-): Promise<string> {
+): Promise<EditorReadValue> {
   const target = await resolveTarget(ctx, path, exec.signal)
   const info = await statExisting(ctx, target, 'view', exec)
   if (info.type === 'directory') {
     if (viewRange !== undefined) {
       throw new Error('The `view_range` parameter is not allowed when `path` points to a directory.')
     }
-    return listDirectory(ctx, target, maxOutputChars, exec)
+    const text = await listDirectory(ctx, target, maxOutputChars, exec)
+    return { path: target.displayPath, text }
   }
   if (info.type !== 'file') {
     throw new FsError(`cannot view "${target.displayPath}": not a regular file or directory`, 'FS_NOT_REGULAR_FILE')
   }
   const content = await ctx.fs.readText(target, exec.signal)
   ctx.emit('fs/observed', target, { kind: 'present', version: info.version }, exec)
-  return formatFileView(target.displayPath, content, maxOutputChars, viewRange)
+  return { path: target.displayPath, text: formatFileView(target.displayPath, content, maxOutputChars, viewRange) }
 }
 
 async function createFile(
@@ -243,7 +244,7 @@ async function createFile(
   path: string,
   fileText: string | undefined,
   exec: ToolRunContext,
-): Promise<string> {
+): Promise<EditorMutationValue> {
   const content = requiredForCommand(fileText, 'file_text', 'create')
   const sandboxPolicy = policy.resolve(exec)
   const target = await resolveTarget(ctx, path, exec.signal)
@@ -269,7 +270,16 @@ async function createFile(
     throw policy.mapError(error, sandboxPolicy)
   }
   ctx.emit('fs/observed', target, { kind: 'present', version: outcome.version }, exec)
-  return `New file created successfully at: ${target.displayPath}`
+  return {
+    path: target.displayPath,
+    text: `New file created successfully at: ${target.displayPath}`,
+    // `createIfAbsent` means the file really was not there, so a null `before`
+    // is an absent baseline rather than an uncaptured one — the distinction a
+    // revert keys off when deciding whether it may delete the file.
+    before: outcome.before,
+    after: outcome.after,
+    operation: outcome.operation,
+  }
 }
 
 async function replaceInFile(
@@ -279,7 +289,7 @@ async function replaceInFile(
   oldStr: string | undefined,
   newStr: string | null | undefined,
   exec: ToolRunContext,
-): Promise<string> {
+): Promise<EditorMutationValue> {
   if (newStr === null) {
     throw new Error('Parameter `new_str` must be omitted or contain a string for command: str_replace')
   }
@@ -328,7 +338,16 @@ async function replaceInFile(
     throw policy.mapError(error, sandboxPolicy)
   }
   ctx.emit('fs/observed', target, { kind: 'present', version: outcome.version }, exec)
-  return `The file ${target.displayPath} has been edited successfully.`
+  return {
+    path: target.displayPath,
+    text: `The file ${target.displayPath} has been edited successfully.`,
+    // The tool's own read, not the backend's buffered basis: an edit must read
+    // the file to match `old_str` at all, so this content is always complete
+    // even where the backend declined to buffer an oversized prior version.
+    before,
+    after: outcome.after,
+    operation: 'update',
+  }
 }
 
 async function insertInFile(
@@ -338,7 +357,7 @@ async function insertInFile(
   insertLine: number | undefined,
   newStr: string | undefined,
   exec: ToolRunContext,
-): Promise<string> {
+): Promise<EditorMutationValue> {
   if (insertLine === undefined) throw new Error('Parameter `insert_line` is required for command: insert')
   const value = requiredForCommand(newStr, 'new_str', 'insert')
   const sandboxPolicy = policy.resolve(exec)
@@ -374,7 +393,45 @@ async function insertInFile(
     throw policy.mapError(error, sandboxPolicy)
   }
   ctx.emit('fs/observed', target, { kind: 'present', version: outcome.version }, exec)
-  return `The file ${target.displayPath} has been edited successfully.`
+  return {
+    path: target.displayPath,
+    text: `The file ${target.displayPath} has been edited successfully.`,
+    // The tool's own read, for the same reason as `str_replace`: it is complete
+    // wherever the backend's buffered basis is not.
+    before,
+    after: outcome.after,
+    operation: 'update',
+  }
+}
+
+/**
+ * One mutating call's canonical value: the sentence the model reads plus the
+ * content pair a revision capture records a baseline from.
+ *
+ * The pair is the whole reason this value is an object rather than the sentence
+ * alone: `write` and `edit` already report the same two sides, so a
+ * `str_replace_editor` mutation that reported only text would be a file change
+ * no surface could show or undo.
+ */
+interface EditorMutationValue {
+  /** Already-resolved path the sentence names. */
+  readonly path: string
+  /** The model-facing sentence; rendered verbatim. */
+  readonly text: string
+  /** Content before this call, or null when the file did not exist. */
+  readonly before: string | null
+  /** Content after this call. */
+  readonly after: string
+  /** Whether the call created the file or replaced existing content. */
+  readonly operation: 'create' | 'update'
+}
+
+/** One read-only call's canonical value. */
+interface EditorReadValue {
+  /** Already-resolved path the text names. */
+  readonly path: string
+  /** The model-facing text; rendered verbatim. */
+  readonly text: string
 }
 
 interface ResolvedConfig {
@@ -474,8 +531,40 @@ function registerStrReplaceEditor(ctx: Context, config: ResolvedConfig): void {
       },
     },
     output: {
-      schema: { type: 'string' },
-      render: (_args, value) => [{ type: 'text', text: value }],
+      // Two value shapes, discriminated by whether the call changed a file. The
+      // mutating commands report the path with both content sides so the
+      // revision capture can record a baseline; `view` reads and reports text
+      // only. The branch is what keeps the capture from having to re-read a file
+      // it cannot see and from mistaking a read for a mutation.
+      schema: {
+        oneOf: [
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              path: { type: 'string', required: true },
+              text: { type: 'string', required: true },
+              before: {
+                required: true,
+                oneOf: [{ type: 'string' }, { type: 'null' }],
+              },
+              after: { type: 'string', required: true },
+              operation: { type: 'string', required: true, enum: ['create', 'update'] },
+            },
+          },
+          {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              path: { type: 'string', required: true },
+              text: { type: 'string', required: true },
+            },
+          },
+        ],
+      },
+      // The rendered text is the value's own `text`: the model sees exactly the
+      // sentence it saw before this value became structured.
+      render: (_args, value) => [{ type: 'text', text: (value as { text: string }).text }],
     },
     async execute(args, exec) {
       switch (args.command) {

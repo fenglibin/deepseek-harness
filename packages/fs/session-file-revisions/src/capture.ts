@@ -15,18 +15,20 @@
  * @module @deepseek-ai/dsh-session-file-revisions/capture
  */
 
-import type { FileRevision, RevisionOperation } from './types.ts'
+import type { BaselineOrigin, FileRevision, RevisionOperation, RevisionOrder } from './types.ts'
 
 /** The wire tool names whose results carry both sides of a file mutation. */
-const MUTATION_TOOLS: ReadonlySet<string> = new Set(['write', 'edit'])
+const MUTATION_TOOLS: ReadonlySet<string> = new Set(['write', 'edit', 'str_replace_editor'])
 
 /**
  * The mutation facts one settled tool result carries, when it has them.
- * `before` is null for a create — the file was not there.
+ * `origin` says what the call found at the path, which is what decides whether
+ * a revert may delete it.
  */
 export interface CapturedMutation {
   readonly path: string
-  readonly before: string | null
+  readonly baseline: string | null
+  readonly origin: BaselineOrigin
   readonly after: string
   readonly operation: RevisionOperation
 }
@@ -39,10 +41,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /**
  * Extract the mutation one settled tool call applied.
  *
- * A `write` reports `operation` and both content sides; an `edit` reports both
- * sides without an operation, so its kind is `edit` by construction. A failed
- * call, a non-mutating tool, and a result missing either side contribute
- * nothing — a partial value cannot bound a revert.
+ * A `write` and the mutating `str_replace_editor` commands report both content
+ * sides plus a self-reported `operation`; an `edit` reports both sides without
+ * one, so its kind is `edit` by construction. A failed call, a non-mutating
+ * tool, and a result missing `after` contribute nothing.
+ *
+ * A missing `before` is ambiguous, and reading it as "the file was not there"
+ * is what would make a revert delete a file this session never created. Only a
+ * report of `operation: 'create'` proves the file really was absent; every other
+ * missing side is `unknown`, which a revert reports as a conflict rather than
+ * guessing at. A tool that declares both sides mandatory (`edit`) can never
+ * produce a genuine create, so a missing one there is not a mutation this plugin
+ * can act on.
  * @param name - wire tool name of the settled call.
  * @param value - the call's canonical result value.
  * @returns the captured mutation, or null when the call is not an applied mutation.
@@ -54,50 +64,88 @@ export function captureMutation(name: string, value: unknown): CapturedMutation 
   const after = value['after']
   if (typeof path !== 'string' || path.length === 0) return null
   if (typeof after !== 'string') return null
+  const operation: RevisionOperation = name === 'write' ? 'write' : 'edit'
   const before = value['before']
-  return {
-    path,
-    before: typeof before === 'string' ? before : null,
-    after,
-    operation: name === 'write' ? 'write' : 'edit',
+  if (typeof before === 'string') {
+    return { path, baseline: before, origin: 'existing', after, operation }
   }
+  // `edit` requires both sides in its result schema, so a missing one there is
+  // not a create this plugin can act on.
+  if (name === 'edit') return null
+  return value['operation'] === 'create'
+    ? { path, baseline: null, origin: 'absent', after, operation }
+    : { path, baseline: null, origin: 'unknown', after, operation }
 }
 
 /**
  * Fold one captured mutation into a path's revision record.
  *
- * The first mutation of a path fixes its baseline and operation; every later
- * one only advances the end state and the last seq. Folding by seq rather than
- * by arrival keeps the result independent of the order calls settle in.
+ * The first mutation of a path fixes its baseline, origin, and operation; every
+ * later one only advances the end state and the last seq. Folding by seq rather
+ * than by arrival keeps the result independent of the order calls settle in.
+ *
+ * A later mutation whose baseline could not be captured does not erase an
+ * earlier usable one: this session may have read the file at its first
+ * mutation, in which case that content is still the honest starting point even
+ * though a bulky later overwrite could not report its own.
  * @param existing - the path's record so far, or undefined for the first mutation.
  * @param mutation - the mutation to fold in.
- * @param seq - the seq this mutation settled at.
+ * @param order - the position this mutation settled at.
  * @returns the next record.
  */
 export function foldMutation(
   existing: FileRevision | undefined,
   mutation: CapturedMutation,
-  seq: number,
+  order: RevisionOrder,
 ): FileRevision {
   if (existing === undefined) {
     return {
       path: mutation.path,
-      baseline: mutation.before,
+      baseline: mutation.baseline,
+      origin: mutation.origin,
       endState: mutation.after,
       operation: mutation.operation,
-      firstSeq: seq,
-      lastSeq: seq,
+      firstOrder: order,
+      lastOrder: order,
     }
   }
-  // Both bounds fold by seq, so the result is independent of the order calls
-  // settle in: the newest mutation owns the end state and the oldest owns the
-  // baseline. Arrival order would let a re-delivered late result move the end
-  // state backwards and hide a change from the reader.
-  const isNewest = seq >= existing.lastSeq
+  // Both bounds fold by position, so the result is independent of the order
+  // calls settle in: the newest mutation owns the end state and the oldest owns
+  // the baseline. Arrival order would let a re-delivered late result move the
+  // end state backwards and hide a change from the reader.
+  const isNewest = compareOrder(order, existing.lastOrder) >= 0
+  const isOldest = compareOrder(order, existing.firstOrder) < 0
+  // Only an older mutation may replace the baseline, and only with a capture it
+  // actually made: downgrading a known baseline to `unknown` would turn a
+  // revertible file into a conflict for no gain.
+  const takesBaseline = isOldest && mutation.origin !== 'unknown'
   return {
     ...existing,
+    ...takesBaseline
+      ? { baseline: mutation.baseline, origin: mutation.origin, operation: mutation.operation }
+      : {},
     endState: isNewest ? mutation.after : existing.endState,
-    firstSeq: Math.min(existing.firstSeq, seq),
-    lastSeq: Math.max(existing.lastSeq, seq),
+    firstOrder: isOldest ? order : existing.firstOrder,
+    lastOrder: isNewest ? order : existing.lastOrder,
   }
+}
+
+/**
+ * Order two mutations across sessions.
+ *
+ * Inside one session seq is authoritative, because it is what makes folding
+ * independent of the order results arrive in. Across sessions the two logs
+ * number themselves independently (a forked child starts at its seed length),
+ * so the settle instant is the only shared ordering.
+ * @param left - one mutation's position.
+ * @param right - the other's.
+ * @returns negative when `left` is earlier, positive when later, 0 when equal.
+ */
+export function compareOrder(left: RevisionOrder, right: RevisionOrder): number {
+  if (left.session === right.session) return left.seq - right.seq
+  if (left.at !== right.at) return left.at - right.at
+  // Distinct sessions settling in the same millisecond have no shared order;
+  // fall back to the session id so the result stays deterministic rather than
+  // depending on which record happened to arrive first.
+  return left.session < right.session ? -1 : 1
 }

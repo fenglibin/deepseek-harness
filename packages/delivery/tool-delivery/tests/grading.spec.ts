@@ -1,155 +1,81 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_MEDIUM_SIGNALS,
-  DEFAULT_STRONG_SIGNALS,
-  DEFAULT_WEAK_SIGNALS,
-  explainGrading,
-  gradeObjective,
-  scanSignals,
+  GRADING_CHARACTER_FLOOR,
+  gradeByLength,
+  parseGradedLevel,
 } from '../src/grading.ts'
-import type { GradingPolicy } from '../src/grading.ts'
 
-/** Policy built from the shipped defaults with an overridable char floor. */
-function policy(overrides: Partial<GradingPolicy> = {}): GradingPolicy {
-  return {
-    specChars: 200,
-    strongSignals: DEFAULT_STRONG_SIGNALS,
-    mediumSignals: DEFAULT_MEDIUM_SIGNALS,
-    weakSignals: DEFAULT_WEAK_SIGNALS,
-    ...overrides,
-  }
-}
-
-/** Text of an exact length that matches no signal. */
+/** Text of an exact length. */
 function filler(length: number): string {
   return '啊'.repeat(length)
 }
 
-describe('gradeObjective', () => {
-  it('classifies a request above the character floor as l2 without scanning', () => {
-    expect(gradeObjective(filler(201), policy())).toBe('l2')
+describe('gradeByLength', () => {
+  it('classifies a request past the floor as l2', () => {
+    expect(gradeByLength(filler(GRADING_CHARACTER_FLOOR + 1), GRADING_CHARACTER_FLOOR)).toBe('l2')
   })
 
-  it('leaves a request at the character floor to the signal scan', () => {
-    expect(gradeObjective(filler(200), policy())).toBe('l0')
+  it('leaves a request at the floor to the model', () => {
+    // The floor is "longer than", not "at least": a request exactly at the
+    // boundary is still small enough to be judged on its meaning.
+    expect(gradeByLength(filler(GRADING_CHARACTER_FLOOR), GRADING_CHARACTER_FLOOR)).toBeUndefined()
   })
 
-  it('classifies structural-contract words as strong signals', () => {
-    expect(gradeObjective('改动 RPC 协议', policy())).toBe('l2')
-    expect(gradeObjective('升级 SESSION_FORMAT_VERSION 磁盘格式', policy())).toBe('l2')
+  it('leaves a short request to the model', () => {
+    expect(gradeByLength('fix the typo', GRADING_CHARACTER_FLOOR)).toBeUndefined()
   })
 
-  it('classifies a loose restructuring word as a medium signal', () => {
-    // "重构" is ordinary phrasing for work that only owes a design document;
-    // treating it as a structural-contract signal sent every such request to l2.
-    expect(gradeObjective('重构这个模块的内部实现', policy())).toBe('l1')
+  it('honours a configured floor', () => {
+    // The floor is a deployment setting, so the comparison has to use it
+    // rather than the built-in default.
+    expect(gradeByLength('12345', 4)).toBe('l2')
+    expect(gradeByLength('1234', 4)).toBeUndefined()
   })
 
-  it('matches strong signals case-insensitively', () => {
-    expect(gradeObjective('改动 RPC 协议', policy())).toBe('l2')
+  it('grades an empty objective as the model’s to decide', () => {
+    expect(gradeByLength('', GRADING_CHARACTER_FLOOR)).toBeUndefined()
   })
 
-  it('classifies one medium signal as l1 and two as l2', () => {
-    expect(gradeObjective('新增一个小能力', policy())).toBe('l1')
-    expect(gradeObjective('新增 client 端的能力', policy())).toBe('l2')
-  })
-
-  it('classifies two weak signals as l1', () => {
-    expect(gradeObjective('优化页面性能', policy())).toBe('l1')
-  })
-
-  it('leaves a small unremarkable request at l0', () => {
-    expect(gradeObjective('修复这个拼写错误', policy())).toBe('l0')
-  })
-
-  it('classifies three numbered requirement items as l1', () => {
-    // A numbered list expresses decomposability, which a design document
-    // already covers; it is not by itself a structural-contract change.
-    const objective = '1、改 A\n2、改 B\n3、改 C\n4、改 D'
-    expect(gradeObjective(objective, policy())).toBe('l1')
-  })
-
-  it('raises a numbered list to l2 when it also hits a medium signal', () => {
-    const objective = '1、改 A\n2、改 B\n3、改 C\n新增 client 端能力'
-    expect(gradeObjective(objective, policy())).toBe('l2')
-  })
-
-  it('ignores a numbered list shorter than three items', () => {
-    const objective = '1、改 A\n2、改 B'
-    expect(scanSignals(objective, policy()).strong).toBe(0)
-    expect(scanSignals(objective, policy()).medium).toBe(0)
-  })
-
-  it('returns l0 for an empty objective', () => {
-    expect(gradeObjective('', policy())).toBe('l0')
-  })
-
-  it('returns l0 when every signal list is empty', () => {
-    const bare = policy({ strongSignals: [], mediumSignals: [], weakSignals: [] })
-    expect(gradeObjective('重构这个模块', bare)).toBe('l0')
-  })
-
-  it('honors a raised character floor', () => {
-    expect(gradeObjective(filler(500), policy({ specChars: 800 }))).toBe('l0')
+  it('counts characters, not bytes', () => {
+    // A CJK objective is far shorter in characters than in UTF-8 bytes; the
+    // floor is stated in characters, so the comparison must be too.
+    expect(gradeByLength(filler(GRADING_CHARACTER_FLOOR), GRADING_CHARACTER_FLOOR)).toBeUndefined()
   })
 })
 
-describe('scanSignals', () => {
-  it('counts hits per strength', () => {
-    const hits = scanSignals('新增 client 端的 schema 迁移', policy())
-    expect(hits.strong).toBeGreaterThan(0)
-    expect(hits.medium).toBeGreaterThanOrEqual(1)
+describe('parseGradedLevel', () => {
+  it('reads a bare label', () => {
+    expect(parseGradedLevel('l2')).toBe('l2')
   })
 
-  it('counts a numbered list as a medium rather than a strong hit', () => {
-    const hits = scanSignals('1、改 A\n2、改 B\n3、改 C', policy())
-    expect(hits.strong).toBe(0)
-    expect(hits.medium).toBe(1)
+  it('ignores case and surrounding whitespace', () => {
+    expect(parseGradedLevel('  L1\n')).toBe('l1')
   })
 
-  it('ignores blank patterns', () => {
-    const hits = scanSignals('重构', policy({ mediumSignals: ['  ', '重构'] }))
-    expect(hits.medium).toBe(1)
-  })
-})
-
-describe('explainGrading', () => {
-  it('names the character floor when length decided the tier', () => {
-    const rationale = explainGrading(filler(201), policy())
-    expect(rationale.level).toBe('l2')
-    expect(rationale.decidedBy).toBe('character-floor')
-    expect(rationale.chars).toBe(201)
-    expect(rationale.charFloor).toBe(200)
+  it('reads a label wrapped in markdown emphasis', () => {
+    expect(parseGradedLevel('**l0**')).toBe('l0')
   })
 
-  it('names the matched patterns when a strong signal decided the tier', () => {
-    const rationale = explainGrading('改动 RPC 协议', policy())
-    expect(rationale.level).toBe('l2')
-    expect(rationale.decidedBy).toBe('signal-scan')
-    expect(rationale.matched.strong).toContain('协议')
+  it('prefers a label standing alone over one named in prose', () => {
+    // "this is not l2, it is l1" names both tiers; the line that holds only a
+    // label is the actual answer.
+    expect(parseGradedLevel('This is not l2.\nl1')).toBe('l1')
   })
 
-  it('reports a numbered list as its own piece of evidence', () => {
-    const rationale = explainGrading('1、改 A\n2、改 B\n3、改 C', policy())
-    expect(rationale.level).toBe('l1')
-    expect(rationale.decidedBy).toBe('signal-scan')
-    expect(rationale.numberedList).toBe(true)
+  it('falls back to the first label when no line stands alone', () => {
+    expect(parseGradedLevel('I would call this l1 because it needs a design.')).toBe('l1')
   })
 
-  it('reports nothing when no rule matched', () => {
-    const rationale = explainGrading('修复这个拼写错误', policy())
-    expect(rationale.level).toBe('l0')
-    expect(rationale.decidedBy).toBe('nothing')
-    expect(rationale.matched.strong).toEqual([])
-    expect(rationale.numberedList).toBe(false)
+  it('does not read a label out of a longer identifier', () => {
+    // `\b` is a word boundary, not a path boundary, so a segment such as
+    // `src/l0/fixture` does read as a label. What must not happen is a label
+    // being found inside a longer token, which is what `l2x` would be.
+    expect(parseGradedLevel('the l2x branch answered nothing')).toBeUndefined()
+    expect(parseGradedLevel('l10n ready')).toBeUndefined()
   })
 
-  it('reports every matched pattern, not only the deciding one', () => {
-    // A reader who disagrees with the tier needs the whole evidence set, not
-    // the single hit that happened to be checked first.
-    const rationale = explainGrading('重构 client 端的 schema 迁移', policy())
-    expect(rationale.matched.strong).toContain('迁移')
-    expect(rationale.matched.medium.length).toBeGreaterThan(0)
-    expect(rationale.matched.weak.length).toBeGreaterThanOrEqual(0)
+  it('reports no tier when the response names none', () => {
+    expect(parseGradedLevel('I cannot tell')).toBeUndefined()
+    expect(parseGradedLevel('')).toBeUndefined()
   })
 })

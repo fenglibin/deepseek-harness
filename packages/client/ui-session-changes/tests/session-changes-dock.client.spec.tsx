@@ -287,6 +287,9 @@ describe('SessionChangesPanel', () => {
           onAcceptAll={onAcceptAll}
           openFile={openFile}
           cwd={overrides?.cwd ?? '/proj'}
+          // This suite covers the accept and open behavior; the revision
+          // controls and their per-row gating live in revision-diff.client.spec.
+          hasRevision={() => false}
           t={t}
         />,
       ),
@@ -426,6 +429,7 @@ describe('SessionChangesPanel', () => {
         onAcceptAll={vi.fn()}
         openFile={() => Promise.resolve()}
         cwd="/proj"
+        hasRevision={() => false}
         t={t}
       />,
     )
@@ -451,6 +455,7 @@ describe('SessionChangesPanel', () => {
         onAcceptAll={vi.fn()}
         openFile={() => Promise.resolve()}
         cwd="/proj"
+        hasRevision={() => false}
         t={t}
       />,
     )
@@ -465,6 +470,7 @@ describe('SessionChangesPanel', () => {
         onAcceptAll={vi.fn()}
         openFile={() => Promise.resolve()}
         cwd="/proj"
+        hasRevision={() => false}
         t={t}
       />,
     )
@@ -485,6 +491,7 @@ describe('SessionChangesPanel', () => {
         onAcceptAll={vi.fn()}
         openFile={() => Promise.resolve()}
         cwd="/proj"
+        hasRevision={() => false}
         t={t}
       />,
     )
@@ -502,6 +509,7 @@ describe('SessionChangesPanel', () => {
         onAcceptAll={vi.fn()}
         openFile={() => Promise.resolve()}
         cwd="/proj"
+        hasRevision={() => false}
         t={t}
       />,
     )

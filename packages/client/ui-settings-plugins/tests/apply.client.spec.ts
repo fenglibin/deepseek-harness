@@ -1,6 +1,7 @@
 /** What the browser half registers, and that it all leaves with the fiber. */
 
 import { Context } from '@deepseek-ai/cordis'
+import z from '@deepseek-ai/schemastery'
 import { describe, expect, it, vi } from 'vitest'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -159,6 +160,57 @@ describe('ui-settings-plugins apply', () => {
     })
   })
 
+  it('reads the acceptance-command candidates from the served prompt-commands namespace', async () => {
+    // 真实 settings mirror 下验证跨命名空间读取。mirror 只保留第一次成功答复，
+    // 因此带命令的值必须在装配前就位。
+    const ctx = new Context()
+    await ctx.plugin(SlotRegistry).await()
+    const locale = new LocaleRuntime(ctx)
+    locale.setLocale('zh')
+    ctx.provide('locale', locale)
+    const describeSettings = vi.fn(() => Promise.resolve({
+      ok: true as const,
+      value: {
+        writable: true,
+        hasDocument: true,
+        namespaces: [
+          { ns: 'delivery', schema: {}, value: {}, applies: 'live', secrets: [], revision: 0 },
+          {
+            ns: 'prompt-commands',
+            // 真实序列化 schema：scope 会用它校验分节，假 schema 不 vouch 任何值。
+            schema: z.object({
+              commands: z.array(z.object({ name: z.string(), title: z.string(), prompt: z.string() })).default([]),
+            }).toJSON(),
+            value: { commands: [{ name: 'smoke', title: '冒烟', prompt: 'run smoke' }] },
+            applies: 'live', secrets: [], revision: 0,
+          },
+        ],
+      },
+    }))
+    new TestRemote(ctx, {
+      credentials: {
+        describe: vi.fn(() => Promise.resolve({ ok: false, error: new RemoteError('gateway/internal', 'none', {}) })),
+        set: vi.fn(),
+      },
+      session: { modelCatalog: vi.fn(() => Promise.resolve({ ok: true as const, value: { groups: [], failures: [] } })) },
+      settings: { describe: describeSettings },
+    })
+    await ctx.plugin({ inject: [...settingsInject], apply: settingsApply }).await()
+    const slots = ctx.get('slots') as SlotRegistry
+    declareRoot(slots)
+    await ctx.plugin({ inject: [...inject], apply }).await()
+
+    const entry = slots.entries('settings.plugin.item').find(item => item.options.key === 'delivery')!
+    const face = (entry.inject as unknown as () => DeliveryCardFace)()
+    await vi.waitFor(() => {
+      const state = face.hooks.deliveryCard.getSnapshot()
+      // scope 透传整份已校验分节，因此候选带着命令的完整字段。
+      expect(state.verificationCandidates).toEqual([
+        { name: 'smoke', title: '冒烟', prompt: 'run smoke' },
+      ])
+    })
+  })
+
   it('injects a card face that exposes every delivery field', async () => {
     const { ctx, slots } = await bench(['delivery'])
     declareRoot(slots)
@@ -173,8 +225,9 @@ describe('ui-settings-plugins apply', () => {
     expect(state.autoDetect).toBeDefined()
     expect(state.designTodoCount).toBeDefined()
     expect(state.specChars).toBeDefined()
-    expect(state.strongSignals).toBeDefined()
-    expect(state.postHooks).toBeDefined()
+    expect(state.gradingPrompt).toBeDefined()
+    expect(state.verificationCommands).toBeDefined()
+    expect(state.verificationCandidates).toBeDefined()
   })
 
   it('re-reads the served namespaces when the Host commits a settings document', async () => {

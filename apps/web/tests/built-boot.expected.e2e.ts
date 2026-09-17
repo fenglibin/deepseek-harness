@@ -161,6 +161,21 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
   }
 })
 
+it('mounts every slot entry without abdicating one', async () => {
+  mountAssembledApp()
+
+  // No slot entry crashed anywhere in the assembled tree. Only the built graph
+  // can catch an entry whose registration reads a service its declared `inject`
+  // does not carry: per-package benches hand every face in by hand, so they pass
+  // while the real composition abdicates the entry and leaves a crash plate
+  // where the surface belongs.
+  await waitFor(() => {
+    expect(document.querySelector('[data-slot="root"]')).not.toBeNull()
+  }, { timeout: 10_000 })
+  expect([...document.querySelectorAll('[data-slot-error]')].map(node => node.getAttribute('data-slot-error')))
+    .toEqual([])
+})
+
 it('boots without ui-chat and does not select another conversation view implicitly', async () => {
   mountAssembledApp('?fixture', { exclude: ['@deepseek-ai/dsh-client-ui-chat'] })
 

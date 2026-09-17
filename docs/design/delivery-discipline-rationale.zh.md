@@ -163,7 +163,7 @@ created → designed → specified → implemented → verified → accepted
       todoCount: 15
       descriptionChars: 1200
     requireOpenspecForBugs: true     # whether non-small bug fixes force L2
-    postHooks:                       # post-execution commands
+    verificationCommands:            # prompt commands the model must run before verified
       - 'openspec validate --strict'
       - 'pnpm run test'              # replaceable with a custom deep self-check
     enforcement: 'stateful'          # 'stateful' | 'advisory' | 'off'
@@ -171,7 +171,7 @@ created → designed → specified → implemented → verified → accepted
 
 - **规模 proxy 说明**：任务开始前"规模"无可靠信号，故用程序化可度量的 proxy（todo 数、描述长度、改动文件数）做**启发式分级**，并在任务进行中可被显式升/降级（模型或用户手动覆盖），避免"误判简单任务为复杂流程"。
 - **`enforcement` 分档**：`off` 纯自由；`advisory` 只提醒不拦；`stateful` 状态机硬约束 + 边界软提醒（默认，已确认）。
-- **后置命令可覆盖**：`postHooks` 来自配置基线，任务运行时允许用户追加/覆盖命令；最终以任务级配置为准。
+- **验收命令可覆盖**：`verificationCommands` 来自配置基线，任务运行时允许用户追加/覆盖选择；最终以任务级配置为准。这些命令是提示词命令（正文由模型执行），门禁按「是否留下验收记录」判定。
 
 ### 6.5 事件与 session log 投影
 
@@ -203,7 +203,7 @@ created → designed → specified → implemented → verified → accepted
 | B1 | 包族骨架 + DeliveryTask domain + 状态机 + `delivery/*` 事件 + 配置 schema + `.dsh/changes` 变更记录工具 + 门禁（stateful/advisory 两档） | 变更记录闭环 | L0 任务能强制落变更记录，状态机拒绝跳步 |
 | B2 | `.dsh/design` 设计方案工具 + 规模分级（proxy + 手动覆盖）+ designThreshold 门禁 | L1 设计闭环 | 稍大任务强制写设计 |
 | B3 | 真实 openspec 集成（change 创建/校验/归档）+ openspecThreshold 门禁 + `openspec validate` 接入后置命令 | L2 拆分闭环 | 大任务走 openspec 全流程，validate 全绿才 accepted |
-| B4 | 后置命令框架（postHooks 执行 + 失败回注）+ 深度自检驱动 | 后置自检闭环 | 任务完成后自动跑配置命令并据此验收 |
+| B4 | 后置命令框架（结构校验执行 + 失败回注）+ 深度自检驱动 | 后置自检闭环 | 任务完成前跑配置的校验并据此验收 |
 | B5 | session projection + client UI（分级徽标/阶段进度/产物预览/门禁节点）+ 配置设置卡片 | 可视化闭环 | 页面能完整呈现各阶段与门禁状态 |
 
 ---
@@ -231,7 +231,7 @@ created → designed → specified → implemented → verified → accepted
 | 1 | openspec 目录位置 | 项目根原生 `openspec/`（非 `.dsh/` 下），`.dsh/changes/` 为每个 L2 任务留索引指向对应 change |
 | 2 | 任务锚点 | 新增 `DeliveryTask` domain，不复用 `goal` |
 | 3 | 门禁强度默认值 | `stateful`（状态机硬约束 + 边界软提醒） |
-| 4 | 后置命令执行权 | 任务完成后由门禁框架自动执行 postHooks 并据结果验收；允许用户在运行时追加/覆盖命令 |
+| 4 | 验收执行权 | 任务完成前由门禁框架执行结构校验并据退出码验收，另按用户勾选的提示词命令核对验收记录；允许用户在运行时追加/覆盖选择 |
 
 ---
 

@@ -12,16 +12,31 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 export type RevisionOperation = 'write' | 'edit'
 
 /**
+ * What the session's first mutation found at the path, as the list reports it.
+ *
+ * `existing` has a captured prior content, so both the preview and the revert
+ * are available. `absent` means the session created the file. `unknown` means
+ * the mutation overwrote a file whose prior content was never captured (the
+ * storage backend reports a null `before` for an overwrite at or above its
+ * presentation bound, and for binary, non-UTF-8, or unreadable content): there
+ * is no baseline to diff against and no baseline to restore, so the surface
+ * must say so instead of showing the whole file as newly added.
+ */
+export type RevisionOrigin = 'existing' | 'absent' | 'unknown'
+
+/**
  * One changed file as the list reports it.
  *
  * `oversized` means the content exceeds the display ceiling: the file still has
  * a recorded baseline and end state and stays revertible, but no diff preview is
- * sent to the browser.
+ * sent to the browser. `origin` is `unknown` when no baseline was ever captured,
+ * which makes the file unrevertible as well as unpreviewable.
  */
 export interface RevisionEntry {
   /** Absolute path of the changed file. */
   readonly path: string
   readonly operation: RevisionOperation
+  readonly origin: RevisionOrigin
   /** Added and removed line counts of the session's cumulative diff. */
   readonly added: number
   readonly removed: number
@@ -32,12 +47,20 @@ export interface RevisionEntry {
 /** One file's cumulative diff: what the session did to it. */
 export interface RevisionDiff {
   readonly path: string
-  /** Content before this session's first mutation; null when the file did not exist. */
+  readonly origin: RevisionOrigin
+  /** Content before this session's first mutation; null unless `origin` is `existing`. */
   readonly baseline: string | null
-  /** Content after this session's last mutation. */
+  /** Content after this session's last mutation; empty when no preview is sent. */
   readonly endState: string
-  /** True when the content is past the display ceiling and neither side is sent. */
-  readonly oversized: boolean
+  /**
+   * Why no preview was sent, or null when both sides are present.
+   *
+   * `oversized` is a size ceiling the surface explains as "too large to
+   * preview". `baseline-missing` means the session's first mutation overwrote a
+   * file whose prior content was never captured, so there is nothing to diff
+   * against and nothing to restore either.
+   */
+  readonly withheld: 'oversized' | 'baseline-missing' | null
 }
 
 /** How one path's revert ended. */

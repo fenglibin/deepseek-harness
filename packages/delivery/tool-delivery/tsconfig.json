@@ -33,6 +33,12 @@
       "path": "../../core/system-prompt"
     },
     {
+      "path": "../../core/lightweight-model"
+    },
+    {
+      "path": "../../util/timeout"
+    },
+    {
       "path": "../delivery"
     },
     {

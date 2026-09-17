@@ -223,30 +223,87 @@ async function discoverCapabilities(ctx: Context, agent: Agent, changeId: string
 }
 
 /**
- * Run the verification commands and report the first failure.
+ * Run the structural verification command and report its failure.
  *
- * These run at `verified` rather than at `accepted`: the phase that claims the
+ * This runs at `verified` rather than at `accepted`: the phase that claims the
  * work was verified is the phase that has to prove it, and a failure found
  * only at acceptance has already let the task report itself as verified. An
  * `l2` task validates its own change id so unrelated legacy changes under
- * `openspec/changes/` cannot block it; a non-`l2` task has no OpenSpec change
- * and runs only the configured hooks.
+ * `openspec/changes/` cannot block it. A task with no OpenSpec change has no
+ * structural artifact to validate and runs nothing here.
+ *
+ * The configured acceptance commands are NOT run here: their bodies are prompt
+ * text the model carries out, so they have no exit code to read. They are
+ * checked as records by {@link acceptanceGap}.
  * @param ctx - plugin context.
  * @param agent - owning live agent.
- * @param postHooks - configured verification commands for this deployment.
- * @returns a failure description, or `undefined` when every command passed.
+ * @returns a failure description, or `undefined` when the command passed or
+ * none applies.
  */
 export async function verificationCommandFailure(
   ctx: Context,
   agent: Agent,
-  postHooks: readonly string[],
 ): Promise<string | undefined> {
   const changeId = ctx.delivery.getTasks(agent)?.changeId
-  const hooks = changeId === undefined || !isValidChangeId(changeId)
-    ? postHooks
-    : [`openspec validate ${changeId} --strict --json`, ...postHooks]
-  if (hooks.length === 0) return undefined
-  return runPostHooks(ctx, agent, hooks)
+  if (changeId === undefined || !isValidChangeId(changeId)) return undefined
+  return runValidation(ctx, agent, [`openspec validate ${changeId} --strict --json`])
+}
+
+/** Record-text prefix marking one acceptance command as carried out. */
+export const ACCEPTANCE_RECORD_PREFIX = 'acceptance: '
+
+/** The one acceptance command the gate requires next, and its place in the list. */
+export interface AcceptanceGap {
+  /** Configured name of the command still without a record. */
+  readonly name: string
+  /** 1-based position of that command in the configured order. */
+  readonly position: number
+  /** How many commands the configuration lists in total. */
+  readonly total: number
+}
+
+/**
+ * The first configured acceptance command that left no record on this task.
+ *
+ * A prompt command is not a shell command: it is text the model carries out,
+ * so it produces no exit code to gate on. The checkable fact is therefore
+ * whether the task recorded that it ran the command. Anchoring on a recorded
+ * line rather than on the model's closing prose keeps the gate independent of
+ * wording.
+ *
+ * Only the earliest unrecorded command is reported, so the configured order is
+ * a mechanical requirement rather than a presentation detail: the model cannot
+ * skip ahead to a later command, and the gate can name the one command that is
+ * actually next. Once that command is recorded, the following call reports the
+ * next one, so a task clears the list from the front under repeated advances.
+ * @param agent - owning live agent.
+ * @param names - configured acceptance command names, in execution order.
+ * @returns the next outstanding command with its position, or `undefined` when
+ * every configured command has a record or none is configured.
+ */
+export function acceptanceGap(agent: Agent, names: readonly string[]): AcceptanceGap | undefined {
+  const current = currentTaskIdFromLog(agent)
+  if (current === undefined || names.length === 0) return undefined
+  const recorded = new Set<string>()
+  for (const event of agent.session.events) {
+    if (event.type !== 'delivery/change') continue
+    const change = event.data as { operation?: unknown; text?: unknown; ref?: { id?: unknown } }
+    if (change.operation !== 'record-change') continue
+    if (change.ref?.id !== current) continue
+    if (typeof change.text !== 'string') continue
+    if (!change.text.startsWith(ACCEPTANCE_RECORD_PREFIX)) continue
+    // The name is the first token after the prefix; the rest is the model's
+    // own note about what it observed, which the gate does not interpret. A
+    // leading slash and a trailing colon are accepted because the model may
+    // copy the `/name:` spelling the settings UI shows.
+    const body = change.text.slice(ACCEPTANCE_RECORD_PREFIX.length).trim()
+    const normalized = (body.split(/\s+/)[0] ?? '').replace(/^\/+/, '').replace(/:$/, '')
+    if (normalized.length > 0) recorded.add(normalized)
+  }
+  for (const [index, name] of names.entries()) {
+    if (!recorded.has(name)) return { name, position: index + 1, total: names.length }
+  }
+  return undefined
 }
 
 /**
@@ -305,11 +362,21 @@ function validationIssues(stdout: string): readonly string[] {
   }
 }
 
-/** Run the configured post-hooks in order and return the first failure, if any. */
-async function runPostHooks(ctx: Context, agent: Agent, hooks: readonly string[]): Promise<string | undefined> {
-  for (const hook of hooks) {
+/**
+ * Run the structural validation commands in order and return the first failure.
+ *
+ * Only commands that produce an exit code reach here: the user-configured
+ * acceptance commands are prompt text the model carries out, so they are
+ * checked by {@link acceptanceGap} instead.
+ * @param ctx - plugin context.
+ * @param agent - owning live agent.
+ * @param commands - commands to run in the session cwd, in order.
+ * @returns the first failure, or `undefined` when every command passed.
+ */
+async function runValidation(ctx: Context, agent: Agent, commands: readonly string[]): Promise<string | undefined> {
+  for (const command of commands) {
     const cwd = agent.session.header.cwd
-    const request: { command: string; workdir?: string } = { command: hook }
+    const request: { command: string; workdir?: string } = { command }
     if (cwd !== undefined) request.workdir = cwd
     const result = await ctx.shell.run(ctx.shell.resolve(request))
     if (result.exitCode === 0 && !result.timedOut && !result.aborted) continue
@@ -317,7 +384,7 @@ async function runPostHooks(ctx: Context, agent: Agent, hooks: readonly string[]
     const detail = issues.length > 0
       ? issues.join('; ')
       : result.stderr.text.trim() || result.stdout.text.trim()
-    return `post-hook "${hook}" failed${detail.length > 0 ? `: ${detail}` : ''}`
+    return `structural validation "${command}" failed${detail.length > 0 ? `: ${detail}` : ''}`
   }
   return undefined
 }

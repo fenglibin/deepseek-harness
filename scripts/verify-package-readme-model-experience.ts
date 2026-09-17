@@ -73,7 +73,6 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
   'packages/util/values': 'The package only validates, snapshots, compares, freezes, or rejects caller-owned values; consumers own every model-facing use.',
   'packages/client/ui-delivery': 'The package only renders read-only delivery-projection views; the task advances through model-side tools, so it registers nothing model-facing.',
   'packages/client/ui-session-changes': 'The package only renders the browser-side changed-files dock from the deliverables vocabulary; accepting a file clears the surface only and changes nothing on disk.',
-  'packages/client/ui-settings-commands': 'The package only edits the browser-side prompt-command settings namespace; it registers no prompt, tool, or session event of its own.',
   'packages/interaction/command-prompt-config': 'The package registers configuration-driven prompt shortcuts whose text reaches the model only as an ordinary user message on invocation; it registers no system prompt, schema, or context.',
 }
 
@@ -156,6 +155,8 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/ui-settings-mcp': { kind: 'none', reason: 'Browser-side settings surface; registers no model surface.' },
   'packages/client/ui-settings-plugin-inventory': { kind: 'none', reason: 'Browser-side inventory projection; registers nothing model-facing.' },
   'packages/client/ui-settings-unarchive-sessions': { kind: 'none', reason: 'Browser-side settings page; registers nothing model-facing.' },
+  'packages/client/ui-settings-commands': { kind: 'none', reason: 'The package only edits the browser-side prompt-command settings namespace; it registers no prompt, tool, or session event of its own.' },
+  'packages/client/ui-settings-skills': { kind: 'indirect', reason: 'The browser surface edits skills through the Host-side skill manager; the discovery watcher turns those writes into model-visible skill context.' },
   'packages/mcp/mcp-manager': { kind: 'indirect', reason: 'The manager mounts one mcp-client instance per enabled entry; each instance owns the model-facing tools it registers under its own serverName.' },
   'packages/client/locale': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/web': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
@@ -208,6 +209,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/skill/skill': { kind: 'indirect', reason: 'The provider registry delegates model rendering to dsh-tool-skill.' },
   'packages/skill/skill-badge': { kind: 'indirect', reason: 'The bundled provider delegates model rendering to dsh-tool-skill.' },
   'packages/skill/skill-filesystem': { kind: 'indirect', reason: 'The provider backend delegates model rendering to dsh-tool-skill.' },
+  'packages/host/skill-manager': { kind: 'indirect', reason: 'Writes reach the model through the skill discovery watcher that refreshes the skill directory at the next model step.' },
   'packages/spill/spill': { kind: 'indirect', reason: 'The storage seam delegates model rendering to spill consumers.' },
   'packages/spill/spill-local': { kind: 'indirect', reason: 'The storage backend delegates model rendering to spill consumers.' },
   'packages/test-support/session-snapshot': { kind: 'none', reason: 'The test harness observes and normalizes transcripts without changing live requests.' },

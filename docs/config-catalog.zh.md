@@ -2942,8 +2942,14 @@ export interface Config {
   openspecThreshold?: OpenspecThresholdConfig
   /** Whether a non-small bug fix (past the design threshold) forces `l2`. */
   requireOpenspecForBugs?: boolean
-  /** Post-execution commands run before a task may reach accepted. */
-  postHooks?: string[]
+  /**
+   * Names of the prompt commands the model must carry out before a task may
+   * reach `verified`. Names rather than command text because the prompt body
+   * lives in the `prompt-commands` settings section: editing a command there
+   * updates every task that selected it, and the selection stays readable in
+   * the settings document.
+   */
+  verificationCommands?: string[]
   /** Auto-create a task at pre-step when a direct human request meets the size proxy. */
   autoDetect?: boolean
   /** Patterns whose first hit classifies a request as `l2`. */

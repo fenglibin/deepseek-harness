@@ -1,13 +1,33 @@
-/* Plugin configuration fields: label, control, override badge, and hint. */
+/* 插件配置字段：标签、控件、覆盖徽标与提示。 */
 
+/* 卡片自有的排布栅格：由使用它的卡片（交付纪律）声明，因此其它卡片保持各自的
+   纵向布局，不会因为这张卡片改密度而被顺带改动。短控件两列成对，多行控件用
+   `.wide` 独占整行。 */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 20px;
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 多行控件独占一行：标签与文本主体需要整行宽度才可读，强行两列等于用可读性
+   换密度。 */
+.wide {
+  grid-column: 1 / -1;
+}
+
+/* 每个字段各自绘制上边框：一个栅格行可能容纳两格，基于兄弟选择器的规则只会把
+   其中一格与上一行分开。 */
 .field {
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding: 12px 0;
-}
-
-.field + .field {
   border-top: 1px solid var(--dsw-alias-border-l2);
 }
 
@@ -98,6 +118,35 @@
   border-color: var(--dsw-alias-label-error);
 }
 
+/* 多行文本控件：承载成段的规则文本，因此给出行高与可纵向调整的尺寸，而不是
+   固定高度的单行输入框。 */
+.textarea {
+  padding: 8px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-3);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--dsw-alias-label-primary);
+  resize: vertical;
+}
+
+.textarea:focus-visible {
+  outline: none;
+  border-color: var(--dsw-alias-brand-primary);
+}
+
+.textarea:disabled {
+  color: var(--dsw-alias-label-tertiary);
+  cursor: default;
+}
+
+.textareaInvalid {
+  composes: textarea;
+  border-color: var(--dsw-alias-label-error);
+}
+
 .invalid {
   margin: 0;
   font-size: 12px;
@@ -125,4 +174,260 @@
 
 .helpMark:hover {
   color: var(--dsw-alias-label-secondary);
+}
+
+/* 标签编辑器：每个值一个标签，另有一个用于添加下一条的输入区。 */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tags:empty {
+  display: none;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  padding: 2px 4px 2px 8px;
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+/* 标签文字本身就是改写入口：点它即变成行内输入框，因此它长得像文字、行为像按钮。 */
+.tagText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: left;
+  color: var(--dsw-alias-label-primary);
+  cursor: text;
+}
+
+.tagText:disabled {
+  cursor: default;
+}
+
+.tagText:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 1px;
+}
+
+/* 改写态：输入框取代标签文字。宽度按内容估算写成内联 style（size 属性在主流
+   浏览器都生效），因此不依赖仅 Chromium 支持的 `field-sizing`。 */
+.tagEditing {
+  padding-right: 2px;
+}
+
+.tagEditInput {
+  min-width: 4ch;
+  max-width: 46ch;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--dsw-alias-label-primary);
+}
+
+.tagEditInput:focus-visible {
+  outline: none;
+}
+
+.tagRemove {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0 2px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.tagRemove:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+}
+
+.tagRemove:disabled {
+  cursor: default;
+}
+
+.tagEntry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tagEntry .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.tagAdd {
+  flex: none;
+  appearance: none;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  background: none;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.tagAdd:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-label-dimmed);
+}
+
+.tagAdd:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tagAdd:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 1px;
+}
+
+/* 验收命令选择器：清单里每条命令一个复选框。 */
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 已选命令的执行顺序列表。顺序有实际语义，因此逐行显示序号与次序控件。 */
+.groupLabel {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.ordered {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.orderedRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border: 1px solid var(--dsw-alias-border-secondary);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-elevated);
+}
+
+/* 拖动悬停时的落点提示：整行加一圈强调边。 */
+.orderedDrop {
+  border-color: var(--dsw-alias-brand-primary);
+  outline: 1px dashed var(--dsw-alias-brand-primary);
+  outline-offset: -1px;
+}
+
+/* 拖动抓手：光标提示可拖，视觉上只作为提示而不进入无障碍树。 */
+.dragHandle {
+  flex: none;
+  cursor: grab;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 1;
+  user-select: none;
+}
+
+.orderIndex {
+  flex: none;
+  min-width: 18px;
+  font-size: 12px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.orderedBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.rowActions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.iconButton:hover:not(:disabled) {
+  background: var(--dsw-alias-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.iconButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 1px;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.checkbox {
+  flex: none;
+  accent-color: var(--dsw-alias-brand-primary);
+}
+
+.choiceName {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-primary);
+}
+
+.choiceTitle {
+  margin-left: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dsw-alias-label-tertiary);
 }

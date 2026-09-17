@@ -30,7 +30,7 @@ import { SubagentModelSelectionCard } from './SubagentModelSelectionCard.tsx'
 import { WebSearchCard } from './WebSearchCard.tsx'
 import { AGENT_LOOP_NS, AgentLoopCardController } from './agent-loop-card-controller.ts'
 import { SHELL_NS, BashCardController } from './bash-card-controller.ts'
-import { DELIVERY_NS, DeliveryCardController } from './delivery-card-controller.ts'
+import { DELIVERY_NS, PROMPT_COMMANDS_NS, DeliveryCardController } from './delivery-card-controller.ts'
 import { ConfigurablePluginsTabController } from './tab-store.ts'
 import {
   SUBAGENT_MODEL_SELECTION_NS, SubagentModelSelectionCardController,
@@ -74,7 +74,13 @@ export function apply(ctx: ClientContext): void {
   const agentLoop = new AgentLoopCardController(ctx.settingsScope.bind({ namespace: AGENT_LOOP_NS }))
   const webSearch = new WebSearchCardController(
     ctx.settingsScope.bind({ namespace: WEB_SEARCH_NS }), ctx)
-  const delivery = new DeliveryCardController(ctx.settingsScope.bind({ namespace: DELIVERY_NS }))
+  const delivery = new DeliveryCardController(
+    ctx.settingsScope.bind({ namespace: DELIVERY_NS }),
+    // The acceptance commands are chosen from the prompt-command list, so the
+    // card reads that namespace too. Absent when a deployment omits the
+    // prompt-command plugin, in which case the card reports an empty choice.
+    ctx.settingsScope.bind({ namespace: PROMPT_COMMANDS_NS }),
+  )
   const subagentModelSelection = new SubagentModelSelectionCardController(
     ctx.settingsScope.bind({ namespace: SUBAGENT_MODEL_SELECTION_NS }),
     ctx,

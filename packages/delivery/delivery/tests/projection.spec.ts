@@ -322,6 +322,66 @@ describe('delivery tasks mirror an l1 todo list', () => {
     expect(kept?.items.map(item => item.content)).toEqual(['recorded step'])
   })
 
+  it('keeps the coverage annotation a recorded l1 item declared', async () => {
+    // The annotation is the only place an item says which verification point it
+    // implements. A todo entry carries none, so mirroring without restoring the
+    // recorded annotation erased every declaration the moment a model used both
+    // lists — and the task could then never pass verification.
+    const bench = await mirrorBench('l1')
+    const task = bench.ctx.delivery.get(bench.agent)
+    bench.ctx.delivery.recordTasks(
+      bench.agent,
+      { id: task!.id, revision: task!.revision },
+      '',
+      [
+        { content: '做甲 (covers: req/1)', phase: 'implemented', status: 'pending' },
+        { content: '做乙 (covers: req/2)', phase: 'implemented', status: 'pending' },
+      ],
+    )
+    bench.session.append('todo/write', { todos: [
+      { content: '做甲', status: 'completed' },
+      { content: '做乙', status: 'completed' },
+    ] })
+    const mirrored = view(bench)
+    expect(mirrored?.source).toBe('mirrored')
+    expect(mirrored?.items.map(item => item.content))
+      .toEqual(['做甲 (covers: req/1)', '做乙 (covers: req/2)'])
+    // The todo list still drives status, which is what the model advances with.
+    expect(mirrored?.items.every(item => item.status === 'completed')).toBe(true)
+  })
+
+  it('keeps an annotation the todo entry already declares', async () => {
+    // An l1 model may annotate the todo entry itself; that declaration wins and
+    // must not be doubled up with a recorded one.
+    const bench = await mirrorBench('l1')
+    const task = bench.ctx.delivery.get(bench.agent)
+    bench.ctx.delivery.recordTasks(
+      bench.agent,
+      { id: task!.id, revision: task!.revision },
+      '',
+      [{ content: '做甲 (covers: req/1)', phase: 'implemented', status: 'pending' }],
+    )
+    bench.session.append('todo/write', { todos: [
+      { content: '做甲 (covers: design/D1)', status: 'completed' },
+    ] })
+    expect(view(bench)?.items.map(item => item.content)).toEqual(['做甲 (covers: design/D1)'])
+  })
+
+  it('mirrors an unrecorded item without inventing an annotation', async () => {
+    const bench = await mirrorBench('l1')
+    const task = bench.ctx.delivery.get(bench.agent)
+    bench.ctx.delivery.recordTasks(
+      bench.agent,
+      { id: task!.id, revision: task!.revision },
+      '',
+      [{ content: '做甲 (covers: req/1)', phase: 'implemented', status: 'pending' }],
+    )
+    bench.session.append('todo/write', { todos: [
+      { content: '全新的工作', status: 'pending' },
+    ] })
+    expect(view(bench)?.items.map(item => item.content)).toEqual(['全新的工作'])
+  })
+
   it('places a mirrored item in the task current phase', async () => {
     const bench = await mirrorBench('l1')
     const created = bench.ctx.delivery.get(bench.agent)!
