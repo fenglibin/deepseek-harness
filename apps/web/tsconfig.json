@@ -107,7 +107,8 @@
     "tests/complex-history.perf.ts",
     "tests/pwsh-terminal.e2e.ts",
     "tests/workflow-run.e2e.ts",
-    "tests/skill-editor-file-tree.e2e.ts"
+    "tests/skill-editor-file-tree.e2e.ts",
+    "tests/file-browser-default-preview.e2e.ts"
   ],
   "references": [
     {
