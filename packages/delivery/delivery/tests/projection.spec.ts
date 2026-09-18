@@ -395,15 +395,53 @@ describe('delivery tasks mirror an l1 todo list', () => {
     expect(view(bench)?.items[0]?.phase).toBe('implemented')
   })
 
-  it('drops the mirror when the task is cleared', async () => {
+  it('drops the checklist when the task is cleared', async () => {
     const bench = await mirrorBench('l1')
     bench.session.append('todo/write', { todos: [{ content: 'gone', status: 'pending' }] })
     expect(view(bench)?.source).toBe('mirrored')
     const task = bench.ctx.delivery.get(bench.agent)!
     bench.ctx.delivery.clear(bench.agent, { id: task.id, revision: task.revision })
-    // A cleared task leaves the last mirrored view in place but drops the level
-    // the mirror depends on, so a later todo list no longer mirrors.
+    // A checklist belongs to the task that recorded it, so clearing the task
+    // retires the list with it.
+    expect(view(bench)).toBeNull()
+    // The cleared task also drops the level the mirror depends on, so a later
+    // todo list has nothing to mirror into.
     bench.session.append('todo/write', { todos: [{ content: 'after clear', status: 'pending' }] })
-    expect(view(bench)?.items.map(item => item.content)).toEqual(['gone'])
+    expect(view(bench)).toBeNull()
+  })
+
+  it('retires the previous task checklist when a new task is created', async () => {
+    const bench = await mirrorBench('l1')
+    bench.session.append('todo/write', { todos: [{ content: 'previous task work', status: 'completed' }] })
+    expect(view(bench)?.items.map(item => item.content)).toEqual(['previous task work'])
+    const previous = bench.ctx.delivery.get(bench.agent)!
+    bench.ctx.delivery.clear(bench.agent, { id: previous.id, revision: previous.revision })
+    bench.ctx.delivery.create(bench.agent, { objective: 'the next task', level: 'l1' })
+    // The new task starts without a checklist rather than inheriting the
+    // previous task's items.
+    expect(view(bench)).toBeNull()
+  })
+
+  it('mirrors a new l1 todo list after a recorded l2 checklist held the previous task', async () => {
+    // A recorded checklist carrying a changeId is protected from being
+    // overwritten by a todo list. Retaining it across a task boundary applied
+    // that protection to the new task, which could then never mirror at all.
+    const bench = await mirrorBench('l1')
+    const previous = bench.ctx.delivery.get(bench.agent)!
+    bench.ctx.delivery.recordTasks(
+      bench.agent,
+      { id: previous.id, revision: previous.revision },
+      'add-previous-change',
+      [{ content: 'previous recorded step', phase: 'implemented', status: 'completed' }],
+    )
+    expect(view(bench)?.changeId).toBe('add-previous-change')
+    // recordTasks advanced the task by one revision; clear needs the current one.
+    const afterRecord = bench.ctx.delivery.get(bench.agent)!
+    bench.ctx.delivery.clear(bench.agent, { id: afterRecord.id, revision: afterRecord.revision })
+    bench.ctx.delivery.create(bench.agent, { objective: 'the next task', level: 'l1' })
+    bench.session.append('todo/write', { todos: [{ content: 'new work', status: 'in_progress' }] })
+    const mirrored = view(bench)
+    expect(mirrored?.source).toBe('mirrored')
+    expect(mirrored?.items.map(item => item.content)).toEqual(['new work'])
   })
 })

@@ -17,7 +17,20 @@
  */
 
 import { assertNever } from '@deepseek-ai/dsh-util-values'
+import { HarnessError } from '@deepseek-ai/dsh-llm'
 import type { SandboxMode } from './index.ts'
+
+/**
+ * Error code for an escalation that needs approval when the approval path
+ * cannot be used at all: no approval service is composed, the execution has no
+ * agent to route the ask through, or the session disabled approval prompts.
+ *
+ * Unlike a rejection or a cancellation — the user's own answer to a specific
+ * ask, which the model simply proceeds without — this state is a deployment or
+ * configuration fact only the user can resolve. Carrying a code keeps the
+ * failure routable, and the page keeps such a row visible.
+ */
+export const SANDBOX_APPROVAL_UNAVAILABLE = 'SANDBOX_APPROVAL_UNAVAILABLE'
 
 /**
  * The strictly-wider table: what a call whose effective mode is the key may
@@ -163,10 +176,16 @@ export async function approveEscalation<A, C>(request: EscalationRequest, approv
     throw new Error(`sandbox escalation to "${mode}" is not strictly wider than this call's current "${effectiveMode}" mode`)
   }
   if (approval.approver === undefined) {
-    throw new Error(`sandbox escalation to "${mode}" requires approval, but no approval service is composed`)
+    throw new HarnessError(
+      `sandbox escalation to "${mode}" requires approval, but no approval service is composed`,
+      SANDBOX_APPROVAL_UNAVAILABLE,
+    )
   }
   if (approval.agent === undefined) {
-    throw new Error(`sandbox escalation to "${mode}" requires approval, but the call has no agent to route it through`)
+    throw new HarnessError(
+      `sandbox escalation to "${mode}" requires approval, but the call has no agent to route it through`,
+      SANDBOX_APPROVAL_UNAVAILABLE,
+    )
   }
   // Self-contained for the audit trail: approval/asked stores this reason,
   // and the target mode is part of the grant's identity.
@@ -183,7 +202,10 @@ export async function approveEscalation<A, C>(request: EscalationRequest, approv
     case 'allowed-once': return mode as SandboxMode
     case 'rejected': throw new Error(`the user rejected escalating this ${subject} to "${mode}"`)
     case 'cancelled': throw new Error(`approval for escalating to "${mode}" was cancelled`)
-    case 'unavailable': throw new Error(`sandbox escalation to "${mode}" requires approval, but no approval channel is available`)
+    case 'unavailable': throw new HarnessError(
+      `sandbox escalation to "${mode}" requires approval, but no approval channel is available`,
+      SANDBOX_APPROVAL_UNAVAILABLE,
+    )
     default: return assertNever(outcome, 'EscalationOutcome')
   }
 }

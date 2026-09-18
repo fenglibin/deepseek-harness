@@ -9,7 +9,7 @@
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
 /** Operation kind of the mutation that first touched a path in the session. */
-export type RevisionOperation = 'write' | 'edit'
+export type RevisionOperation = 'write' | 'edit' | 'delete'
 
 /**
  * What the session's first mutation found at the path, as the list reports it.
@@ -21,8 +21,12 @@ export type RevisionOperation = 'write' | 'edit'
  * presentation bound, and for binary, non-UTF-8, or unreadable content): there
  * is no baseline to diff against and no baseline to restore, so the surface
  * must say so instead of showing the whole file as newly added.
+ *
+ * `deleted` means a shell command removed the path, so the record carries no
+ * content of its own. There is nothing to preview, and a restore reads the
+ * workspace's git objects rather than this record.
  */
-export type RevisionOrigin = 'existing' | 'absent' | 'unknown'
+export type RevisionOrigin = 'existing' | 'absent' | 'unknown' | 'deleted'
 
 /**
  * One changed file as the list reports it.
@@ -42,6 +46,19 @@ export interface RevisionEntry {
   readonly removed: number
   /** True when the content is past the display ceiling and no preview is sent. */
   readonly oversized: boolean
+  /**
+   * Seq of this path's earliest recorded position in the session, used to place
+   * the row in first-seen order.
+   *
+   * The changed-files list is folded from the durable log while this record
+   * lives on the Host's own side, so a path this record knows and the log does
+   * not — a file a command deleted, which no write call ever named — has no seq
+   * of its own in the list. Carrying it here is what lets a surface place such a
+   * row among the others instead of appending it out of order.
+   */
+  readonly firstSeq: number
+  /** Seq of this path's latest recorded position; what an accept is measured against. */
+  readonly lastSeq: number
 }
 
 /** One file's cumulative diff: what the session did to it. */
@@ -66,12 +83,27 @@ export interface RevisionDiff {
 /** How one path's revert ended. */
 export type RevertStatus = 'reverted' | 'unchanged' | 'conflict' | 'missing'
 
+/**
+ * Why restoring a deleted path could not proceed, as a stable discriminant.
+ *
+ * Both situations leave the file unrestored, but they call for different words
+ * and different reader expectations: a path git never tracked has no content
+ * anywhere on this machine, while a workspace outside version control has no
+ * git answers at all. `reason` carries the prose form alongside.
+ */
+export type RevertBlocked = 'not-in-git' | 'not-a-repository'
+
 /** One path's revert outcome. */
 export interface RevertFileResult {
   readonly path: string
   readonly status: RevertStatus
   /** Human-readable reason when the revert did not apply cleanly. */
   readonly reason?: string
+  /**
+   * Stable cause when a deleted path could not be restored, so the surface can
+   * say which situation the reader is in rather than repeating one sentence.
+   */
+  readonly blocked?: RevertBlocked
 }
 
 /** Outcome of reverting a whole session, one entry per attempted path. */

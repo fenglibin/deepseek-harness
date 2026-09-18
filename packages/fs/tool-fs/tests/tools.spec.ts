@@ -293,6 +293,15 @@ describe('read tool', () => {
     expect(result.error).toMatchObject({ info: { code: 'FS_NOT_FOUND' } })
   })
 
+  it('reports an offset past EOF as FS_OFFSET_OUT_OF_RANGE, distinct from an absent file', async () => {
+    const { ctx, fs } = await setup()
+    fs.files.set('key:short.txt', 'one\ntwo')
+    const result = await call(ctx, 'read', { file_path: 'short.txt', offset: 9 })
+    expect(result.isError).toBe(true)
+    expect(result.error).toMatchObject({ info: { code: 'FS_OFFSET_OUT_OF_RANGE' } })
+    expect(text(result)).toContain('out of range')
+  })
+
   it('rejects a non-regular target', async () => {
     const { ctx, fs } = await setup()
     fs.files.set('key:d', '')

@@ -13,8 +13,8 @@
 
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
-/** Operation kind of the mutation that first touched a path in this session. */
-export type RevisionOperation = 'write' | 'edit'
+/** 本会话中首次触碰某路径的改动类型。 */
+export type RevisionOperation = 'write' | 'edit' | 'delete'
 
 /**
  * What this session's first mutation found at the path.
@@ -26,8 +26,12 @@ export type RevisionOperation = 'write' | 'edit'
  * presentation bound, and for binary, non-UTF-8, or unreadable content. A
  * revert cannot reconstruct a baseline it never had, so `unknown` is reported
  * as a conflict rather than guessed at.
+ *
+ * `deleted` 表示观察该会话改动时该路径已不在会话工作区内，且没有任何工具调用
+ * 携带过它的内容——是 shell 命令删掉了它。这条记录不持有任何内容侧，因为发现
+ * 删除时那里已经没有东西可读；恢复改从工作区的 git 对象取内容。
  */
-export type BaselineOrigin = 'existing' | 'absent' | 'unknown'
+export type BaselineOrigin = 'existing' | 'absent' | 'unknown' | 'deleted'
 
 /**
  * Comparable position of one mutation in the whole delegation tree.
@@ -52,10 +56,10 @@ export interface RevisionOrder {
 /**
  * One path's captured revision facts.
  *
- * `baseline` holds the file's content before this session's first mutation, and
- * is null exactly when {@link FileRevision.origin} is not `existing`. The pair
- * of `origin` and `baseline` is what a revert keys off: only `absent` may
- * remove the file, and only `existing` may be reverse-patched.
+ * `baseline` 持有本次会话首次改动前该文件的内容，只要
+ * {@link FileRevision.origin} 不是 `existing` 就为 null。`origin` 与 `baseline`
+ * 这一对是撤销的判据：只有 `absent` 可以删除文件，只有 `existing` 可以做反向
+ * 补丁，而 `deleted` 因为自身不携带内容，改从工作区的 git 对象恢复。
  */
 export interface FileRevision {
   /** Canonical absolute path; the same spelling the changed-files fold uses. */
@@ -64,7 +68,11 @@ export interface FileRevision {
   readonly baseline: string | null
   /** What the first mutation found at the path. */
   readonly origin: BaselineOrigin
-  /** Content after this session's last mutation. */
+  /**
+   * 本次会话最后一次改动之后的内容；该路径被删除时为空。
+   *
+   * 被删除路径的内容活在工作区的 git 对象里，因此这条记录从不携带它，恢复也不读它。
+   */
   readonly endState: string
   /** Operation kind of the first mutation. */
   readonly operation: RevisionOperation

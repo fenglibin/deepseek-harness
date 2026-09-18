@@ -16,14 +16,27 @@ import type { PromptContentPart, QueueAction, SessionRequestId } from '../../typ
 import type { PendingSubmissionImage, PendingSubmissionPart, SessionSnapshot } from './snapshot.ts'
 
 /**
- * Why a local submission echo left the snapshot: `observed` when its durable
- * `user/message` event or host queue occurrence arrived (with the admitted
- * image references in prompt order), `failed` when the prompt was rejected,
- * threw, or was aborted before acceptance.
+ * Why a local submission echo left the snapshot.
+ *
+ * - `observed` — the durable `user/message` arrived (with the admitted image
+ *   references in prompt order). The echo's previews hand off to the durable cache.
+ * - `failed` — the prompt was rejected, threw, or was aborted before acceptance.
+ *   The caller restores the draft, so a failed send is not lost.
+ * - `removed` — the user discarded the still-pending queue occurrence. This is a
+ *   deliberate end state, not a failure: the draft is NOT restored (the user asked
+ *   for the message to go away, and QueueDock offers a separate edit action), and
+ *   the echo's previews are revoked rather than handed anywhere.
+ *
+ * A host queue occurrence alone does NOT retire an echo. An occurrence means the
+ * message is pending on the Host, not that it is visible on the transcript: a
+ * claimed prompt becomes durable only after the turn opens and its first step
+ * resolves, so retiring on the occurrence would blank the message for that whole
+ * span. The echo stands in until the durable event replaces it.
  */
 export type PendingSubmissionRetirement =
   | { readonly reason: 'observed'; readonly attachments: readonly ImageAttachmentRef[] }
   | { readonly reason: 'failed' }
+  | { readonly reason: 'removed' }
 
 /** Input registering one local submission echo ahead of its prompt call. */
 export interface BeginSubmissionInput {
@@ -68,16 +81,20 @@ export interface ISession {
   readonly projections: ProjectionsFace
   /**
    * Register one local submission echo in `snapshot.pendingSubmissions`,
-   * synchronously, before the caller serializes and sends the prompt. The
-   * echo retires when a durable `user/message` event or queue occurrence
-   * carrying the returned identity arrives, or when the identified prompt
-   * call fails.
+   * synchronously, before the caller serializes and sends the prompt. The echo
+   * retires when a durable `user/message` carrying the returned identity
+   * arrives, when its pending queue occurrence is removed, or when the
+   * identified prompt call fails.
    * @param input - echo content and the optional settlement callback.
    * @returns the minted identity for {@link prompt} plus the pre-prompt abandon path.
    */
   beginSubmission(input: BeginSubmissionInput): SubmissionHandle
   /**
    * Send a prompt into the session.
+   *
+   * A subagent address forwards the caller's identity to the child transport,
+   * which stamps it on the durable child message, so a continuation echo retires
+   * on the same observation path as an ordinary send.
    * @param content - text plus browser-owned temporary image uploads.
    * @param mode - 'queue' appends a turn; 'steer' interrupts the running one.
    * @param signal - optional caller cancellation for the complete admission round-trip.

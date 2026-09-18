@@ -11,7 +11,14 @@
 .frame {
   --dsl-rv-width: min(1400px, 96vw);
   --dsl-rv-height: min(900px, 92vh);
-  --dsl-rv-line-height: calc(22px + var(--dsh-content-font-delta, 0px));
+  /* The row pitch MUST equal the content code font's own line-height (24px,
+     declared by --dsh-content-font-code). A row's height is driven by its text,
+     so a smaller value only lowers the floor: a filler cell — the empty half of
+     a one-sided change — has no text and would collapse to it, while its
+     opposite number keeps the full font height. Every filler then shortens one
+     lane by the difference and the two columns drift apart by 2px per
+     insertion. */
+  --dsl-rv-line-height: calc(24px + var(--dsh-content-font-delta, 0px));
   --dsl-rv-gutter: 56px;
   --dsl-rv-radius: 12px;
 
@@ -184,7 +191,8 @@
 .cell {
   display: flex;
   align-items: flex-start;
-  min-height: var(--dsl-rv-line-height);
+  height: var(--dsl-rv-line-height);
+  line-height: var(--dsl-rv-line-height);
 }
 
 /* No wrapping and no word-break: indentation is how a diff is read. */

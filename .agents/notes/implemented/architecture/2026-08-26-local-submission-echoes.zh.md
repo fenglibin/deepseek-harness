@@ -10,19 +10,23 @@ Status: implemented
 
 **Session 对象持有客户端本地的提交回显，用 prompt 现有的 `requestId`/`rpcId` 关联。**`session.beginSubmission` 在调用方序列化任何内容之前，同步把 `{requestId, text, images: previews}` 写入 `SessionSnapshot.pendingSubmissions` 并翻转 `promptAttempted`；同一个 `requestId` 随 prompt RPC 发出。没有新关联 id，没有 wire 类型改动，也没有 session log 改动：host 本就把 prompt 的 `requestId` 写进 durable user source 的 `rpcId`，queue 投影现在把它作为 `SessionQueuedItem.rpcId` 携带，覆盖落进 inbox 而非 log 的 prompt（运行中 turn 的提交）。
 
-**退休由观察驱动并延迟一帧；显示去重是渲染期的声明式规则。**Session 在带其 rpcId 的 durable `user/message` 或 queue occurrence 到达时（append、窗口安装或 control frame）标记回显为已观察，并在一个动画帧之后移除，晚于先注册的会话组装帧。ChatView 独立地隐藏 rpcId 出现在已渲染 user/steering 节点或 queue 行中的回显，因此无论 store 更新顺序如何，每一次渲染中回显与 durable 恰有一个可见。带标识的 prompt 失败、`abandon()` 或销毁使回显立即按 failed 退休；先到的 settlement 生效。
+**退休由 durable 事件驱动；显示去重是渲染期的声明式规则。**Session 在带其 rpcId 的 durable `user/message` 到达时（append、窗口安装或 control frame）标记回显为已观察，并在一个动画帧之后移除，晚于先注册的会话组装帧。ChatView 独立地隐藏 rpcId 出现在已渲染 user/steering 节点或 steering 队列行中的回显，因此无论 store 更新顺序如何，每一次渲染中回显与 durable 恰有一个可见。
 
-**Composer 乐观提交。**Enter 在一个 machine 事务里清空草稿、occurrence 表和撤销历史，phase 保持 `plain`；发送作为 detached attempt 运行，允许并发发送，唯一的冻结 in-flight 槽只留给命令。多个 detached 发送失败时，只要 composer 为空或仍是上一次自动还原的内容，就按提交顺序合并还原；用户编辑后停止这一轮自动还原。草稿图片由 detached attempt 持有到回显退休，因此图片离开 rail 后销毁 Session scope 仍能释放它们。回显以 observed 退休时，`HistoricalImageCache.seed` 把每个预览 URL 挂到 admitted 引用名下。缓存同步公开预览 URL，同时读取 durable 附件；读取完成后用规范化 URL 替换预览，并按各自生命周期撤销两个 URL。直接 subagent continuation 不注册回显，因为它的 transport 会分配另一个 RPC id，而且不支持图片输入。
+**队列出现不再退休回显。**队列 occurrence 说的是「消息在 Host 待处理」，不是「消息已可见于 transcript」：被 claim 的 prompt 要等 turn 打开且首个 step 解析后才 durable。原先在 occurrence 到达时退休回显，会让消息在这整段时间里从页面上消失——实测该窗口等于 `pre-step` 内同步 `await` 的分级判定耗时（6.9 秒），因为 `user/message` 只在 `pre-step` waterfall 解析之后 append。队列行为 queued（渲染在 composer 上方的 QueueDock）时回显继续在消息流中代表该消息；steering 行渲染在消息流尾部、与回显同一位置，因此仍由它隐藏回显。用户移除队列项的移除动作没有 durable 对端，由 `updateQueue` 自行结算回显（在 RPC 之前读取 rpcId，因为移除触发的 queue 帧可能先于回复到达）。
+
+带标识的 prompt 失败、`abandon()` 或销毁使回显立即按 failed 退休；先到的 settlement 生效。
+
+**Composer 乐观提交。**Enter 在一个 machine 事务里清空草稿、occurrence 表和撤销历史，phase 保持 `plain`；发送作为 detached attempt 运行，允许并发发送，唯一的冻结 in-flight 槽只留给命令。多个 detached 发送失败时，只要 composer 为空或仍是上一次自动还原的内容，就按提交顺序合并还原；用户编辑后停止这一轮自动还原。草稿图片由 detached attempt 持有到回显退休，因此图片离开 rail 后销毁 Session scope 仍能释放它们。回显以 observed 退休时，`HistoricalImageCache.seed` 把每个预览 URL 挂到 admitted 引用名下。缓存同步公开预览 URL，同时读取 durable 附件；读取完成后用规范化 URL 替换预览，并按各自生命周期撤销两个 URL。直接 subagent continuation 注册回显：其 transport 把调用方的 rpcId 原样写入子会话消息的 user source（`subagent.prompt` 的 `requestId`），所以续接发送与普通发送走同一条观察退休路径。客户端 `Session.prompt` 的 subagent 分支原先无条件重新生成 requestId，使回显身份永远无法与其 durable 消息关联；现在改为 `requestId ?? randomUUID()`。
 
 客户端图片编码从同步分块 `btoa` 循环换成 `FileReader.readAsDataURL`（原生编码）。browser→host 传输仍是一个 base64 JSON 整包；#2885 剩余的传输改造不在本决定范围内。
 
 ## 后果
 
-普通文本与图片 prompt 点击提交后会在当帧显示消息并让 composer 落底，admission 时机不变。默认发送不再冻结 composer，发送期间可以继续输入和提交；machine 的 `submitting` 阶段只用于命令提交。RPC 响应丢失但 admission 已成功的 prompt 通过观察确认结果，不会重复发送。图片在 durable 字节返回前显示本地预览，随后显示 host 保存的版本，中间没有加载占位。
+普通文本与图片 prompt 点击提交后会在当帧显示消息并让 composer 落底，admission 时机不变。消息在 transcript 上一直由回显代表，直到 durable `user/message` 到达；这覆盖了「已发送但尚未落盘」的整段等待，而不只是提交那一帧。默认发送不再冻结 composer，发送期间可以继续输入和提交；machine 的 `submitting` 阶段只用于命令提交。RPC 响应丢失但 admission 已成功的 prompt 通过观察确认结果，不会重复发送。图片在 durable 字节返回前显示本地预览，随后显示 host 保存的版本，中间没有加载占位。等待超过 400ms 时回显显示「已发送，等待处理…」，让这段等待有解释；阈值延迟是为了让一两帧内就被替换的普通发送不闪出提示。
 
 ## 验证
 
-Session client spec 覆盖同步插入、requestId 透传、event、queue 与窗口观察、queue 和 durable 同时观察时只退休一次、延帧移除、abandon 与销毁。Machine 与 shell spec 覆盖乐观提交、并发 detached settlement、多个失败按提交顺序还原、图片纯发送的取消，以及图片随 scope 销毁而释放。ChatView spec 覆盖流尾渲染，以及回显仍在 snapshot 时按节点和队列去重。Host control spec 覆盖 queue rpcId 投影；缓存与附件 spec 覆盖 seed 首帧显示、规范化替换和 URL 撤销。connection fixture 回显 `requestId`，`fresh-round-trip` 的 recorded-session snapshot 在 durable admission 前记录本地回显。
+Session client spec 覆盖同步插入、requestId 透传、event 与窗口观察、队列 occurrence 不退休回显、移除队列项退休回显（含 queue 帧先于 RPC 回复的竞态）、延帧移除、abandon 与销毁。Machine 与 shell spec 覆盖乐观提交、并发 detached settlement、多个失败按提交顺序还原、图片纯发送的取消，以及图片随 scope 销毁而释放。ChatView spec 覆盖流尾渲染、queued occurrence 下回显保留与 steering occurrence 下回显让位、回显仍在 snapshot 时按节点去重，以及等待提示的阈值时机。Host control spec 覆盖 queue rpcId 投影；缓存与附件 spec 覆盖 seed 首帧显示、规范化替换和 URL 撤销。connection fixture 回显 `requestId`，`fresh-round-trip` 的 recorded-session snapshot 在 durable admission 前记录本地回显。
 
 ## 考虑过的替代方案
 

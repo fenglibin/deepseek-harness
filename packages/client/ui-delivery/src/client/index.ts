@@ -1,12 +1,14 @@
 /**
  * Delivery-discipline surface plugin, browser half: the durable
- * delivery-task Conversation node (timeline card) and the floating task card
- * pinned to the conversation body's left edge. The timeline card folds
- * `delivery/change` session events; the floating card reads the host-computed
- * `delivery`, `delivery-tasks`, and `todos` projections, stays hidden until
- * Ctrl+Shift+P asks for it, and opens the design document through the Host
- * opener. Both are read-only — the task advances through the model-facing
- * tools, so this plugin owns no delivery state and emits no events.
+ * delivery-task Conversation node and the floating task card pinned to the
+ * conversation body's left edge. The timeline node folds `delivery/change`
+ * session events but is built hidden, so the task card never occupies the
+ * transcript — delivery discipline is background bookkeeping the user did not
+ * ask to read. The floating card reads the host-computed `delivery` and
+ * `delivery-tasks` projections, stays hidden until Ctrl+Shift+P asks for it, and
+ * opens the design document through the Host opener. Both are read-only — the
+ * task advances through the model-facing tools, so this plugin owns no delivery
+ * state and emits no events.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: pulls the conversation slots, uiConversation.events, and their session standard seats.

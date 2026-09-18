@@ -322,16 +322,37 @@ function deliveryAgent(ctx: Context, exec: ToolRunContext): Agent {
 }
 
 /**
+ * Whether an existing task still claims the session against a new direct request.
+ *
+ * A finished (`accepted`) task has released its claim, so the next request starts
+ * its own task. An unfinished `l0` is replaceable by policy; an unfinished
+ * `l1`/`l2` keeps its claim because larger work needs continuity across turns.
+ * @param current - the session's current task, or undefined when it has none.
+ * @returns true when this task must keep the session.
+ */
+function holdsClaim(current: DeliveryView | undefined): boolean {
+  return current !== undefined && current.level !== 'l0' && current.phase !== 'accepted'
+}
+
+/**
  * Retire the current task when the discipline policy allows the next one to
  * take its place, then create that task.
  *
- * `DeliveryService.create` refuses a new task while any non-`accepted` one is
- * current, and no tool clears a task. Policy — not the domain — decides which
- * tiers may be replaced: every tier now runs under the discipline, so an l0
- * task the model never advances would otherwise reject every later request in
- * the session, while l1/l2 keep their claim because larger work needs
- * continuity across turns. The clear leaves a durable tombstone, so a replaced
- * task stays traceable in the session log.
+ * Two different rules decide whether a new task may start, and they must agree:
+ *
+ * - The **domain** (`DeliveryService.create`) already accepts a new task when the
+ *   current one is `accepted` — that task is finished, so it no longer claims the
+ *   session. Its own `create` call handles that case, so this function does not
+ *   clear an accepted task; clearing it first would write a tombstone the domain
+ *   does not need.
+ * - **Policy** decides the remaining case, through {@link holdsClaim}: an
+ *   unfinished `l0` task is a small fix the next direct request may replace. Only
+ *   this branch has to clear first, and the clear leaves a durable tombstone so
+ *   the replaced task stays traceable.
+ *
+ * Leaving the accepted case out let a finished task block the session forever: no
+ * tool clears a task, so every later request was refused and ran without any
+ * delivery task at all.
  * @param ctx - plugin context.
  * @param agent - owning live agent.
  * @param objective - the new task's objective.
@@ -345,14 +366,14 @@ function createReplacingL0(
   level: DeliveryLevel,
 ): DeliveryView {
   const current = ctx.delivery.get(agent)
-  if (current !== undefined) {
-    if (current.level !== 'l0') {
-      throw new HarnessError(
-        `delivery task "${current.id}" already exists with phase "${current.phase}"; `
-        + 'only an l0 task may be replaced, so advance or clear it first',
-        'DELIVERY_TOOL_TASK_EXISTS',
-      )
-    }
+  if (current !== undefined && holdsClaim(current)) {
+    throw new HarnessError(
+      `delivery task "${current.id}" already exists with phase "${current.phase}"; `
+      + 'only an l0 task or an accepted task may be replaced, so advance or clear it first',
+      'DELIVERY_TOOL_TASK_EXISTS',
+    )
+  }
+  if (current !== undefined && current.level === 'l0' && current.phase !== 'accepted') {
     ctx.delivery.clear(agent, { id: current.id, revision: current.revision })
   }
   return ctx.delivery.create(agent, { objective, level })
@@ -603,6 +624,134 @@ async function gradeWithModel(
     return { kind: 'fallback', level: 'l1', detail: `grading response named no tier: ${text.slice(0, 80)}` }
   }
   return { kind: 'graded', level, detail: 'model judgement' }
+}
+
+/**
+ * Per-agent auto-detect bookkeeping: the pass in flight plus the newest request
+ * that arrived while it was running.
+ */
+interface AutoDetectState {
+  /** The running pass, or undefined when this agent has none. */
+  running: Promise<void> | undefined
+  /**
+   * The newest direct request that arrived mid-pass, with its own turn signal.
+   * Only the newest is kept: an l0 task is replaced by the NEXT direct request, so
+   * carrying an older one forward would grade a request the user has moved past.
+   */
+  queued: { objective: string; signal: AbortSignal } | undefined
+}
+
+/**
+ * Start one non-blocking auto-detect pass for a claimed step, if it needs one.
+ *
+ * The pass runs off the pre-step critical path: the step proceeds immediately
+ * and the graded tier lands when the judgement does. That ordering is what keeps
+ * a user's own message from waiting on an auxiliary model call, because
+ * `user/message` is appended only after the pre-step waterfall resolves.
+ *
+ * At most one pass per agent runs at a time, so two concurrent passes cannot race
+ * for the same task slot; a request arriving mid-pass is remembered and graded by
+ * the follow-up pass instead of being dropped, which is what keeps consecutive
+ * requests under the discipline.
+ * @param ctx - plugin context.
+ * @param agent - owning live agent.
+ * @param objective - direct human request text from the claimed batch.
+ * @param signal - the step's cancellation signal.
+ * @param lifetime - plugin lifetime, aborted at disposal.
+ * @param policy - reads the policy currently in force.
+ * @param states - per-agent bookkeeping holding the running and queued passes.
+ */
+function scheduleAutoDetect(
+  ctx: Context,
+  agent: Agent,
+  objective: string,
+  signal: AbortSignal,
+  lifetime: AbortSignal,
+  policy: () => ResolvedConfig,
+  states: Map<string, AutoDetectState>,
+): void {
+  if (objective.length === 0 || signal.aborted || lifetime.aborted) return
+  const key = agent.id
+  const state = states.get(key) ?? { running: undefined, queued: undefined }
+  states.set(key, state)
+  if (state.running !== undefined) {
+    state.queued = { objective, signal }
+    return
+  }
+  const start = (goal: string, goalSignal: AbortSignal): Promise<void> =>
+    runAutoDetect(ctx, agent, goal, goalSignal, lifetime, policy)
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error)
+        ctx.logger.warn(`delivery auto-detect failed: ${message}; continuing the turn`)
+      })
+  const drain = async (): Promise<void> => {
+    let next = { objective, signal }
+    while (true) {
+      await start(next.objective, next.signal)
+      const queued = state.queued
+      state.queued = undefined
+      if (queued === undefined) break
+      next = queued
+    }
+    state.running = undefined
+    states.delete(key)
+  }
+  state.running = drain()
+}
+
+/**
+ * Grade one already-claimed request and commit its task.
+ *
+ * The task is re-read here rather than captured when the pass started: the
+ * judgement outlives the step that scheduled it, and during that time the model
+ * may have created a task itself or a later request may have replaced the l0
+ * one. Creation is therefore decided against the live task, and a task the model
+ * owns is left alone.
+ * @param ctx - plugin context.
+ * @param agent - owning live agent.
+ * @param objective - direct human request text.
+ * @param signal - the scheduling step's cancellation signal.
+ * @param lifetime - plugin lifetime, aborted at disposal.
+ * @param policy - reads the policy currently in force.
+ */
+async function runAutoDetect(
+  ctx: Context,
+  agent: Agent,
+  objective: string,
+  signal: AbortSignal,
+  lifetime: AbortSignal,
+  policy: () => ResolvedConfig,
+): Promise<void> {
+  const current = ctx.delivery.get(agent)
+  // A claiming task needs no grading call: an unfinished l1/l2 keeps its claim
+  // across turns, so this request runs under it untouched. Everything else (no
+  // task, a replaceable l0, or a finished accepted one) starts its own task.
+  if (holdsClaim(current)) return
+  const floored = gradeByLength(objective, policy().specChars)
+  const outcome = floored === undefined
+    ? await gradeWithModel(ctx, agent, objective, policy().gradingPrompt, AbortSignal.any([signal, lifetime]))
+    : { kind: 'graded' as const, level: floored, detail: 'objective exceeds the length floor' }
+  // Cancellation and disposal land after the call, so an aborted session never
+  // commits a task for a request the user took back. The grading request itself
+  // is already logged, which is what the model-visibility rule requires.
+  if (signal.aborted || lifetime.aborted) return
+  // Re-read: the judgement outlived the step that scheduled it, and the model may
+  // have created or finished a task in the meantime.
+  if (holdsClaim(ctx.delivery.get(agent))) return
+  // The decision is made before the task is created, so the task starts at its
+  // final tier instead of being raised afterwards.
+  const created = createReplacingL0(ctx, agent, objective, outcome.level)
+  // The rationale is written after the create commits, so a failed artifact
+  // write cannot leave a task without its own record.
+  await recordGradingRationale(ctx, agent, String(created.id), {
+    level: outcome.level,
+    decidedBy: floored !== undefined
+      ? 'character-floor'
+      : outcome.kind === 'fallback' ? 'fallback' : 'model',
+    chars: objective.length,
+    charFloor: GRADING_CHARACTER_FLOOR,
+    detail: outcome.detail,
+  })
 }
 
 /** The four OpenSpec change artifacts `record_spec` may write. */
@@ -1090,39 +1239,16 @@ export function apply(ctx: Context, config: Config): void {
   })
 
   if (resolved.autoDetect) {
-    ctx.on('agent/pre-step', async ({ agent, messages, signal }, next): Promise<PreStepDecision> => {
-      if (signal.aborted) return next()
-      try {
-        const objective = directHumanText(messages)
-        if (objective.length > 0) {
-          const current = ctx.delivery.get(agent)
-          // An l1/l2 task keeps its claim across turns, so this turn needs no
-          // grading call and proceeds untouched. An l0 task is a small fix the
-          // next direct request may replace, so it is graded like a fresh one.
-          if (current === undefined || current.level === 'l0') {
-            const floored = gradeByLength(objective, policy().specChars)
-            const outcome = floored === undefined
-              ? await gradeWithModel(ctx, agent, objective, policy().gradingPrompt, signal)
-              : { kind: 'graded' as const, level: floored, detail: 'objective exceeds the length floor' }
-            // The decision is made before the task is created, so the task
-            // starts at its final tier instead of being raised afterwards.
-            const created = createReplacingL0(ctx, agent, objective, outcome.level)
-            // The rationale is written after the create commits, so a failed
-            // artifact write cannot leave a task without its own record.
-            await recordGradingRationale(ctx, agent, String(created.id), {
-              level: outcome.level,
-              decidedBy: floored !== undefined
-                ? 'character-floor'
-                : outcome.kind === 'fallback' ? 'fallback' : 'model',
-              chars: objective.length,
-              charFloor: GRADING_CHARACTER_FLOOR,
-              detail: outcome.detail,
-            })
-          }
-        }
-      } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error)
-        ctx.logger.warn(`delivery auto-detect failed: ${message}; continuing the turn`)
+    // Auto-detect runs off the pre-step critical path. A graded tier is not
+    // model-visible content, while `user/message` is appended only after this
+    // waterfall resolves — so holding the step for the grading call would keep
+    // the user's own message off the transcript for the call's whole duration.
+    const lifetime = new AbortController()
+    ctx.effect(() => () => { lifetime.abort(new Error('tool-delivery disposed')) }, 'tool-delivery: auto-detect')
+    const states = new Map<string, AutoDetectState>()
+    ctx.on('agent/pre-step', ({ agent, messages, signal }, next): Promise<PreStepDecision> => {
+      if (!signal.aborted) {
+        scheduleAutoDetect(ctx, agent, directHumanText(messages), signal, lifetime.signal, policy, states)
       }
       return next()
     })

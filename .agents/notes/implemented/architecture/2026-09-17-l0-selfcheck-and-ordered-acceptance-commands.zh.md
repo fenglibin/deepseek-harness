@@ -18,9 +18,11 @@ Status: implemented
 
 替换规则因此落在 `pre-step`：当前任务为 `l0` 且本步收到新的直接人类请求时，先 `clear` 再建。`l1`/`l2` 保留占用，因为较大的工作需要跨 turn 的连续性。`clear` 留下 durable tombstone，被替换的任务仍在会话日志里可追溯。
 
+`accepted` 走的是 domain 自己的路径：`DeliveryService.create` 本就允许在 `accepted` 任务之后新建，因此那种情形直接新建，不写 tombstone。策略与 domain 两层判断都收在 `holdsClaim` 一个谓词里（`level !== 'l0' && phase !== 'accepted'`），`createReplacingL0` 与 `runAutoDetect` 共用它。策略曾经只豁免 `l0`，于是**已完成的 `l1`/`l2` 任务把会话永久占死**——它既非 `l0` 可替换、又已 `accepted` 不再需要占用，而没有任何工具能清空它，后续每个请求都被 `DELIVERY_TOOL_TASK_EXISTS` 拒绝，并由 `runAutoDetect` 记成警告后静默跳过。
+
 代价必须说清：**`l0` 的自检保护是尽力而为的。** 同一个 turn 内没有走完 `verified` 的任务会被下一个请求替换掉，那次自检就没有被门禁强制。要把它变成硬保证，`l0` 就得像 `l1` 一样要求用户等待完整流程走完，这与「小微修复」的定位冲突。
 
-`create_delivery_task` 也复用同一条替换规则（当前任务是 `l0` 时替换），因此模型显式提高分级与自动路径的行为一致。
+`create_delivery_task` 也复用同一条替换规则（当前任务是 `l0` 或已 `accepted` 时替换），因此模型显式提高分级与自动路径的行为一致。
 
 ### `l0` 保留对清单与 `covers` 注解的豁免
 

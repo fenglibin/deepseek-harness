@@ -1,9 +1,9 @@
 /**
  * DeliveryFloatCard: the floating task card pinned to the conversation body's
- * left edge (§6.6 "会话侧边栏/卡片"). It reads the host-computed `delivery`,
- * `delivery-tasks`, and `todos` projections and renders the current task's
- * semantic progress in four groups — requirement analysis, design, task list,
- * and implementation verification — each with a live status.
+ * left edge (§6.6 "会话侧边栏/卡片"). It reads the host-computed `delivery` and
+ * `delivery-tasks` projections and renders the current task's semantic
+ * progress in four groups — requirement analysis, design, task list, and
+ * implementation verification — each with a live status.
  *
  * Hidden by default: the card overlays the transcript, and its progress can
  * disagree with what the reader sees the agent doing, so it stays out of the
@@ -87,16 +87,16 @@ export function DeliveryFloatCard({
     const onKeyDown = (event: KeyboardEvent): void => {
       if (!isToggleShortcut(event)) return
       event.preventDefault()
-      actions.cycle()
+      actions.toggle()
     }
     document.addEventListener('keydown', onKeyDown)
     return () => { document.removeEventListener('keydown', onKeyDown) }
   }, [actions])
 
-  // The card follows the task by default, so a reader sees progress without
-  // discovering the shortcut; an explicit preference overrides that both ways.
-  const hasTask = projection !== undefined && projection !== null
-  if (!cardVisible(preference, hasTask)) return null
+  // The card is opt-in, so the reader's preference is the only gate. The task
+  // check below is a separate concern: a shown card with no current task has
+  // nothing to report.
+  if (!cardVisible(preference)) return null
   if (projection === undefined || projection === null) return null
   const task = projection.task
   // `delivery-tasks` is the single authority for the checklist: an l1 task's

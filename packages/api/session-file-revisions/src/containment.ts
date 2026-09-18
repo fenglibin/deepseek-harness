@@ -42,11 +42,14 @@ export class EscapeError extends Error {
  * Canonicalize a path, tolerating the parts that do not exist yet.
  *
  * A revert may target a path whose file was removed since capture, so the deep
- * ancestor is canonicalized and the missing tail is re-appended verbatim.
+ * ancestor is canonicalized and the missing tail is re-appended verbatim. That
+ * is also what makes it usable on a DELETED path: a plain `realpath` fails there
+ * and would leave the caller comparing a resolved root against an unresolved
+ * file path.
  * @param path - absolute path, existing or not.
  * @returns its canonical form.
  */
-async function canonicalOf(path: string): Promise<string> {
+export async function canonicalOf(path: string): Promise<string> {
   const target = isAbsolute(path) ? normalize(path) : resolve(path)
   const segments = target.split(sep).filter(segment => segment !== '')
   let current: string = sep

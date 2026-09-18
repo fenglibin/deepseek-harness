@@ -5,6 +5,7 @@ import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 import type { AttachmentIdType, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
+import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { SessionEventStream } from '../transport.ts'
 import type { SessionJournalChange } from '../transport.ts'
@@ -234,7 +235,7 @@ export class Session implements SessionFace {
       }, signal)
     } else {
       const routed = await this.remote.subagents.prompt({
-        requestId: randomUUID() as SessionRequestId,
+        requestId: requestId ?? randomUUID() as SessionRequestId,
         parentSessionId: this.address.parentSessionId,
         childSessionId: this.address.childSessionId,
         mode: 'continuable',
@@ -283,9 +284,60 @@ export class Session implements SessionFace {
     return { ok: true, value: { attachment: result.value.attachment, data } }
   }
 
-  /** Apply one operation to a still-pending queue occurrence. */
+  /**
+   * Apply one operation to a still-pending queue occurrence.
+   *
+   * Removal and edit both settle the occurrence's local echo here, because no
+   * later event will before the durable message lands: the Host drops a removed
+   * message without ever admitting it to the log, and an edit keeps the message
+   * identity (and its rpcId) while replacing its content — which is exactly the
+   * span an echo occupies.
+   */
   async updateQueue(itemId: MessageId, action: QueueAction): Promise<RemoteResult<{ accepted: true }>> {
-    return this.remote.session.updateQueue({ sessionId: this.sessionId, itemId, action })
+    // The rpcId is read BEFORE the call. Both settling operations make the Host
+    // broadcast the queue frame that replaces this row, and that frame can land
+    // before the RPC resolves; reading the projection afterwards would find no row
+    // and leave the echo standing forever (removal) or showing stale text (edit).
+    const settles = action.kind === 'remove' || action.kind === 'edit'
+    const rpcId = settles ? this.queuedRpcId(itemId) : undefined
+    const result = await this.remote.session.updateQueue({ sessionId: this.sessionId, itemId, action })
+    if (result.ok && rpcId !== undefined) {
+      // `steer` reaches no branch here: a steered occurrence stays pending on the
+      // Host and its echo retires on the durable event that follows.
+      if (action.kind === 'remove') this.retireRemovedSubmission(rpcId)
+      else if (action.kind === 'edit') this.retargetSubmissionText(rpcId, action.content)
+    }
+    return result
+  }
+
+  /** The prompt-RPC identity of one pending queue occurrence, when it has one. */
+  private queuedRpcId(itemId: MessageId): SessionRequestId | undefined {
+    const row = this.queueMirror.snapshot()
+      .find(candidate => candidate.id === itemId || candidate.messageId === itemId)
+    return row?.rpcId
+  }
+
+  /**
+   * Rewrite one echo's content to match an edited queue occurrence.
+   *
+   * The edit preserves the message identity, so the durable `user/message` that
+   * eventually replaces this echo carries the NEW text. Without this the echo
+   * would keep showing what the user already changed.
+   * @param requestId - echo identity.
+   * @param content - the replacement content the Host accepted.
+   */
+  private retargetSubmissionText(requestId: SessionRequestId, content: readonly ContentBlock[]): void {
+    if (this.submissionSettlements.size === 0) return
+    const settlement = this.submissionSettlements.get(requestId)
+    // A retiring echo is already gone; rewriting it would resurrect stale text.
+    if (settlement === undefined || settlement.retiring) return
+    const texts = content.filter(block => block.type === 'text').map(block => block.text)
+    if (texts.length === 0) return
+    const text = texts.join('')
+    this.pendingSubmissions = this.pendingSubmissions.map(submission => submission.requestId === requestId
+      ? { ...submission, text, parts: [{ type: 'text' as const, text }] }
+      : submission)
+    this.notifier.markDirty()
   }
 
   /**
@@ -415,7 +467,6 @@ export class Session implements SessionFace {
    */
   replaceControl(queue: readonly SessionQueuedItem[]): void {
     this.queueMirror.replace(queue)
-    this.observeSubmissionQueue(queue)
     this.notifier.markDirty()
   }
 
@@ -425,7 +476,6 @@ export class Session implements SessionFace {
    */
   handleControlFrame(frame: Extract<SessionControlFrame, { type: 'queue' }>): void {
     this.queueMirror.replace(frame.items)
-    this.observeSubmissionQueue(frame.items)
     this.notifier.markDirty()
   }
 
@@ -596,7 +646,17 @@ export class Session implements SessionFace {
     return queueChanged || awaitingFirstTurn !== this.firstPromptPendingTurn
   }
 
-  /** Retire the matching echo when a durable browser-prompt `user/message` becomes visible. */
+  /**
+   * Retire the matching echo when a durable browser-prompt `user/message` becomes visible.
+   *
+   * A queue occurrence deliberately does NOT retire an echo. An occurrence says
+   * the message is pending on the Host, not that it is visible on the transcript:
+   * a claimed prompt becomes durable only after the turn opens and its first step
+   * resolves, and retiring on the occurrence would blank the message for that
+   * whole span. The echo therefore stands in for the message until the durable
+   * event replaces it, and the one gesture with no durable counterpart afterwards
+   * — {@link updateQueue} with a removal — settles its own echo.
+   */
   private observeSubmissionEvent(event: { readonly type: string; readonly data?: unknown }): void {
     if (this.submissionSettlements.size === 0 || event.type !== 'user/message') return
     // Structural read: window entries may be compact history records, so the
@@ -606,16 +666,6 @@ export class Session implements SessionFace {
     const source = data?.source as { readonly kind?: unknown; readonly rpcId?: unknown } | undefined
     if (source?.kind !== 'user' || typeof source.rpcId !== 'string') return
     this.scheduleObservedRetirement(source.rpcId as SessionRequestId, imageRefsIn(data?.content))
-  }
-
-  /** Retire echoes whose prompts landed in the host inbox instead of the log (running-turn submissions). */
-  private observeSubmissionQueue(items: readonly SessionQueuedItem[]): void {
-    if (this.submissionSettlements.size === 0) return
-    for (const item of items) {
-      if (item.rpcId !== undefined) {
-        this.scheduleObservedRetirement(item.rpcId, imageRefsIn(item.message.content))
-      }
-    }
   }
 
   /**
@@ -640,6 +690,19 @@ export class Session implements SessionFace {
     if (settlement === undefined || settlement.retiring) return
     settlement.retiring = true
     this.finishSubmission(requestId, { reason: 'failed' })
+  }
+
+  /**
+   * Remove one unsettled echo whose pending occurrence the user discarded.
+   *
+   * Distinct from {@link retireFailedSubmission}: the send did not fail, the user
+   * ended it, so the caller must not treat it as a failure and restore the draft.
+   */
+  private retireRemovedSubmission(requestId: SessionRequestId): void {
+    const settlement = this.submissionSettlements.get(requestId)
+    if (settlement === undefined || settlement.retiring) return
+    settlement.retiring = true
+    this.finishSubmission(requestId, { reason: 'removed' })
   }
 
   /** Single removal point: drop the echo, publish, then notify the owner. */

@@ -10,7 +10,7 @@ B5 的 `DeliveryDock` 把交付任务作为只读条带展示在 composer 上方
 
 用两个均为只读的界面替换 `DeliveryDock`：
 
-- 持久**时间线卡片**：一个 `ConversationNodeDefinition`（`delivery-task`）把 `delivery/change` 会话事件族折叠为一个 keyed Chat 节点。每个 `create` 打开节点，每个 `advance` / `record-*` / `clear` 更新折叠进其状态，卡片在转录中跟随任务生命周期，并在每次变更时重新渲染（实时，而非快照）。由 `DeliveryTaskPanel` 通过 `conversation.chat.node` keyed 座位渲染。
+- 持久**时间线节点**：一个 `ConversationNodeDefinition`（`delivery-task`）把 `delivery/change` 会话事件族折叠为一个 keyed Chat 节点。每个 `create` 打开节点，每个 `advance` / `record-*` / `clear` 更新折叠进其状态。由 `DeliveryTaskPanel` 通过 `conversation.chat.node` keyed 座位渲染；该节点以 `visibility: 'hidden'` 构造，因此卡片不进入转录（见[交付任务卡片撤出转录](2026-09-17-delivery-task-card-withdrawn-from-transcript.zh.md)，该 note 推翻了本 note 最初的"卡片在转录中渲染"）。
 - **悬浮卡片**：`DeliveryFloatCard` 注册在新的 session 作用域 `conversation.side.float` 槽上，该槽由 `ui-conversation` 声明并渲染在正文左边缘。它读取 `delivery` 投影，折叠态展示分级徽标、阶段与目标；展开后展示阶段进度条与产物路径。
 
 为使客户端能读取 `delivery/change` 事件数据，持久变更词汇（`DeliveryChangeMeta` 及其 `Delivery*Meta` 成员、`DeliveryOperation`、`FoldedDelivery`、`DeliveryErrorCode`）与 `SessionEventMap['delivery/change']` 合并从 host 侧 `domain.ts` 迁入 client-safe 的 `types.ts` 出口。`domain.ts` 仅保留 `DeliveryChanged` 与作用域化的 `delivery/changed` cordis 事件。
@@ -25,7 +25,7 @@ B5 的 `DeliveryDock` 把交付任务作为只读条带展示在 composer 上方
 
 ## 后果
 
-- **获得**：一个随每次交付变更实时重渲染的转录内任务卡片，加上一个针对当前任务的常驻左边缘悬浮卡片。composer dock 已移除。
+- **获得**：一个随每次交付变更实时重折叠的任务节点，加上一个针对当前任务的常驻左边缘悬浮卡片。composer dock 已移除。
 - **代价**：新增 session 作用域 `conversation.side.float` 槽（声明于 `ui-conversation` 的 `slots.ts`、`apply.ts`，由 `ConversationRoot` 渲染）、一个 `ConversationNodeDefinition`，以及交付类型迁入 client-safe 出口。
 - **迁移**：`delivery/change` 词汇迁入 `types.ts`；`fold.ts`、`runtime.ts`、`index.ts` 现从 `types.ts` 而非 `domain.ts` 导入。包根 re-export 未变，host 消费方不受影响。
 

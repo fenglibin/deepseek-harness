@@ -211,57 +211,69 @@
   white-space: nowrap;
 }
 
-.operation {
-  flex: none;
-  padding: 0 6px;
-  border-radius: 4px;
-  font-size: 11px;
-  line-height: 18px;
-  color: var(--dsw-alias-label-caption);
-  background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.operation[data-operation='write'] {
-  color: var(--dsw-alias-state-business-primary);
-}
-
-.accept {
+/* The added/removed pair reads as one fact about the change, so the two numbers
+   sit together in a fixed slot the eye can scan down the column. */
+.lines {
   display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  align-items: baseline;
+  gap: 6px;
   flex: none;
-  padding: 2px 8px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--dsw-alias-label-secondary);
   font-size: 12px;
   line-height: 18px;
-  cursor: pointer;
+  font-variant-numeric: tabular-nums;
 }
 
-.accept:hover {
+.lineAdded {
   color: var(--dsw-alias-state-success-primary);
-  border-color: var(--dsw-alias-state-success-primary);
 }
 
-/* The view-diff control opens a reading surface, so it stays quieter than the
-   accept control beside it: the row's decision is accept, its detail is view. */
-.viewDiff {
+.lineRemoved {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+/* A deleted path has no line counts to show, so the row states the deletion in
+   the same slot the numbers occupy rather than leaving the column blank. */
+.deleted {
   flex: none;
-  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+/* Icon-only row actions: a square hit target that reads as one glyph rather
+   than as a labelled button, so the path keeps the width it needs. */
+.iconAction {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
-  font-size: 12px;
-  line-height: 18px;
   cursor: pointer;
 }
 
-.viewDiff:hover {
+.iconAction:hover {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
+}
+
+.iconAction:disabled {
+  color: var(--dsw-alias-label-caption);
+  cursor: default;
+}
+
+.accept:hover {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+/* Revert is the one row control that changes the workspace, so it takes the
+   caution colour on hover. */
+.revert:hover {
+  color: var(--dsw-alias-state-error-primary);
 }
 
 /* Revert is the one control here that changes the workspace, so it takes the

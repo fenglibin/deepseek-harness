@@ -45,6 +45,7 @@ export const zh = {
   'fileOpen.folderTitle': '无法打开文件夹',
   'fileOpen.folderUnknown': '无法打开此文件夹',
   'message.extraBlock': '附加内容块',
+  'message.echo.sending': '已发送，等待处理…',
   'message.systemPrompt': '系统提示词',
   'message.contextInjection': '上下文注入',
   'message.contextRecall': '跨会话召回',

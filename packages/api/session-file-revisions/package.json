@@ -49,11 +49,13 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@deepseek-ai/dsh-native-command": "workspace:^",
     "zod": "^4.4.3"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/dsh-native-command": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-session-file-revisions": "workspace:^",
     "@deepseek-ai/dsh-typert-protocol": "workspace:^"
@@ -61,6 +63,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
+    "@deepseek-ai/dsh-native-command": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-session-file-revisions": "workspace:^",
     "@deepseek-ai/dsh-typert-protocol": "workspace:^"

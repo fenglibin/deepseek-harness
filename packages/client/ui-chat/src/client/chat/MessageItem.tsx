@@ -224,7 +224,8 @@ function TurnMaxTokensItem({ t }: {
 
 /** Right-aligned bubble shared by user and steering rows. */
 function UserStyleBubble({
-  runs, text, rest, renderMessageImages, actions, pending = false, echo = false, referenceLabels = [], reveal = 'always', t,
+  runs, text, rest, renderMessageImages, actions, pending = false, echo = false,
+  referenceLabels = [], reveal = 'always', notice, t,
 }: {
   runs: readonly BubbleRun[]
   /** Joined text across all text runs; the actions row receives it. */
@@ -242,6 +243,8 @@ function UserStyleBubble({
   referenceLabels?: readonly string[]
   /** Whole actions-row visibility: earlier rows reveal on hover, the latest stays shown (turn tails' gate). */
   reveal?: 'always' | 'hover'
+  /** Wait notice under the actions row; absent renders nothing. */
+  notice?: string | undefined
   t: ChatViewSlotProps['t']
 }): ReactNode {
   const truncated = (total: number): string => t('json.truncated', { total })
@@ -268,6 +271,9 @@ function UserStyleBubble({
           <div className={css.referenceSummary}>
             {t('message.referenceSummary', { labels: referenceLabels.join(t('message.referenceSeparator')) })}
           </div>
+        )}
+        {notice !== undefined && (
+          <div className={css.waitNotice} role="status">{notice}</div>
         )}
       </div>
       {actions?.(text)}
@@ -308,10 +314,15 @@ export function PendingSteeringBubble({ content, renderMessageImages, t }: {
 }
 
 /**
- * Render one local submission echo with the exact visual language of the
- * durable user node that replaces it: draft text plus object-URL previews,
- * visible from the submit click until the durable `user/message` (or its
- * queue occurrence) renders.
+ * Render one local submission echo with the visual language of the durable user
+ * node that replaces it: draft text plus object-URL previews, visible from the
+ * submit click until the durable `user/message` renders.
+ *
+ * The echo now spans the turn's own start (a claimed prompt becomes durable only
+ * after the first step resolves), so a wait notice appears when the durability
+ * handoff is still outstanding. It is delayed rather than immediate: an ordinary
+ * send is replaced within a frame or two, and a notice that flashes for one frame
+ * reads as a defect.
  * @param props - the session snapshot's pending submission and render seats.
  * @returns the echoed user bubble.
  */
@@ -321,6 +332,7 @@ export function PendingSubmissionBubble({ submission, renderMessageImages, t }: 
   t: ChatViewSlotProps['t']
 }): ReactNode {
   const { runs, text } = useMemo(() => partsRuns(submission.parts), [submission.parts])
+  const waiting = useDelayedFlag(ECHO_WAIT_NOTICE_MS)
   return (
     <UserStyleBubble
       runs={runs}
@@ -338,8 +350,29 @@ export function PendingSubmissionBubble({ submission, renderMessageImages, t }: 
           t={t}
         />
       )}
+      notice={waiting ? t('message.echo.sending') : undefined}
     />
   )
+}
+
+/** How long a local submission echo may stand unanswered before it says so. */
+const ECHO_WAIT_NOTICE_MS = 400
+
+/**
+ * Whether mounted time has reached one threshold.
+ *
+ * Component-internal behavior only: it subscribes to nothing external, so it
+ * stays out of the reactive-read channels that carry business facts.
+ * @param delayMs - milliseconds to wait after mount.
+ * @returns true once the delay has elapsed; false initially and forever when unmounted first.
+ */
+function useDelayedFlag(delayMs: number): boolean {
+  const [elapsed, setElapsed] = useState(false)
+  useEffect(() => {
+    const id = setTimeout(() => { setElapsed(true) }, delayMs)
+    return () => { clearTimeout(id) }
+  }, [delayMs])
+  return elapsed
 }
 
 /** User and admitted-steering keyed Chat renderer. */

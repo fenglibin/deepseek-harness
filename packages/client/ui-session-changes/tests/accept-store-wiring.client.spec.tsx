@@ -173,7 +173,7 @@ describe('the dock registration declares the accept store', () => {
     } as unknown as Parameters<typeof SessionChangesDock>[0]
 
     const first = render(<SessionChangesDock {...props} />)
-    fireEvent.click(screen.getByRole('button', { name: /修改的文件/ }))
+    fireEvent.click(screen.getByRole('button', { name: /变更/ }))
     fireEvent.click(screen.getByRole('button', { name: '接受' }))
 
     // The click reached the framework-resolved instance rather than a local copy.

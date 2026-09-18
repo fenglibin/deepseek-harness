@@ -24,7 +24,7 @@ import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@dee
 // hole this occupant serves.
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { RevisionDiff } from '@deepseek-ai/dsh-api-session-file-revisions/types'
-import { RevisionError, type RevisionRemote } from './revision-remote.ts'
+import { RevisionError, revisionFailureText, type RevisionRemote } from './revision-remote.ts'
 import type { RevisionViewerRequest } from './revision-viewer-request.ts'
 import {
   EMPTY_SIDE_BY_SIDE, sideBySide, unifiedDiffText,
@@ -198,7 +198,11 @@ export function RevisionDiffOverlay({
       (result) => { if (!cancelled) setState({ kind: 'loaded', diff: result }) },
       (cause: unknown) => {
         if (cancelled) return
-        setState({ kind: 'failed', message: cause instanceof Error ? cause.message : String(cause) })
+        // The dock offers this viewer for paths the Host has no revision for, so
+        // "this session recorded nothing for that file" is an expected answer
+        // here rather than an anomaly; the mapped sentence says which situation
+        // the reader is in instead of showing the Host's raw diagnostic.
+        setState({ kind: 'failed', message: revisionFailureText(cause, t, 'diff.viewerFailed') })
       },
     )
     return () => { cancelled = true }

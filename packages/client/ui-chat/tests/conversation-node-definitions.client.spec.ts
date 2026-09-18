@@ -873,7 +873,9 @@ describe('built-in conversation node Definitions', () => {
       turn: 1,
       step: 1,
       message: toolResult('root', 'done', true),
-      error: { name: 'ToolError', code: 'failed' },
+      // A reader-actionable code keeps the row visible, so this case exercises
+      // key stability across settlement rather than the visibility verdict.
+      error: { name: 'FsError', code: 'FS_PERMISSION_DENIED' },
       meta: { presentation: 'raw' },
     }, { surfaceOp: 'append' }))
     value.flush()
@@ -888,7 +890,7 @@ describe('built-in conversation node Definitions', () => {
       call: { name: 'code', argsRaw: '{}' },
       content: [{ type: 'text', text: 'done' }],
       isError: true,
-      error: { name: 'ToolError', code: 'failed' },
+      error: { name: 'FsError', code: 'FS_PERMISSION_DENIED' },
       meta: { presentation: 'raw' },
     })
 
@@ -1909,7 +1911,10 @@ describe('built-in conversation node Definitions', () => {
     expect(node(snapshot(recovered), 'turn-error')).toBeUndefined()
   })
 
-  it('hides a recoverable mutation failure once a later mutation of the same file succeeds', () => {
+  it('hides a guarded-mutation failure the model owns, whether or not a later mutation succeeds', () => {
+    // The model usually abandons a blocked path instead of retrying it, so the
+    // verdict must not be conditioned on a later mutation of the same path. A
+    // successful read in between is not a mutation and must stay visible.
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
@@ -1930,46 +1935,18 @@ describe('built-in conversation node Definitions', () => {
         turn: 1, step: 1,
         message: toolResult('read-1', 'contents'),
       }, { surfaceOp: 'append' }),
-      at(7, 'tool/call', {
-        turn: 1, step: 1, callId: 'edit-2', name: 'edit',
-        arguments: '{"file_path":"a.txt","old_string":"x","new_string":"y"}',
-      }),
-      at(8, 'tool/result', {
-        turn: 1, step: 1,
-        message: toolResult('edit-2', 'Updated file'),
-      }, { surfaceOp: 'append' }),
-      at(9, 'step/end', { turn: 1, step: 1 }),
-      at(10, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+      at(7, 'step/end', { turn: 1, step: 1 }),
+      at(8, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
     ])
     const snap = snapshot(value)
     const calls = snap.nodes.values().filter(candidate => candidate.kind === 'tool-call')
     const byCallId = new Map(calls.map(candidate => [(candidate.data as ToolChatData).root.callId, candidate]))
     expect(byCallId.get('edit-1')?.visibility).toBe('hidden')
     expect(byCallId.get('read-1')?.visibility).toBe('visible')
-    expect(byCallId.get('edit-2')?.visibility).toBe('visible')
+    expect(snap.order).not.toContain(byCallId.get('edit-1')?.key)
   })
 
-  it('keeps a recoverable mutation failure visible when no later mutation of that file succeeds', () => {
-    const value = assembler([
-      at(1, 'turn/start', { turn: 1 }),
-      at(2, 'step/start', { turn: 1, step: 1 }),
-      at(3, 'tool/call', {
-        turn: 1, step: 1, callId: 'edit-1', name: 'edit',
-        arguments: '{"file_path":"a.txt","old_string":"x","new_string":"y"}',
-      }),
-      at(4, 'tool/result', {
-        turn: 1, step: 1,
-        message: toolResult('edit-1', 'edit requires reading "a.txt" first', true),
-        error: { name: 'FsError', code: 'FS_NOT_OBSERVED' },
-      }, { surfaceOp: 'append' }),
-      at(5, 'step/end', { turn: 1, step: 1 }),
-      at(6, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
-    ])
-    const call = snapshot(value).nodes.values().find(candidate => candidate.kind === 'tool-call')
-    expect(call?.visibility).toBe('visible')
-  })
-
-  it('keeps a non-recoverable mutation failure visible even when a later mutation succeeds', () => {
+  it('keeps a reader-actionable mutation failure visible even when a later mutation succeeds', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
@@ -2061,14 +2038,52 @@ describe('built-in conversation node Definitions', () => {
     expect(call?.visibility).toBe('hidden')
   })
 
-  it('keeps every failure outside the unactionable set visible', () => {
+  it('hides a model-owned failure whatever its code, and keeps the actionable set visible', () => {
+    const modelOwned = [
+      'FS_STALE_VERSION',
+      'FS_NOT_OBSERVED',
+      'FS_NOT_FOUND',
+      'FS_OFFSET_OUT_OF_RANGE',
+      'FS_NOT_REGULAR_FILE',
+      'FS_EDIT_NOT_FOUND',
+      'FS_AMBIGUOUS_EDIT',
+      'DELIVERY_GATE_BLOCKED',
+      'DELIVERY_ALREADY_EXISTS',
+      'UNKNOWN_TOOL',
+      'INVALID_ARGS',
+      // A code from an older session's replay, absent from today's source.
+      'DELIVERY_POST_HOOK_FAILED',
+      'failed',
+    ]
+    for (const code of modelOwned) {
+      const value = assembler([
+        at(1, 'turn/start', { turn: 1 }),
+        at(2, 'step/start', { turn: 1, step: 1 }),
+        at(3, 'tool/call', {
+          turn: 1, step: 1, callId: `call-${code}`, name: 'edit',
+          arguments: '{"file_path":"a.txt","old_string":"x","new_string":"y"}',
+        }),
+        at(4, 'tool/result', {
+          turn: 1, step: 1,
+          message: toolResult(`call-${code}`, `${code} on a.txt`, true),
+          error: { name: 'FsError', code },
+        }, { surfaceOp: 'append' }),
+        at(5, 'step/end', { turn: 1, step: 1 }),
+        at(6, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+      ])
+      const call = snapshot(value).nodes.values().find(candidate => candidate.kind === 'tool-call')
+      expect(call?.visibility, code).toBe('hidden')
+    }
+  })
+
+  it('keeps every reader-actionable failure visible', () => {
     const codes = [
       'FS_PERMISSION_DENIED',
       'FS_SANDBOX_DENIED',
-      'FS_STALE_VERSION',
-      'FS_NOT_FOUND',
-      'FS_NOT_REGULAR_FILE',
-      'failed',
+      'SANDBOX_APPROVAL_UNAVAILABLE',
+      'NO_PROVIDER',
+      'GOAL_TOOL_AUTHORITY_REQUIRED',
+      'SEARCH_FAILED',
     ]
     for (const code of codes) {
       const value = assembler([
@@ -2087,11 +2102,11 @@ describe('built-in conversation node Definitions', () => {
         at(6, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
       ])
       const call = snapshot(value).nodes.values().find(candidate => candidate.kind === 'tool-call')
-      expect(call?.visibility).toBe('visible')
+      expect(call?.visibility, code).toBe('visible')
     }
   })
 
-  it('keeps a successful call and an error without a code visible', () => {
+  it('hides a failure that carries no error code and keeps a successful call visible', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
@@ -2117,10 +2132,10 @@ describe('built-in conversation node Definitions', () => {
     const calls = snap.nodes.values().filter(candidate => candidate.kind === 'tool-call')
     const byCallId = new Map(calls.map(candidate => [(candidate.data as ToolChatData).root.callId, candidate]))
     expect(byCallId.get('edit-ok')?.visibility).toBe('visible')
-    expect(byCallId.get('edit-codeless')?.visibility).toBe('visible')
+    expect(byCallId.get('edit-codeless')?.visibility).toBe('hidden')
   })
 
-  it('re-hides an earlier recoverable failure when a later success lands incrementally', () => {
+  it('hides a guarded-mutation failure on the incremental path without waiting for a later success', () => {
     const value = assembler([
       at(1, 'turn/start', { turn: 1 }),
       at(2, 'step/start', { turn: 1, step: 1 }),
@@ -2135,7 +2150,7 @@ describe('built-in conversation node Definitions', () => {
       }, { surfaceOp: 'append' }),
     ])
     const before = snapshot(value).nodes.values().find(candidate => candidate.kind === 'tool-call')
-    expect(before?.visibility).toBe('visible')
+    expect(before?.visibility).toBe('hidden')
 
     value.append(at(5, 'tool/call', {
       turn: 1, step: 1, callId: 'edit-2', name: 'edit',

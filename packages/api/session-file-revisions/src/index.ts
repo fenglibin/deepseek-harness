@@ -16,20 +16,25 @@ import { readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
+import { runNativeCommand } from '@deepseek-ai/dsh-native-command'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 // Type-only: pulls the session store's Context merge (ctx.sessions).
 import type {} from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-session-file-revisions'
-import { revertContent } from '@deepseek-ai/dsh-session-file-revisions'
+import { lineCounts, readDeletedContent, revertContent } from '@deepseek-ai/dsh-session-file-revisions'
 import type { FileRevision } from '@deepseek-ai/dsh-session-file-revisions/types'
-import { containPath, EscapeError } from './containment.ts'
+import { canonicalOf, containPath, EscapeError } from './containment.ts'
 import type {
   RevisionDiff, RevisionEntry, RevertFileResult, RevertResult, RevertStatus,
   RevisionsDiffRequest, RevisionsListRequest, RevisionsRevertRequest,
 } from './types.ts'
 
 export type * from './types.ts'
+// The line counts and the deleted-path restore are the capture layer's, so the
+// Host surface and any other consumer read one implementation; re-exported
+// because this is the package a Client reads the entry vocabulary from.
+export { lineCounts, type LineCounts } from '@deepseek-ai/dsh-session-file-revisions'
 
 /**
  * Inclusive byte ceiling of one content side sent to the browser. A file past
@@ -42,23 +47,6 @@ declare module '@deepseek-ai/cordis' {
     /** Host session-revision business API and Remote namespace owner. */
     sessionRevisionController: SessionRevisionController
   }
-}
-
-/**
- * Count the added and removed lines between two texts, split on LF.
- *
- * An `unknown` origin has no captured baseline, so neither count is derivable:
- * reporting the end state's lines as "added" would claim a whole-file addition
- * the capture cannot support. Both counts are 0 and `origin` carries the reason.
- * @param revision - the revision to measure.
- * @returns the line counts of each side.
- */
-export function lineCounts(revision: FileRevision): { added: number; removed: number } {
-  if (revision.origin === 'unknown') return { added: 0, removed: 0 }
-  const { baseline, endState } = revision
-  const removed = baseline === null ? 0 : baseline.split('\n').length - (baseline.endsWith('\n') ? 1 : 0)
-  const added = endState.split('\n').length - (endState.endsWith('\n') ? 1 : 0)
-  return { added, removed }
 }
 
 /**
@@ -102,6 +90,10 @@ export class SessionRevisionController extends TypertRemoteService {
           origin: revision.origin,
           ...counts,
           oversized,
+          // The session's own seq, so a row the changed-files log cannot place
+          // (a path only a shell command named) still lands in first-seen order.
+          firstSeq: revision.firstOrder.seq,
+          lastSeq: revision.lastOrder.seq,
         }
       }),
     })
@@ -191,6 +183,14 @@ export class SessionRevisionController extends TypertRemoteService {
       throw error
     }
     const current = await this.readOrNull(contained)
+    // The path was removed by a shell command, so this record carries no content
+    // of its own. The workspace's git objects hold the version to restore, and
+    // which object that is depends on how the file stood when it was deleted —
+    // hence two sources rather than one.
+    if (revision.origin === 'deleted') {
+      if (current !== null) return { path: revision.path, status: 'unchanged' }
+      return this.restoreDeleted(root, contained, revision)
+    }
     // `unknown` means this session overwrote a file whose prior content was
     // never captured. Its baseline cannot be reconstructed, so refusing is the
     // only honest outcome: the session may well have created the file, but
@@ -223,6 +223,58 @@ export class SessionRevisionController extends TypertRemoteService {
     return result.applied === 'partial'
       ? { path: revision.path, status: 'conflict', reason: `${String(result.skipped)} hunk(s) could not be reverted` }
       : { path: revision.path, status: 'reverted' }
+  }
+
+  /**
+   * Restore one deleted path from the workspace's git objects.
+   *
+   * Which source holds the content depends on whether the file was ever
+   * committed, and the two situations where neither does are the reader's to
+   * act on: a path git has never heard of has no content anywhere, while a
+   * workspace outside version control has no git answers at all. Both are
+   * reported per path so the surface can say which one the reader is in.
+   * @param root - the session's workspace root, where git runs.
+   * @param contained - the already-contained absolute path to restore.
+   * @param revision - the deleted path's record.
+   * @returns the outcome for this path.
+   */
+  private async restoreDeleted(
+    root: string,
+    contained: string,
+    revision: FileRevision,
+  ): Promise<RevertFileResult> {
+    // The root is canonicalized the same tolerant way `containPath` canonicalized
+    // the file: on a DELETED path a plain `realpath` fails, so mixing a resolved
+    // root with an unresolved file path would subtract two unrelated prefixes and
+    // the restore would look up a path git never had.
+    const canonicalRoot = await canonicalOf(root)
+    const outcome = await readDeletedContent(
+      runNativeCommand,
+      canonicalRoot,
+      contained,
+      this.revertSignal(),
+    )
+    if (outcome.kind === 'restored') {
+      await this.writeAtomic(contained, outcome.content)
+      return { path: revision.path, status: 'reverted' }
+    }
+    if (outcome.kind === 'blocked') {
+      return { path: revision.path, status: 'missing', blocked: outcome.reason }
+    }
+    return { path: revision.path, status: 'missing' }
+  }
+
+  /**
+   * The signal one git restore observes.
+   *
+   * A restore is short and owned by the request that asked for it rather than by
+   * a tool call, so there is no caller signal to reuse; the fresh controller
+   * keeps the boundary honest without inventing cancellation this path cannot
+   * honor.
+   * @returns an unaborted signal.
+   */
+  private revertSignal(): AbortSignal {
+    return new AbortController().signal
   }
 
   /**

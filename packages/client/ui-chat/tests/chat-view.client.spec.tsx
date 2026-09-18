@@ -923,7 +923,30 @@ describe('ChatView', () => {
     expect(view.getAllByText('即发即显')).toHaveLength(1)
   })
 
-  it('hides an echo once its queue occurrence carries the rpcId (running-turn submission)', () => {
+  it('says an echo is still unconfirmed only after the wait threshold', () => {
+    // A send the Host replaces within a frame or two must not flash a notice;
+    // one that outlives the threshold says why it is still standing there.
+    vi.useFakeTimers()
+    try {
+      const h = makeHarness(
+        { nodes: [assistant(1, 'working')] },
+        {
+          pendingSubmissions: [
+            { requestId: 'req-w' as never, time: 5_000, text: '等待确认', images: [], parts: [{ type: 'text', text: '等待确认' }] },
+          ],
+        },
+      )
+      const view = render(<h.ChatView {...h.props} />)
+      const notice = '已发送，等待处理…'
+      expect(view.queryByText(notice)).toBeNull()
+      act(() => { vi.advanceTimersByTime(500) })
+      expect(view.getByText(notice)).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps an echo while its queued occurrence is pending (running-turn submission)', () => {
     const h = makeHarness(
       { nodes: [assistant(1, 'working')] },
       {
@@ -948,9 +971,44 @@ describe('ChatView', () => {
         }],
       })
     })
-    // The queued occurrence renders in the queue dock, not the flow; the
-    // flow-tail echo yields to it in the same snapshot.
-    expect(view.queryByText('排队中')).toBeNull()
+    // A queued row renders in the QueueDock above the composer, not in the
+    // flow, so the echo keeps the transcript occupied until the durable
+    // user/message lands — a claimed prompt reaches that only after its first
+    // step, which is the wait the echo exists to cover.
+    expect(view.getByText('排队中').closest('[data-submission-echo]')).not.toBeNull()
+    act(() => { h.setSession({ queue: [] }) })
+    expect(view.getByText('排队中').closest('[data-submission-echo]')).not.toBeNull()
+  })
+
+  it('hides an echo while its steering occurrence is pending (same flow position)', () => {
+    // A steering bubble renders at the flow tail exactly where the echo sits,
+    // so the two WOULD double-render; the echo yields to the occurrence.
+    const h = makeHarness(
+      { nodes: [assistant(1, 'working')] },
+      {
+        running: true,
+        pendingSubmissions: [
+          { requestId: 'req-s' as never, time: 6_000, text: '插话', images: [], parts: [{ type: 'text', text: '插话' }] },
+        ],
+      },
+    )
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.getByText('插话').closest('[data-submission-echo]')).not.toBeNull()
+    act(() => {
+      h.setSession({
+        queue: [{
+          id: 's-occurrence' as never,
+          messageId: 's-message' as never,
+          placement: 'steering' as const,
+          rpcId: 'req-s' as never,
+          content: [{ type: 'text' as const, text: '插话' }],
+          preview: '插话',
+          text: '插话',
+        }],
+      })
+    })
+    expect(view.getAllByText('插话')).toHaveLength(1)
+    expect(view.queryByText('插话')?.closest('[data-submission-echo]')).toBeNull()
   })
 
   it('an image echo renders its previews through the message-image slot', () => {

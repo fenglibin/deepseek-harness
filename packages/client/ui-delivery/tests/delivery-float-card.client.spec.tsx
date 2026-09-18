@@ -104,11 +104,11 @@ afterEach(() => {
 })
 
 describe('DeliveryFloatCard visibility', () => {
-  it('shows the card by default while a task is current', () => {
+  it('stays hidden by default even while a task is current', () => {
     const { container } = renderCard(makeProjection())
-    // The card follows the task by default, so progress is visible without the
-    // reader discovering a shortcut.
-    expect(container.querySelector('[data-delivery-float]')).not.toBeNull()
+    // The card is opt-in: a reader who never asked for it sees nothing, task or
+    // no task, because the card overlays the transcript.
+    expect(container.firstChild).toBeNull()
   })
 
   it('ignores other key combinations', () => {
@@ -117,10 +117,10 @@ describe('DeliveryFloatCard visibility', () => {
     fireEvent.keyDown(document, { key: 'p', ctrlKey: true })
     fireEvent.keyDown(document, { key: 'p', shiftKey: true })
     fireEvent.keyDown(document, { key: 'o', ctrlKey: true, shiftKey: true })
-    expect(store.getSnapshot()).toEqual({ preference: 'auto' })
+    expect(store.getSnapshot()).toEqual({ preference: 'hidden' })
   })
 
-  it('Ctrl+Shift+P cycles the preference through shown, hidden, and auto', () => {
+  it('Ctrl+Shift+P toggles between shown and hidden', () => {
     const { container, store } = renderCard(makeProjection())
     fireEvent.keyDown(document, { key: 'P', ctrlKey: true, shiftKey: true })
     expect(store.getSnapshot()).toEqual({ preference: 'shown' })
@@ -128,8 +128,10 @@ describe('DeliveryFloatCard visibility', () => {
     fireEvent.keyDown(document, { key: 'p', ctrlKey: true, shiftKey: true })
     expect(store.getSnapshot()).toEqual({ preference: 'hidden' })
     expect(container.firstChild).toBeNull()
+    // The two states are the whole set: a third press returns to shown rather
+    // than passing through a task-following state.
     fireEvent.keyDown(document, { key: 'p', ctrlKey: true, shiftKey: true })
-    expect(store.getSnapshot()).toEqual({ preference: 'auto' })
+    expect(store.getSnapshot()).toEqual({ preference: 'shown' })
     expect(container.querySelector('[data-delivery-float]')).not.toBeNull()
   })
 
@@ -142,11 +144,22 @@ describe('DeliveryFloatCard visibility', () => {
     expect(store.getSnapshot()).toEqual({ preference: 'shown' })
   })
 
+  it('starts hidden even when an older persist key holds a visibility choice', () => {
+    // The earlier schema persisted a three-state preference under the bare key,
+    // where `auto` followed the task. That value has no meaning here, so the
+    // versioned key must keep a returning reader from seeing the old `auto`
+    // resurrect as a visible card.
+    localStorage.setItem('dsh.delivery.float-card', JSON.stringify({ preference: 'auto' }))
+    const { container, store } = renderCard(makeProjection())
+    expect(store.getSnapshot()).toEqual({ preference: 'hidden' })
+    expect(container.firstChild).toBeNull()
+  })
+
   it('stops listening once the card unmounts', () => {
     const { unmount, store } = renderCard(makeProjection())
     unmount()
     fireEvent.keyDown(document, { key: 'p', ctrlKey: true, shiftKey: true })
-    expect(store.getSnapshot()).toEqual({ preference: 'auto' })
+    expect(store.getSnapshot()).toEqual({ preference: 'hidden' })
   })
 })
 

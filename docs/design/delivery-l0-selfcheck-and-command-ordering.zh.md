@@ -36,7 +36,7 @@
 
 `clear` 留下 tombstone 且进入会话日志，因此被替换的任务仍可追溯，不是静默丢弃。
 
-替换判定落在 `tool-delivery` 的 `createReplacingL0` 一处，`agent/pre-step` 与 `create_delivery_task` 共用它：模型显式提高分级（把一个 l0 任务换成 l1/l2）与自动路径因此行为一致。非 l0 的当前任务仍以 `DELIVERY_TOOL_TASK_EXISTS` 拒绝，错误消息说明只有 l0 可被替换。
+替换判定落在 `tool-delivery` 的 `createReplacingL0` 一处，`agent/pre-step` 与 `create_delivery_task` 共用它：模型显式提高分级（把一个 l0 任务换成 l1/l2）与自动路径因此行为一致。未完成的非 l0 当前任务以 `DELIVERY_TOOL_TASK_EXISTS` 拒绝，错误消息说明只有 l0 或已 accepted 的任务可被替换。已 accepted 的任务由 `DeliveryService.create` 自己的规则放行（它只在当前任务非 accepted 时拒绝新建），因此那种情形直接新建、不写 tombstone。
 
 **已知代价**：l0 的自检保护是「尽力而为」的。模型若在同一个回合内没走完 `verified`，下一个请求会替换掉该任务，那次自检就没被门禁强制。这是让 l0 保持轻量的必然取舍：要让它成为硬保证，l0 就得像 l1 一样要求用户等待完整流程走完。l1/l2 不受影响，它们的门禁仍是硬的。
 

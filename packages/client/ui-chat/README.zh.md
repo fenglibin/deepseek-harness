@@ -6,7 +6,7 @@ kind: "package-reference"
 
 ## 概述
 
-Conversation 组装的浏览器 Chat target。本包注册 Chat event definition 与 snapshot 构造、提供 `useChat`、渲染 transcript node 和详情，并拥有 Chat 专属 store、action、本地化与滚动位置恢复；历史图片 URL 通过 Conversation 持有的按会话缓存（`ctx.uiConversation.imageUrl`）解析。其中 Assistant 与 Turn Tail definition 会直接 fold packed Assistant 历史 run，不展开其成员。消息流尾部渲染 session 的本地提交回显（`SessionSnapshot.pendingSubmissions`），气泡与其最终的 durable user 节点一致；一旦某个 user/steering 节点或 queue occurrence 携带回显的 prompt `rpcId`，该回显即在同一渲染中隐藏，因此回显到 durable 的替换是原子的。
+Conversation 组装的浏览器 Chat target。本包注册 Chat event definition 与 snapshot 构造、提供 `useChat`、渲染 transcript node 和详情，并拥有 Chat 专属 store、action、本地化与滚动位置恢复；历史图片 URL 通过 Conversation 持有的按会话缓存（`ctx.uiConversation.imageUrl`）解析。其中 Assistant 与 Turn Tail definition 会直接 fold packed Assistant 历史 run，不展开其成员。消息流尾部渲染 session 的本地提交回显（`SessionSnapshot.pendingSubmissions`），气泡与其最终的 durable user 节点一致。一旦某个 user/steering 节点或 **steering** queue occurrence 携带回显的 prompt `rpcId`，该回显即在同一渲染中隐藏，因此回显到 durable 的替换是原子的。`queued` occurrence 不隐藏回显：它的行渲染在 composer 上方的 QueueDock，与消息流是不同表面，回显继续在消息流中代表该消息，直到 durable `user/message` 到达（被 claim 的 prompt 要等 turn 打开且首个 step 解析后才落盘）。回显跨越了这段等待，因此在等待超过 400ms 时显示「已发送，等待处理…」；阈值延迟避免一两帧内就被替换的普通发送闪出提示。
 
 ## 目录
 
@@ -52,9 +52,19 @@ Chat 会为每个非空的初始或恢复请求、显式消息序列起点或真
 <a id="unactionable-tool-failure-rows"></a>
 ## 不可操作的工具失败行
 
-`edit` 的搜索文本由模型自己撰写，因此「字面量在文件中找不到」与「字面量匹配到多处」这两类失败，读者既没有参与也没有处置权：改写搜索文本、改用 `replace_all` 都是模型的下一步动作。这两类失败的行从对话流中隐藏，判定只依据 `tool/result` 事件上持久化的 `error.code`（`FS_EDIT_NOT_FOUND` / `FS_AMBIGUOUS_EDIT`），不解析结果文本——同一条件在各文件系统后端措辞不同，按文本匹配既脆弱又必然漏掉后端。隐藏无条件成立，不要求存在任何后续成功的调用，因为模型常常放弃该路径而不是重试。
+工具调用的失败原因多数出在模型自己撰写的输入上：陈旧的变更版本、越界的读取位置、在文件中找不到的搜索字面量、未满足的交付前置条件。读者既没有参与这些失败，也没有处置权——重读后重试、改写搜索文本、补上流程记录都是模型的下一步动作。这类失败的行从对话流中隐藏。
 
-只有页面上不展示：模型收到的结果文本与错误码原样保留。权限与沙箱拒绝、目标不存在一类的失败保持可见，因为它们可能需要用户授权或告知路径问题。该判定由独立的节点投影承担，与「被后续同文件成功覆盖」的条件式隐藏互不重叠。
+判定是白名单制：只有读者能够处置的失败码保持可见，其余一概隐藏，包含判定时尚不存在的错误码与不携带 `error.code` 的失败。白名单为 `FS_SANDBOX_DENIED`、`FS_PERMISSION_DENIED`、`SANDBOX_APPROVAL_UNAVAILABLE`、`NO_PROVIDER`、`GOAL_TOOL_AUTHORITY_REQUIRED`、`SEARCH_FAILED`——沙箱与权限拒绝、提权时无可用审批通道、缺少可用提供方、需要用户授予的权限、搜索工具自身不可用，都需要读者介入；其余失败归模型处置。
+
+`SANDBOX_APPROVAL_UNAVAILABLE` 与「用户拒绝了提权」是两类事：前者是审批路径根本用不了（未组装审批服务、调用无 agent 可路由、无可用应答者），属部署配置事实，只有读者能解决；后者是用户对自己那次询问的答复，模型照常继续，把它回显成红色错误只是噪音。工具的通用审批路径（`ctx.get('approval')` 未组装或调用无 agent）不携带该码：能够显示页面的部署必定组装了审批服务，而 headless 部署没有读者在场。
+
+白名单制而非黑名单制的理由是工具会持续增加，而读者可处置的集合应当小而明确：新错误码、历史会话重放时的旧错误码、以及无码的失败都默认隐藏，不会变成没有人能处置的残留行。
+
+判定只依据 `tool/result` 事件上持久化的 `error.code`，不解析结果文本——同一条件在各文件系统后端措辞不同，按文本匹配既脆弱又必然漏掉后端。隐藏无条件成立，不要求存在任何后续成功的调用，因为模型常常放弃该路径而不是重试。
+
+只有页面上不展示：模型收到的结果文本与错误码原样保留。隐藏过程中的失败行不会隐藏结果——以失败收场的轮次仍渲染自己的终态行，需要读者同意的操作通过审批表面发问，而不是靠结果行传达。
+
+该判定由不持有跨节点状态的节点投影承担。
 
 -----
 
@@ -74,7 +84,6 @@ Chat 会为每个非空的初始或恢复请求、显式消息序列起点或真
 - **视图只反映已加载的 Session 窗口**——只有 Session Controller 加载前一页 event 后，更早的 transcript node 才会出现。轮次导航同样只表示已加载的 Turn；加载更早一页时，已有 Turn 刻度保持身份不变，完整的已加载集合在紧凑轨道中重新排布，不显示未加载历史占位。刻度默认相隔 10px，仅在已加载集合超过可用高度时压缩间距。用户消息抽屉至少需要一条已加载的用户提示词，因此打开一个窗口内没有任何提示词的会话时，会自动加载更早的分页直到出现一条。
 
 - **不可操作的失败行只覆盖顶层调用**——PTC 模式下 `edit` 会作为 `run_code` 的嵌套子调用出现，而 `tool/code-dispatch` 事件只记录 `isError` 与 `content`，不带 `{ name, code }`。子调用因此没有可判定的错误码，其失败行不因该判定而隐藏。要覆盖它需要扩展事件格式并连带更新快照与两个 SDK 的期望输出，在 PTC 呈现模式的部署中该事件确有产出之前不做。
-
 
 <a id="dev-note"></a>
 ### 开发备注

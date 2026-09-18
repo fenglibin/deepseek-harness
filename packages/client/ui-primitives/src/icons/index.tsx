@@ -1,7 +1,8 @@
 /**
  * ic_ds_* icon set for the dsh web UI. All glyphs render fill="currentColor"
  * and take {size, className}. Batch A mirrors the deepsuite icon library
- * (same figma source); batch B glyphs are harness-only figma extracts.
+ * (same figma source); batch B glyphs are harness-only figma extracts; a few
+ * product glyphs belong to neither set and are drawn on the same 16px grid.
  */
 import type { IconProps } from './props.ts'
 
@@ -943,5 +944,19 @@ export const IconUndoOutline16 = ({ size = 16, className }: IconProps) => (
       strokeLinecap="round"
       strokeLinejoin="round"
     />
+  </svg>
+)
+
+/** ic_ds_eye_outline_16 — an eye, for inspecting a change without acting on it. */
+export const IconEyeOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8s-2.4 4.5-6.5 4.5S1.5 8 1.5 8Z"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <circle cx="8" cy="8" r="1.9" stroke="currentColor" strokeWidth="1.3" />
   </svg>
 )

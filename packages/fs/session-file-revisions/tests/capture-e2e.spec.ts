@@ -8,7 +8,8 @@
  * recorded pair is — because those are the parts a unit test cannot reach.
  */
 
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -537,5 +538,257 @@ describe('durable revisions', () => {
     })
     expect(second.ctx.sessionFileRevisions.list(SessionId('r6'))).toEqual([])
     await second.ctx.fiber.dispose()
+  })
+})
+
+describe('deletions through the real tool pipeline', () => {
+  /**
+   * Register a `bash`-shaped tool whose body runs the command for real.
+   *
+   * The deletion paths are what these specs exercise, so the command has to
+   * actually remove a file: a stub that only returned would leave the workspace
+   * unchanged and prove nothing about what git reports.
+   */
+  function registerBash(ctx: Context): void {
+    ctx.tools.register(defineTool({
+      name: 'bash',
+      description: 'Run a shell command.',
+      parameters: { command: { type: 'string', required: true } },
+      output: {
+        schema: { type: 'object', additionalProperties: false, properties: { text: { type: 'string', required: true } } },
+        render: (_args, value) => [{ type: 'text', text: (value as { text: string }).text }],
+      },
+      async execute(args: { command: string }) {
+        execFileSync('bash', ['-c', args.command], { cwd: root, stdio: 'pipe' })
+        return { text: 'ok' }
+      },
+    }))
+  }
+
+  /** Initialize the temp root as a git repository with one committed file. */
+  async function initRepo(): Promise<void> {
+    await writeFile(join(root, 'tracked.txt'), 'committed\n', 'utf8')
+    execFileSync('git', ['-C', root, 'init', '-q', '.'], { stdio: 'pipe' })
+    execFileSync('git', ['-C', root, 'add', '-A'], { stdio: 'pipe' })
+    execFileSync('git', ['-C', root, '-c', 'user.email=a@b', '-c', 'user.name=c', 'commit', '-qm', 'init'], { stdio: 'pipe' })
+  }
+
+  /** Run one bash call through the real pipeline. */
+  async function bash(ctx: Context, session: Session, command: string): Promise<void> {
+    await ctx.tools.execute({
+      callId: ToolCallId(`c-${command}`),
+      name: 'bash',
+      arguments: { command },
+      agent: { session } as never,
+      signal: new AbortController().signal,
+    })
+  }
+
+  it('records a file a shell command deleted', async () => {
+    const { ctx, session } = await composed('d1')
+    registerBash(ctx)
+    await initRepo()
+
+    await bash(ctx, session, 'rm tracked.txt')
+
+    const revisions = ctx.sessionFileRevisions.list(session.id)
+    expect(revisions).toHaveLength(1)
+    expect(revisions[0]?.path).toBe(join(root, 'tracked.txt'))
+    expect(revisions[0]?.origin).toBe('deleted')
+    expect(revisions[0]?.operation).toBe('delete')
+    await ctx.fiber.dispose()
+  })
+
+  it('records a file a script removed rather than rm', async () => {
+    // The point of reading git instead of the command text: the deletion is
+    // seen whatever performed it.
+    const { ctx, session } = await composed('d2')
+    registerBash(ctx)
+    await initRepo()
+
+    await bash(ctx, session, 'python3 -c "import os; os.remove(\'tracked.txt\')"')
+
+    expect(ctx.sessionFileRevisions.list(session.id).map(entry => entry.origin)).toEqual(['deleted'])
+    await ctx.fiber.dispose()
+  })
+
+  it('does not record a file that was already deleted when the session began', async () => {
+    // The baseline is taken before the session's first command, so a path that
+    // was already gone is not this session's doing.
+    const { ctx, session } = await composed('d3')
+    registerBash(ctx)
+    await initRepo()
+    await rm(join(root, 'tracked.txt'))
+    await writeFile(join(root, 'other.txt'), 'x\n', 'utf8')
+
+    // A first command that deletes nothing establishes the baseline.
+    await bash(ctx, session, 'true')
+    expect(ctx.sessionFileRevisions.list(session.id)).toEqual([])
+    await ctx.fiber.dispose()
+  })
+
+  it('records the first deletion of a session, not only later ones', async () => {
+    // The baseline must exist BEFORE the first command that could delete
+    // something: folding that command's own deletions into the baseline would
+    // hide the very first file the session removed.
+    const { ctx, session } = await composed('d4')
+    registerBash(ctx)
+    await initRepo()
+
+    await bash(ctx, session, 'rm tracked.txt')
+
+    expect(ctx.sessionFileRevisions.list(session.id)).toHaveLength(1)
+    await ctx.fiber.dispose()
+  })
+
+  it('records a deletion made by a command run later in the session', async () => {
+    const { ctx, session } = await composed('d5')
+    registerBash(ctx)
+    await initRepo()
+    await writeFile(join(root, 'second.txt'), 'two\n', 'utf8')
+    execFileSync('git', ['-C', root, 'add', '-A'], { stdio: 'pipe' })
+    execFileSync('git', ['-C', root, '-c', 'user.email=a@b', '-c', 'user.name=c', 'commit', '-qm', 'second'], { stdio: 'pipe' })
+
+    await bash(ctx, session, 'true')
+    await bash(ctx, session, 'rm second.txt')
+
+    expect(ctx.sessionFileRevisions.list(session.id).map(entry => entry.path))
+      .toEqual([join(root, 'second.txt')])
+    await ctx.fiber.dispose()
+  })
+
+  it('records nothing when the workspace is not a git repository', async () => {
+    // A workspace that cannot answer for deletions still has every other
+    // capture path working, so the call must not fail because of it.
+    const { ctx, session } = await composed('d6')
+    registerBash(ctx)
+    await writeFile(join(root, 'plain.txt'), 'x\n', 'utf8')
+
+    await bash(ctx, session, 'rm plain.txt')
+
+    expect(ctx.sessionFileRevisions.list(session.id)).toEqual([])
+    await ctx.fiber.dispose()
+  })
+
+  it('keeps an ordinary write record when no deletion happened', async () => {
+    // Deletion observation rides the same listener as write capture, so a
+    // write-shaped call must still produce its own record and no deletion row.
+    const { ctx, session } = await composed('d7')
+    registerWrite(ctx)
+    registerBash(ctx)
+    await initRepo()
+
+    await bash(ctx, session, 'true')
+    await ctx.tools.execute({
+      callId: ToolCallId('c-write'),
+      name: 'write',
+      arguments: { file_path: 'written.txt', content: 'fresh\n' },
+      agent: { session } as never,
+      signal: new AbortController().signal,
+    })
+
+    const revisions = ctx.sessionFileRevisions.list(session.id)
+    expect(revisions).toHaveLength(1)
+    expect(revisions[0]?.origin).toBe('absent')
+    await ctx.fiber.dispose()
+  })
+
+  it('records nothing at all when deletion observation is turned off', async () => {
+    // The capability is opt-out because a workspace outside version control
+    // cannot answer for deletions; with it off the call still runs and still
+    // captures write-shaped mutations.
+    const ctx = new Context()
+    await mountStorage(ctx)
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    const session = Session.create(SessionId('d8'), undefined, {
+      version: 0, id: SessionId('d8'), createdAt: 0, cwd: root,
+    })
+    await ctx.plugin(SessionFileRevisions, { observeDeletions: false })
+    registerBash(ctx)
+    await initRepo()
+
+    await bash(ctx, session, 'rm tracked.txt')
+
+    expect(ctx.sessionFileRevisions.list(session.id)).toEqual([])
+    await ctx.fiber.dispose()
+  })
+
+  it('records no deletion when the session has no workspace root', async () => {
+    // Without a cwd there is no workspace to ask git about, so the scan is
+    // skipped rather than run against an unrelated directory.
+    const ctx = new Context()
+    await mountStorage(ctx)
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    const session = Session.create(SessionId('d9'), undefined, {
+      version: 0, id: SessionId('d9'), createdAt: 0,
+    })
+    await ctx.plugin(SessionFileRevisions, {})
+    registerBash(ctx)
+
+    await ctx.tools.execute({
+      callId: ToolCallId('c-nocwd'),
+      name: 'bash',
+      arguments: { command: 'true' },
+      agent: { session } as never,
+      signal: new AbortController().signal,
+    })
+
+    expect(ctx.sessionFileRevisions.list(session.id)).toEqual([])
+    await ctx.fiber.dispose()
+  })
+
+  it('leaves a failed call alone even when a deletion happened', async () => {
+    // A failed call contributes nothing: the mutation is not proven to have
+    // applied, and capture follows only what the pipeline accepted.
+    const { ctx, session } = await composed('d10')
+    registerBash(ctx)
+    await initRepo()
+    // A write-shaped tool that reports failure instead of doing the work.
+    ctx.tools.register(defineTool({
+      name: 'write',
+      description: 'Refuse to write.',
+      parameters: { file_path: { type: 'string', required: true }, content: { type: 'string', required: true } },
+      output: {
+        schema: { type: 'object', additionalProperties: false, properties: { text: { type: 'string', required: true } } },
+        render: (_args, value) => [{ type: 'text', text: (value as { text: string }).text }],
+      },
+      async execute() {
+        throw new Error('refused')
+      },
+    }))
+
+    // The registry reports a throwing body as an error RESULT, not a rejection.
+    const result = await ctx.tools.execute({
+      callId: ToolCallId('c-fail'),
+      name: 'write',
+      arguments: { file_path: 'a.txt', content: 'x\n' },
+      agent: { session } as never,
+      signal: new AbortController().signal,
+    })
+    expect(result.isError).toBe(true)
+
+    expect(ctx.sessionFileRevisions.list(session.id)).toEqual([])
+    await ctx.fiber.dispose()
+  })
+
+  it('records no deletion for a call with no owning session', async () => {
+    // Nothing to attribute the change to, so neither capture path records.
+    const { ctx } = await composed('d11')
+    registerBash(ctx)
+    await initRepo()
+
+    await ctx.tools.execute({
+      callId: ToolCallId('c-orphan'),
+      name: 'bash',
+      arguments: { command: 'rm tracked.txt' },
+      signal: new AbortController().signal,
+    })
+
+    expect(ctx.sessionFileRevisions.list(SessionId('d11'))).toEqual([])
+    await ctx.fiber.dispose()
   })
 })

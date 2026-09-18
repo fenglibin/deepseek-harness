@@ -2,8 +2,13 @@
  * Durable delivery-task conversation node: folds the `delivery/change` session
  * event family into one keyed Chat node. Each delivery task's `create` opens
  * the node; every later `advance` / `record-*` / `clear` update folds into its
- * state, so the rendered task card follows the task's lifecycle in the
- * conversation timeline — the §6.6 "Conversation node" surface.
+ * state.
+ *
+ * The node is built `hidden`: the fold still runs (so the Chat snapshot keeps a
+ * complete task state, and a later surface can read it), but the card does not
+ * occupy the transcript. Delivery discipline is background bookkeeping the user
+ * did not ask to read; the durable record stays in the session log, and the
+ * Ctrl+Shift+P floating card reads the host projection when the user does want it.
  */
 
 import type { ConversationNodeDefinition } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -150,7 +155,10 @@ export const deliveryTaskDefinition: ConversationNodeDefinition<DeliveryTaskStat
       target: 'chat',
       anchorSeq: context.start.event.seq,
       location: context.start.location,
-      visibility: 'visible',
+      // Hidden, never `null`: the node keeps folding every delivery/change event
+      // so the Chat snapshot carries the task's complete state, while
+      // `orderedVisibleChatNodes` leaves it out of the rendered transcript.
+      visibility: 'hidden',
       data: {
         objective: state.objective,
         level: state.level,

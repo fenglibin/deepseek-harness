@@ -910,6 +910,9 @@ importers:
 
   packages/api/session-file-revisions:
     dependencies:
+      '@deepseek-ai/dsh-native-command':
+        specifier: workspace:^
+        version: link:../../util/native-command
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -2423,6 +2426,9 @@ importers:
       '@deepseek-ai/dsh-commands':
         specifier: workspace:^
         version: link:../../interaction/commands
+      '@deepseek-ai/dsh-delivery':
+        specifier: workspace:^
+        version: link:../../delivery/delivery
       '@deepseek-ai/dsh-goal':
         specifier: workspace:^
         version: link:../../goal/goal
@@ -6294,6 +6300,9 @@ importers:
 
   packages/fs/session-file-revisions:
     dependencies:
+      '@deepseek-ai/dsh-native-command':
+        specifier: workspace:^
+        version: link:../../util/native-command
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery

@@ -54,9 +54,9 @@ const revisionOrder = z.object({
 export const storedRevision = z.object({
   path: z.string(),
   baseline: z.string().nullable(),
-  origin: z.enum(['existing', 'absent', 'unknown']),
+  origin: z.enum(['existing', 'absent', 'unknown', 'deleted']),
   endState: z.string(),
-  operation: z.enum(['write', 'edit']),
+  operation: z.enum(['write', 'edit', 'delete']),
   firstOrder: revisionOrder,
   lastOrder: revisionOrder,
 })
@@ -87,10 +87,14 @@ export type RevisionRecord = z.infer<typeof revisionRecord>
  * discarded record is a real capability loss rather than a cache miss — the
  * revision it held cannot be replayed — so the layout choice keeps one
  * unreadable document from taking every other session's revisions with it.
+ *
+ * Version 2 widened the stored `origin` enum with `deleted`, whose records a
+ * version-1 document cannot express; a stale document is discarded rather than
+ * migrated, per the repository's pre-release stance of no compatibility shims.
  */
 export const revisionsDomainSpec = defineDomain({
   name: 'session_file_revisions',
-  version: 1,
+  version: 2,
   layout: 'per-record',
   tables: { sessions: domainTable<SessionId, RevisionRecord>(revisionRecord) },
 })

@@ -21,6 +21,9 @@
       "path": "../../core/session"
     },
     {
+      "path": "../../util/native-command"
+    },
+    {
       "path": "../../fs/session-file-revisions"
     }
   ]

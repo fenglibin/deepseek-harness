@@ -326,11 +326,40 @@ describe('sendSession submission echo', () => {
     await b.runtime.dispose()
   })
 
-  it('sends a subagent continuation without registering an unobservable echo', async () => {
+  it('reports a user-removed queue occurrence as success so the draft is not restored', async () => {
+    // A removal is a deliberate end state. Reporting an error would make the
+    // composer restore a draft the user just discarded, and (because only image
+    // sends await the settlement) that would happen for image messages alone.
+    const b = await echoBench()
+    try {
+      const [attachment] = b.root.createDraftImages([
+        new File([Uint8Array.of(1, 2, 3)], 'a.png', { type: 'image/png' }),
+      ])
+      const session = b.runtime.sessions.binding('s1')!.session
+      const sending = b.root.sendSession(session, [{ type: 'image', attachmentId: attachment!.id }], 'queue')
+      await vi.waitFor(() => { expect(b.prompt).toHaveBeenCalledOnce() })
+      b.retire.onRetire?.({ reason: 'removed' })
+      await expect(sending).resolves.toEqual({ kind: 'success' })
+      // The preview is released rather than handed to the durable cache: nothing
+      // will ever reference it.
+      expect(b.revoked).toHaveBeenCalledWith('blob:echo-1')
+      expect(b.root.draftImages([attachment!.id])).toEqual([])
+    } finally {
+      b.restore()
+    }
+    await b.runtime.dispose()
+  })
+
+  it('registers a subagent echo and prompts under its identity', async () => {
+    // The subagent transport stamps the caller's rpcId onto the durable message,
+    // so a continuation echo retires on the same observation path as an ordinary
+    // send. Registering it first is what keeps a subagent send visible from the
+    // click rather than from the end of its admission round-trip.
     const b = await bench()
     const session = b.runtime.sessions.binding('s1')!.session
     const snapshot = session.getSnapshot()
     const beginSubmission = vi.spyOn(session, 'beginSubmission')
+      .mockReturnValue({ requestId: 'req-sub' as never, abandon: vi.fn() })
     vi.spyOn(session, 'getSnapshot').mockReturnValue({
       ...snapshot,
       subagent: {
@@ -339,8 +368,8 @@ describe('sendSession submission echo', () => {
     })
     const prompt = vi.spyOn(session, 'prompt').mockResolvedValue({ ok: true, value: { accepted: true } })
     await expect(b.root.sendSession(session, [{ type: 'text', text: '继续' }], 'queue')).resolves.toEqual({ kind: 'success' })
-    expect(beginSubmission).not.toHaveBeenCalled()
-    expect(prompt).toHaveBeenCalledWith([{ type: 'text', text: '继续' }], 'queue', undefined)
+    expect(beginSubmission).toHaveBeenCalledWith(expect.objectContaining({ text: '继续' }))
+    expect(prompt).toHaveBeenCalledWith([{ type: 'text', text: '继续' }], 'queue', undefined, 'req-sub')
     await b.runtime.dispose()
   })
 })

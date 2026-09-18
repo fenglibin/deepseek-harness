@@ -136,16 +136,23 @@ function isFolderOpenPath(path: string): boolean {
 }
 
 /**
- * Prompt-RPC identities already rendered by durable material: user/steering
- * node sources plus queue occurrences. A submission echo whose identity
- * appears here is hidden in the same render, so the echo→durable swap is
- * atomic — no duplicate, no gap — regardless of when the echo leaves the
- * session snapshot.
+ * Prompt-RPC identities already rendered by durable material: user/steering node
+ * sources plus pending STEERING occurrences. A submission echo whose identity
+ * appears here is hidden in the same render, so the echo→durable swap is atomic —
+ * no duplicate, no gap — regardless of when the echo leaves the session snapshot.
+ *
+ * A pending QUEUED occurrence deliberately does not hide the echo. A queued row
+ * renders in the QueueDock above the composer, not in the flow, so the row and
+ * the echo are different surfaces rather than two renderings of one message; the
+ * echo keeps standing in on the transcript until the durable `user/message`
+ * arrives, which a claimed prompt reaches only after the turn opens and its first
+ * step resolves. A steering occurrence is the opposite case: its bubble renders at
+ * the flow tail exactly where the echo sits, so the two would double-render.
  */
 function observedRpcIds(
   order: readonly string[],
   nodes: ChatSnapshot['nodes'],
-  queue: readonly { readonly rpcId?: string }[],
+  queue: readonly { readonly rpcId?: string; readonly placement?: string }[],
 ): ReadonlySet<string> {
   const observed = new Set<string>()
   for (const key of order) {
@@ -157,7 +164,7 @@ function observedRpcIds(
     if (source?.kind === 'user' && typeof source.rpcId === 'string') observed.add(source.rpcId)
   }
   for (const item of queue) {
-    if (item.rpcId !== undefined) observed.add(item.rpcId)
+    if (item.placement === 'steering' && item.rpcId !== undefined) observed.add(item.rpcId)
   }
   return observed
 }

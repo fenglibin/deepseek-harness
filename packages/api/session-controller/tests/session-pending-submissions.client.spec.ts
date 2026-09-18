@@ -150,8 +150,10 @@ describe('observed retirement', () => {
     expect(retirements).toEqual([{ reason: 'observed', attachments: refs }])
   })
 
-  it('a queue occurrence carrying the rpcId retires the echo (running-turn submissions)', async () => {
-    const { session } = makeSession()
+  it('keeps the echo while a queued occurrence is pending, then retires it on removal', async () => {
+    const { api, session } = makeSession()
+    api.onHistory = () => Promise.resolve(ok(historyValue([])))
+    await session.open()
     const retirements: PendingSubmissionRetirement[] = []
     const handle = session.beginSubmission({
       text: '排队',
@@ -161,10 +163,90 @@ describe('observed retirement', () => {
     const refs = [imageRef('att-q')]
     session.handleControlFrame({ type: 'queue', sessionId: SID, items: [queuedItem(handle.requestId, refs)] })
     await settleFrames()
+    // A queued row renders in the QueueDock, not the flow, so the echo keeps
+    // standing in on the transcript until the durable user/message arrives.
+    expect(session.getSnapshot().pendingSubmissions).toHaveLength(1)
+    expect(retirements).toEqual([])
+    // Removing the occurrence discards the prompt without a durable
+    // counterpart, so the removal itself settles the echo.
+    await session.updateQueue('m-queued' as never, { kind: 'remove' })
+    await settleFrames()
     expect(session.getSnapshot().pendingSubmissions).toEqual([])
-    expect(retirements).toEqual([{ reason: 'observed', attachments: refs }])
-    // The queue projection keeps the correlation id for render-time dedupe.
-    expect(session.getSnapshot().queue).toMatchObject([{ rpcId: handle.requestId }])
+    expect(retirements).toEqual([{ reason: 'removed' }])
+  })
+
+  it('retires a removed echo even when its queue frame lands before the RPC resolves', async () => {
+    // The Host broadcasts the queue frame that drops the row, and that frame can
+    // beat the RPC reply. Reading the projection after the call would then find
+    // no row and leave the echo standing forever.
+    const api = new FakeApiClient()
+    const { session } = makeSession(api)
+    const retirements: PendingSubmissionRetirement[] = []
+    const handle = session.beginSubmission({
+      text: '先删后答',
+      images: [],
+      onRetire: retirement => retirements.push(retirement),
+    })
+    session.handleControlFrame({ type: 'queue', sessionId: SID, items: [queuedItem(handle.requestId)] })
+    await settleFrames()
+    expect(session.getSnapshot().pendingSubmissions).toHaveLength(1)
+    // Hold the reply open so the dropping frame can arrive first.
+    let reply: (() => void) | undefined
+    api.onUpdateQueue = () => new Promise((resolve) => {
+      reply = () => { resolve(ok({ accepted: true as const })) }
+    })
+    const removing = session.updateQueue('m-queued' as never, { kind: 'remove' })
+    session.handleControlFrame({ type: 'queue', sessionId: SID, items: [] })
+    reply?.()
+    await removing
+    await settleFrames()
+    expect(session.getSnapshot().pendingSubmissions).toEqual([])
+    expect(retirements).toEqual([{ reason: 'removed' }])
+  })
+
+  it('keeps the echo when a queued occurrence is left unremoved after an unrelated queue action', async () => {
+    // Only `remove` and `edit` settle the echo themselves; an occurrence that
+    // keeps standing still reaches the log under the same rpcId, which then
+    // retires the echo through the durable event.
+    const { session } = makeSession()
+    const handle = session.beginSubmission({ text: '编辑', images: [] })
+    session.handleControlFrame({
+      type: 'queue', sessionId: SID, items: [queuedItem(handle.requestId)],
+    })
+    await settleFrames()
+    expect(session.getSnapshot().pendingSubmissions).toHaveLength(1)
+  })
+
+  it('rewrites the echo content when its queued occurrence is edited', async () => {
+    // An edit keeps the message identity, so the durable user/message that
+    // eventually replaces this echo carries the NEW text. Leaving the echo alone
+    // would keep the transcript showing what the user already changed.
+    const { session } = makeSession()
+    const handle = session.beginSubmission({ text: '原来的', images: [] })
+    session.handleControlFrame({
+      type: 'queue', sessionId: SID, items: [queuedItem(handle.requestId)],
+    })
+    await settleFrames()
+    await session.updateQueue('m-queued' as never, {
+      kind: 'edit',
+      content: [{ type: 'text', text: '改过的' }],
+    })
+    const [echo] = session.getSnapshot().pendingSubmissions
+    expect(echo?.text).toBe('改过的')
+    expect(echo?.parts).toEqual([{ type: 'text', text: '改过的' }])
+  })
+
+  it('leaves a steered echo pending, because steering keeps the message pending on the Host', async () => {
+    // `steer` moves the message into the running turn instead of discarding or
+    // rewriting it, so the echo still retires on the durable event that follows.
+    const { session } = makeSession()
+    const handle = session.beginSubmission({ text: '插话', images: [] })
+    session.handleControlFrame({
+      type: 'queue', sessionId: SID, items: [queuedItem(handle.requestId)],
+    })
+    await settleFrames()
+    await session.updateQueue('m-queued' as never, { kind: 'steer' })
+    expect(session.getSnapshot().pendingSubmissions).toHaveLength(1)
   })
 
   it('a full-window install (reconnect resync) retires echoes observed in the window', async () => {

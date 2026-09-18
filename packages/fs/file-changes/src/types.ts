@@ -12,8 +12,14 @@
 // table instead of declaring an ambient module.
 export {}
 
-/** A mutation's user-visible kind: `write` (new/overwrite) or `edit` (in-place). */
-export type FileChangeOperation = 'write' | 'edit'
+/**
+ * A mutation's user-visible kind.
+ *
+ * `write` (new/overwrite), `edit` (in-place mutation), or `delete` (removed by
+ * a command rather than by a write tool, so the list can report it and offer a
+ * restore).
+ */
+export type FileChangeOperation = 'write' | 'edit' | 'delete'
 
 /**
  * One file's changes across the complete durable log.

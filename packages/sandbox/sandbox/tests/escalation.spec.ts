@@ -9,6 +9,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ESCALATION_TARGETS,
+  SANDBOX_APPROVAL_UNAVAILABLE,
   WIDER_MODES,
   approveEscalation,
   escalationHintMarker,
@@ -103,6 +104,23 @@ describe('approveEscalation', () => {
       .rejects.toThrow('approval for escalating to "workspace-write" was cancelled')
     await expect(approveEscalation(req(), ingredients({ approver: approver('unavailable') })))
       .rejects.toThrow('no approval channel is available')
+  })
+
+  it('carries SANDBOX_APPROVAL_UNAVAILABLE only when the approval path cannot be used at all', async () => {
+    // The three unusable-path states are a deployment fact the reader resolves,
+    // so they must be routable by code rather than only by message text.
+    await expect(approveEscalation(req(), ingredients({ approver: undefined })))
+      .rejects.toMatchObject({ code: SANDBOX_APPROVAL_UNAVAILABLE })
+    await expect(approveEscalation(req(), ingredients({ agent: undefined })))
+      .rejects.toMatchObject({ code: SANDBOX_APPROVAL_UNAVAILABLE })
+    await expect(approveEscalation(req(), ingredients({ approver: approver('unavailable') })))
+      .rejects.toMatchObject({ code: SANDBOX_APPROVAL_UNAVAILABLE })
+    // A rejection or a cancellation is the user's own answer about ONE ask —
+    // the model proceeds without it — so neither carries the code.
+    await expect(approveEscalation(req(), ingredients({ approver: approver('rejected') })))
+      .rejects.not.toMatchObject({ code: SANDBOX_APPROVAL_UNAVAILABLE })
+    await expect(approveEscalation(req(), ingredients({ approver: approver('cancelled') })))
+      .rejects.not.toMatchObject({ code: SANDBOX_APPROVAL_UNAVAILABLE })
   })
 
   it('an outcome outside the closed union trips the exhaustiveness guard (defensive)', async () => {

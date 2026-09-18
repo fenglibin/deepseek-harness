@@ -90,6 +90,44 @@ export class SessionRevisionStore {
   }
 
   /**
+   * Record that one path is now gone from the workspace.
+   *
+   * A deletion REPLACES whatever this session previously recorded for the path
+   * rather than folding into it. The two are different shapes: a write record
+   * holds a baseline and an end state to reverse-patch, while a deleted path has
+   * nothing on disk to patch and is restored from the workspace's git objects.
+   * Folding a deletion into a write record would leave a record whose content
+   * sides describe a file that is not there, and the surface would report an
+   * ordinary change for a path the reader can only get back from git.
+   *
+   * `firstOrder` is kept from an existing record so a path the session wrote and
+   * later deleted keeps its place in the list instead of jumping to the end.
+   * @param sessionId - the session whose command deleted the path.
+   * @param path - canonical absolute path of the deleted file.
+   * @param order - the position the deleting call settled at.
+   */
+  recordDeletion(sessionId: SessionId, path: string, order: RevisionOrder): void {
+    const root = this.rootOf(sessionId)
+    if (root !== sessionId) {
+      const siblings = this.children.get(root) ?? new Set<SessionId>()
+      siblings.add(sessionId)
+      this.children.set(root, siblings)
+    }
+    const records = this.own.get(sessionId) ?? new Map<string, FileRevision>()
+    const previous = records.get(path)
+    records.set(path, {
+      path,
+      baseline: null,
+      origin: 'deleted',
+      endState: '',
+      operation: 'delete',
+      firstOrder: previous?.firstOrder ?? order,
+      lastOrder: order,
+    })
+    this.own.set(sessionId, records)
+  }
+
+  /**
    * Restore one session's persisted records and its stored parent link.
    *
    * Seeding does not register the child under its root: a batch is seeded in no
@@ -222,6 +260,40 @@ export function mergeRevisions(left: FileRevision | undefined, right: FileRevisi
   if (left === undefined) return right
   const firstIsLeft = compareOrder(left.firstOrder, right.firstOrder) <= 0
   const lastIsLeft = compareOrder(left.lastOrder, right.lastOrder) >= 0
+  const newest = lastIsLeft ? left : right
+  const oldest = firstIsLeft ? left : right
+  // A session's own deletion is the newest fact about the path, and it decides
+  // the record's whole shape: the merged record describes a path that is gone,
+  // so it cannot also carry the content sides a reverse patch would need. Only
+  // the newest side can say this — a deletion the other session has since
+  // overwritten is no longer how the path stands.
+  if (newest.origin === 'deleted') {
+    return {
+      path: right.path,
+      baseline: null,
+      origin: 'deleted',
+      endState: '',
+      operation: 'delete',
+      firstOrder: oldest.firstOrder,
+      lastOrder: newest.lastOrder,
+    }
+  }
+  // The path was deleted and then written again. The write is what the file
+  // holds now, but its baseline is unreadable by construction — the content it
+  // replaced was the deleted state, which no longer exists anywhere — so the
+  // record is honest about having no baseline rather than pretending the write
+  // created the file.
+  if (oldest.origin === 'deleted') {
+    return {
+      path: right.path,
+      baseline: null,
+      origin: 'unknown',
+      endState: newest.endState,
+      operation: newest.operation,
+      firstOrder: oldest.firstOrder,
+      lastOrder: newest.lastOrder,
+    }
+  }
   return {
     path: right.path,
     baseline: firstIsLeft ? left.baseline : right.baseline,

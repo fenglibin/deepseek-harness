@@ -34,6 +34,8 @@ target package 通过 declaration merge 扩展 snapshot 与 Location data map，
 
 本包注册 optional-Session `conversation` shell、strict Session header/body、View list、composer chain 与 bar、输入区域、Hero 区域、queue dock、草稿持久化和 phase 计算。`ctx.uiSession.provide()` 从同一个 Session binding 物化 Conversation 与 input source，并将 `inputActions` 作为稳定标准 prop 提供。
 
+`conversation.input.dock` 上的 todo 条目渲染本 Session 当前生效的任务清单，来源按任务归属切换：本 Session 持有交付任务（`delivery` 投影非 null）时只读 `delivery-tasks`（跨轮持久，左侧交付浮层读同一份值），否则读当轮的 `todos`。持有任务而清单为空时不渲染该面板——`l0` 不镜像 todo、`l2` 禁用 `todo_write`，左侧浮层此时同样没有清单。
+
 View 选择规则固定：有效且已注册的持久化选择优先，其次是已注册的 `chat`，否则不渲染 View；绝不选择第一个已注册 View。Shell phase 只组合 Session lifecycle 与 active-target set，不读取任何 target-specific snapshot。
 
 常驻 composer 在无 Session 与有 Session 之间保持挂载。无 Session 时，同一个编辑器表面保持 inert，Workspace picker 连接 blank Session。某个 Session 的 input shell 不可达（其 scope 正在建立或销毁）时，composer bar 渲染同一个 inert 表面，而不是崩溃退出槽位；scope 重建后会重新执行该 entry 的 inject；scope 已销毁的 shell 不再持有可绑定的编辑器，因此 bar 不绑定任何编辑器。该表面是 shell 所有的 Lexical 编辑器：引用 chip 是携带 owner 序列化身份的原子 decorator 节点（提交时经 owner codec 展开），已认领的 slash command 保持为带样式的行首文本，文件夹文本引用以图标前缀携带文件夹图形，行内图片是零宽 decorator chip，渲染缩略图与行内移除控件，草稿的剪贴板投影镜像到逐 Session Conversation store。Queue 操作通过 scoped `ctx.conversation` service 寻址准确的 queue occurrence；queue 预览经 `ui-primitives` 的共享行内引用投影渲染已发送文本（wire 会话形式折叠为其标签），编辑态则展示字面发送文本。繁忙时 Enter 行为保存在 Host-backed `ui-conversation` settings namespace。有两项拖拽得到的尺寸属于浏览器本地而非设置：会话正文的内容宽度与 composer 的高度，各自在所调整对象旁边提供手柄，存放在 `localStorage` 的 `dsh.conversation.contentWidth` 与 `dsh.conversation.composerHeight` 之下。两者都会按容纳它们的列收敛，而不会改写已存储的偏好：窗口变小时收敛显示值，窗口变大时恢复用户拖出的值；composer 的手柄还支持方向键，双击恢复默认高度。

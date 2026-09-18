@@ -174,6 +174,15 @@ export interface FsEditOutcome {
  */
 export type FsErrorCode =
   | 'FS_NOT_FOUND'
+  /**
+   * A read request's `offset` lies past the target's last line. Split from
+   * `FS_NOT_FOUND` because the two carry opposite remedies: an out-of-range
+   * offset is a caller-authored request error, while an absent target is a
+   * fact about the tree. Consumers routing on the code — a UI deciding
+   * whether the reader can act, a retry layer — otherwise cannot tell them
+   * apart.
+   */
+  | 'FS_OFFSET_OUT_OF_RANGE'
   | 'FS_NOT_DIRECTORY'
   | 'FS_NOT_TEXT'
   | 'FS_NOT_REGULAR_FILE'

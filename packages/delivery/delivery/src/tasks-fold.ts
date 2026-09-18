@@ -3,6 +3,10 @@
  * checklists. Deliberately separate from the task fold: a checklist write must
  * never widen the `delivery` snapshot's field set, whose decoder rejects
  * unknown keys.
+ *
+ * The checklist belongs to one task, so creating or clearing a task retires
+ * it: the projection always describes the current task rather than whichever
+ * one last recorded a list.
  * @module @deepseek-ai/dsh-delivery/tasks-fold
  */
 
@@ -158,6 +162,21 @@ function taskPosition(
 }
 
 /**
+ * Whether one `delivery/change` starts or ends a task's ownership of the list.
+ *
+ * A checklist belongs to the task that recorded it, so both ends of a task's
+ * life retire it: a new task must not inherit the previous one's items, and a
+ * cleared task leaves no current checklist behind. Retaining it on `create`
+ * also silently disabled the l2 `changeId` protection for the new task, which
+ * then could not mirror a `todo_write` list at all.
+ * @param change - decoded delivery change.
+ * @returns whether the change ends the previous task's claim on the list.
+ */
+function retiresChecklist(change: DeliveryChangeMeta): boolean {
+  return change.operation === 'create' || change.operation === 'clear'
+}
+
+/**
  * The checklist phase a mirrored todo item belongs to.
  *
  * Todo entries carry no phase, so they inherit the task's current one: a list
@@ -261,8 +280,11 @@ export function applyDeliveryTasksEvent(state: DeliveryTasksState, event: Sessio
   if (event.type === 'delivery/change') {
     const change = event.data as DeliveryChangeMeta
     const position = taskPosition(state, change)
-    if (position.level === state.level && position.phase === state.phase) return state
-    return { ...state, level: position.level, phase: position.phase }
+    // Only a manifest checklist retires; an already-absent one keeps the
+    // unchanged-reference guarantee the projection's change feed relies on.
+    const retires = retiresChecklist(change) && state.current !== null
+    if (!retires && position.level === state.level && position.phase === state.phase) return state
+    return { ...state, level: position.level, phase: position.phase, ...retires ? { current: null } : {} }
   }
   if (event.type === 'todo/write') {
     return mirrorTodos(state, event.data.todos)
@@ -318,5 +340,5 @@ export const deliveryTasksProjectionDefinition = {
   init: (): DeliveryTasksState => ({ current: null, failure: null, level: null, phase: null }),
   apply: applyDeliveryTasksEvent,
   wire: { viewSchema: tasksViewSchema, view: state => state.current },
-  stateVersion: 2,
+  stateVersion: 3,
 } satisfies ProjectionDefinition<'delivery-tasks', DeliveryTasksState>

@@ -153,6 +153,22 @@ describe('delivery-task Conversation Definition', () => {
     expect(node.kind).toBe('delivery-task')
   })
 
+  it('builds the node hidden so the task card stays out of the transcript', () => {
+    // Delivery discipline is background bookkeeping: the fold must still run (the
+    // assertions in the lifecycle test above read this node's data), but the card
+    // must not occupy the conversation. `orderedVisibleChatNodes` filters on
+    // exactly this field.
+    const value = assembler([
+      at(1, 'delivery/change', createChange()),
+      at(2, 'delivery/change', advanceChange(2, 'designed')),
+    ])
+    const nodes = [...(value.snapshot('chat') as ChatSnapshot).nodes.values()]
+    expect(nodes).toHaveLength(1)
+    expect(nodes[0]?.visibility).toBe('hidden')
+    // The fold still tracks the task, so the node is hidden rather than absent.
+    expect((nodes[0]?.data as DeliveryTaskChatData).phase).toBe('designed')
+  })
+
   it('marks a cleared task and keeps its tombstone event', () => {
     const value = assembler([
       at(1, 'delivery/change', createChange()),

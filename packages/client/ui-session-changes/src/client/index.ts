@@ -47,7 +47,7 @@ export {
 } from './SessionChangesDock.tsx'
 export { ACCEPTED_CHANGES_PERSIST_KEY, createAcceptedChangesStore, type AcceptedChanges }
   from './accept-store.ts'
-export { RevisionError, revisionFailureText, type RevisionRemote } from './revision-remote.ts'
+export { RevisionError, revisionFailureText, revertBlockedText, type RevisionRemote } from './revision-remote.ts'
 export {
   RevisionDiffOverlay, RevisionViewerOccupant, MAX_VISIBLE_ROWS,
   type RevisionDiffOverlayProps, type RevisionViewerInjected, type RevisionViewerOccupantProps,
@@ -106,11 +106,14 @@ function remoteVerbs(ctx: ClientContext): RevisionRemote | undefined {
     // Omitting `path` reverts every path the Host recorded for this session.
     // The Host owns that set, so the dock does not narrow it to the rows the
     // page happens to hold: a client that paged in part of a long Session
-    // would otherwise silently revert only part of the change.
-    revertAll: async (): Promise<readonly RevertFileResult[]> => {
-      const current = ctx.sessions.list.getSnapshot().current
-      if (current === undefined) return []
-      const result = await remote.revert({ sessionId: current })
+    // would otherwise silently revert only part of the change. A given path
+    // narrows the same call on the Host's own side, so single and bulk reverts
+    // cannot drift apart.
+    revert: async (id: string, path?: string): Promise<readonly RevertFileResult[]> => {
+      const result = await remote.revert({
+        sessionId: id as SessionId,
+        ...path === undefined ? {} : { path },
+      })
       if (!result.ok) throw new RevisionError(result.error.code, result.error.message)
       return result.value.results
     },

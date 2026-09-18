@@ -18,12 +18,14 @@
 
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
+import { runNativeCommand } from '@deepseek-ai/dsh-native-command'
 import z from '@deepseek-ai/schemastery'
-import type { PostToolDecision, ToolExecution, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
+import type { PostToolDecision, PreToolDecision, ToolExecution, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { SessionId as toSessionId } from '@deepseek-ai/dsh-session'
 import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
 import { captureMutation } from './capture.ts'
+import { DeletionBaseline, scanDeletedPaths } from './git-deletions.ts'
 import { SessionRevisionStore } from './registry.ts'
 import {
   fromStoredRevision, revisionsDomainSpec, toStoredRevision,
@@ -34,6 +36,12 @@ import type { FileRevision } from './types.ts'
 export {
   captureMutation, compareOrder, foldMutation, type CapturedMutation,
 } from './capture.ts'
+export {
+  DeletionBaseline, parseDeletedPaths, scanDeletedPaths,
+  type DeletionScan,
+} from './git-deletions.ts'
+export { lineCounts, type LineCounts } from './line-counts.ts'
+export { readDeletedContent, type RestoreOutcome } from './git-restore.ts'
 export { mergeRevisions, SessionRevisionStore, type ParentLookup } from './registry.ts'
 export { revertContent, type RevertResult } from './revert.ts'
 export type { RevisionIdentity, RevisionRecord } from './spec.ts'
@@ -61,26 +69,41 @@ export interface Config {
    * costs that session its revisions across a restart.
    */
   maxRecordBytes?: number
+  /**
+   * Whether deletions made by shell commands are observed by querying the
+   * workspace's git status; absent means enabled.
+   *
+   * Disabling it leaves every other capture path intact and only removes the
+   * deleted-file rows, which is the honest choice for a composition whose
+   * workspaces are not git repositories.
+   */
+  observeDeletions?: boolean
 }
 
 /** Validated plugin config; the cap is optional so an absent value resolves to the default. */
 export const Config: z<Config> = z.object({
   maxRecordBytes: z.natural().default(DEFAULT_MAX_RECORD_BYTES),
+  observeDeletions: z.boolean().default(true),
 })
+
+/** 能执行任意代码、因而能在没有任何写工具调用的情况下删除文件的线上工具名。 */
+const CODE_TOOLS: ReadonlySet<string> = new Set(['bash', 'pwsh', 'run_code'])
+
+/** 一次工具执行归属的会话，只取捕获需要的 header 与 seq。 */
+interface RevisionOwner {
+  readonly header: {
+    readonly id: SessionId
+    readonly parentSession?: SessionId
+    readonly createdAt?: number
+    readonly cwd?: string
+  }
+  readonly seq: number
+}
 
 /** Structural view of the session a tool execution carries. */
 interface RevisionExec {
-  readonly agent?: {
-    readonly session?: {
-      readonly header: {
-        readonly id: SessionId
-        readonly parentSession?: SessionId
-        readonly createdAt?: number
-        readonly cwd?: string
-      }
-      readonly seq: number
-    }
-  }
+  readonly signal: AbortSignal
+  readonly agent?: { readonly session?: RevisionOwner }
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -114,6 +137,18 @@ export class SessionFileRevisions extends Service {
     this.store = new SessionRevisionStore(
       id => this.ctx.sessions.get(id)?.header.parentSession,
     )
+    // The baseline has to exist BEFORE the first command that could delete
+    // something, or that first command's own deletions would be folded into the
+    // baseline and never reported. Only a code tool can delete without a write
+    // call, so the first one about to run is exactly the last safe moment.
+    ctx.on('tools/pre-execute', async (
+      exec: ToolExecution,
+      next: () => Promise<PreToolDecision>,
+    ): Promise<PreToolDecision> => {
+      const owner = (exec as RevisionExec).agent?.session
+      if (owner !== undefined) await this.establishDeletionBaseline(exec, owner)
+      return next()
+    })
     ctx.on('tools/post-execute', async (
       exec: ToolExecution,
       result: ToolExecutionResult,
@@ -126,7 +161,15 @@ export class SessionFileRevisions extends Service {
       const owner = (exec as RevisionExec).agent?.session
       if (owner === undefined) return decision
       const mutation = captureMutation(exec.name, result.value)
-      if (mutation === null) return decision
+      if (mutation === null) {
+        // A shell call mutated the workspace through no write tool, so its file
+        // deletions are invisible to `captureMutation`. Asking git what the
+        // workspace lost covers every way a command can delete something —
+        // `rm`, `find -delete`, a script, `git clean` — without parsing the
+        // command text, which no finite rule can decide.
+        await this.observeDeletions(exec, owner)
+        return decision
+      }
       // Order by the settle instant rather than the session's own seq: each
       // session numbers its own log, so a subagent's seq is not comparable with
       // its parent's. The session id and seq keep the order total.
@@ -143,7 +186,64 @@ export class SessionFileRevisions extends Service {
     })
   }
 
+  /**
+   * Fix one session's deletion baseline before its first command runs.
+   *
+   * A path already deleted here is not this session's doing, so it must not
+   * reach the list; what the session deletes afterwards is measured against
+   * this snapshot. Scanning once per session is enough, which is why an
+   * existing baseline short-circuits.
+   * @param exec - the call about to dispatch.
+   * @param owner - the session the call belongs to.
+   */
+  private async establishDeletionBaseline(exec: ToolExecution, owner: RevisionOwner): Promise<void> {
+    if (this.config?.observeDeletions === false) return
+    if (!CODE_TOOLS.has(exec.name)) return
+    const sessionId = String(owner.header.id)
+    if (this.deleteBaseline.known(sessionId)) return
+    const cwd = owner.header.cwd
+    if (cwd === undefined) return
+    const scan = await scanDeletedPaths(runNativeCommand, cwd, (exec as RevisionExec).signal)
+    this.deleteBaseline.establish(sessionId, scan.kind === 'ok' ? scan.paths : [])
+  }
+
+  /**
+   * Fold the deletions a shell call left in the workspace into the session's
+   * records.
+   *
+   * Every later scan reports only what grew past the baseline, so a path
+   * deleted before this session started — or deleted outside it — never enters
+   * the list. A scan that cannot answer (not a repository, git failed) records
+   * nothing rather than failing the call: the deletion rows are an addition to
+   * the list, and a workspace that cannot report them still has every other
+   * capture path working.
+   * @param exec - the settled shell call.
+   * @param owner - the session the call belongs to.
+   */
+  private async observeDeletions(exec: ToolExecution, owner: RevisionOwner): Promise<void> {
+    if (this.config?.observeDeletions === false) return
+    if (!CODE_TOOLS.has(exec.name)) return
+    const cwd = owner.header.cwd
+    if (cwd === undefined) return
+    const scan = await scanDeletedPaths(runNativeCommand, cwd, (exec as RevisionExec).signal)
+    if (scan.kind !== 'ok') return
+    const added = this.deleteBaseline.since(String(owner.header.id), scan.paths)
+    if (added.length === 0) return
+    // One position for the whole scan: every path it reports became deleted by
+    // the call that just settled, so they share this call's settle instant.
+    // The scan already returns absolute paths inside the workspace, which is the
+    // spelling the revision records are keyed by.
+    const order = { session: owner.header.id, at: Date.now(), seq: owner.seq }
+    for (const path of added) {
+      this.store.recordDeletion(owner.header.id, path, order)
+    }
+    await this.persist(owner.header.id, owner.header)
+  }
+
   private readonly store: SessionRevisionStore
+
+  /** Per-session deletion baseline, so only this session's deletions are listed. */
+  private readonly deleteBaseline = new DeletionBaseline()
 
   /**
    * The identity each restored record was bound to, so a live session can be

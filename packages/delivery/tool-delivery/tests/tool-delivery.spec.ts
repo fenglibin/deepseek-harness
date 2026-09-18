@@ -166,6 +166,11 @@ class StubSettings {
 class StubLlm extends LlmRuntime {
   /** Every request this stub was asked to serve, in order. */
   readonly requests: GenerateOptions[] = []
+  /**
+   * Optional gate awaited before the stream resolves, so a test can hold a
+   * grading call open and observe what the world does while it is pending.
+   */
+  beforeResolve: (() => Promise<void>) | undefined
 
   constructor(ctx: Context, private readonly reply: string | (() => string) = 'l0') {
     super(ctx)
@@ -173,9 +178,10 @@ class StubLlm extends LlmRuntime {
 
   override async *stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     this.requests.push(options)
+    await this.beforeResolve?.()
     const text = typeof this.reply === 'function' ? this.reply() : this.reply
     yield { type: 'text-delta', text } as StreamChunk
-    yield { type: 'finish', reason: { kind: 'stop' } } as StreamChunk
+    yield { type: 'finish', reason: { kind: 'stop' } }
   }
 }
 
@@ -214,8 +220,35 @@ async function harness(
   return { ctx, fiber, agent, cwd }
 }
 
-/** Dispatch one pre-step boundary for the delivery auto-detect listener. */
+/**
+ * Dispatch one pre-step boundary for the delivery auto-detect listener and wait
+ * for the pass it schedules.
+ *
+ * Auto-detect runs off the pre-step critical path, so the waterfall resolving
+ * proves only that the step was released — the task it grades lands later. Every
+ * assertion about a graded task therefore has to let the scheduled pass settle,
+ * which a macrotask boundary covers: the pass is a chained promise over at most
+ * one model stream.
+ */
 async function preStep(ctx: Context, agent: Agent, messages: UserMessage[]): Promise<void> {
+  await preStepWithoutSettle(ctx, agent, messages)
+  await settleAutoDetect()
+}
+
+/**
+ * Let every scheduled auto-detect pass run to completion.
+ *
+ * A pass is not merely promise chaining: it ends by writing the grading artifact
+ * through the real filesystem, so a handful of macrotask turns is not enough once
+ * the suite runs beside other packages. The turn budget is generous on purpose and
+ * costs only the turns the pending work actually needs.
+ */
+async function settleAutoDetect(): Promise<void> {
+  for (let turn = 0; turn < 60; turn += 1) await new Promise((resolve) => { setTimeout(resolve, 0) })
+}
+
+/** Dispatch one pre-step boundary without waiting for the pass it schedules. */
+async function preStepWithoutSettle(ctx: Context, agent: Agent, messages: UserMessage[]): Promise<void> {
   const signal = new AbortController().signal
   await agentEvents(ctx, agent).waterfall(
     'agent/pre-step',
@@ -1268,6 +1301,78 @@ describe('tool-delivery auto-detect', () => {
     expect(view?.level).toBe('l0')
   })
 
+  it('releases the step before the grading call resolves', async () => {
+    // The user's own message is appended only after this waterfall resolves, so
+    // holding the step for the grading call would keep their message off the
+    // transcript for the call's whole duration.
+    const { ctx, agent } = await harness()
+    let release: (() => void) | undefined
+    llmOf(ctx).beforeResolve = () => new Promise<void>((resolve) => { release = resolve })
+    const signal = new AbortController().signal
+    let released = false
+    const stepping = agentEvents(ctx, agent).waterfall(
+      'agent/pre-step',
+      {
+        messages: [createUserMessage({ content: [{ type: 'text', text: 'fix the typo' }], source: { kind: 'user' } })],
+        turn: 1,
+        step: 1,
+        signal,
+      },
+      () => { released = true; return Promise.resolve({ kind: 'enter' as const, messages: [] }) },
+    )
+    await stepping
+    expect(released).toBe(true)
+    // The graded task lands only once the judgement does.
+    expect(ctx.delivery.get(agent)).toBeUndefined()
+    release?.()
+    await settleAutoDetect()
+    expect(ctx.delivery.get(agent)?.level).toBe('l0')
+  })
+
+  it('leaves a task the model created while the judgement was pending', async () => {
+    // The pass reads the live task when it lands, so a task the model created
+    // during the call is never replaced by the graded one.
+    const { ctx, agent } = await harness()
+    let release: (() => void) | undefined
+    llmOf(ctx).beforeResolve = () => new Promise<void>((resolve) => { release = resolve })
+    const stepping = preStepWithoutSettle(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'fix the typo' }],
+      source: { kind: 'user' },
+    })])
+    await stepping
+    const mine = ctx.delivery.create(agent, { objective: 'model-owned', level: 'l1' })
+    release?.()
+    await settleAutoDetect()
+    expect(ctx.delivery.get(agent)?.id).toBe(mine.id)
+  })
+
+  it('grades a request that arrives while an earlier judgement is still pending', async () => {
+    // Consecutive sends must both reach the discipline. A mid-pass request is
+    // remembered and graded by the follow-up pass rather than dropped, which at
+    // most one in-flight pass per agent makes necessary.
+    const { ctx, agent } = await harness()
+    let release: (() => void) | undefined
+    llmOf(ctx).beforeResolve = () => new Promise<void>((resolve) => { release = resolve })
+    await preStepWithoutSettle(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'fix the typo' }],
+      source: { kind: 'user' },
+    })])
+    // The second request lands while the first judgement is held open.
+    const second = preStepWithoutSettle(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'fix another typo' }],
+      source: { kind: 'user' },
+    })])
+    await second
+    expect(llmOf(ctx).requests).toHaveLength(1)
+    llmOf(ctx).beforeResolve = undefined
+    release?.()
+    await settleAutoDetect()
+    // Both requests were graded: the first created its task and the second
+    // replaced it, so neither send runs without the discipline.
+    expect(ctx.delivery.get(agent)?.objective).toBe('fix another typo')
+    expect(llmOf(ctx).requests).toHaveLength(2)
+  })
+
   it('replaces an unfinished l0 task with the next request', async () => {
     // An l0 task the model never advances must not reject later requests:
     // `create` refuses a new task while a non-accepted one is current and no
@@ -1285,6 +1390,75 @@ describe('tool-delivery auto-detect', () => {
     const second = ctx.delivery.get(agent)
     expect(second?.id).not.toBe(first?.id)
     expect(second?.objective).toBe('fix another typo')
+  })
+
+  it('starts a new task after the previous one reached accepted', async () => {
+    // The accepted task here is deliberately l1: an l0 task is replaceable by
+    // policy anyway, so only l1/l2 exercise the finished-task branch.
+    const { ctx, agent } = await harness()
+    const first = ctx.delivery.create(agent, { objective: 'finished work', level: 'l1' })
+    for (const phase of ['designed', 'implemented', 'verified', 'accepted'] as const) {
+      const current = ctx.delivery.get(agent)!
+      ctx.delivery.advance(agent, { id: current.id, revision: current.revision }, phase)
+    }
+    expect(ctx.delivery.get(agent)).toMatchObject({ id: first.id, phase: 'accepted' })
+
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'a brand new request' }],
+      source: { kind: 'user' },
+    })])
+    const next = ctx.delivery.get(agent)
+    expect(next?.objective).toBe('a brand new request')
+    expect(next?.id).not.toBe(first.id)
+  })
+
+  it('starts a new task through the tool after an accepted task', async () => {
+    // The same branch through the model-facing tool, which is how a session
+    // recovers when the user never advanced a task by hand.
+    const { ctx, agent } = await harness()
+    ctx.delivery.create(agent, { objective: 'finished work', level: 'l1' })
+    for (const phase of ['designed', 'implemented', 'verified', 'accepted'] as const) {
+      const current = ctx.delivery.get(agent)!
+      ctx.delivery.advance(agent, { id: current.id, revision: current.revision }, phase)
+    }
+    const created = resultTask(await execute(ctx, 'create_delivery_task', {
+      objective: 'next work', level: 'l0',
+    }, agent))
+    expect(created).toMatchObject({ objective: 'next work', phase: 'created' })
+  })
+
+  it('replaces an accepted task without writing a clear tombstone', async () => {
+    // The domain already accepts a create over an accepted task, so policy must
+    // not clear it first: that would record a clear event nothing needs.
+    const { ctx, agent } = await harness()
+    let task = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'finished work', level: 'l0' }, agent))
+    task = resultTask(await execute(ctx, 'record_change', { task_id: task['id'], revision: task['revision'], text: 'the fix' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'implemented' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', { task_id: task['id'], revision: task['revision'], phase: 'verified' }, agent))
+    task = resultTask(await execute(ctx, 'advance_delivery_task', {
+      task_id: task['id'], revision: task['revision'], phase: 'accepted',
+    }, agent))
+    expect(task).toMatchObject({ phase: 'accepted' })
+
+    const before = agent.session.events.filter(event => event.type === 'delivery/change').length
+    const next = resultTask(await execute(ctx, 'create_delivery_task', { objective: 'next work', level: 'l0' }, agent))
+    expect(next).toMatchObject({ phase: 'created', objective: 'next work' })
+    const operations = agent.session.events
+      .slice(before)
+      .filter(event => event.type === 'delivery/change')
+      .map(event => (event.data as { operation: string }).operation)
+    expect(operations).toEqual(['create'])
+  })
+
+  it('still refuses to replace an unfinished l1 task', async () => {
+    // Larger work needs continuity across turns, so its claim must survive.
+    const { ctx, agent } = await harness()
+    const existing = ctx.delivery.create(agent, { objective: 'in-flight work', level: 'l1' })
+    await preStep(ctx, agent, [createUserMessage({
+      content: [{ type: 'text', text: 'a brand new request' }],
+      source: { kind: 'user' },
+    })])
+    expect(ctx.delivery.get(agent)?.id).toBe(existing.id)
   })
 
   it('does not create a second task when one already exists', async () => {

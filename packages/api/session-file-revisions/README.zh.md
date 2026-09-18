@@ -38,13 +38,17 @@ kind: "package-reference"
 
 | 方法 | 作用 |
 |---|---|
-| `list` | 该会话（含子代理）改动过的文件，含增删行数、基线来源与是否超限 |
+| `list` | 该会话（含子代理）改动过的文件，含增删行数、基线来源、seq 边界与是否超限 |
 | `diff` | 一个文件的基线与末态；有基线但超限时 `withheld` 为 `oversized` |
 | `revert` | 撤销一个路径，或省略 `path` 撤销该会话全部记录 |
+
+`list` 的增删行数是**变更**的行数而非两侧文件的行数，由 `dsh-session-file-revisions` 的 `lineCounts` 按行比较得出。`firstSeq` / `lastSeq` 让消费者能把「只有修订记录知道」的路径（被 shell 命令删除、没有任何写调用命名过的文件）放进首次出现顺序里。
 
 ### 失败与恢复
 
 `revert` 逐路径独立执行：一处冲突不牵连其余路径，结果按路径逐条返回 `reverted` / `unchanged` / `conflict` / `missing`。完全失败时才以 Remote 错误返回。
+
+恢复一个被删除的路径（`origin` 为 `deleted`）时内容取自工作区的 git 对象：先在 `HEAD` 中查找该路径，未命中则改从 index 取（覆盖本次会话创建并 `git add` 但未提交的新文件）。两者都取不到时结果带 `blocked`，取值为 `not-in-git` 或 `not-a-repository`——这是两个不同的处境，消费者据此给出不同的说明，而不是让一句泛泛的失败顶替它们。git 调用经 `runNativeCommand` 以 argv 数组执行，不经 shell。
 
 撤销成功（`reverted`）的路径会连同它在 `dsh-session-file-revisions` 中的记录一起被移除，因为该路径上已经没有本会话的改动了；继续留着它会让界面反复提供一个无事可做的文件，而在记录持久化之后这种过期提示会跨重启一直存在。`conflict`、`missing` 与 `unchanged` 都保留记录：前两者的文件上仍有本会话的改动待处理，后者表示撤销并未真正发生，记录仍是描述当前状态的唯一依据。
 
@@ -54,7 +58,7 @@ kind: "package-reference"
 
 `revert` 是唯一改动文件的方法，因此每次写盘前都解析该会话自己的工作区根，并经 `realpath` 包含检查后才落盘。这一步不是形式：`path` 来自会话日志，捕获之后放置的符号链接完全可能指向工作区之外。
 
-回写走同目录临时文件加 `rename`，中断不会留下截断文件。
+回写走同目录临时文件加 `rename`，中断不会留下截断文件。删除恢复的内容同样经该原子写落盘，因此它不因内容来自 git 而绕开工作区包含检查。
 
 -----
 
@@ -113,4 +117,5 @@ This package produces no text that enters a request, so it cannot invalidate an 
 - **依赖会话的工作区根** —— 会话没有 `cwd` 时 `revert` 报 `session-revisions/no-workspace`；`list` 与 `diff` 不受影响，因为它们不写盘。
 - **超限内容不下发** —— 任一侧超过 512KB 时 `diff` 的 `withheld` 为 `oversized`，浏览器无法预览，但该路径仍可撤销。
 - **未捕获基线的文件不可撤销** —— `origin` 为 `unknown` 的路径只能报告冲突；见「基线未捕获的文件」。
+- **删除恢复需要工作区是 git 仓库** —— 恢复内容取自 git 对象，因此仓库之外的历史无法找回。此外被删除路径若在会话开始前就有未提交改动，恢复出来的是 `HEAD` 版本：那些改动在 git 中没有任何记录。
 - **不跨会话合并** —— 每次调用只针对给定会话及其子代理；不提供跨会话聚合。

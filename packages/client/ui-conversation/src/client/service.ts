@@ -208,8 +208,28 @@ export class ConversationController extends Service implements IConversation {
     }
     const text = parts.filter(part => part.type === 'text').map(part => part.text).join('')
     if (session.getSnapshot().subagent !== null) {
-      const content = await this.contentFor(parts, imageIds, attachments)
-      const result = await session.prompt(content, mode, signal)
+      // The subagent transport mints its own RPC id and stamps it on the durable
+      // message, so the echo registers first and hands that identity to prompt();
+      // without it a subagent send shows nothing until its whole admission lands.
+      const submission = session.beginSubmission({
+        text,
+        images: attachments.map(attachment => ({
+          previewUrl: attachment.previewUrl,
+          ...(attachment.file.name === '' ? {} : { name: attachment.file.name }),
+          ...(attachment.width === undefined ? {} : { width: attachment.width }),
+          ...(attachment.height === undefined ? {} : { height: attachment.height }),
+        })),
+        parts: this.submissionPartsOf(parts, attachments),
+      })
+      let content: Parameters<SessionFace['prompt']>[0]
+      try {
+        await nextPaint()
+        content = await this.contentFor(parts, imageIds, attachments)
+      } catch (error) {
+        submission.abandon()
+        throw error
+      }
+      const result = await session.prompt(content, mode, signal, submission.requestId)
       return result.ok ? { kind: 'success' } : { kind: 'error' }
     }
     let finishRetirement: ((retirement: PendingSubmissionRetirement) => void) | undefined
@@ -240,7 +260,13 @@ export class ConversationController extends Service implements IConversation {
     }
     const result = await session.prompt(content, mode, signal, submission.requestId)
     if (!result.ok) return { kind: 'error' }
-    if (retirement !== undefined && (await retirement).reason !== 'observed') return { kind: 'error' }
+    if (retirement !== undefined) {
+      const settlement = await retirement
+      // `removed` is a deliberate end state, not a failure: reporting an error
+      // would make the composer restore a draft the user just discarded.
+      if (settlement.reason === 'removed') return { kind: 'success' }
+      if (settlement.reason !== 'observed') return { kind: 'error' }
+    }
     return { kind: 'success' }
   }
 
@@ -406,24 +432,33 @@ export class ConversationController extends Service implements IConversation {
   }
 
   /**
-   * Settle one submission's draft images when its echo retires. Observed:
-   * each image leaves the registry, handing its preview URL to the durable
-   * image cache (seeded under the admitted reference so the transcript node
-   * renders immediately while the cache reads canonical bytes) or revoking it
-   * when the cache already holds that reference. Failed: nothing changes;
-   * the ids stay registered for the composer's rail restore.
+   * Settle one submission's draft images when its echo retires.
+   *
+   * Observed: each image leaves the registry, handing its preview URL to the
+   * durable image cache (seeded under the admitted reference so the transcript
+   * node renders immediately while the cache reads canonical bytes) or revoking it
+   * when the cache already holds that reference.
+   *
+   * Removed: the message is gone for good, so nothing can consume the preview; it
+   * is revoked and the registry entry dropped rather than leaked.
+   *
+   * Failed: nothing changes; the ids stay registered for the composer's restore.
    */
   private settleSubmittedImages(
     sessionId: SessionId,
     attachments: readonly ComposerAttachment[],
     retirement: PendingSubmissionRetirement,
   ): void {
-    if (retirement.reason !== 'observed') return
+    if (retirement.reason === 'failed') return
     const uiConversation = this.ctx.get('uiConversation')
     attachments.forEach((attachment, index) => {
       const live = this.draftAttachments.get(attachment.id)
       if (live === undefined) return
       this.draftAttachments.delete(attachment.id)
+      if (retirement.reason === 'removed') {
+        revokePreview(attachment.previewUrl)
+        return
+      }
       const ref = retirement.attachments[index]
       if (ref !== undefined && uiConversation?.seedImageUrl(sessionId, ref, attachment.previewUrl) === true) return
       revokePreview(attachment.previewUrl)

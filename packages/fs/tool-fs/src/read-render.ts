@@ -94,15 +94,15 @@ function stripCarriageReturn(line: string): string {
 
 function finish(acc: WindowAccumulator, request: ReadWindow, displayPath: string): WindowResult {
   if (!acc.truncatedByBytes && request.offset > acc.totalLines && !(acc.totalLines === 0 && request.offset === 1)) {
-    throw new FsError(`offset ${request.offset} is out of range for "${displayPath}" (${acc.totalLines} lines)`, 'FS_NOT_FOUND')
+    throw new FsError(`offset ${request.offset} is out of range for "${displayPath}" (${acc.totalLines} lines)`, 'FS_OFFSET_OUT_OF_RANGE')
   }
   return { lines: acc.lines, totalLines: acc.totalLines, truncatedByBytes: acc.truncatedByBytes }
 }
 
 /**
  * Build one window from streamed or whole-file chunks, enforcing line and byte caps while still
- * scanning to an exact total line count, and throwing `FS_NOT_FOUND` when the requested offset is
- * past EOF.
+ * scanning to an exact total line count, and throwing `FS_OFFSET_OUT_OF_RANGE` when the requested
+ * offset is past EOF.
  * @param chunks - decoded text chunks in file order; chunk boundaries carry no meaning.
  * @param request - the resolved window; the caller has already applied its defaults and caps.
  * @param displayPath - the caller-facing path used in the offset-out-of-range error.

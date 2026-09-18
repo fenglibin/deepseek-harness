@@ -62,8 +62,14 @@ describe('buildWindow', () => {
     expect(result.totalLines).toBe(0)
   })
 
-  it('rejects an offset past EOF', async () => {
-    await expect(buildWindow(whole('one\ntwo'), { offset: 9, limit: 1, ...DEFAULT_CAPS }, 'f')).rejects.toMatchObject({ code: 'FS_NOT_FOUND' })
+  it('rejects an offset past EOF with FS_OFFSET_OUT_OF_RANGE', async () => {
+    await expect(buildWindow(whole('one\ntwo'), { offset: 9, limit: 1, ...DEFAULT_CAPS }, 'f')).rejects.toMatchObject({ code: 'FS_OFFSET_OUT_OF_RANGE' })
+  })
+
+  it('reads offset 1 of an empty file rather than reporting an out-of-range offset', async () => {
+    const result = await buildWindow(whole(''), { offset: 1, limit: 1, ...DEFAULT_CAPS }, 'f')
+    expect(result.lines).toEqual([])
+    expect(result.totalLines).toBe(0)
   })
 
   it('flushes a final line with no trailing newline', async () => {

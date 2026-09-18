@@ -1,4 +1,4 @@
-import { useId, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import type { Context } from '@deepseek-ai/cordis'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // The domain's client-namespace pure-type outlet: one import edge delivers
@@ -6,6 +6,9 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 // declare) and the payload type. Type-only by construction — the outlet is
 // free of host value imports, so no host Context merge enters this program.
 import type { TodoItem } from '@deepseek-ai/dsh-tool-todo/client'
+// Type-only: pulls the `delivery-tasks` projection-key merge and its view type,
+// so this panel can read the authoritative checklist the delivery card shows.
+import type { DeliveryTasksView } from '@deepseek-ai/dsh-delivery/client'
 import { IconChecklistOutline14, IconChevronDownOutline14, IconChevronUpOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { NS } from '../locales.ts'
 import css from './TodoPanel.module.css'
@@ -15,6 +18,44 @@ export interface TodoPanelProps {
   todos: readonly TodoItem[]
   /** The dock entry's locale seat, passed down as a plain prop. */
   t: TodoDockProps['t']
+}
+
+/** Stable empty list: the panel's returned reference must not move between renders. */
+const EMPTY_TODOS: readonly TodoItem[] = []
+
+/**
+ * The list this panel renders, from the projections that can carry one.
+ *
+ * Holding a delivery task — not merely having a non-empty checklist — selects
+ * the authoritative source, so both progress surfaces on the conversation page
+ * show the same items and the same statuses. Reading `todos` here made the
+ * panel freeze on whichever list the model wrote first (`todo_write` runs
+ * before `record_tasks`, so the panel always showed the staler one).
+ *
+ * Keying on a non-empty checklist instead would leave `l0` and `l2` showing a
+ * turn plan the delivery card never has: an `l0` task's todo list does not
+ * mirror into the checklist, and an `l2` task cannot call `todo_write` at all.
+ * For those tiers the checklist is legitimately empty, and an empty list is
+ * what the card shows too.
+ *
+ * A session with no delivery task — every plain conversation, and any
+ * deployment without the delivery domain — keeps rendering its `todos`.
+ * @param hasTask - whether the session currently holds a delivery task.
+ * @param checklist - the `delivery-tasks` projection value, or null/undefined when absent.
+ * @param todos - the `todos` projection value, or null/undefined when absent.
+ * @returns the authoritative list, sharing one reference per unchanged input.
+ */
+export function authoritativeTodos(
+  hasTask: boolean,
+  checklist: DeliveryTasksView | null | undefined,
+  todos: readonly TodoItem[] | null | undefined,
+): readonly TodoItem[] {
+  if (hasTask) {
+    if (checklist === null || checklist === undefined || checklist.items.length === 0) return EMPTY_TODOS
+    return checklist.items.map(item => ({ content: item.content, status: item.status }))
+  }
+  if (todos !== null && todos !== undefined && todos.length > 0) return todos
+  return EMPTY_TODOS
 }
 
 /** Local exhaustiveness helper — client packages do not depend on `dsh-llm`. */
@@ -86,10 +127,10 @@ function progressLabel(todos: readonly TodoItem[], t: TodoPanelProps['t']): stri
 }
 
 export function TodoPanel({ todos, t }: TodoPanelProps) {
-  // Plan strips are operational state the reader refers to constantly while
-  // an agent is running, so the panel defaults expanded; the collapse toggle
-  // is the reader's escape hatch, not the default.
-  const [collapsed, setCollapsed] = useState(false)
+  // The strip stands directly above the composer, so it opens collapsed: the
+  // header's count summary is the standing reading, and the item list is one
+  // click away. The toggle is component-local, so every mount starts collapsed.
+  const [collapsed, setCollapsed] = useState(true)
   if (todos.length === 0) return null
 
   return (
@@ -129,7 +170,15 @@ export type TodoDockProps = PropsRuntime<'conversation.input.dock'> & PropsLocal
 /** Renders the current todo projection, or nothing when it is absent. */
 export function TodoDock({ useProjection, t }: TodoDockProps) {
   const todos = useProjection('todos')
-  return <TodoPanel todos={todos ?? []} t={t} />
+  const task = useProjection('delivery')
+  const checklist = useProjection('delivery-tasks')
+  // Derived data over framework-hook reads, so the memo is the whole cache:
+  // an unchanged projection reference keeps the list reference stable.
+  const list = useMemo(
+    () => authoritativeTodos(task !== null && task !== undefined, checklist, todos),
+    [task, checklist, todos],
+  )
+  return <TodoPanel todos={list} t={t} />
 }
 
 /** Registers the projected todo dock. */
