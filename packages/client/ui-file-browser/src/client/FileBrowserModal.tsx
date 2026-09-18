@@ -213,14 +213,21 @@ export function FileBrowserModal({ open, request, onClose, remote, openNative, t
     void openNative(path).then((message) => { setOpenLocalError(message) })
   }, [openNative])
 
-  /** Read one file into the content pane. */
-  const openFile = useCallback((path: string): void => {
+  /**
+   * Read one file into the content pane.
+   * @param path - the file to read.
+   * @param keepOpen - whether the pane keeps showing the already open file while
+   * this read is in flight. True for re-reading that file, where clearing it
+   * would unmount the editor and hand the operator back a freshly opened — and
+   * therefore defaulted — view of the file they were editing.
+   */
+  const readFile = useCallback((path: string, keepOpen: boolean): void => {
     if (workspaceId === undefined) return
     setSelected(path)
     setReadError(undefined)
     setSaveError(undefined)
     setConflict(false)
-    setFile(undefined)
+    if (!keepOpen) setFile(undefined)
     void remote.read({ workspaceId, path }).then(
       (result) => {
         if (!result.ok) {
@@ -236,6 +243,9 @@ export function FileBrowserModal({ open, request, onClose, remote, openNative, t
       () => { setReadError(t('content.failed')) },
     )
   }, [remote, t, workspaceId])
+
+  /** Open one file, replacing whatever the pane was showing. */
+  const openFile = useCallback((path: string): void => { readFile(path, false) }, [readFile])
 
   // A file request opens that file as soon as the dialog is showing. Declared
   // after the reset effect above so the two run in that order within one commit:
@@ -457,7 +467,7 @@ export function FileBrowserModal({ open, request, onClose, remote, openNative, t
             text={buffer}
             onChange={setBuffer}
             onSave={() => save(false)}
-            onReload={() => { openFile(file.path) }}
+            onReload={() => { readFile(file.path, true) }}
             saving={saving}
             conflict={conflict}
             onOverwrite={() => { void save(true) }}

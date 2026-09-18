@@ -3,6 +3,10 @@
  * The content pane's Markdown and HTML preview: which files offer the switch,
  * what each preview renders, and the one buffer the two views share.
  *
+ * A previewable file opens with the switch already on, so these specs start from
+ * the rendered document and uncheck to reach the source; the one buffer is what
+ * makes that round trip lossless.
+ *
  * The Markdown arm is exercised through the real `MarkdownText` pipeline, so
  * these specs assert the rendered document (a table, a diagram fence) rather
  * than a projection of it. The HTML arm asserts the isolation attributes the
@@ -81,6 +85,11 @@ function previewSwitch(): HTMLInputElement | null {
   return screen.queryByRole('checkbox', { name: '预览' }) as HTMLInputElement | null
 }
 
+/** Leave the preview for the source editor. */
+function showSource(): void {
+  fireEvent.click(previewSwitch() as HTMLInputElement)
+}
+
 describe('previewKindOfPath', () => {
   it.each([
     ['README.md', 'markdown'],
@@ -131,9 +140,42 @@ describe('preview switch', () => {
     expect(previewSwitch()).not.toBeNull()
   })
 
+  it('starts on for a previewable file, so the first frame is the rendered document', async () => {
+    await open('README.md', '# Title')
+    expect((previewSwitch() as HTMLInputElement).checked).toBe(true)
+    // No click precedes this: the default is what put the heading on screen.
+    expect(screen.getByRole('heading', { level: 1, name: 'Title' })).toBeTruthy()
+    expect(screen.queryByLabelText('README.md')).toBeNull()
+  })
+
+  it('starts on for an HTML file the same way', async () => {
+    await open('page.html', '<p>hi</p>')
+    expect((previewSwitch() as HTMLInputElement).checked).toBe(true)
+    expect(await screen.findByTitle('HTML 预览：page.html')).toBeTruthy()
+  })
+
+  it('starts on for an uppercase extension too', async () => {
+    await open('NOTES.MD', '# Upper')
+    expect((previewSwitch() as HTMLInputElement).checked).toBe(true)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Upper' })).toBeTruthy()
+  })
+
+  it('previews an empty previewable file without failing', async () => {
+    await open('EMPTY.md', '')
+    expect((previewSwitch() as HTMLInputElement).checked).toBe(true)
+    // An empty document renders nothing — the point is that the default is
+    // still the preview rather than a fallback to the editor.
+    expect(screen.queryByLabelText('EMPTY.md')).toBeNull()
+  })
+
   it('replaces the editor while on and restores it, keeping unsaved edits, when off', async () => {
     await open('README.md', '# Title')
-    const box = screen.getByLabelText('README.md')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Title' })).toBeTruthy()
+
+    // Editing starts by unchecking: the two views share one buffer, so the
+    // source is where the work happens and the preview is where it is read.
+    showSource()
+    const box = await screen.findByLabelText('README.md')
     fireEvent.change(box, { target: { value: '# Edited but unsaved' } })
     expect(await screen.findByText('未保存')).toBeTruthy()
 
@@ -142,7 +184,7 @@ describe('preview switch', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Edited but unsaved' })).toBeTruthy()
     expect(screen.queryByLabelText('README.md')).toBeNull()
 
-    fireEvent.click(previewSwitch() as HTMLInputElement)
+    showSource()
     // The unsaved buffer survived the round trip; previewing is not a save,
     // and it is not a discard either.
     await waitFor(() => { expect(screen.getByLabelText<HTMLTextAreaElement>('README.md').value).toBe('# Edited but unsaved') })
@@ -151,13 +193,14 @@ describe('preview switch', () => {
 
   it('hides the write actions while previewing and restores them when off', async () => {
     await open('README.md', '# Title')
-    expect(screen.getByRole('button', { name: '保存' })).toBeTruthy()
-    fireEvent.click(previewSwitch() as HTMLInputElement)
     expect(await screen.findByRole('heading', { level: 1 })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '保存' })).toBeNull()
     expect(screen.queryByRole('button', { name: '重新加载' })).toBeNull()
-    fireEvent.click(previewSwitch() as HTMLInputElement)
+    showSource()
     await waitFor(() => { expect(screen.getByRole('button', { name: '保存' })).toBeTruthy() })
+    fireEvent.click(previewSwitch() as HTMLInputElement)
+    expect(await screen.findByRole('heading', { level: 1 })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '保存' })).toBeNull()
   })
 
   it('renders the write actions at the compact size that matches the status text', async () => {
@@ -171,7 +214,7 @@ describe('preview switch', () => {
     }
   })
 
-  it('starts off again when another file is opened', async () => {
+  it('starts on again when another previewable file is opened', async () => {
     const remote: FileBrowserRemote = {
       ...remoteStub('# Title'),
       list: () => Promise.resolve({
@@ -189,25 +232,66 @@ describe('preview switch', () => {
       />,
     )
     fireEvent.click(await screen.findByText('a.md'))
-    await screen.findByText('已保存')
-    fireEvent.click(previewSwitch() as HTMLInputElement)
     expect(await screen.findByRole('heading', { level: 1 })).toBeTruthy()
 
     fireEvent.click(screen.getByText('b.md'))
-    // The next file opens in its editor, not in the previous file's view. The
-    // dialog unmounts the editor between files (the read clears the open file
-    // first), so this asserts the outcome the operator sees either way.
-    await waitFor(() => { expect(screen.getByLabelText('b.md')).toBeTruthy() })
-    expect(screen.queryByRole('heading', { level: 1 })).toBeNull()
+    // The next file opens in its own default, not in the view the previous one
+    // was left in. The dialog unmounts the editor between files (the read clears
+    // the open file first), so this asserts the outcome the operator sees.
+    await waitFor(() => { expect(screen.getByRole('heading', { level: 1 })).toBeTruthy() })
+    expect(screen.queryByLabelText('b.md')).toBeNull()
     expect(previewSwitch()).not.toBeNull()
+    expect((previewSwitch() as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('stays in the editor when the same file is reloaded', async () => {
+    await open('README.md', '# Title')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Title' })).toBeTruthy()
+    showSource()
+    const box = await screen.findByLabelText('README.md')
+    fireEvent.change(box, { target: { value: '# Edited' } })
+    expect(await screen.findByText('未保存')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '重新加载' }))
+    // Reloading one file is not opening one: the operator asked for the disk
+    // content in the view they are already working in, so the default view of a
+    // newly opened file must not drag them out of it.
+    await waitFor(() => { expect(screen.getByLabelText<HTMLTextAreaElement>('README.md').value).toBe('# Title') })
     expect((previewSwitch() as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('opens the next file in the editor when that file offers no preview', async () => {
+    const remote: FileBrowserRemote = {
+      ...remoteStub('# Title'),
+      list: () => Promise.resolve({
+        ok: true as const,
+        value: listing([{ name: 'a.md', kind: 'file' }, { name: 'b.ts', kind: 'file' }]),
+      }),
+      read: request => Promise.resolve({
+        ok: true as const,
+        value: { kind: 'text' as const, text: request.path === 'a.md' ? '# Title' : 'const a = 1', version: 'v1', size: 6 },
+      }),
+    }
+    render(
+      <FileBrowserModal
+        open
+        request={{ kind: 'workspace', workspaceId: WID, title: 'Project' }}
+        onClose={() => {}}
+        remote={remote}
+        t={t}
+      />,
+    )
+    fireEvent.click(await screen.findByText('a.md'))
+    await screen.findByRole('heading', { level: 1 })
+    fireEvent.click(screen.getByText('b.ts'))
+    await waitFor(() => { expect(screen.getByLabelText('b.ts')).toBeTruthy() })
+    expect(previewSwitch()).toBeNull()
   })
 })
 
 describe('Markdown preview', () => {
   it('renders a GFM table as a table', async () => {
     await open('README.md', '| a | b |\n| - | - |\n| 1 | 2 |')
-    fireEvent.click(previewSwitch() as HTMLInputElement)
     const table = await screen.findByRole('table')
     expect(table.textContent).toContain('a')
     expect(table.textContent).toContain('2')
@@ -215,7 +299,6 @@ describe('Markdown preview', () => {
 
   it('renders a mermaid fence as a diagram rather than as a code block', async () => {
     await open('README.md', '```mermaid\ngraph TD;\n  A-->B;\n```')
-    fireEvent.click(previewSwitch() as HTMLInputElement)
     // The Mermaid runtime is imported only once a document carries a diagram,
     // so this waits for that import plus the render it drives.
     await waitFor(
@@ -226,15 +309,23 @@ describe('Markdown preview', () => {
 
   it('renders inline TeX through KaTeX', async () => {
     await open('README.md', 'Euler: $e^{i\\pi}+1=0$')
-    fireEvent.click(previewSwitch() as HTMLInputElement)
     await waitFor(() => { expect(document.querySelector('.katex')).not.toBeNull() })
+  })
+
+  it('renders the buffer as it is typed, once the source is shown', async () => {
+    await open('README.md', '# Title')
+    await screen.findByRole('heading', { level: 1, name: 'Title' })
+    showSource()
+    const box = await screen.findByLabelText('README.md')
+    fireEvent.change(box, { target: { value: '# Second' } })
+    fireEvent.click(previewSwitch() as HTMLInputElement)
+    expect(await screen.findByRole('heading', { level: 1, name: 'Second' })).toBeTruthy()
   })
 })
 
 describe('HTML preview', () => {
   it('hands the buffer to a frame sandboxed to an opaque origin', async () => {
     await open('page.html', '<p id="body">hi</p>')
-    fireEvent.click(previewSwitch() as HTMLInputElement)
     const frame = await screen.findByTitle('HTML 预览：page.html')
     expect(frame.tagName).toBe('IFRAME')
     // Scripts may run; the origin is withheld, which is what keeps the
@@ -245,27 +336,31 @@ describe('HTML preview', () => {
 
   it('follows the buffer while previewing unsaved edits', async () => {
     await open('page.html', '<p>first</p>')
-    fireEvent.click(previewSwitch() as HTMLInputElement)
     const frame = await screen.findByTitle('HTML 预览：page.html')
     expect(frame.getAttribute('srcdoc')).toBe('<p>first</p>')
+    showSource()
+    fireEvent.change(await screen.findByLabelText('page.html'), { target: { value: '<p>second</p>' } })
+    fireEvent.click(previewSwitch() as HTMLInputElement)
+    await waitFor(() => {
+      expect(screen.getByTitle('HTML 预览：page.html').getAttribute('srcdoc')).toBe('<p>second</p>')
+    })
   })
 })
 
 describe('read-only preview', () => {
-  it('offers the same preview switch a browsable file gets', async () => {
+  it('offers the same preview switch a browsable file gets, and starts on', async () => {
     mountFile('README.md', '# Title')
     await screen.findByText('只读')
     // The read-only viewer is the same content pane, so a session file link
     // reaches the same rendering the browser's own entry does.
     expect(previewSwitch()).not.toBeNull()
-    fireEvent.click(previewSwitch() as HTMLInputElement)
+    expect((previewSwitch() as HTMLInputElement).checked).toBe(true)
     expect(await screen.findByRole('heading', { level: 1, name: 'Title' })).toBeTruthy()
   })
 
   it('previews HTML read-only as well', async () => {
     mountFile('page.htm', '<p>hi</p>')
     await screen.findByText('只读')
-    fireEvent.click(previewSwitch() as HTMLInputElement)
     const frame = await screen.findByTitle('HTML 预览：page.htm')
     expect(frame.getAttribute('sandbox')).toBe('allow-scripts')
   })
@@ -274,5 +369,6 @@ describe('read-only preview', () => {
     mountFile('main.ts', 'const a = 1')
     await screen.findByText('只读')
     expect(previewSwitch()).toBeNull()
+    expect(screen.getByLabelText('main.ts')).toBeTruthy()
   })
 })

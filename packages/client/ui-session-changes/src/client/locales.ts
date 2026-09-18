@@ -3,8 +3,8 @@
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
   'title': '变更',
-  'summary': '{count} 处变更',
-  'summaryAll': '共 {count} 处变更',
+  'summary': '{count} 个文件',
+  'summaryAll': '共 {count} 个文件',
   'accept': '接受',
   'acceptAll': '全部接受',
   'accepted': '已接受',

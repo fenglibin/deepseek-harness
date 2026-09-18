@@ -15,9 +15,10 @@
  * renders plain text and re-colors when the grammar arrives).
  *
  * A file whose extension names a preview kind carries one extra control: a
- * preview switch that swaps the editor for the rendered document. The two views
- * share the one buffer, so previewing never discards unsaved work — it shows
- * that work rendered, and switching back returns to it unchanged.
+ * preview switch that swaps the editor for the rendered document. Such a file
+ * opens with that switch already on — the rendered document is what opening a
+ * Markdown or HTML file is for — and the two views share the one buffer, so
+ * switching to the source and back never discards unsaved work.
  */
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
@@ -119,23 +120,26 @@ export function CodeEditor({
   // The buffer the highlight layer was last tokenized from. Kept separate from
   // `text` so typing stays responsive while coloring trails a beat behind.
   const [highlighted, setHighlighted] = useState(text)
-  // The preview switch is remembered together with the file it was set on, so
-  // opening another file starts in the editor within the SAME render. Keeping a
-  // bare boolean and clearing it from an effect would paint one frame of the new
-  // file already rendered as a preview before that effect ran.
-  const [preview, setPreview] = useState(false)
-
-  // Opening another file starts in the editor: the switch describes one file's
-  // view, and a leftover "on" would hide the file the operator just asked for.
-  // The dialog unmounts this component between files, so this only has to catch
-  // a same-instance path change.
-  useEffect(() => { setPreview(false) }, [path])
-
   // Re-render when a lazily imported grammar finishes loading, so a file that
   // rendered plain while its grammar arrived picks up coloring.
   const grammarRevision = useSyncExternalStore(subscribeGrammarLoaded, grammarLoadCount)
   const lang = languageOfPath(path)
   const previewKind = previewKindOfPath(path)
+
+  // A previewable file opens in its preview: a rendered document is what the
+  // operator asked to see, and the source stays one unchecking away with the
+  // buffer intact. The default is derived during render rather than corrected
+  // from an effect, so the first painted frame is already the preview instead
+  // of one frame of source that would then jump.
+  const [preview, setPreview] = useState(() => previewKind !== undefined)
+
+  // Opening another file takes that file's own default: the switch describes one
+  // file's view, and a leftover choice would show the newly opened file in the
+  // view the previous one happened to be left in. Keyed on the path rather than
+  // on the kind, so switching between two Markdown files re-takes the default
+  // as well. The dialog unmounts this component between files, so this only has
+  // to catch a same-instance path change.
+  useEffect(() => { setPreview(previewKindOfPath(path) !== undefined) }, [path])
 
   useEffect(() => {
     if (text === highlighted) return

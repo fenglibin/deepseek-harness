@@ -66,3 +66,5 @@ packages/typert/generator/tests/.generated-*/
 #.dsh/changes/
 #.dsh/design/
 #openspec/changes/
+
+.dsh-tmp/

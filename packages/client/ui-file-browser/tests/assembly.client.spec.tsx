@@ -184,6 +184,21 @@ describe('workspace file browser through the assembled browser', () => {
     await runtime.dispose()
   })
 
+  it('previews a session file link to a Markdown file without an extra click', async () => {
+    const { runtime, fileBrowser } = await mountBoth()
+    const view = runtime.renderRoot()
+
+    runtime.ctx.get('fileViewer')?.open({ sessionId: SESSION_ID, path: 'README.md' })
+    await view.findByRole('dialog', { name: /文件浏览器/ })
+    await waitFor(() => { expect(fileBrowser.calls).toContain('read:README.md') })
+
+    // The read answered '# hi', and the pane's first frame is that document
+    // rendered: reaching the source is the unchecking, not the opening.
+    expect(await view.findByRole('heading', { level: 1, name: 'hi' })).toBeTruthy()
+    expect(view.queryByDisplayValue('# hi')).toBeNull()
+    await runtime.dispose()
+  })
+
   it('hands the viewed path to the desktop opener when the operator asks for it', async () => {
     const { runtime, openWorkspacePath } = await mountBoth()
     const view = runtime.renderRoot()
